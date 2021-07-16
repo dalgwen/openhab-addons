@@ -49,6 +49,8 @@ public class MapTransformationProfile implements StateProfile {
     @NonNullByDefault({})
     private final String function;
     @NonNullByDefault({})
+    private final String reverseFunction;
+    @NonNullByDefault({})
     private final String sourceFormat;
 
     public MapTransformationProfile(ProfileCallback callback, ProfileContext context, TransformationService service) {
@@ -65,12 +67,15 @@ public class MapTransformationProfile implements StateProfile {
             paramSource = "%s";
         }
         if (paramFunction instanceof String && paramSource instanceof String) {
-            function = (String) paramFunction;
+            String[] functions = ((String) paramFunction).split(",");
+            function = functions[0].trim().isEmpty() ? null : functions[0].trim();
+            reverseFunction = functions.length > 1 && !functions[1].trim().isEmpty() ? functions[1].trim() : null;
             sourceFormat = (String) paramSource;
         } else {
             logger.error("Parameter '{}' and '{}' have to be Strings. Profile will be inactive.", FUNCTION_PARAM,
                     SOURCE_FORMAT_PARAM);
             function = null;
+            reverseFunction = null;
             sourceFormat = null;
         }
     }
@@ -86,38 +91,55 @@ public class MapTransformationProfile implements StateProfile {
 
     @Override
     public void onCommandFromItem(Command command) {
-        callback.handleCommand(command);
+
+        if (function == null && reverseFunction == null || sourceFormat == null) {
+            logger.warn(
+                    "Please specify a function and a source format for this Profile in the '{}', and '{}' parameters, e.g \"translation.map\"  and \"%s\". Returning the original command now.",
+                    FUNCTION_PARAM, SOURCE_FORMAT_PARAM);
+        }
+        if (reverseFunction == null || sourceFormat == null) {
+            callback.handleCommand(command);
+        } else {
+            callback.handleCommand(transformState(command, true));
+        }
     }
 
     @Override
     public void onCommandFromHandler(Command command) {
-        if (function == null || sourceFormat == null) {
+        if (function == null && reverseFunction == null || sourceFormat == null) {
             logger.warn(
                     "Please specify a function and a source format for this Profile in the '{}', and '{}' parameters, e.g \"translation.map\"  and \"%s\". Returning the original command now.",
                     FUNCTION_PARAM, SOURCE_FORMAT_PARAM);
-            callback.sendCommand(command);
-            return;
         }
-        callback.sendCommand((Command) transformState(command));
+        if (function == null || sourceFormat == null) {
+            callback.sendCommand(command);
+        } else {
+            callback.sendCommand(transformState(command, false));
+        }
     }
 
     @Override
     public void onStateUpdateFromHandler(State state) {
-        if (function == null || sourceFormat == null) {
+        if (function == null && reverseFunction == null || sourceFormat == null) {
             logger.warn(
                     "Please specify a function and a source format for this Profile in the '{}' and '{}' parameters, e.g \"translation.map\" and \"%s\". Returning the original state now.",
                     FUNCTION_PARAM, SOURCE_FORMAT_PARAM);
-            callback.sendUpdate(state);
-            return;
         }
-        callback.sendUpdate((State) transformState(state));
+        if (function == null || sourceFormat == null) {
+            callback.sendUpdate(state);
+        } else {
+            callback.sendUpdate(transformState(state, false));
+        }
     }
 
-    private Type transformState(Type state) {
+    @SuppressWarnings("unchecked")
+    private <T extends Type> T transformState(T state, boolean reverseMode) {
+
+        String filename = reverseMode && reverseFunction != null ? reverseFunction : function;
         String result = state.toFullString();
         try {
-            result = TransformationHelper.transform(service, function, sourceFormat, state.toFullString());
-            if (result != null && result.isEmpty()) {
+            result = TransformationHelper.transform(service, filename, sourceFormat, state.toFullString());
+            if (result == null || result.isEmpty()) {
                 // map transformation service returns an empty string if the entry is not found in the map, we will use
                 // the original value
                 result = state.toFullString();
@@ -128,6 +150,6 @@ public class MapTransformationProfile implements StateProfile {
         }
         StringType resultType = new StringType(result);
         logger.debug("Transformed '{}' into '{}'", state, resultType);
-        return resultType;
+        return (T) resultType;
     }
 }
