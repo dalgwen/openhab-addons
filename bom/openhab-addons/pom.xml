@@ -1896,6 +1896,11 @@
       <artifactId>org.openhab.transform.map</artifactId>
       <version>${project.version}</version>
     </dependency>
+	<dependency>
+      <groupId>org.openhab.addons.bundles</groupId>
+      <artifactId>org.openhab.transform.rawrockermultilongpress</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.openhab.addons.bundles</groupId>
       <artifactId>org.openhab.transform.regex</artifactId>
