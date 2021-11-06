@@ -24,6 +24,8 @@ import org.openhab.core.thing.profiles.ProfileContext;
 import org.openhab.core.thing.profiles.ProfileTypeUID;
 import org.openhab.core.thing.profiles.TriggerProfile;
 import org.openhab.core.types.State;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Profile to offer the RockerMultiLongPressProfile on a ItemChannelLink
@@ -33,7 +35,11 @@ import org.openhab.core.types.State;
 @NonNullByDefault
 public class RawRockerMultiLongPressProfile implements TriggerProfile {
 
-    public static final ProfileTypeUID PROFILE_TYPE_UID = new ProfileTypeUID("ROCKER", "rawrocker-to-string");
+    private final Logger logger = LoggerFactory.getLogger(RawRockerMultiLongPressProfile.class);
+
+    public static final ProfileTypeUID PROFILE_TYPE_UID = new ProfileTypeUID("rocker", "rawrocker-to-string");
+    public static final String PARAM_BUTTON1 = "button1";
+    public static final String PARAM_BUTTON2 = "button2";
 
     private final ProfileCallback callback;
     private final ProfileContext context;
@@ -44,9 +50,30 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
     protected int releasedNumber = 0;
     protected boolean continuousPressMode = false;
 
+    String button1Name = "1";
+    String button2Name = "2";
+
     RawRockerMultiLongPressProfile(ProfileCallback callback, ProfileContext context) {
         this.callback = callback;
         this.context = context;
+
+        Object paramValue1 = context.getConfiguration().get(PARAM_BUTTON1);
+        if (paramValue1 != null) {
+            if (paramValue1 instanceof String) {
+                button1Name = (String) paramValue1;
+            } else {
+                logger.error("Parameter '{}' is not of type String. Please make sure it is", PARAM_BUTTON1);
+            }
+        }
+        Object paramValue2 = context.getConfiguration().get(PARAM_BUTTON2);
+        if (paramValue2 != null) {
+            if (paramValue2 instanceof String) {
+                button2Name = (String) paramValue2;
+            } else {
+                logger.error("Parameter '{}' is not of type String. Please make sure it is", PARAM_BUTTON2);
+            }
+        }
+
     }
 
     @Override
@@ -57,17 +84,17 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
     @Override
     public void onTriggerFromHandler(String event) {
         if (CommonTriggerEvents.DIR1_PRESSED.equals(event)) {
-            buttonPressed("1");
+            buttonPressed(button1Name);
         } else if (CommonTriggerEvents.DIR1_RELEASED.equals(event)) {
-            buttonReleased("1");
+            buttonReleased(button1Name);
         } else if (CommonTriggerEvents.DIR2_PRESSED.equals(event)) {
-            buttonPressed("2");
+            buttonPressed(button2Name);
         } else if (CommonTriggerEvents.DIR2_RELEASED.equals(event)) {
-            buttonReleased("2");
+            buttonReleased(button2Name);
         } else if (CommonTriggerEvents.PRESSED.equals(event)) {
-            buttonPressed("1");
+            buttonPressed(button1Name);
         } else if (CommonTriggerEvents.RELEASED.equals(event)) {
-            buttonReleased("1");
+            buttonReleased(button1Name);
         }
     }
 
