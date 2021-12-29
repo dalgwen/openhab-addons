@@ -18,6 +18,8 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
@@ -94,6 +96,11 @@ public class GoogleTTSService implements TTSService {
     private static final String PARAM_SPEAKING_RATE = "speakingRate";
     private static final String PARAM_VOLUME_GAIN_DB = "volumeGainDb";
     private static final String PARAM_PURGE_CACHE = "purgeCache";
+
+    /**
+     * Wav magic packet signaling the beginning of the data
+     */
+    private final static int DATA_MAGIC = 0x64617461; // "data"
 
     /**
      * Logger.
@@ -344,7 +351,37 @@ public class GoogleTTSService implements TTSService {
         // compute the real format returned by google
         AudioFormat realAudioFormat = parseAudioFormat(audio);
 
+        audio = removeFMT(audio);
+
         return new ByteArrayAudioStream(audio, realAudioFormat);
+    }
+
+    /**
+     * Remove FMT block (WAV header) from the data array.
+     * If you don't remove the FMT, the underlying play method
+     * will try to play it and will do a "click" noise
+     * at the beginning
+     *
+     * @param audio
+     * @return the byte array without the header
+     */
+    byte[] removeFMT(byte[] data) {
+        int index = 0;
+        while (true) {
+            try {
+                byte[] nextPacket = Arrays.copyOfRange(data, index, index + 4);
+                int datahdr = ByteBuffer.wrap(nextPacket).getInt();
+                if (datahdr == DATA_MAGIC) {
+                    break;
+                }
+                index += 4;
+            } catch (ArrayIndexOutOfBoundsException eof) {
+                // we've reached the end of the file without finding the 'data' chunk
+                // assuming it's already prune
+                return data;
+            }
+        }
+        return Arrays.copyOfRange(data, index + 4, data.length);
     }
 
     private AudioFormat parseAudioFormat(byte[] audio) {
