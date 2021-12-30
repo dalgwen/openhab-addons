@@ -348,12 +348,15 @@ public class GoogleTTSService implements TTSService {
             throw new TTSException("Could not read from Google Cloud TTS Service");
         }
 
-        // compute the real format returned by google
-        AudioFormat realAudioFormat = parseAudioFormat(audio);
+        // compute the real format returned by google, if WAV
+        AudioFormat finalFormat = requestedFormat;
+        if (AudioFormat.CONTAINER_WAVE.equals(requestedFormat.getContainer())) {
+            finalFormat = parseAudioFormat(audio);
+            // temp patch until the FMT is handled in the core openhab audio player :
+            audio = removeFMT(audio);
+        }
 
-        audio = removeFMT(audio);
-
-        return new ByteArrayAudioStream(audio, realAudioFormat);
+        return new ByteArrayAudioStream(audio, finalFormat);
     }
 
     /**
