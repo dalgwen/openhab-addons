@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,11 +12,13 @@
  */
 package org.openhab.transform.rawrockermultilongpress.profiles;
 
+import java.math.BigDecimal;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.CommonTriggerEvents;
 import org.openhab.core.thing.profiles.ProfileCallback;
@@ -40,6 +42,7 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
     public static final ProfileTypeUID PROFILE_TYPE_UID = new ProfileTypeUID("rocker", "rawrocker-to-string");
     public static final String PARAM_BUTTON1 = "button1";
     public static final String PARAM_BUTTON2 = "button2";
+    public static final String PARAM_MAXREPETITION = "maxRepetition";
 
     private final ProfileCallback callback;
     private final ProfileContext context;
@@ -49,15 +52,19 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
     protected int pressedNumber = 0;
     protected int releasedNumber = 0;
     protected boolean continuousPressMode = false;
+    public Integer currentRepetition = 0;
 
     String button1Name = "1";
     String button2Name = "2";
+    Integer maxRepetition = -1;
 
     RawRockerMultiLongPressProfile(ProfileCallback callback, ProfileContext context) {
         this.callback = callback;
         this.context = context;
 
-        Object paramValue1 = context.getConfiguration().get(PARAM_BUTTON1);
+        Configuration configuration = context.getConfiguration();
+
+        Object paramValue1 = configuration.get(PARAM_BUTTON1);
         if (paramValue1 != null) {
             if (paramValue1 instanceof String) {
                 button1Name = (String) paramValue1;
@@ -65,7 +72,7 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
                 logger.error("Parameter '{}' is not of type String. Please make sure it is", PARAM_BUTTON1);
             }
         }
-        Object paramValue2 = context.getConfiguration().get(PARAM_BUTTON2);
+        Object paramValue2 = configuration.get(PARAM_BUTTON2);
         if (paramValue2 != null) {
             if (paramValue2 instanceof String) {
                 button2Name = (String) paramValue2;
@@ -73,7 +80,17 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
                 logger.error("Parameter '{}' is not of type String. Please make sure it is", PARAM_BUTTON2);
             }
         }
-
+        Object paramValueMaxRepetition = configuration.get(PARAM_MAXREPETITION);
+        if (paramValueMaxRepetition != null) {
+            if (paramValueMaxRepetition instanceof BigDecimal) {
+                maxRepetition = ((BigDecimal) paramValueMaxRepetition).intValue();
+            } else if (paramValueMaxRepetition instanceof Integer) {
+                maxRepetition = ((Integer) paramValueMaxRepetition);
+            } else {
+                logger.error("Parameter '{}' is not of type Integer/BigDecimal. Please make sure it is",
+                        PARAM_MAXREPETITION);
+            }
+        }
     }
 
     @Override
@@ -83,6 +100,7 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
 
     @Override
     public void onTriggerFromHandler(String event) {
+        currentRepetition = 0;
         if (CommonTriggerEvents.DIR1_PRESSED.equals(event)) {
             buttonPressed(button1Name);
         } else if (CommonTriggerEvents.DIR1_RELEASED.equals(event)) {
@@ -98,13 +116,13 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
         }
     }
 
-    public void reset() {
+    private void reset() {
         this.lastPressedButton = "";
         this.pressedNumber = 0;
         this.releasedNumber = 0;
     }
 
-    public void resolve() {
+    private void resolve() {
         if (!this.lastPressedButton.isEmpty()) {
             if (this.releasedNumber != 0) {
                 callback.sendCommand(new StringType(this.lastPressedButton + "." + this.releasedNumber));
@@ -113,41 +131,57 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
                 continuousPressMode = true;
                 String _lastPressedBouton = this.lastPressedButton;
                 synchronized (this) {
-                    if (this.resolveLater != null) {
-                        this.resolveLater.cancel(true);
+                    ScheduledFuture<?> resolveLaterFinal = this.resolveLater;
+                    if (resolveLaterFinal != null) {
+                        resolveLaterFinal.cancel(true);
                     }
-                    this.resolveLater = context.getExecutorService().scheduleAtFixedRate(
-                            () -> callback.sendCommand(new StringType(_lastPressedBouton + "." + 0)), 0, 500,
-                            TimeUnit.MILLISECONDS);
+                    this.resolveLater = context.getExecutorService().scheduleWithFixedDelay(
+                            () -> recurrentLongPress(_lastPressedBouton, new StringType(_lastPressedBouton + "." + 0)),
+                            0, 500, TimeUnit.MILLISECONDS);
                 }
             }
         }
         reset();
     }
 
-    public void buttonPressed(String bouton) {
+    private void recurrentLongPress(String button, StringType command) {
+        if (maxRepetition > 0) {
+            if (currentRepetition < maxRepetition) {
+                callback.sendCommand(new StringType(button + "." + 0));
+                currentRepetition++;
+            }
+            var scheduledRepetition = this.resolveLater;
+            if (currentRepetition >= maxRepetition && scheduledRepetition != null) {
+                scheduledRepetition.cancel(false);
+            }
+        } else {
+            callback.sendCommand(new StringType(button + "." + 0));
+        }
+    }
 
+    private void buttonPressed(String bouton) {
         if (!this.lastPressedButton.equals(bouton)) {
             resolve();
         }
         this.pressedNumber++;
         this.lastPressedButton = bouton;
         synchronized (this) {
-            if (this.resolveLater != null) {
-                this.resolveLater.cancel(true);
+            ScheduledFuture<?> resolveLaterFinal = this.resolveLater;
+            if (resolveLaterFinal != null) {
+                resolveLaterFinal.cancel(true);
             }
             this.resolveLater = context.getExecutorService().schedule(this::resolve, 550, TimeUnit.MILLISECONDS);
         }
     }
 
-    public void buttonReleased(String bouton) {
-
+    private void buttonReleased(String bouton) {
         if (this.lastPressedButton.equals(bouton)) {
-            this.releasedNumber++;
+            this.releasedNumber = this.pressedNumber;
         }
         synchronized (this) {
-            if (this.resolveLater != null && continuousPressMode) {
-                this.resolveLater.cancel(true);
+            ScheduledFuture<?> resolveLaterFinal = this.resolveLater;
+            if (resolveLaterFinal != null && continuousPressMode) {
+                resolveLaterFinal.cancel(true);
                 continuousPressMode = false;
             }
         }
@@ -156,5 +190,4 @@ public class RawRockerMultiLongPressProfile implements TriggerProfile {
     @Override
     public void onStateUpdateFromItem(State state) {
     }
-
 }

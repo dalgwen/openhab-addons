@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -56,8 +56,9 @@ public class RawRockerMultiLongPressProfileFactory implements ProfileFactory, Pr
 
     @Override
     public Collection<ProfileType> getProfileTypes(@Nullable Locale locale) {
-        return List.of(ProfileTypeBuilder.newTrigger(RawRockerMultiLongPressProfile.PROFILE_TYPE_UID,
-                RawRockerMultiLongPressProfile.PROFILE_TYPE_UID.getId()).build());
+        return List.of(ProfileTypeBuilder
+                .newTrigger(RawRockerMultiLongPressProfile.PROFILE_TYPE_UID, "Raw Rocker To Multi / Long Press String")
+                .build());
     }
 
     @Override
@@ -107,5 +108,4 @@ public class RawRockerMultiLongPressProfileFactory implements ProfileFactory, Pr
             return getSuggestedProfileTypeUID(channelType, itemType);
         }
     }
-
 }
