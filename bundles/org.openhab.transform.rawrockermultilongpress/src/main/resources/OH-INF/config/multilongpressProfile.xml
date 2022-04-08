@@ -7,14 +7,20 @@
 
 	<config-description uri="profile:rocker:rawrocker-to-string">
 		<parameter name="button1" type="text" required="false">
-		    <default>1</default>
+			<default>1</default>
 			<label>Button1</label>
 			<description>Button1 name returned in the string</description>
 		</parameter>
 		<parameter name="button2" type="text" required="false">
-		    <default>2</default>
-		    <label>Button2</label>
-            <description>Button2 name returned in the string</description>
-        </parameter>
+			<default>2</default>
+			<label>Button2</label>
+			<description>Button2 name returned in the string</description>
+		</parameter>
+		<parameter name="maxRepetition" type="integer" required="false">
+			<default>-1</default>
+			<label>Maximum Repetition</label>
+			<description>This is the maximum number of repetition to do for a long press. Usefull as a safeguard when the
+				'release' is not detected. -1 for no limit</description>
+		</parameter>
 	</config-description>
 </config-description:config-descriptions>
