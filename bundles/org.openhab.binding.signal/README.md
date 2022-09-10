@@ -3,12 +3,12 @@
 This binding connects to the Signal network and allows openHAB to send and receive message through it.
 
 This binding rely on a binary library compiled for specific architecture. These architectures are theoretically supported:
-amd64 for Windows
-amd64 for Linux
-arm for Linux
-armv7 for Linux
-aarch64 for OSX
-amd64 for OSX
+* amd64 for Windows
+* amd64 for Linux
+* arm for Linux
+* armv7 for Linux
+* aarch64 for OSX
+* amd64 for OSX
 
 ## Supported Things
 
@@ -26,16 +26,17 @@ A *signalconversation* thing will be discovered and added to the inbox everytime
 ## Storage and security
 
 Signal is a highly secured protocol. This binding, not so much.
-Be aware that this Signal binding stores secret keys, id, etc, on your disk (unencrypted).
-Take appropriate measures protecting the directory <OPENHAB_USER_DIR>/signal/<bridgeid>.
+
+Be aware that this Signal binding stores secret keys, id, etc, on your disk (unencrypted). Take appropriate measures protecting the directory <OPENHAB_USER_DIR>/signal/<bridgeid>.
 
 
 ## Captcha (for signalaccount only)
 
 Unfortunately, registering a custom agent (a non-mobile device), is tedious. Signal protects its network with a captcha anti-bot registration system.
+
 So, the Signal network will probably require a captcha to register your number. This is a string, returned by a dedicated web page, proving that you are a human. You have then to provide it to the binding.
-In order to get one, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and intercept the response with the browser developer tool (use Chrome for this).
-You can see the full procedure in the following screencap.
+
+In order to get one, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and intercept the response with the browser developer tool (use Chrome for this). You can see the full procedure in the following screencap.
 
 ![Captcha obtention procedure](doc/signal-captcha.gif "Captcha")
 
@@ -49,9 +50,10 @@ If you have a dedicated number available and not already linked to a device, thi
 Tip : you can use a landline number. The only requirement is that your can receive SMS or voice call from the Signal service.
 
 Because Signal requires several verifications, the signal account thing creation is a several steps process.
-At first, you have to get a valid captcha proving that you are human. You can try without one but Signal will probably reject your attempt (see above).
-Second, you have to get a verification code proving that you own the phone number. In order to do so, create the bridge thing, without the verification code. You will then receive a SMS or a voice call with the verification code.
-Third, set the verificationCode parameter and then save your thing, again.
+
+* At first, you have to get a valid captcha proving that you are human. You can try without one but Signal will probably reject your attempt (see above).
+* Second, you have to get a verification code proving that you own the phone number. In order to do so, create the bridge thing, without the verification code. You will then receive a SMS or a voice call with the verification code.
+* Third, set the verificationCode parameter and then save your thing, again.
 
 For a *signalaccount*, the following parameters are available:
 
@@ -66,8 +68,9 @@ For a *signalaccount*, the following parameters are available:
 
 You can use this bridge thing if you have no spare phone number. You will use your mobile phone application.
 This is also a several steps registration process.
-At first, create the thing. It will be in the CONFIGURATION_PENDING state.
-Then, you have to open the thing with the main UI, and scan the QR code with your Signal application on your phone (linked devices menu).
+
+* At first, create the thing. It will be in the CONFIGURATION_PENDING state.
+* Then, you have to open the thing with the main UI, and scan the QR code with your Signal application on your phone (linked devices menu).
 
 | Parameter Name | type | required | description    |
 |----------------|------|----------|----------------|
