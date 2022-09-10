@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="signal"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<thing-type id="signalconversation">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="signalaccountbridge"/>
+			<bridge-type-ref id="signallinkedbridge"/>
+		</supported-bridge-type-refs>
+		<label>Signal Conversation</label>
+		<description>Represents a conversation with a Signal recipient.</description>
+
+		<channels>
+			<channel id="send" typeId="send"/>
+			<channel id="receive" typeId="receive"/>
+			<channel id="deliverystatus" typeId="deliverystatus"/>
+		</channels>
+
+		<representation-property>recipient</representation-property>
+
+		<config-description>
+			<parameter name="recipient" type="text" required="true">
+				<label>Recipient Number</label>
+				<description>The Signal number of the recipient.</description>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<channel-type id="send">
+		<item-type>String</item-type>
+		<label>Send Message</label>
+		<description>Message to send to the recipient.</description>
+	</channel-type>
+
+	<channel-type id="receive">
+		<item-type>String</item-type>
+		<label>Message Received</label>
+		<description>Last message received</description>
+	</channel-type>
+
+	<channel-type id="deliverystatus">
+		<item-type>String</item-type>
+		<label>Delivery Status</label>
+		<description>Last message delivery status</description>
+	</channel-type>
+</thing:thing-descriptions>
