@@ -70,7 +70,7 @@ public abstract class Context implements CredentialsProvider {
     private static final String SIGNAL_KEY_BACKUP_URL = "https://api.backup.signal.org";
     private static final String SIGNAL_STORAGE_URL = "https://storage.signal.org";
     private static final String SIGNAL_CDSH_URL = "";
-    public static final String USER_AGENT = "Signal-Android/5.22.3 signal-cli";
+    public static final String USER_AGENT = "Signal-Android/5.51.7 signal-cli";
     public static final int PREKEY_MINIMUM_SIZE = 5;
     public static final int PREKEY_BATCH_SIZE = 20;
 

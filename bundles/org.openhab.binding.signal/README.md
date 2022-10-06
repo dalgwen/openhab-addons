@@ -3,6 +3,7 @@
 This binding connects to the Signal network and allows openHAB to send and receive message through it.
 
 This binding rely on a binary library compiled for specific architecture. These architectures are theoretically supported:
+
 * amd64 for Windows
 * amd64 for Linux
 * arm for Linux
@@ -28,6 +29,8 @@ A *signalconversation* thing will be discovered and added to the inbox everytime
 Signal is a highly secured protocol. This binding, not so much.
 
 Be aware that this Signal binding stores secret keys, id, etc, on your disk (unencrypted). Take appropriate measures protecting the directory <OPENHAB_USER_DIR>/signal/<bridgeid>.
+
+Also, note that if you use docker with openHAB, you have to lift the cryptography restrictions. See [this link](https://github.com/openhab/openhab-docker#java-cryptographic-strength-policy) for more details.
 
 
 ## Captcha (for signalaccount only)
@@ -137,7 +140,7 @@ Bridge signal:signalaccountbridge:mymainsignalaccount "Signal account for my num
 }
 ```
 
-### Send SMS
+### Send message
 
 `signal.rules` for DSL:
 
@@ -151,7 +154,7 @@ then
 end
 ```
 
-### Receive and forward SMS
+### Receive and forward message
 
 `signal.py` with the python helper library :
 
