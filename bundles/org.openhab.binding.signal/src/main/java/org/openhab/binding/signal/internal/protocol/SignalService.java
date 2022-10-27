@@ -68,7 +68,6 @@ import org.whispersystems.libsignal.SignalProtocolAddress;
 import org.whispersystems.libsignal.ecc.Curve;
 import org.whispersystems.libsignal.protocol.CiphertextMessage;
 import org.whispersystems.libsignal.protocol.PlaintextContent;
-import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
 import org.whispersystems.libsignal.protocol.SignalMessage;
 import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
@@ -124,6 +123,8 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
     @NonNullByDefault({})
 
     private static final int MAX_BACKOFF_COUNTER = 9;
+    // this counter help asking only sometimes -not always- for pre keys count to the server
+    private int refreshCounter = 0;
 
     private static final MessageReceivedCallback EMPTY_CALLBACK = (a) -> {
     };
@@ -239,8 +240,9 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
 
     private synchronized void refreshPreKeysIfNeeded()
             throws IOException, InvalidKeyException, IncompleteRegistrationException {
-        if (context.needsKeysRecreation()
-                || context.getOrCreateAccountManager().getPreKeysCount() < Context.PREKEY_MINIMUM_SIZE) {
+        refreshCounter++;
+        if (context.needsKeysRecreation() || (refreshCounter > 10
+                && context.getOrCreateAccountManager().getPreKeysCount() < Context.PREKEY_MINIMUM_SIZE)) {
             logger.info("Generating keys for {} ...", context.getId());
             int initialPreKeyId = new SecureRandom().nextInt(Medium.MAX_VALUE);
             List<PreKeyRecord> records = Utils.generatePreKeyRecords(initialPreKeyId, Context.PREKEY_BATCH_SIZE);
@@ -251,6 +253,7 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
             context.getProtocolStore().storeSignedPreKey(signedPreKey.getId(), signedPreKey);
             context.getOrCreateAccountManager().setPreKeys(identityKeyPair.getPublicKey(), signedPreKey, records);
             context.setNeedsKeysRecreation(false);
+            refreshCounter = 0;
         }
     }
 
@@ -433,7 +436,7 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
                         envelope = result.get();
                         if (envelope.isPreKeySignalMessage()) {
                             refreshPreKeysIfNeeded();
-                            logger.info("Pre keys message, count: {}",
+                            logger.debug("Pre keys message, count: {}",
                                     context.getOrCreateAccountManager().getPreKeysCount());
                         }
                         SignalServiceContent message = decrypt(envelope);
@@ -572,8 +575,13 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
             ACI aci = context.getAci();
             SealedSessionCipher sealedSessionCipher = new SealedSessionCipher(context.getProtocolStore(),
                     aci != null ? aci.uuid() : null, context.getE164(), SignalServiceAddress.DEFAULT_DEVICE_ID);
-            DecryptionResult result = sealedSessionCipher.decrypt(VALIDATOR, ciphertext,
-                    envelope.getServerReceivedTimestamp());
+            DecryptionResult result;
+            try {
+                result = sealedSessionCipher.decrypt(VALIDATOR, ciphertext, envelope.getServerReceivedTimestamp());
+            } catch (ProtocolNoSessionException e) {
+                logger.debug("No session with unidentified sender", e);
+                return null;
+            }
             SignalServiceAddress resultAddress = new SignalServiceAddress(ACI.parseOrThrow(result.getSenderUuid()),
                     result.getSenderE164());
             Optional<byte[]> groupId = result.getGroupId();
