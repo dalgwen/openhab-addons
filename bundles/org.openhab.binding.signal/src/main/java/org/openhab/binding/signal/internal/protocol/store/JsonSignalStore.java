@@ -351,6 +351,9 @@ public class JsonSignalStore implements SignalServiceDataStore, SignalServiceAcc
         SessionRecord loadSession = loadSession(address);
         loadSession.archiveCurrentState();
         storeSession(address, loadSession);
+        if (address != null) {
+            clearSenderKeySharedWith(List.of(address));
+        }
     }
 
     @Override
