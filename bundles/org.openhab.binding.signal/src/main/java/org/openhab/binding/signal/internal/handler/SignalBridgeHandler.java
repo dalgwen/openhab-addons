@@ -69,6 +69,8 @@ import org.whispersystems.signalservice.api.push.exceptions.NonSuccessfulRespons
 public class SignalBridgeHandler extends BaseBridgeHandler
         implements StateListener, MessageListener, DeliveryReportListener {
 
+    private static final String SIGNAL_DIRECTORY = "signal";
+
     private final Logger logger = LoggerFactory.getLogger(SignalBridgeHandler.class);
 
     private final ThingTypeUID thingTypeUID;
@@ -149,21 +151,17 @@ public class SignalBridgeHandler extends BaseBridgeHandler
             }
         } catch (IncompleteRegistrationException e) {
             String message = "Incomplete registration: " + e.getMessage();
-            logger.info(message);
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
             checkScheduled.cancel(false);
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
         } catch (NonSuccessfulResponseCodeException e) {
             String message = "Communication error: " + e.getClass().getSimpleName() + " - " + e.getMessage();
-            logger.error(message, e);
             checkScheduled.cancel(false);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, message);
         } catch (IOException | InvalidInputException e) {
             String message = e.getClass().getSimpleName() + " - " + e.getMessage();
-            logger.debug(message, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
         } catch (InvalidKeyException e) {
             String message = e.getMessage();
-            logger.debug(message, e);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, message);
         } finally {
             isStarting.set(false);
@@ -173,7 +171,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler
     protected SignalService createService(SignalBridgeConfiguration config)
             throws InvalidInputException, IOException, IncompleteRegistrationException {
         Context context;
-        Path accountStoragePath = Path.of(OpenHAB.getUserDataFolder(), "signal", thing.getUID().getId());
+        Path accountStoragePath = Path.of(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY, thing.getUID().getId());
         PersistentStorageFile persistentStorage = new PersistentStorageFile(accountStoragePath);
         if (thingTypeUID.equals(SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE)) {
             context = new ContextLinkedAccount(persistentStorage, config.deviceName);
@@ -304,8 +302,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler
     public void newStateEvent(ConnectionState connectionState) {
         switch (connectionState) {
             case AUTH_FAILED:
-                logger.error("Signal library reported an authentication error on the account {}", getId());
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR);
+                String message = "Signal library reported an authentication error on the account " + getId();
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, message);
                 break;
             case CONNECTED:
                 logger.debug("Signal library reported the service for {} is connected", getId());
@@ -336,7 +334,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler
     @Override
     public void handleRemoval() {
         stopService();
-        Path accountStoragePath = Path.of(OpenHAB.getUserDataFolder(), thing.getUID().getId());
+        Path accountStoragePath = Path.of(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY, thing.getUID().getId());
         new PersistentStorageFile(accountStoragePath).deleteEverything();
         updateStatus(ThingStatus.REMOVED);
     }
