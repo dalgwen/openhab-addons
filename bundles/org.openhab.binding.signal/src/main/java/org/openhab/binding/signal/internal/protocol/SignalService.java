@@ -324,13 +324,13 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
                         ContentHint.IMPLICIT, message, IndividualSendEvents.EMPTY);
                 success = sendDataMessageResult.isSuccess();
                 if (sendDataMessageResult.isUnregisteredFailure()) { // wrong recipient. does he have changed number ?
-                    logger.error("Recipient unregistered !");
+                    logger.warn("Recipient unregistered !");
                     aciByPhoneNumber.remove(address); // remove. next try will find the new number
                 }
             } catch (IllegalStateException e) { // workaround, maybe stored session is not in a good state ?
                 if (aciString != null) {
                     // delete it before retrying :
-                    logger.error("Session with recipient inconsistent, deleting it before retrying");
+                    logger.warn("Session with recipient inconsistent, deleting it before retrying");
                     context.getProtocolStore().deleteAllSessions(aciString);
                 }
             } catch (IOException e) { // could be a network failure, retry
@@ -344,7 +344,7 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
             }
         }
         if (!success) {
-            logger.error("Cannot send message, stop trying");
+            logger.warn("Cannot send message, stop trying");
             if (exceptionEncountered != null) {
                 throw exceptionEncountered;
             }
@@ -485,7 +485,9 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
                     }
                 }
             } catch (IncompleteRegistrationException | InterruptedException e) {
-                logger.error("Unrecoverable error or interruption while trying to process message", e);
+                logger.warn("Unrecoverable error or interruption while trying to process message");
+                // we should let an option to investigate :
+                logger.debug("Exception details :", e);
                 stopReceiving();
             } finally {
                 isRunning = false;
@@ -546,13 +548,13 @@ public class SignalService implements Consumer<WebSocketConnectionState> {
         if (envelope.isPreKeySignalMessage()) {
             SignalProtocolAddress sourceAddress = new SignalProtocolAddress(envelope.getSourceUuid().get(),
                     envelope.getSourceDevice());
-            SessionCipher sessionCipher = new SessionCipher(context.getProtocolStore(), sourceAddress);
-
-            paddedMessage = sessionCipher.decrypt(new PreKeySignalMessage(ciphertext));
-            metadata = new SignalServiceMetadata(envelope.getSourceAddress(), envelope.getSourceDevice(),
-                    envelope.getTimestamp(), envelope.getServerReceivedTimestamp(),
-                    envelope.getServerDeliveredTimestamp(), false, envelope.getServerGuid(), Optional.absent());
+            try {
+                refreshPreKeysIfNeeded();
+            } catch (IOException | InvalidKeyException | IncompleteRegistrationException e) {
+                logger.warn("Cannot refresh prekey but receiving message to do so... Will retry later");
+            }
             context.getProtocolStore().clearSenderKeySharedWith(Collections.singleton(sourceAddress));
+            return null;
         } else if (envelope.isSignalMessage()) {
             SignalProtocolAddress sourceAddress = new SignalProtocolAddress(envelope.getSourceUuid().get(),
                     envelope.getSourceDevice());
