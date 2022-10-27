@@ -132,37 +132,6 @@ public class SignalConversationHandler extends BaseThingHandler {
     public void initialize() {
         config = getConfigAs(SignalConversationConfiguration.class);
         bridgeHandler = getBridgeHandler();
-        setStatusByBridgeStatus();
-    }
-
-    private void setStatusByBridgeStatus() {
-        SignalBridgeHandler bridgeHandlerFinal = bridgeHandler;
-        if (bridgeHandlerFinal != null) {
-            switch (bridgeHandlerFinal.getThing().getStatus()) {
-                case INITIALIZING:
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-                case OFFLINE:
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-                case ONLINE:
-                    updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
-                    break;
-                case REMOVED:
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-                case REMOVING:
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-                case UNINITIALIZED:
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-                case UNKNOWN:
-                    updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.BRIDGE_OFFLINE);
-                    break;
-            }
-        } else {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
-        }
+        updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
     }
 }
