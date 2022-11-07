@@ -6,10 +6,6 @@ export default class WebSocketWorker {
   /**@type {string} */
   id = "";
   /**@type {string} */
-  label = "";
-  /**@type {string} */
-  listeningItem = "";
-  /**@type {string} */
   token = "";
   /**@type {number} */
   sampleRate = 0;
@@ -46,8 +42,6 @@ export default class WebSocketWorker {
       switch (ev.data.cmd) {
         case WorkerInCmd.INITIALIZE:
           this.id = ev.data.id;
-          this.label = ev.data.label;
-          this.listeningItem = ev.data.listeningItem;
           this.sampleRate = ev.data.sampleRate;
           this.token = ev.data.token;
           this.connectWebSocket();
@@ -69,8 +63,6 @@ export default class WebSocketWorker {
           break;
         case WorkerInCmd.RESET_CONNECTION:
           this.id = ev.data.id;
-          this.label = ev.data.label;
-          this.listeningItem = ev.data.listeningItem;
           if (this.wsRef !== null) {
             this.wsRef.close();
           } else {
@@ -141,9 +133,7 @@ export default class WebSocketWorker {
       var initMessage = JSON.stringify({
         cmd: WebSocketInCmd.INITIALIZE,
         id: this.id,
-        label: this.label,
         token: (this.token && this.token.length) ? this.token : null,
-        listeningItem: (this.listeningItem && this.listeningItem.length) ? this.listeningItem : null,
         sampleRate: this.sampleRate,
       });
       console.debug("worker => websocket:", initMessage);

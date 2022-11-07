@@ -126,13 +126,11 @@ let worker = null;
 /**
  *
  * @param {string} id
- * @param {string} label
- * @param {string} listeningItem
  * @param {string|null} token
  * @param {{setListening:(value:boolean)=> void, setSpeaking:(value:boolean)=> void, setOnline:(value:boolean)=>void }} actions
  * @returns {Promise<Worker>}
  */
-export async function startWebsocketWorker(id, label, listeningItem, token, actions) {
+export async function startWebsocketWorker(id, token, actions) {
   let volume = 100;
   await setupAudio();
   function onSinkSpeaking(id, speaking) {

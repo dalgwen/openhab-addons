@@ -9,7 +9,7 @@ const settingsStore = useSettingsStore();
 const { getAccessToken } = useAuthStore();
 const { startListening, stopListening, startWorker, isAudioSupported } = store;
 const { listening, speaking, online, userInteractionDone } = storeToRefs(store);
-const { audioComponentId, audioComponentLabel, listeningItem } = storeToRefs(settingsStore);
+const { audioComponentId } = storeToRefs(settingsStore);
 function toggleListening() {
   if (!listening.value) {
     startListening();
@@ -21,8 +21,6 @@ function onPanelClick() {
   if (!userInteractionDone.value) {
     startWorker(
       audioComponentId.value,
-      audioComponentLabel.value,
-      listeningItem.value,
       getAccessToken()
     ).catch(() => {
       router.replace("/error");

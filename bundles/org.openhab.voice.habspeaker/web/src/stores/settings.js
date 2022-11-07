@@ -3,34 +3,19 @@ import { defineStore } from "pinia";
 export const useSettingsStore = defineStore("settings", () => {
   const storagePrefix = "habspeaker.ui:";
   const idLocalStorageKey = `${storagePrefix}id`;
-  const labelLocalStorageKey = `${storagePrefix}label`;
-  const listeningItemLocalStorageKey = `${storagePrefix}listeningItem`;
   const storedAudioComponentId = localStorage.getItem(idLocalStorageKey);
-  const storedAudioComponentLabel = localStorage.getItem(labelLocalStorageKey);
-  const storedListeningItem = localStorage.getItem(listeningItemLocalStorageKey);
   const audioComponentId = ref(storedAudioComponentId ?? generateUUID());
-  const audioComponentLabel = ref(
-    storedAudioComponentLabel ?? getDefaultLabel(audioComponentId.value)
-  );
-  const listeningItem = ref(storedListeningItem ?? "");
   if (storedAudioComponentId == null) {
     commit();
   }
   function commit() {
     localStorage.setItem(idLocalStorageKey, audioComponentId.value);
-    localStorage.setItem(labelLocalStorageKey, audioComponentLabel.value);
-    localStorage.setItem(listeningItemLocalStorageKey, listeningItem.value);
   }
   return {
     audioComponentId,
-    audioComponentLabel,
-    listeningItem,
     commit,
   };
 });
-function getDefaultLabel(id) {
-  return `HAB Speaker Client (${id})`;
-}
 function generateUUID() {
   let d = new Date().getTime(),
     d2 = (performance && performance.now && performance.now() * 1000) || 0;

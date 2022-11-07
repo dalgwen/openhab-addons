@@ -5,26 +5,18 @@ import { useAssistantStore } from "../stores/assistant";
 import { useSettingsStore } from "../stores/settings";
 const store = useSettingsStore();
 const assistantStore = useAssistantStore();
-const { audioComponentId, audioComponentLabel, listeningItem } = storeToRefs(store);
+const { audioComponentId } = storeToRefs(store);
 const model = ref({
   id: audioComponentId.value,
-  label: audioComponentLabel.value,
-  listeningItem: listeningItem.value,
 });
 function reset() {
   model.value.id = audioComponentId.value;
-  model.value.label = audioComponentLabel.value;
-  model.value.listeningItem = listeningItem.value;
 }
 function save() {
   audioComponentId.value = model.value.id;
-  audioComponentLabel.value = model.value.label;
-  listeningItem.value = model.value.listeningItem;
   store.commit();
   assistantStore.resetConnection(
     audioComponentId.value,
-    audioComponentLabel.value,
-    listeningItem.value,
   );
 }
 </script>
@@ -32,32 +24,13 @@ function save() {
   <div class="container">
     <div class="form">
       <div class="form-group">
-        <label for="id">Audio Components Id</label>
+        <label for="id">Speaker Id</label>
         <input
           type="text"
           id="id"
           class="form-control"
           v-model="model.id"
           onkeydown="return /[0-9a-zA-Z\-\_]/i.test(event.key)"
-        />
-      </div>
-      <div class="form-group">
-        <label for="label">Audio Components Label</label>
-        <input
-          type="text"
-          label="label"
-          class="form-control"
-          v-model="model.label"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="label">Listening Item</label>
-        <input
-          type="text"
-          label="label"
-          class="form-control"
-          v-model="model.listeningItem"
         />
       </div>
       <div class="form-buttons">

@@ -28,10 +28,10 @@ export const useAssistantStore = defineStore("assistant", () => {
       console.error("Worker not running");
     }
   }
-  function startWorker(id, label, listeningItem, token) {
+  function startWorker(id, token) {
     userInteractionDone.value = true;
     if (!worker) {
-      return startWebsocketWorker(id, label, listeningItem, token, {
+      return startWebsocketWorker(id, token, {
         setListening,
         setSpeaking,
         setOnline,
@@ -50,8 +50,8 @@ export const useAssistantStore = defineStore("assistant", () => {
   // TODO: allow manual abort?
   function stopListening() {
   }
-  function resetConnection(id, label, listeningItem) {
-    postToWorker(WorkerInCmd.RESET_CONNECTION, { id, label, listeningItem });
+  function resetConnection(id) {
+    postToWorker(WorkerInCmd.RESET_CONNECTION, { id });
   }
   function renewToken(token) {
     if (worker) {
