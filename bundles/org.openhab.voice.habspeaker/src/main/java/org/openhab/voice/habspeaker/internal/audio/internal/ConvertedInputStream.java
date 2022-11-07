@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.audio;
+package org.openhab.voice.habspeaker.internal.audio.internal;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="habspeaker"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+	<!-- Sample Thing Type -->
+	<thing-type id="speaker">
+		<label>HAB Speaker Thing</label>
+		<description>Represents a connected speaker</description>
+		<channels>
+			<channel id="sink-volume" typeId="system.volume"/>
+		</channels>
+		<config-description>
+			<parameter name="label" type="text">
+				<label>Label</label>
+				<description>Label for the registered sink and source.</description>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<!-- Client Channels -->
+</thing:thing-descriptions>

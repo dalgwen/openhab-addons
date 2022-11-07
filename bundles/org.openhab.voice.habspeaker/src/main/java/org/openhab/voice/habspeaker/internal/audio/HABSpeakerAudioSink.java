@@ -31,7 +31,8 @@ import org.openhab.core.audio.FixedLengthAudioStream;
 import org.openhab.core.audio.UnsupportedAudioFormatException;
 import org.openhab.core.audio.UnsupportedAudioStreamException;
 import org.openhab.core.library.types.PercentType;
-import org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketHandler;
+import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedInputStream;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,14 +54,14 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     private final String sinkId;
     private final String sinkLabel;
-    private final HABSpeakerWebSocketHandler wsHandler;
+    private final HABSpeakerIO speakerIO;
     private final long targetSampleRate;
 
-    public HABSpeakerAudioSink(String id, String label, long targetSampleRate, HABSpeakerWebSocketHandler wsHandler) {
+    public HABSpeakerAudioSink(String id, String label, long targetSampleRate, HABSpeakerIO speakerIO) {
         this.sinkId = id;
         this.sinkLabel = label;
         this.targetSampleRate = targetSampleRate;
-        this.wsHandler = wsHandler;
+        this.speakerIO = speakerIO;
     }
 
     @Override
@@ -80,7 +81,7 @@ public class HABSpeakerAudioSink implements AudioSink {
             return;
         }
         try (ConvertedInputStream convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate)) {
-            convertedInputStream.transferTo(new HABSpeakerWebSocketOutputStream(wsHandler));
+            convertedInputStream.transferTo(new HABSpeakerWebSocketOutputStream(speakerIO));
         } catch (UnsupportedAudioFileException e) {
             logger.warn("UnsupportedAudioFileException: {}", e.getMessage());
         } catch (IOException e) {
@@ -109,10 +110,10 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     private static class HABSpeakerWebSocketOutputStream extends OutputStream {
         private final byte[] id = generateId();
-        private final HABSpeakerWebSocketHandler wsHandler;
+        private final HABSpeakerIO speakerIO;
 
-        public HABSpeakerWebSocketOutputStream(HABSpeakerWebSocketHandler wsHandler) {
-            this.wsHandler = wsHandler;
+        public HABSpeakerWebSocketOutputStream(HABSpeakerIO speakerIO) {
+            this.speakerIO = speakerIO;
         }
 
         @Override
@@ -123,11 +124,7 @@ public class HABSpeakerAudioSink implements AudioSink {
         @Override
         public void write(byte @Nullable [] b, int off, int len) throws IOException {
             if (b != null) {
-                // concat stream identifier and send
-                ByteBuffer buff = ByteBuffer.wrap(new byte[id.length + b.length]);
-                buff.put(id);
-                buff.put(b);
-                wsHandler.sendAudio(buff.array());
+                speakerIO.sendAudio(id, b);
             }
         }
 

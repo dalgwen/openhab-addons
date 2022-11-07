@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.rest;
+package org.openhab.voice.habspeaker.internal.ui;
 
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.GET;
@@ -23,8 +23,8 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.auth.Role;
 import org.openhab.core.io.rest.RESTConstants;
 import org.openhab.core.io.rest.RESTResource;
-import org.openhab.voice.habspeaker.internal.HABSpeakerConfig;
-import org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketServlet;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -60,11 +60,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class HABSpeakerResource implements RESTResource {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerResource.class);
     public static final String PATH_HABSPEAKER = "habspeaker";
-    private final HABSpeakerWebSocketServlet wsServlet;
+    private final HABSpeakerConfigProvider configProvider;
 
     @Activate
-    public HABSpeakerResource(@Reference final HABSpeakerWebSocketServlet wsServlet) {
-        this.wsServlet = wsServlet;
+    public HABSpeakerResource(final @Reference HABSpeakerConfigProvider configProvider) {
+        this.configProvider = configProvider;
         logger.debug("HAB Speaker Resource added at rest/{}", PATH_HABSPEAKER);
     }
 
@@ -74,8 +74,8 @@ public class HABSpeakerResource implements RESTResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(summary = "Retrieves the speaker configuration.", responses = {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = HABSpeakerConfig.class))),
-            @ApiResponse(responseCode = "500", description = "There is no support for the configured language") })
+            @ApiResponse(responseCode = "500", description = "Server error") })
     public Response config() {
-        return Response.ok(wsServlet.getConfig()).build();
+        return Response.ok(configProvider.getConfig()).build();
     }
 }

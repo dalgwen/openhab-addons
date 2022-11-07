@@ -1,0 +1,113 @@
+/**
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+package org.openhab.voice.habspeaker.internal.io;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.audio.AudioManager;
+import org.openhab.core.auth.UserRegistry;
+import org.openhab.core.voice.VoiceManager;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketServlet;
+import org.osgi.framework.BundleContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.http.HttpService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The {@link HABSpeakerIOManager} represents a speaker active connection.
+ *
+ * @author Miguel Álvarez - Initial contribution
+ */
+@Component(service = HABSpeakerIOManager.class)
+@NonNullByDefault
+public class HABSpeakerIOManager implements HABSpeakerIOListener {
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOManager.class);
+    private final List<HABSpeakerWebSocketServlet> ioProtocols;
+    private final Set<HABSpeakerIO> speakerConnections = new HashSet<>();
+    private @Nullable HABSpeakerIOListener protocolListener = null;
+
+    @Activate
+    public HABSpeakerIOManager(BundleContext bundleContext, final @Reference HttpService httpService,
+            final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
+            final @Reference UserRegistry userRegistry, final @Reference HABSpeakerConfigProvider configProvider) {
+        this.ioProtocols = List.of(new HABSpeakerWebSocketServlet(this, configProvider, bundleContext, httpService,
+                audioManager, voiceManager, userRegistry));
+    }
+
+    public List<HABSpeakerIO> getSpeakerConnections() {
+        synchronized (speakerConnections) {
+            return new ArrayList<>(speakerConnections);
+        }
+    }
+
+    public @Nullable HABSpeakerIO getSpeakerConnection(String id) {
+        synchronized (speakerConnections) {
+            return speakerConnections.stream()
+                    .filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id)).findAny().orElse(null);
+        }
+    }
+
+    public void setProtocolListener(HABSpeakerIOListener protocolListener) {
+        this.protocolListener = protocolListener;
+    }
+
+    @Activate
+    public void activate() {
+        logger.debug("Registering protocols");
+        ioProtocols.forEach(HABSpeakerIOProtocol::register);
+    }
+
+    @Deactivate
+    public void dispose() {
+        logger.debug("Unregistering protocols");
+        ioProtocols.forEach(HABSpeakerIOProtocol::unregister);
+    }
+
+    @Override
+    public void onConnected(HABSpeakerIO speaker) throws IllegalStateException {
+        logger.debug("connecting speakers {}", speakerConnections.size());
+        synchronized (speakerConnections) {
+            if (getSpeakerConnection(speaker.getId()) != null) {
+                throw new IllegalStateException("speaker already registered");
+            }
+            speakerConnections.add(speaker);
+            var protocolListener = this.protocolListener;
+            if (protocolListener != null) {
+                protocolListener.onConnected(speaker);
+            }
+        }
+    }
+
+    @Override
+    public void onDisconnected(HABSpeakerIO speaker) {
+        logger.debug("speaker disconnected '{}'", speaker.getId());
+        synchronized (speakerConnections) {
+            speakerConnections.remove(speaker);
+            logger.debug("connected speakers {}", speakerConnections.size());
+            var protocolListener = this.protocolListener;
+            if (protocolListener != null) {
+                protocolListener.onDisconnected(speaker);
+            }
+        }
+    }
+}

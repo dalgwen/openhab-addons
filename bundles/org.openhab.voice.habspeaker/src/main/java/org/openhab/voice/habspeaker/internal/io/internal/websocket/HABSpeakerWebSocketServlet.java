@@ -10,9 +10,9 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.websockets;
+package org.openhab.voice.habspeaker.internal.io.internal.websocket;
 
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.*;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,19 +38,14 @@ import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserApiTokenCredentials;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.common.ThreadPoolManager;
-import org.openhab.core.config.core.ConfigurableService;
-import org.openhab.core.config.core.Configuration;
 import org.openhab.core.voice.VoiceManager;
-import org.openhab.voice.habspeaker.internal.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.auth.HABSpeakerJwtHelper;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocol;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceRegistration;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Modified;
-import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.http.HttpService;
 import org.osgi.service.http.NamespaceException;
 import org.slf4j.Logger;
@@ -61,19 +56,14 @@ import org.slf4j.LoggerFactory;
  *
  * @author Miguel Álvarez - Initial contribution
  */
-@Component(service = HABSpeakerWebSocketServlet.class, immediate = true, configurationPid = SERVICE_PID, property = Constants.SERVICE_PID
-        + "=" + SERVICE_PID)
-@ConfigurableService(category = SERVICE_CATEGORY, label = SERVICE_NAME, description_uri = SERVICE_CATEGORY + ":"
-        + SERVICE_ID)
 @NonNullByDefault
-public class HABSpeakerWebSocketServlet extends WebSocketServlet {
-
-    public static final String NAME = "habspeaker";
-    public static final String WS_PATH = "/" + NAME + "/ws";
+public class HABSpeakerWebSocketServlet extends WebSocketServlet implements HABSpeakerIOProtocol {
+    public static final String WS_PATH = "/" + SERVICE_ID + "/ws";
+    private static final String API_TOKEN_PREFIX = "oh.";
+    protected static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketServlet.class);
-
     private final HttpService httpService;
-    protected final List<HABSpeakerWebSocketHandler> handlers = new ArrayList<>();
+    private final List<HABSpeakerWebSocketHandler> handlers = new ArrayList<>();
     private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("OH-ui-habspeaker");
     protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
     protected final BundleContext bundleContext;
@@ -82,14 +72,14 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet {
     private final UserRegistry userRegistry;
     private final HABSpeakerJwtHelper jwtHelper;
     private final ScheduledFuture<?> pingTask;
-    private HABSpeakerConfig serviceConfig = new HABSpeakerConfig();
-    private static final String API_TOKEN_PREFIX = "oh.";
-    protected static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
+    private final HABSpeakerIOListener protocolListener;
+    private final HABSpeakerConfigProvider configProvider;
 
-    @Activate
-    public HABSpeakerWebSocketServlet(Map<String, Object> configProps, BundleContext bundleContext,
-            final @Reference HttpService httpService, final @Reference AudioManager audioManager,
-            final @Reference VoiceManager voiceManager, final @Reference UserRegistry userRegistry) {
+    public HABSpeakerWebSocketServlet(HABSpeakerIOListener protocolListener, HABSpeakerConfigProvider configProvider,
+            BundleContext bundleContext, HttpService httpService, AudioManager audioManager, VoiceManager voiceManager,
+            UserRegistry userRegistry) {
+        this.protocolListener = protocolListener;
+        this.configProvider = configProvider;
         this.bundleContext = bundleContext;
         this.httpService = httpService;
         this.audioManager = audioManager;
@@ -97,33 +87,29 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet {
         this.userRegistry = userRegistry;
         this.jwtHelper = new HABSpeakerJwtHelper();
         pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
-        modified(configProps);
-        registerServlet();
     }
 
-    private void registerServlet() {
+    @Override
+    public void register() {
         try {
             httpService.registerServlet(WS_PATH, this, null,
                     new HABSpeakerWebsocketContext(this, userRegistry, httpService.createDefaultHttpContext()));
             logger.debug("Started HABSpeaker at " + WS_PATH);
         } catch (NamespaceException | ServletException e) {
-            logger.error("Error during HABSpeaker startup: {}", e.getMessage());
+            logger.error("Error during HABSpeakerWebsocketIO, service will not work: {}", e.getMessage());
         }
     }
 
-    @Activate
-    public void activate(BundleContext bundleContext, Map<String, Object> config) {
-        modified(config);
-    }
-
-    @SuppressWarnings("null")
-    @Modified
-    public void modified(Map<String, Object> config) {
-        this.serviceConfig = new Configuration(config).as(HABSpeakerConfig.class);
+    @Override
+    public void unregister() {
+        disconnectHandlers();
+        httpService.unregister(WS_PATH);
+        pingTask.cancel(true);
+        handlers.clear();
     }
 
     public HABSpeakerConfig getConfig() {
-        return this.serviceConfig;
+        return this.configProvider.getConfig();
     }
 
     private void pingHandlers() {
@@ -145,10 +131,14 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet {
     private void disconnectHandlers() {
         logger.debug("Disconnecting {} clients...", handlers.size());
         for (var handler : handlers) {
-            try {
-                handler.getSession().disconnect();
-            } catch (IOException e) {
-                logger.debug("Disconnect failed: {}", e.getMessage());
+            protocolListener.onDisconnected(handler);
+            var session = handler.getSession();
+            if (session != null) {
+                try {
+                    session.disconnect();
+                } catch (IOException e) {
+                    logger.debug("Disconnect failed: {}", e.getMessage());
+                }
             }
         }
     }
@@ -176,19 +166,21 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet {
         }
     }
 
-    @Deactivate
-    public void deactivate() {
-        pingTask.cancel(true);
-        httpService.unregister(WS_PATH);
-        disconnectHandlers();
-        handlers.clear();
-    }
-
     @Override
     public void configure(@Nullable WebSocketServletFactory webSocketServletFactory) {
         if (webSocketServletFactory != null) {
             webSocketServletFactory.getPolicy().setIdleTimeout(60000);
             webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketHandler(this, executor));
         }
+    }
+
+    public void addHandler(HABSpeakerWebSocketHandler habSpeakerWebSocketHandler) {
+        handlers.add(habSpeakerWebSocketHandler);
+        protocolListener.onConnected(habSpeakerWebSocketHandler);
+    }
+
+    public void removeHandler(HABSpeakerWebSocketHandler habSpeakerWebSocketHandler) {
+        handlers.remove(habSpeakerWebSocketHandler);
+        protocolListener.onDisconnected(habSpeakerWebSocketHandler);
     }
 }

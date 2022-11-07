@@ -10,9 +10,9 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.websockets;
+package org.openhab.voice.habspeaker.internal.io.internal.websocket;
 
-import static org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketServlet.ALT_AUTH_HEADER;
+import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketServlet.ALT_AUTH_HEADER;
 
 import java.io.IOException;
 import java.net.URL;

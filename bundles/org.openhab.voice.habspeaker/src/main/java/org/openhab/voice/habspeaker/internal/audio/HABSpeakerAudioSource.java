@@ -25,7 +25,7 @@ import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
-import org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketHandler;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 
 /**
  * The {@link HABSpeakerAudioSource} class defines the speaker Audio Source
@@ -39,12 +39,12 @@ public class HABSpeakerAudioSource implements AudioSource {
     private final Set<AudioFormat> supportedFormats = Set.of(HABSPEAKER_SOURCE_FORMAT);
     private final String sourceId;
     private final String sourceLabel;
-    private final HABSpeakerWebSocketHandler wsHandler;
+    private final HABSpeakerIO speakerIO;
 
-    public HABSpeakerAudioSource(String id, String label, HABSpeakerWebSocketHandler wsHandler) {
+    public HABSpeakerAudioSource(String id, String label, HABSpeakerIO speakerIO) {
         this.sourceId = id;
         this.sourceLabel = label;
-        this.wsHandler = wsHandler;
+        this.speakerIO = speakerIO;
     }
 
     @Override
@@ -69,18 +69,18 @@ public class HABSpeakerAudioSource implements AudioSource {
             var pipeInput = new PipedInputStream(pipeOutput, 2730 * 20) {
                 @Override
                 public void close() throws IOException {
-                    wsHandler.unregisterListener(pipeOutput);
+                    speakerIO.removeSourceListener(pipeOutput);
                     super.close();
                 }
             };
-            wsHandler.registerListener(pipeOutput);
+            speakerIO.addSourceListener(pipeOutput);
             return new HABSpeakerAudioStream(HABSPEAKER_SOURCE_FORMAT, pipeInput);
         } catch (IOException e) {
             throw new AudioException(e);
         }
     }
 
-    public class HABSpeakerAudioStream extends AudioStream {
+    public static class HABSpeakerAudioStream extends AudioStream {
         private final InputStream input;
         private final AudioFormat format;
         private boolean closed = false;

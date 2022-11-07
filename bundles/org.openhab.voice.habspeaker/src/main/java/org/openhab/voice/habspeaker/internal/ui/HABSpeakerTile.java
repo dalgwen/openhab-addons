@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.tile;
+package org.openhab.voice.habspeaker.internal.ui;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_NAME;
 

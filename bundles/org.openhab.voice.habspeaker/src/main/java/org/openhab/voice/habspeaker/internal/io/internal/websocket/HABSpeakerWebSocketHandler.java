@@ -10,10 +10,10 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.websockets;
+package org.openhab.voice.habspeaker.internal.io.internal.websocket;
 
-import static org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketServlet.ALT_AUTH_HEADER;
-import static org.openhab.voice.habspeaker.internal.websockets.HABSpeakerWebSocketServlet.NAME;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketServlet.ALT_AUTH_HEADER;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -36,7 +36,9 @@ import org.openhab.core.audio.AudioSink;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
-import org.openhab.voice.habspeaker.internal.ks.HABSpeakerKS;
+import org.openhab.voice.habspeaker.internal.handler.HABSpeakerThingHandler;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,12 +52,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
+public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABSpeakerIO {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketHandler.class);
     private final HABSpeakerWebSocketServlet servlet;
     private final ScheduledExecutorService executor;
     private String id = "";
-    private String label = "";
     private @Nullable String listeningItem = null;
     private int requiredSinkSampleRate = 0;
     private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
@@ -63,9 +64,26 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
     private boolean initialized = false;
     private @Nullable HABSpeakerKS ks;
 
+    private int sinkVolume = 100;
+    private @Nullable HABSpeakerThingHandler thingHandler = null;
+
     public HABSpeakerWebSocketHandler(HABSpeakerWebSocketServlet servlet, ScheduledExecutorService executor) {
         this.servlet = servlet;
         this.executor = executor;
+    }
+
+    @Override
+    public void setThingHandler(@Nullable HABSpeakerThingHandler handler) {
+        thingHandler = handler;
+        if (handler != null) {
+            if (!initialized) {
+                logger.debug("loading current volume from handler");
+                sinkVolume = handler.getSinkVolume();
+                handler.updateSinkVolume(sinkVolume);
+            } else {
+                handler.setSinkVolume(sinkVolume);
+            }
+        }
     }
 
     public void handleCommand(WebsocketInputCommand command, Map<String, Object> data) {
@@ -73,7 +91,6 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
         switch (command) {
             case INITIALIZE:
                 id = (String) data.getOrDefault("id", "");
-                label = (String) data.getOrDefault("label", id);
                 requiredSinkSampleRate = (int) data.get("sampleRate");
                 listeningItem = (String) data.get("listeningItem");
                 @Nullable
@@ -84,7 +101,7 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
                 }
                 scheduledDisconnection.cancel(true);
                 if (isValidAccess(token)) {
-                    registerAudioComponents();
+                    registerSpeakerComponents();
                 } else {
                     logger.warn("Unauthorized access, disconnecting client");
                     try {
@@ -96,6 +113,13 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
             case ON_SPOT:
                 onRemoteSpot();
                 break;
+            case SINK_VOLUME:
+                try {
+                    sinkVolume = Integer.parseInt(data.getOrDefault("value", "0").toString());
+                    thingHandler.updateSinkVolume(sinkVolume);
+                } catch (NumberFormatException e) {
+                    logger.warn("Unable to parse sink volume");
+                }
             default:
                 logger.warn("Unhandled JSON command: {}", data);
         }
@@ -126,7 +150,7 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
             logger.warn("Missing audio components");
             return;
         }
-        var ks = new HABSpeakerKS();
+        var ks = new HABSpeakerKS(this);
         this.ks = ks;
         servlet.voiceManager.startDialog(ks, null, null, null, List.of(), source, sink, null, null, listeningItem);
     }
@@ -136,21 +160,28 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
         if (source != null) {
             try {
                 servlet.voiceManager.stopDialog(source);
-            } catch (IllegalStateException e) {
+            } catch (Exception e) {
                 logger.debug("Unable to stop dialog for {}", getSourceId());
             }
         }
     }
 
-    public void sendAudio(byte b[]) {
+    public void sendAudio(byte[] id, byte[] b) {
         try {
-            getRemote().sendBytes(ByteBuffer.wrap(b));
+            var remote = getRemote();
+            if (remote != null) {
+                // concat stream identifier and send
+                ByteBuffer buff = ByteBuffer.wrap(new byte[id.length + b.length]);
+                buff.put(id);
+                buff.put(b);
+                remote.sendBytes(ByteBuffer.wrap(buff.array()));
+            }
         } catch (IOException e) {
             logger.warn("IOException while sending audio");
         }
     }
 
-    public void registerListener(OutputStream output) {
+    public void addSourceListener(OutputStream output) {
         synchronized (listeners) {
             listeners.add(output);
             if (listeners.size() == 1) {
@@ -159,11 +190,22 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
         }
     }
 
-    public void unregisterListener(OutputStream output) {
+    public void removeSourceListener(OutputStream output) {
         synchronized (listeners) {
             listeners.remove(output);
             if (listeners.size() == 0) {
                 sendClientCommand(WebsocketOutputCommand.STOP_LISTENING);
+            }
+        }
+    }
+
+    @Override
+    public void disconnect() {
+        var session = getSession();
+        if (session != null) {
+            try {
+                session.disconnect();
+            } catch (IOException ignored) {
             }
         }
     }
@@ -175,7 +217,6 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
             // never
             return;
         }
-        servlet.handlers.add(this);
         logger.info("New client connected.");
         scheduledDisconnection = executor.schedule(() -> {
             try {
@@ -185,10 +226,19 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
         }, 5, TimeUnit.SECONDS);
     }
 
-    private synchronized void registerAudioComponents() {
+    private synchronized void registerSpeakerComponents() {
         try {
-            if (id.isBlank() || label.isBlank()) {
+            if (id.isBlank()) {
                 throw new IOException("Unable to register audio components");
+            }
+            servlet.addHandler(this);
+            var label = "HAB Speaker (" + id + ")";
+            var thingHandler = this.thingHandler;
+            if (thingHandler != null) {
+                var config = thingHandler.getSpeakerConfig();
+                if (!config.label.isBlank()) {
+                    label = config.label;
+                }
             }
             var sourceId = getSourceId();
             logger.debug("Registering audio source {}", sourceId);
@@ -209,7 +259,13 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
                     servlet.bundleContext.registerService(AudioSink.class.getName(),
                             new HABSpeakerAudioSink(sinkId, label, requiredSinkSampleRate, this), new Hashtable<>()));
             startDialog();
-            sendClientCommand(WebsocketOutputCommand.INITIALIZED);
+            var sinkVolume = this.getSinkVolume();
+            if (thingHandler != null) {
+                sinkVolume = thingHandler.getSinkVolume();
+            }
+            var initializedConfig = new HashMap<String, Object>();
+            initializedConfig.put("sinkVolume", sinkVolume);
+            sendClientCommand(WebsocketOutputCommand.INITIALIZED, initializedConfig);
         } catch (IOException | IllegalStateException e) {
             logger.warn("Disconnecting client: {}", e.getMessage());
             var session = getSession();
@@ -222,7 +278,8 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
         }
     }
 
-    private void unregisterAudioComponents() {
+    private synchronized void unregisterSpeakerComponents() {
+        stopDialog();
         var sourceId = getSourceId();
         ServiceRegistration<?> sourceReg = servlet.audioComponentRegistrations.remove(sourceId);
         if (sourceReg != null) {
@@ -243,21 +300,24 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
 
     private void sendClientCommand(WebsocketOutputCommand command, Map<String, Object> args) {
         args.put("cmd", command.toString());
-        try {
-            getRemote().sendString(new ObjectMapper().writeValueAsString(args));
-        } catch (JsonProcessingException e) {
-            logger.warn("JsonProcessingException writing JSON message: ", e);
-        } catch (IOException e) {
-            logger.debug("IOException sending client command: ", e);
+        var remote = getRemote();
+        if (remote != null) {
+            try {
+                remote.sendString(new ObjectMapper().writeValueAsString(args));
+            } catch (JsonProcessingException e) {
+                logger.warn("JsonProcessingException writing JSON message: ", e);
+            } catch (IOException e) {
+                logger.debug("IOException sending client command: ", e);
+            }
         }
     }
 
     private String getSinkId() {
-        return NAME + "::" + id + "::sink";
+        return SERVICE_ID + "::" + id + "::sink";
     }
 
     private String getSourceId() {
-        return NAME + "::" + id + "::source";
+        return SERVICE_ID + "::" + id + "::source";
     }
 
     @Override
@@ -298,21 +358,39 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter {
     public void onWebSocketClose(int statusCode, @Nullable String reason) {
         super.onWebSocketClose(statusCode, reason);
         logger.debug("Session closed with code {}: {}", statusCode, reason);
-        servlet.handlers.remove(this);
+        servlet.removeHandler(this);
         if (initialized) {
-            stopDialog();
-            unregisterAudioComponents();
+            unregisterSpeakerComponents();
         }
+    }
+
+    @Override
+    public String getId() {
+        return id;
+    }
+
+    @Override
+    public void setSinkVolume(int value) {
+        var data = new HashMap<String, Object>();
+        data.put("value", value);
+        sendClientCommand(WebsocketOutputCommand.SINK_VOLUME, data);
+    }
+
+    @Override
+    public int getSinkVolume() {
+        return sinkVolume;
     }
 
     private enum WebsocketInputCommand {
         INITIALIZE,
         ON_SPOT,
+        SINK_VOLUME,
     }
 
     private enum WebsocketOutputCommand {
         INITIALIZED,
         START_LISTENING,
         STOP_LISTENING,
+        SINK_VOLUME,
     }
 }

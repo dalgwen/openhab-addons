@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.ks;
+package org.openhab.voice.habspeaker.internal.voice;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -27,6 +27,7 @@ import org.openhab.core.voice.KSListener;
 import org.openhab.core.voice.KSService;
 import org.openhab.core.voice.KSServiceHandle;
 import org.openhab.core.voice.KSpottedEvent;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,12 @@ public class HABSpeakerKS implements KSService {
         SUPPORTED_STREAMS.add(FixedLengthAudioStream.class);
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerKS.class);
+    private final HABSpeakerIO speakerIO;
     private @Nullable KSListener ksListener;
+
+    public HABSpeakerKS(HABSpeakerIO speakerIO) {
+        this.speakerIO = speakerIO;
+    }
 
     public void onRemoteSpot() {
         var ksListener = this.ksListener;
@@ -79,11 +85,13 @@ public class HABSpeakerKS implements KSService {
             throws KSException {
         this.ksListener = ksListener;
         try {
+            Thread.sleep(0);
+        } catch (InterruptedException ignored) {
+        }
+        try {
             audioStream.close();
         } catch (IOException ignored) {
         }
-        return () -> {
-            // TODO: close websocket
-        };
+        return speakerIO::disconnect;
     }
 }

@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.tile;
+package org.openhab.voice.habspeaker.internal.ui;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -88,6 +88,6 @@ public class HABSpeakerHttpContext implements HttpContext {
     }
 
     private boolean isGzipVersionAvailable(@Nullable String name) {
-        return name != null && name.endsWith(".css") || name.endsWith(".js") && !name.contains("websocket-worker");
+        return name != null && (name.endsWith(".css") || name.endsWith(".js")) && !name.contains("websocket-worker");
     }
 }

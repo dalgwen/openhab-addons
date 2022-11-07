@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal;
+package org.openhab.voice.habspeaker.internal.config;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 

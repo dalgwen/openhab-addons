@@ -13,6 +13,7 @@
 package org.openhab.voice.habspeaker.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.core.thing.ThingTypeUID;
 
 /**
  * The {@link HABSpeakerConstants} class defines common constants, which are
@@ -42,4 +43,11 @@ public class HABSpeakerConstants {
      * Service pid
      */
     public static final String SERVICE_PID = "org.openhab." + SERVICE_CATEGORY + "." + SERVICE_ID;
+    // THINGS
+    /**
+     * Speaker thing uid
+     */
+    public static final ThingTypeUID SPEAKER_THING_TYPE = new ThingTypeUID(SERVICE_ID, "speaker");
+    // CHANNELS
+    public static final String SINK_VOLUME_CHANNEL = "sink-volume";
 }
