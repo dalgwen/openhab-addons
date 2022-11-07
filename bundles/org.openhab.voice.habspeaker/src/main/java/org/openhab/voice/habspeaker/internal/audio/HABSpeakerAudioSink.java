@@ -101,11 +101,12 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     @Override
     public PercentType getVolume() throws IOException {
-        return PercentType.valueOf("0");
+        return new PercentType(speakerIO.getSinkVolume());
     }
 
     @Override
     public void setVolume(PercentType percentType) throws IOException {
+        speakerIO.setSinkVolume(percentType.intValue());
     }
 
     private static class HABSpeakerWebSocketOutputStream extends OutputStream {
