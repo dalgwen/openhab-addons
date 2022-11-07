@@ -58,6 +58,12 @@ export default class WebSocketWorker {
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
           break;
+        case WorkerInCmd.SINK_VOLUME:
+          const sinkVolume = ev.data.value;
+          if (sinkVolume != null) {
+            this.postToWebSocket(WebSocketInCmd.SINK_VOLUME, { value: sinkVolume });
+          }
+          break;
         case WorkerInCmd.TOKEN_RENEW:
           this.token = ev.data.token;
           break;
@@ -92,13 +98,19 @@ export default class WebSocketWorker {
       console.debug("websocket => worker: ", data);
       switch (data.cmd) {
         case WebSocketOutCmd.INITIALIZED:
-          this.postToMainThread(WorkerOutCmd.INITIALIZED);
+          this.postToMainThread(WorkerOutCmd.INITIALIZED, { sinkVolume: data.sinkVolume });
           break;
         case WebSocketOutCmd.START_LISTENING:
           this.postToMainThread(WorkerOutCmd.START_LISTENING);
           break;
         case WebSocketOutCmd.STOP_LISTENING:
           this.postToMainThread(WorkerOutCmd.STOP_LISTENING);
+          break;
+        case WebSocketOutCmd.SINK_VOLUME:
+          const sinkVolume = data.value;
+          if (sinkVolume != null) {
+            this.postToMainThread(WorkerOutCmd.SINK_VOLUME, { value: sinkVolume });
+          }
           break;
         default:
           throw new Error("Unknown command: " + data.cmd);
@@ -180,12 +192,14 @@ export default class WebSocketWorker {
 const WebSocketInCmd = {
   INITIALIZE: "INITIALIZE",
   ON_SPOT: "ON_SPOT",
+  SINK_VOLUME: "SINK_VOLUME",
 };
 // Commands from server to worker (no command for receiving audio as is sent as binary).
 const WebSocketOutCmd = {
   INITIALIZED: "INITIALIZED",
   START_LISTENING: "START_LISTENING",
   STOP_LISTENING: "STOP_LISTENING",
+  SINK_VOLUME: "SINK_VOLUME",
 };
 // Commands from main thread to worker.
 export const WorkerInCmd = {
@@ -194,6 +208,7 @@ export const WorkerInCmd = {
   ON_SPOT: "ON_SPOT",
   RESET_CONNECTION: "RESET_CONNECTION",
   TOKEN_RENEW: "TOKEN_RENEW",
+  SINK_VOLUME: "SINK_VOLUME",
 };
 // Commands from worker to main thread.
 export const WorkerOutCmd = {
@@ -202,6 +217,7 @@ export const WorkerOutCmd = {
   SPEAK: "SPEAK",
   START_LISTENING: "START_LISTENING",
   STOP_LISTENING: "STOP_LISTENING",
+  SINK_VOLUME: "SINK_VOLUME",
 };
 
 // WAV conversion utils

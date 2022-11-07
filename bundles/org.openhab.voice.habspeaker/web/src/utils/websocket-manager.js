@@ -48,16 +48,22 @@ class AudioCache {
   }
 }
 /**
+ * @typedef {Object} SinkMetadata
+ * @property {number} audioCache - The audio cache
+ * @property {(value:number)=>void} setVolume - Volume
+ */
+/**
  *
  * @param {string} id
  * @param {(id: string, value:boolean)=> void} setSpeaking
  * @param {(id:string)=> void} onStop
- * @returns {AudioCache}
+ * @param {number} volume
+ * @returns {SinkMetadata}
  */
-function setupSinkAudio(id, setSpeaking, onStop) {
+function setupSinkAudio(id, setSpeaking, onStop, volume) {
   /**@type {ScriptProcessorNode} */
   let sinkProcessorNode = null;
-  /**@type {MediaStreamAudioSourceNode} */
+  /**@type {GainNode} */
   let gainNode = null;
   const audioCache = new AudioCache();
   // Sink teardown timeout id
@@ -96,13 +102,16 @@ function setupSinkAudio(id, setSpeaking, onStop) {
     }
   };
   gainNode = audioContext.createGain();
+  const setVolume = (value) => gainNode.gain.value = value / 100;
+  console.log("Setting stream volume to: "+volume);
+  setVolume(volume);
   sinkProcessorNode.connect(gainNode);
   audioCache.reset();
   gainNode.connect(audioContext.destination);
-  return audioCache;
+  return { audioCache, setVolume };
 }
 
-/**@type {Map<string, {audioCache: AudioCache, speaking: boolean}>} */
+/**@type {Map<string, {audioCache: AudioCache, setVolume: (value:number) => void, speaking: boolean}>} */
 const activeSinks = new Map();
 /**
  * 
@@ -124,6 +133,7 @@ let worker = null;
  * @returns {Promise<Worker>}
  */
 export async function startWebsocketWorker(id, label, listeningItem, token, actions) {
+  let volume = 100;
   await setupAudio();
   function onSinkSpeaking(id, speaking) {
     const sinkContext = activeSinks.get(id);
@@ -151,6 +161,11 @@ export async function startWebsocketWorker(id, label, listeningItem, token, acti
         console.debug("worker => main thread:", ev.data);
         switch (ev.data.cmd) {
           case WorkerOutCmd.INITIALIZED:
+            // load init config
+            const sinkVolume = ev.data.sinkVolume;
+            if(sinkVolume != null) {
+              volume = sinkVolume;
+            }
             actions.setOnline(true);
             break;
           case WorkerOutCmd.OFFLINE:
@@ -165,7 +180,7 @@ export async function startWebsocketWorker(id, label, listeningItem, token, acti
           case WorkerOutCmd.SPEAK: {
             let sinkContext = activeSinks.get(ev.data.id);
             if (!sinkContext) {
-              sinkContext = { audioCache: setupSinkAudio(ev.data.id, onSinkSpeaking, onSinkStop), speaking: false };
+              sinkContext = { ...setupSinkAudio(ev.data.id, onSinkSpeaking, onSinkStop, volume), speaking: false };
               activeSinks.set(ev.data.id, sinkContext);
             }
             sinkContext.audioCache.writeAudioData(ev.data.buffer);
@@ -189,6 +204,12 @@ export async function startWebsocketWorker(id, label, listeningItem, token, acti
               // ignore the error
             }
             break;
+          case WorkerOutCmd.SINK_VOLUME:
+            volume = ev.data.value;
+            activeSinks.forEach(sinkContext=>{
+              sinkContext.setVolume(volume);
+            });
+            break;
         }
       };
       worker.onerror = (err) => {
@@ -198,9 +219,7 @@ export async function startWebsocketWorker(id, label, listeningItem, token, acti
       worker.postMessage({
         cmd: WorkerInCmd.INITIALIZE,
         id,
-        label,
         token,
-        listeningItem,
         sampleRate: audioContext.sampleRate,
       });
       resolve(worker);
