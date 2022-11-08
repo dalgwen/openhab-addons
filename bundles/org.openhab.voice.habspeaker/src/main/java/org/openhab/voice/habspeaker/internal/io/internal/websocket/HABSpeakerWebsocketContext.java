@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class HABSpeakerWebsocketContext implements HttpContext {
-    private static final String SESSION_COOKIE = "X-OPENHAB-SESSIONID";
+    private static final String HAB_SPEAKER_COOKIE = "X-HABSPEAKER-SESSIONID";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebsocketContext.class);
     private final UserRegistry userRegistry;
     private final HttpContext defaultHttpContext;
@@ -76,12 +76,10 @@ public class HABSpeakerWebsocketContext implements HttpContext {
         Optional<User> user = Optional.empty();
         var cookies = request.getCookies();
         if (cookies != null && cookies.length > 0) {
-            var sessionCookie = Arrays.stream(cookies).filter(cookie -> SESSION_COOKIE.equals(cookie.getName()))
+            var sessionCookie = Arrays.stream(cookies).filter(cookie -> HAB_SPEAKER_COOKIE.equals(cookie.getName()))
                     .findAny();
-            user = sessionCookie.flatMap(cookie -> userRegistry.getAll().stream()
-                    .filter(u -> ((ManagedUser) u).getSessions().stream()
-                            .anyMatch(s -> s.hasSessionCookie() && s.getSessionId().equals(cookie.getValue())))
-                    .findAny());
+            user = sessionCookie.flatMap(cookie -> userRegistry.getAll().stream().filter(u -> ((ManagedUser) u)
+                    .getSessions().stream().anyMatch(s -> s.getSessionId().equals(cookie.getValue()))).findAny());
             user.ifPresent((_user) -> logger.debug("Found active user session: {}", _user.getName()));
         }
         return user.isPresent();

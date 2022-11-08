@@ -2,12 +2,11 @@
 import { RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 
-const { isTokenRequired, refreshAccessToken } = useAuthStore();
+const { isTokenRequired, authorize } = useAuthStore();
 isTokenRequired().then(async (requireToken) => {
-  console.debug("Token required: " + requireToken);
   if (requireToken) {
-    console.debug("Refreshing token...");
-    await refreshAccessToken();
+    console.debug("Authorization required!");
+    await authorize();
   } else {
     console.debug("Authorization no required!");
   }

@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import axios from "axios";
 import { useAssistantStore } from "./assistant";
-import { ohAuthHelper } from "../utils/openhab-auth-helper";
+import { OHAuthHelper } from "../utils/openhab-auth-helper";
 export const useAuthStore = defineStore("auth", () => {
   const { renewToken } = useAssistantStore();
+  const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker' });
   function getAccessToken() {
     return ohAuthHelper.getAccessToken();
   }
@@ -21,23 +22,37 @@ export const useAuthStore = defineStore("auth", () => {
       });
     return requireToken;
   }
+  async function getSpeakerCookie() {
+    const headers = {
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+    }
+    if (ohAuthHelper.hasAccessToken()) { headers["Authorization"] = "Bearer " + ohAuthHelper.getAccessToken(); }
+    await axios
+      .post("/rest/habspeaker/cookie", `${encodeURIComponent("refresh_token")}=${encodeURIComponent(ohAuthHelper.getRefreshToken())}`, { headers });
+  }
   function unauthorized() {
-    const mainUrl = document.location.origin;
-    console.debug("Unauthorized, redirecting to main url: " + mainUrl);
+    console.debug("Unauthorized, redirecting to login");
     if (!import.meta.env.DEV) {
       ohAuthHelper.authorize();
     } else {
-      console.warn("Redirection disabled in dev mode");
+      console.warn("Login redirection disabled in dev mode");
     }
   }
-  async function refreshAccessToken() {
-    await ohAuthHelper.tryExchangeAuthorizationCode();
-    await ohAuthHelper.refreshAccessToken((err, data) => {
-      if(err) {
-        return unauthorized();
-      }
-      renewToken(data.access_token);
-    });
+  async function authorize() {
+    try {
+      const authorized = await ohAuthHelper.tryExchangeAuthorizationCode();
+      await ohAuthHelper.refreshAccessToken((err, data) => {
+        if (err) {
+          return unauthorized();
+        }
+        renewToken(data.access_token);
+        getSpeakerCookie().catch(err => console.error(err));
+      }, !authorized);
+    } catch (error) {
+      console.error(error);
+      return unauthorized();
+    }
   }
-  return { isTokenRequired, getAccessToken, refreshAccessToken };
+  return { isTokenRequired, getAccessToken, authorize };
 });

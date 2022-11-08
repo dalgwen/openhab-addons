@@ -1,16 +1,23 @@
 import axios from "axios";
-class OHAuthHelper {
-    accessToken = ""
-    authorize(setup) {
+export class OHAuthHelper {
+    accessToken = "";
+    constructor(options = {}) {
+        this.options = options;
+    }
+    getRedirectUri() {
+        return window.location.origin + (this.options.path ?? '');
+    }
+    authorize() {
         import('pkce-challenge').then((PkceChallenge) => {
             const pkceChallenge = PkceChallenge.default()
-            const authState = (setup ? 'setup-' : '') + generateUUID();
+            const authState = (this.options.setup ? 'setup-' : '') + generateUUID();
             sessionStorage.setItem('openhab.ui:codeVerifier', pkceChallenge.code_verifier)
             sessionStorage.setItem('openhab.ui:authState', authState)
+            var redirectUri = this.getRedirectUri();
             window.location = '/auth?' + urlEncodeObject({
                 response_type: "code",
-                client_id: window.location.origin,
-                redirect_uri: window.location.origin,
+                client_id: redirectUri,
+                redirect_uri: redirectUri,
                 scope: "admin",
                 code_challenge_method: "S256",
                 code_challenge: pkceChallenge.code_challenge,
@@ -24,56 +31,65 @@ class OHAuthHelper {
      * @param {(err: Error|null, { access_token: string, refresh_token: string }) => void} callback 
      * @param {boolean} noRefresh 
      */
-    async refreshAccessToken(callback, noRefresh = false) {
+    async refreshAccessToken(callback, refreshNow = true) {
         try {
             const refreshToken = this.getRefreshToken();
             if (!refreshToken) {
                 throw new Error("Missing refresh token");
             }
-            const payload = urlEncodeObject({
-                grant_type: "refresh_token",
-                client_id: window.location.origin,
-                redirect_uri: window.location.origin,
-                refresh_token: refreshToken,
-            });
-            const resp = await axios.post("/rest/auth/token", payload, {
-                headers: {
-                    "content-type": "application/x-www-form-urlencoded",
-                    accept: "application/json",
-                },
-            });
-            this.accessToken = resp.data.access_token;
-            if (callback) {
-                callback(null, resp.data);
-                if (!noRefresh) {
-                    if (this.refreshAccessTokenTimeoutRef) {
-                        clearTimeout(this.refreshAccessTokenTimeoutRef);
-                    }
-                    const newRefreshFn = () => this.refreshAccessToken(callback, true);
-                    this.refreshAccessTokenTimeoutRef = setTimeout(
-                        newRefreshFn,
-                        resp.data.expires_in * 950,
-                    );
-                    this.currentTokenExpireTime = new Date().getTime() + resp.expires_in * 950;
-                    if (this.refreshOnVisibilityChangeFn) {
-                        document.removeEventListener("visibilitychange", this.refreshOnVisibilityChangeFn);
-                    }
-                    this.refreshOnVisibilityChangeFn = () => {
-                        if (!document.hidden && this.currentTokenExpireTime && this.currentTokenExpireTime < new Date().getTime()) {
-                            console.log('Refreshing expired token')
-                            this.refreshAccessToken(callback, true);
-                        }
-                    };
-                    document.addEventListener("visibilitychange", this.refreshOnVisibilityChangeFn);
-                }
+            if (this.currentTokenExpireTime == null || refreshNow) {
+                var redirectUri = this.getRedirectUri();
+                const payload = urlEncodeObject({
+                    grant_type: "refresh_token",
+                    client_id: redirectUri,
+                    redirect_uri: redirectUri,
+                    refresh_token: refreshToken,
+                });
+                const resp = await axios.post("/rest/auth/token", payload, {
+                    headers: {
+                        "content-type": "application/x-www-form-urlencoded",
+                        accept: "application/json",
+                    },
+                });
+                this.accessToken = resp.data.access_token;
+                this.setRefreshToken(resp.data.refresh_token);
+                this.currentTokenExpireTime = new Date().getTime() + resp.data.expires_in * 950;
             }
-            return resp.data;
+            const result = { access_token: this.getAccessToken(), refresh_token: this.getRefreshToken() };
+            if (callback) {
+                if(this.currentTokenExpireTime == null || isNaN(this.currentTokenExpireTime)) {
+                    throw new Error("Missing token expire time");
+                }
+                callback(null, result);
+                if (this.refreshAccessTokenTimeoutRef) {
+                    clearTimeout(this.refreshAccessTokenTimeoutRef);
+                }
+                const newRefreshFn = () => this.refreshAccessToken(callback);
+                this.refreshAccessTokenTimeoutRef = setTimeout(
+                    newRefreshFn,
+                    this.currentTokenExpireTime - new Date().getTime(),
+                );
+                if (this.refreshOnVisibilityChangeFn) {
+                    document.removeEventListener("visibilitychange", this.refreshOnVisibilityChangeFn);
+                }
+                this.refreshOnVisibilityChangeFn = () => {
+                    if (!document.hidden && this.currentTokenExpireTime && this.currentTokenExpireTime < new Date().getTime()) {
+                        console.debug('Refreshing expired token')
+                        this.refreshAccessToken(callback);
+                    }
+                };
+                document.addEventListener("visibilitychange", this.refreshOnVisibilityChangeFn);
+            }
+            return result;
         } catch (error) {
             console.error(error);
             if (callback) {
                 callback(error, null);
             }
         }
+    }
+    hasAccessToken() {
+        return !!this.getAccessToken().length;
     }
     getAccessToken() {
         return this.accessToken;
@@ -98,24 +114,29 @@ class OHAuthHelper {
             if (window.history) {
                 window.history.replaceState(null, window.title, window.location.href.replace('?code=' + code, '').replace('&state=' + authState, ''))
             }
-            const codeVerifier = sessionStorage.getItem('openhab.ui:codeVerifier')
-            sessionStorage.removeItem('openhab.ui:codeVerifier')
+            const codeVerifier = sessionStorage.getItem('openhab.ui:codeVerifier');
+            sessionStorage.removeItem('openhab.ui:codeVerifier');
+            var redirectUri = this.getRedirectUri();
             const payload = urlEncodeObject({
                 'grant_type': 'authorization_code',
-                'client_id': window.location.origin,
-                'redirect_uri': window.location.origin,
+                'client_id': redirectUri,
+                'redirect_uri': redirectUri,
                 'code': code,
                 'code_verifier': codeVerifier
             });
             this.clearAccessToken();
-            const resp = await axios.post('/rest/auth/token?useCookie=true', payload, {
+            const resp = await axios.post('/rest/auth/token?useCookie=' + (this.options.useCookie ?? false), payload, {
                 headers: {
                     "content-type": "application/x-www-form-urlencoded",
                     accept: "application/json",
                 },
             });
+            this.accessToken = resp.data.access_token;
             this.setRefreshToken(resp.data.refresh_token);
+            this.currentTokenExpireTime = new Date().getTime() + resp.data.expires_in * 950;
+            return true;
         }
+        return false;
     }
 }
 function getQueryParams() {
@@ -156,4 +177,3 @@ function generateUUID(mask = null) {
         return (c == 'x' ? r : (r & 0x7 | 0x8)).toString(16);
     });
 };
-export const ohAuthHelper = new OHAuthHelper();

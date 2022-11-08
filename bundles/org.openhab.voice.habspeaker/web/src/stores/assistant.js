@@ -37,7 +37,7 @@ export const useAssistantStore = defineStore("assistant", () => {
         setOnline,
       }).then((_worker) => {
         worker = _worker;
-        console.log("worker running");
+        console.info("worker running");
         return worker;
       });
     }
