@@ -62,7 +62,7 @@ public class HABSpeakerKS implements KSService {
 
     @Override
     public String getId() {
-        return "habspeakerks";
+        return "habspeaker::" + speakerIO.getId() + "::ks";
     }
 
     @Override
