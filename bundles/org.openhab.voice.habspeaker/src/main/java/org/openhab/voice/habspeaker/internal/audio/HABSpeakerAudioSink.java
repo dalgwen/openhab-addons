@@ -48,6 +48,7 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     static {
         SUPPORTED_FORMATS.add(AudioFormat.WAV);
+        SUPPORTED_FORMATS.add(AudioFormat.MP3);
         SUPPORTED_STREAMS.add(FixedLengthAudioStream.class);
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerAudioSink.class);
@@ -56,11 +57,13 @@ public class HABSpeakerAudioSink implements AudioSink {
     private final String sinkLabel;
     private final HABSpeakerIO speakerIO;
     private final long targetSampleRate;
+    private final int targetChannels;
 
-    public HABSpeakerAudioSink(String id, String label, long targetSampleRate, HABSpeakerIO speakerIO) {
+    public HABSpeakerAudioSink(String id, String label, long sampleRate, int channels, HABSpeakerIO speakerIO) {
         this.sinkId = id;
         this.sinkLabel = label;
-        this.targetSampleRate = targetSampleRate;
+        this.targetSampleRate = sampleRate;
+        this.targetChannels = channels;
         this.speakerIO = speakerIO;
     }
 
@@ -80,7 +83,8 @@ public class HABSpeakerAudioSink implements AudioSink {
         if (audioStream == null) {
             return;
         }
-        try (ConvertedInputStream convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate)) {
+        try (ConvertedInputStream convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate,
+                targetChannels)) {
             convertedInputStream.transferTo(new HABSpeakerWebSocketOutputStream(speakerIO));
         } catch (UnsupportedAudioFileException e) {
             logger.warn("UnsupportedAudioFileException: {}", e.getMessage());

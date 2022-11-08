@@ -75,15 +75,6 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
     @Override
     public void setThingHandler(@Nullable HABSpeakerThingHandler handler) {
         thingHandler = handler;
-        if (handler != null) {
-            if (!initialized) {
-                logger.debug("loading current volume from handler");
-                sinkVolume = handler.getSinkVolume();
-                handler.updateSinkVolume(sinkVolume);
-            } else {
-                handler.setSinkVolume(sinkVolume);
-            }
-        }
     }
 
     public void handleCommand(WebsocketInputCommand command, Map<String, Object> data) {
@@ -92,7 +83,6 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
             case INITIALIZE:
                 id = (String) data.getOrDefault("id", "");
                 requiredSinkSampleRate = (int) data.get("sampleRate");
-                listeningItem = (String) data.get("listeningItem");
                 @Nullable
                 String token = (String) data.get("token");
                 if (token == null) {
@@ -111,12 +101,17 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
                 }
                 break;
             case ON_SPOT:
-                onRemoteSpot();
+                var ks = this.ks;
+                if (ks != null) {
+                    ks.onRemoteSpot();
+                }
                 break;
             case SINK_VOLUME:
                 try {
                     sinkVolume = Integer.parseInt(data.getOrDefault("value", "0").toString());
-                    thingHandler.updateSinkVolume(sinkVolume);
+                    if (thingHandler != null) {
+                        thingHandler.updateSinkVolume(sinkVolume);
+                    }
                 } catch (NumberFormatException e) {
                     logger.warn("Unable to parse sink volume");
                 }
@@ -134,13 +129,6 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
             return false;
         }
         return servlet.isValidToken(token);
-    }
-
-    private void onRemoteSpot() {
-        var ks = this.ks;
-        if (ks != null) {
-            ks.onRemoteSpot();
-        }
     }
 
     private void startDialog() throws IllegalStateException {
@@ -232,13 +220,23 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
                 throw new IOException("Unable to register audio components");
             }
             servlet.addHandler(this);
-            var label = "HAB Speaker (" + id + ")";
+            String label = "HAB Speaker (" + id + ")";
+            var sinkStereo = false;
             var thingHandler = this.thingHandler;
             if (thingHandler != null) {
+                // send speaker configuration before initialization
                 var config = thingHandler.getSpeakerConfig();
                 if (!config.label.isBlank()) {
                     label = config.label;
                 }
+                listeningItem = !config.listeningItem.isBlank() ? config.listeningItem : null;
+                var initializedConfig = new HashMap<String, Object>();
+                var currentVolume = thingHandler.getSinkVolume();
+                sinkVolume = currentVolume != null ? currentVolume : config.sinkVolume;
+                initializedConfig.put("sinkVolume", sinkVolume);
+                sinkStereo = config.sinkStereo;
+                initializedConfig.put("sinkStereo", sinkStereo);
+                sendClientCommand(WebsocketOutputCommand.CONFIGURE, initializedConfig);
             }
             var sourceId = getSourceId();
             logger.debug("Registering audio source {}", sourceId);
@@ -257,24 +255,13 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
             // register sink
             servlet.audioComponentRegistrations.put(sinkId,
                     servlet.bundleContext.registerService(AudioSink.class.getName(),
-                            new HABSpeakerAudioSink(sinkId, label, requiredSinkSampleRate, this), new Hashtable<>()));
+                            new HABSpeakerAudioSink(sinkId, label, requiredSinkSampleRate, sinkStereo ? 2 : 1, this),
+                            new Hashtable<>()));
             startDialog();
-            var sinkVolume = this.getSinkVolume();
-            if (thingHandler != null) {
-                sinkVolume = thingHandler.getSinkVolume();
-            }
-            var initializedConfig = new HashMap<String, Object>();
-            initializedConfig.put("sinkVolume", sinkVolume);
-            sendClientCommand(WebsocketOutputCommand.INITIALIZED, initializedConfig);
+            sendClientCommand(WebsocketOutputCommand.INITIALIZED);
         } catch (IOException | IllegalStateException e) {
             logger.warn("Disconnecting client: {}", e.getMessage());
-            var session = getSession();
-            if (session != null) {
-                try {
-                    session.disconnect();
-                } catch (IOException ignored) {
-                }
-            }
+            disconnect();
         }
     }
 
@@ -388,6 +375,7 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
     }
 
     private enum WebsocketOutputCommand {
+        CONFIGURE,
         INITIALIZED,
         START_LISTENING,
         STOP_LISTENING,

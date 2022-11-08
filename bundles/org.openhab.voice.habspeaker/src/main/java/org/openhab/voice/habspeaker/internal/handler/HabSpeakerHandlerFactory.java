@@ -79,7 +79,8 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
             var handler = new HABSpeakerThingHandler(thing);
-            handler.setDeviceIO(ioManager.getSpeakerConnection(handler.getSpeakerId()));
+            var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
+            handler.setSpeakerIO(speakerIO);
             speakerHandlers.put(handler.getSpeakerId(), handler);
             return handler;
         }
@@ -96,7 +97,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("connecting speaker {} handler", speaker.getId());
-            handler.setDeviceIO(speaker);
+            handler.setSpeakerIO(speaker);
             handler.updateStatus();
         }
     }
@@ -106,7 +107,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("disconnecting speaker {} handler", speaker.getId());
-            handler.setDeviceIO(null);
+            handler.setSpeakerIO(null);
             handler.updateStatus();
         }
     }

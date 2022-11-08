@@ -14,6 +14,8 @@ package org.openhab.voice.habspeaker.internal.handler;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
 
+import java.util.Map;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.DecimalType;
@@ -39,8 +41,8 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerThingHandler extends BaseThingHandler {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
-    private @Nullable HABSpeakerIO deviceIO = null;
-    private int sinkVolume = 100;
+    private @Nullable HABSpeakerIO speakerIO = null;
+    private @Nullable Integer sinkVolume = null;
 
     public HABSpeakerThingHandler(Thing thing) {
         super(thing);
@@ -50,12 +52,24 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
     public void initialize() {
         this.config = getConfigAs(HABSpeakerThingConfig.class);
         updateStatus();
+        if (speakerIO != null) {
+            this.sinkVolume = speakerIO.getSinkVolume();
+        }
     }
 
-    public void setDeviceIO(@Nullable HABSpeakerIO deviceIO) {
-        this.deviceIO = deviceIO;
-        if (deviceIO != null) {
-            deviceIO.setThingHandler(this);
+    public void setSpeakerIO(@Nullable HABSpeakerIO speakerIO) {
+        this.speakerIO = speakerIO;
+        if (speakerIO != null) {
+            speakerIO.setThingHandler(this);
+        }
+    }
+
+    @Override
+    public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
+        super.handleConfigurationUpdate(configurationParameters);
+        // forces a disconnection so the speaker reconnects with the new config
+        if (speakerIO != null) {
+            speakerIO.disconnect();
         }
     }
 
@@ -64,7 +78,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
     }
 
     public void updateStatus() {
-        updateStatus(deviceIO == null ? ThingStatus.OFFLINE : ThingStatus.ONLINE);
+        updateStatus(speakerIO == null ? ThingStatus.OFFLINE : ThingStatus.ONLINE);
     }
 
     @Override
@@ -74,7 +88,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
 
     public void handleCommand(String channelId, Command command) {
         try {
-            var deviceIO = this.deviceIO;
+            var deviceIO = this.speakerIO;
             if (deviceIO == null) {
                 logger.warn("speaker {} is not connected", getSpeakerId());
                 return;
@@ -104,17 +118,13 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
         }
     }
 
-    public void setSinkVolume(int sinkVolume) {
-        this.sinkVolume = sinkVolume;
-    }
-
-    public int getSinkVolume() {
+    public @Nullable Integer getSinkVolume() {
         return sinkVolume;
     }
 
     @Override
     public void dispose() {
-        var deviceIO = this.deviceIO;
+        var deviceIO = this.speakerIO;
         if (deviceIO != null) {
             deviceIO.setThingHandler(null);
         }

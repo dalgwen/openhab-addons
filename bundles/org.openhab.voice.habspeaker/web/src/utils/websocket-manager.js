@@ -60,7 +60,8 @@ class AudioCache {
  * @param {number} volume
  * @returns {SinkMetadata}
  */
-function setupSinkAudio(id, setSpeaking, onStop, volume) {
+function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
+  let numberOfChannels = stereo ? 2 : 1;
   /**@type {ScriptProcessorNode} */
   let sinkProcessorNode = null;
   /**@type {GainNode} */
@@ -78,7 +79,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume) {
   }
   function debouncedStopSpeaker() {
     if (!speakerOffTimeout) {
-      speakerOffTimeout = setTimeout(() => stopSpeaker(), 3000);
+      speakerOffTimeout = setTimeout(() => stopSpeaker(), 1000);
     }
   }
   function cancelStopSpeaker() {
@@ -87,18 +88,37 @@ function setupSinkAudio(id, setSpeaking, onStop, volume) {
       speakerOffTimeout = null;
     }
   }
-  sinkProcessorNode = audioContext.createScriptProcessor(4096, 0, 1);
+  sinkProcessorNode = audioContext.createScriptProcessor(4096, 0, numberOfChannels);
   sinkProcessorNode.onaudioprocess = function (e) {
     if (audioCache.available()) {
       setSpeaking(id, true);
       cancelStopSpeaker();
-      e.outputBuffer
-        .getChannelData(0)
-        .set(audioCache.readAudioData(e.outputBuffer.length));
+      var audioData = audioCache.readAudioData(e.outputBuffer.length * numberOfChannels);
+      var channelsData = [];
+      if (numberOfChannels == 1) {
+        channelsData[0] = audioData;
+      } else {
+        var length = audioData.byteLength / audioData.BYTES_PER_ELEMENT;
+        for (let s = 0; s < length;s++) {
+          // the channel index
+          const c = s % numberOfChannels;
+          // the index inside the buffer channel
+          const i = (s - c) / numberOfChannels;
+          const channelData = channelsData[c] = (channelsData[c] ?? new Float32Array(length / numberOfChannels));
+          channelData [i] = audioData[s];
+        }
+      }
+      for (let c = 0; c < numberOfChannels; c++) {
+        e.outputBuffer
+          .getChannelData(c)
+          .set(channelsData[0]);
+      }
     } else {
       setSpeaking(id, false);
       debouncedStopSpeaker();
-      e.outputBuffer.getChannelData(0).set(audioCache.silence);
+      for (let c = 0; c < numberOfChannels; c++) {
+        e.outputBuffer.getChannelData(c).set(audioCache.silence);
+      }
     }
   };
   gainNode = audioContext.createGain();
@@ -131,7 +151,10 @@ let worker = null;
  * @returns {Promise<Worker>}
  */
 export async function startWebsocketWorker(id, token, actions) {
-  let volume = 100;
+  const sinkConfig = {
+    volume: 100,
+    stereo: false,
+  }
   await setupAudio();
   function onSinkSpeaking(id, speaking) {
     const sinkContext = activeSinks.get(id);
@@ -158,17 +181,23 @@ export async function startWebsocketWorker(id, token, actions) {
       worker.onmessage = (ev) => {
         console.debug("worker => main thread:", ev.data);
         switch (ev.data.cmd) {
-          case WorkerOutCmd.INITIALIZED:
-            // load init config
+          case WorkerOutCmd.CONFIGURE:
+            // TODO: disallow configure after initialized
             const sinkVolume = ev.data.sinkVolume;
-            if(sinkVolume != null) {
-              volume = sinkVolume;
+            if (sinkVolume != null) {
+              sinkConfig.volume = sinkVolume;
             }
+            const sinkStereo = ev.data.sinkStereo;
+            if (sinkStereo != null) {
+              sinkConfig.stereo = sinkStereo;
+            }
+            break;
+          case WorkerOutCmd.INITIALIZED:
             actions.setOnline(true);
             break;
           case WorkerOutCmd.OFFLINE:
-            actions.setOnline(false);
             actions.setListening(false);
+            actions.setOnline(false);
             try {
               processorNode.disconnect(audioContext.destination);
             } catch (error) {
@@ -178,7 +207,7 @@ export async function startWebsocketWorker(id, token, actions) {
           case WorkerOutCmd.SPEAK: {
             let sinkContext = activeSinks.get(ev.data.id);
             if (!sinkContext) {
-              sinkContext = { ...setupSinkAudio(ev.data.id, onSinkSpeaking, onSinkStop, volume), speaking: false };
+              sinkContext = { ...setupSinkAudio(ev.data.id, onSinkSpeaking, onSinkStop, sinkConfig.volume, sinkConfig.stereo), speaking: false };
               activeSinks.set(ev.data.id, sinkContext);
             }
             sinkContext.audioCache.writeAudioData(ev.data.buffer);
@@ -203,9 +232,9 @@ export async function startWebsocketWorker(id, token, actions) {
             }
             break;
           case WorkerOutCmd.SINK_VOLUME:
-            volume = ev.data.value;
-            activeSinks.forEach(sinkContext=>{
-              sinkContext.setVolume(volume);
+            sinkConfig.volume = ev.data.value;
+            activeSinks.forEach(sinkContext => {
+              sinkContext.setVolume(sinkConfig.volume);
             });
             break;
         }

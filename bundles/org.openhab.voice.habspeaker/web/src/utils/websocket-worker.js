@@ -90,7 +90,7 @@ export default class WebSocketWorker {
       console.debug("websocket => worker: ", data);
       switch (data.cmd) {
         case WebSocketOutCmd.INITIALIZED:
-          this.postToMainThread(WorkerOutCmd.INITIALIZED, { sinkVolume: data.sinkVolume });
+          this.postToMainThread(WorkerOutCmd.INITIALIZED);
           break;
         case WebSocketOutCmd.START_LISTENING:
           this.postToMainThread(WorkerOutCmd.START_LISTENING);
@@ -98,6 +98,8 @@ export default class WebSocketWorker {
         case WebSocketOutCmd.STOP_LISTENING:
           this.postToMainThread(WorkerOutCmd.STOP_LISTENING);
           break;
+        case WebSocketOutCmd.CONFIGURE:
+          this.postToMainThread(WorkerOutCmd.CONFIGURE, data);
         case WebSocketOutCmd.SINK_VOLUME:
           const sinkVolume = data.value;
           if (sinkVolume != null) {
@@ -159,7 +161,7 @@ export default class WebSocketWorker {
                 buffer: floatBuffer,
               });
             });
-            console.trace("websocket => worker: Binary data");
+            console.debug("websocket => worker: Binary data");
           }
           break;
         default:
@@ -186,6 +188,7 @@ const WebSocketInCmd = {
 };
 // Commands from server to worker (no command for receiving audio as is sent as binary).
 const WebSocketOutCmd = {
+  CONFIGURE: "CONFIGURE",
   INITIALIZED: "INITIALIZED",
   START_LISTENING: "START_LISTENING",
   STOP_LISTENING: "STOP_LISTENING",
@@ -202,6 +205,7 @@ export const WorkerInCmd = {
 };
 // Commands from worker to main thread.
 export const WorkerOutCmd = {
+  CONFIGURE: "CONFIGURE",
   INITIALIZED: "INITIALIZED",
   OFFLINE: "OFFLINE",
   SPEAK: "SPEAK",

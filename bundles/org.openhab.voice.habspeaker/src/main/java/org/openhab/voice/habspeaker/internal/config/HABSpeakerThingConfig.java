@@ -30,4 +30,13 @@ public class HABSpeakerThingConfig {
      * Custom listeningItem for this speaker
      */
     public String listeningItem = "";
+
+    /**
+     * Default volume for the sink
+     */
+    public int sinkVolume = 100;
+    /**
+     * Use dual channel audio sink
+     */
+    public boolean sinkStereo = false;
 }
