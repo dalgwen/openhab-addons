@@ -226,8 +226,9 @@ public class HABSpeakerWebSocketHandler extends WebSocketAdapter implements HABS
             if (thingHandler != null) {
                 // send speaker configuration before initialization
                 var config = thingHandler.getSpeakerConfig();
-                if (!config.label.isBlank()) {
-                    label = config.label;
+                var thingLabel = thingHandler.getThing().getLabel();
+                if (thingLabel != null && !thingLabel.isBlank()) {
+                    label = thingLabel;
                 }
                 listeningItem = !config.listeningItem.isBlank() ? config.listeningItem : null;
                 var initializedConfig = new HashMap<String, Object>();

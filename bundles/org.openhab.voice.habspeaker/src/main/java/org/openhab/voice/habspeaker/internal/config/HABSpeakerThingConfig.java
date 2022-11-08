@@ -21,10 +21,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public class HABSpeakerThingConfig {
-    /**
-     * Custom label for this speaker sink and source
-     */
-    public String label = "";
 
     /**
      * Custom listeningItem for this speaker

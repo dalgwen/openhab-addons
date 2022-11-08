@@ -15,10 +15,6 @@
 				<label>Audio</label>
 				<description>Sink and source options.</description>
 			</parameter-group>
-			<parameter name="label" type="text">
-				<label>Label</label>
-				<description>Label for the registered sink and source.</description>
-			</parameter>
 			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Sink Volume</label>
 				<description>Default sink volume</description>
