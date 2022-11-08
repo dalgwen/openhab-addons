@@ -66,11 +66,11 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
 
     @Override
     public void handleConfigurationUpdate(Map<String, Object> configurationParameters) {
-        super.handleConfigurationUpdate(configurationParameters);
         // forces a disconnection so the speaker reconnects with the new config
         if (speakerIO != null) {
             speakerIO.disconnect();
         }
+        super.handleConfigurationUpdate(configurationParameters);
     }
 
     public HABSpeakerThingConfig getSpeakerConfig() {
