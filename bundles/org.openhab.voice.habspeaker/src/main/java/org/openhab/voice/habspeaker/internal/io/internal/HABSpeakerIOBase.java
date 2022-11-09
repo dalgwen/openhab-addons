@@ -1,0 +1,175 @@
+/**
+ * Copyright (c) 2010-2022 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+package org.openhab.voice.habspeaker.internal.io.internal;
+
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.audio.AudioManager;
+import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
+import org.openhab.core.voice.VoiceManager;
+import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
+import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
+import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceRegistration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * The {@link HABSpeakerIOBase} represents a speaker active connection.
+ *
+ * @author Miguel Álvarez - Initial contribution
+ */
+@NonNullByDefault
+public abstract class HABSpeakerIOBase implements HABSpeakerIO {
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOBase.class);
+    private final AudioManager audioManager;
+    private final VoiceManager voiceManager;
+    private final BundleContext bundleContext;
+    protected @Nullable HABSpeakerIOHandler thingHandler = null;
+    private boolean initialized = false;
+    private @Nullable HABSpeakerKS ks = null;
+
+    protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
+
+    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext) {
+        this.audioManager = audioManager;
+        this.voiceManager = voiceManager;
+        this.bundleContext = bundleContext;
+    }
+
+    @Override
+    public void setThingHandler(@Nullable HABSpeakerIOHandler handler) {
+        thingHandler = handler;
+    }
+
+    protected @Nullable Map<String, Object> getSpeakerConfig() {
+        var thingHandler = this.thingHandler;
+        if (thingHandler == null) {
+            return null;
+        }
+        // send speaker configuration before initialization
+        var config = thingHandler.getSpeakerConfig();
+        var initializedConfig = new HashMap<String, Object>();
+        var currentVolume = thingHandler.getSinkVolume();
+        var sinkVolume = currentVolume != null ? currentVolume : config.sinkVolume;
+        initializedConfig.put("sinkVolume", sinkVolume);
+        var sinkStereo = config.sinkStereo;
+        initializedConfig.put("sinkStereo", sinkStereo);
+        return initializedConfig;
+    }
+
+    protected synchronized void registerSpeakerComponents(String id, long requiredSinkSampleRate) throws IOException {
+        if (id.isBlank()) {
+            throw new IOException("Unable to register audio components");
+        }
+        String label = "HAB Speaker (" + id + ")";
+        var sinkStereo = false;
+        var thingHandler = this.thingHandler;
+        @Nullable
+        String listeningItem = null;
+        if (thingHandler != null) {
+            // send speaker configuration before initialization
+            var config = thingHandler.getSpeakerConfig();
+            var thingLabel = thingHandler.getLabel();
+            if (thingLabel != null && !thingLabel.isBlank()) {
+                label = thingLabel;
+            }
+            listeningItem = !config.listeningItem.isBlank() ? config.listeningItem : null;
+            sinkStereo = config.sinkStereo;
+        }
+        initialized = true;
+        // register source
+        var source = new HABSpeakerAudioSource(getSourceId(id), label, this);
+        registerAudioComponent(source);
+        // register sink
+        var sink = new HABSpeakerAudioSink(getSinkId(id), label, requiredSinkSampleRate, sinkStereo ? 2 : 1, this);
+        registerAudioComponent(sink);
+        var ks = new HABSpeakerKS(this);
+        this.ks = ks;
+        voiceManager.startDialog(ks, null, null, null, List.of(), source, sink, null, null, listeningItem);
+    }
+
+    protected synchronized void unregisterSpeakerComponents(String id) {
+        if (initialized) {
+            var source = audioManager.getSource(getSourceId(id));
+            if (source != null) {
+                try {
+                    voiceManager.stopDialog(source);
+                } catch (Exception e) {
+                    logger.debug("Unable to stop dialog for {}", source.getId());
+                }
+                unregisterAudioComponent(source);
+            }
+            var sink = audioManager.getSink(getSinkId(id));
+            if (sink != null) {
+                unregisterAudioComponent(sink);
+            }
+        }
+    }
+
+    protected void onRemoteSpot() {
+        var ks = this.ks;
+        if (ks != null) {
+            ks.onRemoteSpot();
+        }
+    }
+
+    private void registerAudioComponent(AudioSink sink) {
+        logger.debug("Registering audio sink {}", sink.getId());
+        audioComponentRegistrations.put(sink.getId(),
+                bundleContext.registerService(AudioSink.class.getName(), sink, new Hashtable<>()));
+    }
+
+    private void registerAudioComponent(AudioSource source) {
+        logger.debug("Registering audio source {}", source.getId());
+        audioComponentRegistrations.put(source.getId(),
+                bundleContext.registerService(AudioSource.class.getName(), source, new Hashtable<>()));
+    }
+
+    private void unregisterAudioComponent(AudioSink sink) {
+        ServiceRegistration<?> sinkReg = audioComponentRegistrations.remove(sink.getId());
+        if (sinkReg != null) {
+            logger.debug("Unregistering audio sink {}", sink.getId());
+            sinkReg.unregister();
+        }
+    }
+
+    private void unregisterAudioComponent(AudioSource source) {
+        ServiceRegistration<?> sourceReg = audioComponentRegistrations.remove(source.getId());
+        if (sourceReg != null) {
+            logger.debug("Unregistering audio source {}", source.getId());
+            sourceReg.unregister();
+        }
+    }
+
+    private String getSinkId(String id) {
+        return SERVICE_ID + "::" + id + "::sink";
+    }
+
+    private String getSourceId(String id) {
+        return SERVICE_ID + "::" + id + "::source";
+    }
+}

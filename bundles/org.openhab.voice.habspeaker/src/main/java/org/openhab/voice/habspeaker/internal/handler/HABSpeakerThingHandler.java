@@ -28,6 +28,7 @@ import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class HABSpeakerThingHandler extends BaseThingHandler {
+public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeakerIOHandler {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
     private @Nullable HABSpeakerIO speakerIO = null;
@@ -77,6 +78,11 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
         return config;
     }
 
+    @Override
+    public @Nullable String getLabel() {
+        return getThing().getLabel();
+    }
+
     public void updateStatus() {
         updateStatus(speakerIO == null ? ThingStatus.OFFLINE : ThingStatus.ONLINE);
     }
@@ -96,7 +102,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
             switch (channelId) {
                 case SINK_VOLUME_CHANNEL:
                     if (command instanceof RefreshType) {
-                        updateSinkVolume(sinkVolume);
+                        onSinkVolumeUpdate(sinkVolume);
                         return;
                     }
                     if (command instanceof DecimalType) {
@@ -111,7 +117,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler {
         }
     }
 
-    public void updateSinkVolume(int volume) {
+    public void onSinkVolumeUpdate(int volume) {
         sinkVolume = volume;
         if (isLinked(SINK_VOLUME_CHANNEL)) {
             updateState(SINK_VOLUME_CHANNEL, new PercentType(volume));

@@ -23,7 +23,7 @@ import org.openhab.core.audio.AudioManager;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketServlet;
+import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -34,23 +34,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerIOManager} represents a speaker active connection.
+ * The {@link HABSpeakerIOManager} manages the {@link HABSpeakerIOProtocol} implementations and the active speaker
+ * connections
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @Component(service = HABSpeakerIOManager.class)
 @NonNullByDefault
-public class HABSpeakerIOManager implements HABSpeakerIOListener {
+public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOManager.class);
-    private final List<HABSpeakerWebSocketServlet> ioProtocols;
+    private final List<HABSpeakerWebSocketProtocol> ioProtocols;
     private final Set<HABSpeakerIO> speakerConnections = new HashSet<>();
-    private @Nullable HABSpeakerIOListener protocolListener = null;
+    private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
 
     @Activate
     public HABSpeakerIOManager(BundleContext bundleContext, final @Reference HttpService httpService,
             final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
             final @Reference UserRegistry userRegistry, final @Reference HABSpeakerConfigProvider configProvider) {
-        this.ioProtocols = List.of(new HABSpeakerWebSocketServlet(this, configProvider, bundleContext, httpService,
+        this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext, httpService,
                 audioManager, voiceManager, userRegistry));
     }
 
@@ -67,7 +68,7 @@ public class HABSpeakerIOManager implements HABSpeakerIOListener {
         }
     }
 
-    public void setProtocolListener(HABSpeakerIOListener protocolListener) {
+    public void setProtocolListener(HABSpeakerIOProtocolListener protocolListener) {
         this.protocolListener = protocolListener;
     }
 

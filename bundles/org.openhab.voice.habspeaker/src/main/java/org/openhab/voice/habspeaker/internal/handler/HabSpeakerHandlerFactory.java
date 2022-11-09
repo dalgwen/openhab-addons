@@ -29,8 +29,8 @@ import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Activate;
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 @Component(service = ThingHandlerFactory.class, configurationPid = "binding.habspeaker", property = Constants.SERVICE_PID
         + "=" + SERVICE_PID)
 @NonNullByDefault
-public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements HABSpeakerIOListener {
+public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements HABSpeakerIOProtocolListener {
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(SPEAKER_THING_TYPE);
     private final Logger logger = LoggerFactory.getLogger(HabSpeakerHandlerFactory.class);
     private final Map<String, HABSpeakerThingHandler> speakerHandlers = new ConcurrentHashMap<>();

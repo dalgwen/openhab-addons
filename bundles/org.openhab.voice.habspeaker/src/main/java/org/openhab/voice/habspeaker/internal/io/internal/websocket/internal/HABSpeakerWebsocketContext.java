@@ -10,9 +10,9 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.io.internal.websocket;
+package org.openhab.voice.habspeaker.internal.io.internal.websocket.internal;
 
-import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketServlet.ALT_AUTH_HEADER;
+import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol.ALT_AUTH_HEADER;
 
 import java.io.IOException;
 import java.net.URL;
@@ -27,6 +27,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.auth.ManagedUser;
 import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserRegistry;
+import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
 import org.osgi.service.http.HttpContext;
 import org.osgi.service.http.HttpService;
 import org.slf4j.Logger;
@@ -43,7 +44,7 @@ public class HABSpeakerWebsocketContext implements HttpContext {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebsocketContext.class);
     private final UserRegistry userRegistry;
     private final HttpContext defaultHttpContext;
-    private final HABSpeakerWebSocketServlet servlet;
+    private final HABSpeakerWebSocketProtocol servlet;
 
     /**
      * Constructs an {@link HABSpeakerWebsocketContext} with will another {@link HttpContext} as a base.
@@ -51,7 +52,7 @@ public class HABSpeakerWebsocketContext implements HttpContext {
      * @param defaultHttpContext the base {@link HttpContext} - use {@link HttpService#createDefaultHttpContext()} to
      *            create a default one
      */
-    public HABSpeakerWebsocketContext(HABSpeakerWebSocketServlet servlet, UserRegistry userRegistry,
+    public HABSpeakerWebsocketContext(HABSpeakerWebSocketProtocol servlet, UserRegistry userRegistry,
             HttpContext defaultHttpContext) {
         this.servlet = servlet;
         this.defaultHttpContext = defaultHttpContext;

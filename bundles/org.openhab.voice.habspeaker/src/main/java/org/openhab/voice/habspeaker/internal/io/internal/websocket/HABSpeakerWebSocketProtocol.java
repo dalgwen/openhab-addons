@@ -19,8 +19,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -42,42 +40,41 @@ import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.auth.HABSpeakerJwtHelper;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocol;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
+import org.openhab.voice.habspeaker.internal.io.internal.websocket.internal.HABSpeakerWebsocketContext;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.http.HttpService;
 import org.osgi.service.http.NamespaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerWebSocketServlet} class defines the WebSocket servlet
+ * The {@link HABSpeakerWebSocketProtocol} class defines the WebSocket servlet
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class HABSpeakerWebSocketServlet extends WebSocketServlet implements HABSpeakerIOProtocol {
+public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HABSpeakerIOProtocol {
     public static final String WS_PATH = "/" + SERVICE_ID + "/ws";
     private static final String API_TOKEN_PREFIX = "oh.";
-    protected static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketServlet.class);
+    public static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketProtocol.class);
     private final HttpService httpService;
-    private final List<HABSpeakerWebSocketHandler> handlers = new ArrayList<>();
+    private final List<HABSpeakerWebSocketIO> handlers = new ArrayList<>();
     private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("OH-ui-habspeaker");
-    protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
     protected final BundleContext bundleContext;
     protected final VoiceManager voiceManager;
     protected final AudioManager audioManager;
     private final UserRegistry userRegistry;
     private final HABSpeakerJwtHelper jwtHelper;
     private final ScheduledFuture<?> pingTask;
-    private final HABSpeakerIOListener protocolListener;
+    private final HABSpeakerIOProtocolListener protocolListener;
     private final HABSpeakerConfigProvider configProvider;
 
-    public HABSpeakerWebSocketServlet(HABSpeakerIOListener protocolListener, HABSpeakerConfigProvider configProvider,
-            BundleContext bundleContext, HttpService httpService, AudioManager audioManager, VoiceManager voiceManager,
-            UserRegistry userRegistry) {
+    public HABSpeakerWebSocketProtocol(HABSpeakerIOProtocolListener protocolListener,
+            HABSpeakerConfigProvider configProvider, BundleContext bundleContext, HttpService httpService,
+            AudioManager audioManager, VoiceManager voiceManager, UserRegistry userRegistry) {
         this.protocolListener = protocolListener;
         this.configProvider = configProvider;
         this.bundleContext = bundleContext;
@@ -143,7 +140,7 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet implements HABS
         }
     }
 
-    protected boolean isValidToken(String token) {
+    public boolean isValidToken(String token) {
         try {
             if (token.startsWith(API_TOKEN_PREFIX)) {
                 // Allow access to the websocket using user generated tokens
@@ -170,17 +167,17 @@ public class HABSpeakerWebSocketServlet extends WebSocketServlet implements HABS
     public void configure(@Nullable WebSocketServletFactory webSocketServletFactory) {
         if (webSocketServletFactory != null) {
             webSocketServletFactory.getPolicy().setIdleTimeout(60000);
-            webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketHandler(this, executor));
+            webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketIO(this, executor));
         }
     }
 
-    public void addHandler(HABSpeakerWebSocketHandler habSpeakerWebSocketHandler) {
-        handlers.add(habSpeakerWebSocketHandler);
-        protocolListener.onConnected(habSpeakerWebSocketHandler);
+    public void addHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
+        handlers.add(habSpeakerWebSocketIO);
+        protocolListener.onConnected(habSpeakerWebSocketIO);
     }
 
-    public void removeHandler(HABSpeakerWebSocketHandler habSpeakerWebSocketHandler) {
-        handlers.remove(habSpeakerWebSocketHandler);
-        protocolListener.onDisconnected(habSpeakerWebSocketHandler);
+    public void removeHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
+        handlers.remove(habSpeakerWebSocketIO);
+        protocolListener.onDisconnected(habSpeakerWebSocketIO);
     }
 }

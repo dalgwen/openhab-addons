@@ -16,7 +16,6 @@ import java.io.OutputStream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.voice.habspeaker.internal.handler.HABSpeakerThingHandler;
 
 /**
  * The {@link HABSpeakerIO} represents a speaker active connection.
@@ -50,7 +49,7 @@ public interface HABSpeakerIO {
      * 
      * @param handler the associated thing handler
      */
-    void setThingHandler(@Nullable HABSpeakerThingHandler handler);
+    void setThingHandler(@Nullable HABSpeakerIOHandler handler);
 
     /**
      * Send audio to the speaker
