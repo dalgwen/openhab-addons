@@ -63,12 +63,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
         ioManager.setProtocolListener(this);
         this.ioManager = ioManager;
     }
-
-    @Deactivate
-    public void deactivate() {
-        ioManager.dispose();
-    }
-
+    
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID);
