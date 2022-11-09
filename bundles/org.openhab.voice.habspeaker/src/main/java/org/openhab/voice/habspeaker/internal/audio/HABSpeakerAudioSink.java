@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -85,11 +87,23 @@ public class HABSpeakerAudioSink implements AudioSink {
         }
         try (ConvertedInputStream convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate,
                 targetChannels)) {
+            Instant start = Instant.now();
             convertedInputStream.transferTo(new HABSpeakerWebSocketOutputStream(speakerIO));
+            if (convertedInputStream.getDuration() != -1) {
+                Instant end = Instant.now();
+                long millisSecondTimedToSendAudioData = Duration.between(start, end).toMillis();
+                if (millisSecondTimedToSendAudioData < convertedInputStream.getDuration()) {
+                    long timeToSleep = convertedInputStream.getDuration() - millisSecondTimedToSendAudioData;
+                    logger.debug("Sleep time to let the system play sound : {}", timeToSleep);
+                    Thread.sleep(timeToSleep);
+                }
+            }
         } catch (UnsupportedAudioFileException e) {
             logger.warn("UnsupportedAudioFileException: {}", e.getMessage());
         } catch (IOException e) {
             logger.warn("IOException: {}", e.getMessage());
+        } catch (InterruptedException e) {
+            logger.debug("InterruptedException: {}", e.getMessage());
         }
     }
 
