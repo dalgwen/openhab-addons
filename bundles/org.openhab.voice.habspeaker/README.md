@@ -45,10 +45,11 @@ These settings are stored on your browser local storage.
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config     |  Type   | description                                         |
-|------------|---------|-----------------------------------------------------|
-| sinkVolume | String  | Default sink volume                                 |
-| sinkStereo | Boolean | Use dual channel audio (increases bandwidth usage ) |
+| Config        |  Type   | description                                                             |
+|---------------|---------|-------------------------------------------------------------------------|
+| sinkVolume    | String  | Default sink volume                                                     |
+| sinkStereo    | Boolean | Use dual channel audio (increases bandwidth usage )                     |
+| listeningItem | String  | If provided, the item will be switched on during the voice recognition  |
 
 ## Thing Channels
 
