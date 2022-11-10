@@ -45,11 +45,16 @@ These settings are stored on your browser local storage.
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config        |  Type   | description                                                             |
-|---------------|---------|-------------------------------------------------------------------------|
-| sinkVolume    | String  | Default sink volume                                                     |
-| sinkStereo    | Boolean | Use dual channel audio (increases bandwidth usage )                     |
-| listeningItem | String  | If provided, the item will be switched on during the voice recognition  |
+| Config        |  Type   | Group | Description                                                                |
+|---------------|---------|-------|----------------------------------------------------------------------------|
+| sinkVolume    | String  | audio | Default sink volume                                                        |
+| sinkStereo    | Boolean | audio | Use dual channel audio                                                     |
+| stt           | String  | voice | The text-to-speech service to use, leave empty to use the default.         |
+| tts           | String  | voice | The speech-to-text service to use, leave empty to use the default.         |
+| voice         | String  | voice | The voice to use if no voice is specified, leave empty to use the default. |
+| hli           | String  | voice | The human language interpreter to use, leave empty to use the default.     |
+| ks            | String  | voice | Enables keyword spotting using the specified service.                      |
+| listeningItem | String  | voice | If provided, the item will be switched on during the voice recognition.    |
 
 ## Thing Channels
 
@@ -69,8 +74,7 @@ The discovery service will register all the connected speakers.
 * The speaker icon circle displays an animation whenever it's waiting for you to talk.
 * The speaker icon dots part displays an animation while it's playing audio.
 * By clicking on the speaker icon a single shot audio dialog processing will start. It uses the registered audio components (sink/source) and the default processing services configured on the openHAB voice settings.
-
-As a summary you need to click the icon, wait for it to be animated, speak, and wait for interpreter response (if any).
+* At this point you can discover the speaker using the main ui to add it as a thing in openHAB.
 
 ## Audio Component Details:
 

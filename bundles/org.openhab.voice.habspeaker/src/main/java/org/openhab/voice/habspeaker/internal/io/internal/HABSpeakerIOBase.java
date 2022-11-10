@@ -26,7 +26,12 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.audio.AudioSink;
 import org.openhab.core.audio.AudioSource;
+import org.openhab.core.voice.KSService;
+import org.openhab.core.voice.STTService;
+import org.openhab.core.voice.TTSService;
+import org.openhab.core.voice.Voice;
 import org.openhab.core.voice.VoiceManager;
+import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
@@ -50,6 +55,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private final BundleContext bundleContext;
     protected @Nullable HABSpeakerIOHandler thingHandler = null;
     private boolean initialized = false;
+    protected boolean serverSpotting = false;
     private @Nullable HABSpeakerKS ks = null;
 
     protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
@@ -65,8 +71,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         thingHandler = handler;
     }
 
-    protected @Nullable Map<String, Object> getSpeakerConfig() {
-        var thingHandler = this.thingHandler;
+    protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler) {
         if (thingHandler == null) {
             return null;
         }
@@ -78,16 +83,21 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         initializedConfig.put("sinkVolume", sinkVolume);
         var sinkStereo = config.sinkStereo;
         initializedConfig.put("sinkStereo", sinkStereo);
+        if (!thingHandler.getSpeakerConfig().ks.isBlank()
+                && voiceManager.getKS(thingHandler.getSpeakerConfig().ks) != null) {
+            serverSpotting = true;
+            initializedConfig.put("remoteSpot", true);
+        }
         return initializedConfig;
     }
 
-    protected synchronized void registerSpeakerComponents(String id, long requiredSinkSampleRate) throws IOException {
+    protected synchronized void registerSpeakerComponents(String id, long requiredSinkSampleRate,
+            @Nullable HABSpeakerIOHandler thingHandler) throws IOException {
         if (id.isBlank()) {
             throw new IOException("Unable to register audio components");
         }
         String label = "HAB Speaker (" + id + ")";
         var sinkStereo = false;
-        var thingHandler = this.thingHandler;
         @Nullable
         String listeningItem = null;
         if (thingHandler != null) {
@@ -107,9 +117,36 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         // register sink
         var sink = new HABSpeakerAudioSink(getSinkId(id), label, requiredSinkSampleRate, sinkStereo ? 2 : 1, this);
         registerAudioComponent(sink);
-        var ks = new HABSpeakerKS(this);
-        this.ks = ks;
-        voiceManager.startDialog(ks, null, null, null, List.of(), source, sink, null, null, listeningItem);
+        // init dialog
+        STTService stt = null;
+        TTSService tts = null;
+        Voice voice = null;
+        KSService ks = null;
+        List<HumanLanguageInterpreter> hlis = List.of();
+        if (thingHandler != null) {
+            if (!thingHandler.getSpeakerConfig().stt.isBlank()) {
+                stt = voiceManager.getSTT(thingHandler.getSpeakerConfig().hli);
+            }
+            if (!thingHandler.getSpeakerConfig().tts.isBlank()) {
+                tts = voiceManager.getTTS(thingHandler.getSpeakerConfig().hli);
+            }
+            if (!thingHandler.getSpeakerConfig().voice.isBlank()) {
+                voice = voiceManager.getAllVoices().stream()
+                        .filter(v -> v.getUID().equals(thingHandler.getSpeakerConfig().voice)).findAny().orElse(null);
+            }
+            if (!thingHandler.getSpeakerConfig().hli.isBlank()) {
+                var hli = voiceManager.getHLI(thingHandler.getSpeakerConfig().hli);
+                if (hli != null) {
+                    hlis = List.of(hli);
+                }
+            }
+            if (!thingHandler.getSpeakerConfig().ks.isBlank()) {
+                ks = voiceManager.getKS(thingHandler.getSpeakerConfig().ks);
+            }
+        }
+        var hsKS = new HABSpeakerKS(this, ks);
+        this.ks = hsKS;
+        voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, null, listeningItem);
     }
 
     protected synchronized void unregisterSpeakerComponents(String id) {

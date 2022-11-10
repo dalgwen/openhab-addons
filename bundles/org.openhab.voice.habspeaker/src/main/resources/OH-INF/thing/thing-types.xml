@@ -17,8 +17,9 @@
 			</parameter-group>
 			<parameter-group name="voice">
 				<label>Voice</label>
-				<description>Voice configuration options for this speaker (leave unset to use the default voice options).</description>
+				<description>Voice configuration options for this speaker.</description>
 			</parameter-group>
+			<!-- Sink config -->
 			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Sink Volume</label>
 				<description>Default sink volume</description>
@@ -28,6 +29,27 @@
 				<label>Sink Stereo</label>
 				<description>Use dual channel audio</description>
 				<default>false</default>
+			</parameter>
+			<!-- Voice config -->
+			<parameter name="tts" type="text" groupName="voice">
+				<label>Text-to-Speech</label>
+				<description>The text-to-speech service to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="stt" type="text" groupName="voice">
+				<label>Speech-to-Text</label>
+				<description>The speech-to-text service to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="voice" type="text" groupName="voice">
+				<label>Voice</label>
+				<description>The voice to use if no voice is specified, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="hli" type="text" groupName="voice">
+				<label>Human Language Interpreter</label>
+				<description>The human language interpreter to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="ks" type="text" groupName="voice">
+				<label>Keyword Spotter</label>
+				<description>Enables keyword spotting using the specified service.</description>
 			</parameter>
 			<parameter name="listeningItem" type="text" groupName="voice">
 				<context>item</context>

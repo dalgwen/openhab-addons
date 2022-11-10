@@ -78,11 +78,12 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 if (isValidAccess(token)) {
                     servlet.addHandler(this);
                     try {
-                        var speakerConfig = getSpeakerConfig();
+                        var thingHandler = this.thingHandler;
+                        var speakerConfig = getSpeakerConfig(thingHandler);
                         if (speakerConfig != null) {
                             sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE, speakerConfig);
                         }
-                        registerSpeakerComponents(id, requiredSinkSampleRate);
+                        registerSpeakerComponents(id, requiredSinkSampleRate, thingHandler);
                         sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
                     } catch (IOException | IllegalStateException e) {
                         logger.warn("Disconnecting client: {}", e.getMessage());
@@ -139,7 +140,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     public void addSourceListener(OutputStream output) {
         synchronized (listeners) {
             listeners.add(output);
-            if (listeners.size() == 1) {
+            if (listeners.size() == (serverSpotting ? 2 : 1)) {
                 sendClientCommand(WebsocketOutputCommand.START_LISTENING);
             }
         }
@@ -148,7 +149,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     public void removeSourceListener(OutputStream output) {
         synchronized (listeners) {
             listeners.remove(output);
-            if (listeners.size() == 0) {
+            if (listeners.size() == (serverSpotting ? 1 : 0)) {
                 sendClientCommand(WebsocketOutputCommand.STOP_LISTENING);
             }
         }

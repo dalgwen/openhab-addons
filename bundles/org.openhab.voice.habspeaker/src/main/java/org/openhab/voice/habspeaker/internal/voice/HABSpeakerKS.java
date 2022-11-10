@@ -47,10 +47,13 @@ public class HABSpeakerKS implements KSService {
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerKS.class);
     private final HABSpeakerIO speakerIO;
+    private final @Nullable KSService serverKsService;
+    private @Nullable KSServiceHandle serverKsServiceHandler;
     private @Nullable KSListener ksListener;
 
-    public HABSpeakerKS(HABSpeakerIO speakerIO) {
+    public HABSpeakerKS(HABSpeakerIO speakerIO, @Nullable KSService serverKsService) {
         this.speakerIO = speakerIO;
+        this.serverKsService = serverKsService;
     }
 
     public void onRemoteSpot() {
@@ -84,14 +87,19 @@ public class HABSpeakerKS implements KSService {
     public KSServiceHandle spot(KSListener ksListener, AudioStream audioStream, Locale locale, String keyword)
             throws KSException {
         this.ksListener = ksListener;
-        try {
-            Thread.sleep(0);
-        } catch (InterruptedException ignored) {
+        if (serverKsService == null) {
+            try {
+                audioStream.close();
+            } catch (IOException ignored) {
+            }
+        } else {
+            serverKsServiceHandler = serverKsService.spot(ksListener, audioStream, locale, keyword);
         }
-        try {
-            audioStream.close();
-        } catch (IOException ignored) {
-        }
-        return speakerIO::disconnect;
+        return () -> {
+            if (serverKsServiceHandler != null) {
+                serverKsServiceHandler.abort();
+            }
+            speakerIO.disconnect();
+        };
     }
 }

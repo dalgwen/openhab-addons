@@ -21,12 +21,32 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public class HABSpeakerThingConfig {
-
+    // Voice config
+    /**
+     * Custom tts service for this speaker
+     */
+    public String tts = "";
+    /**
+     * Custom stt service for this speaker
+     */
+    public String stt = "";
+    /**
+     * Custom voice service for this speaker
+     */
+    public String voice = "";
+    /**
+     * Custom hli service for this speaker
+     */
+    public String hli = "";
+    /**
+     * Enables ks service for this speaker
+     */
+    public String ks = "";
     /**
      * Custom listeningItem for this speaker
      */
     public String listeningItem = "";
-
+    // Sink config
     /**
      * Default volume for the sink
      */

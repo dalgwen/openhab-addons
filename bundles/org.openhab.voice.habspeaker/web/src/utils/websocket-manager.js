@@ -1,6 +1,7 @@
 import { WorkerInCmd, WorkerOutCmd } from "./websocket-worker";
 /**@type {AudioContext} */
 let audioContext = null;
+let micStreaming = false;
 
 // Audio Record
 
@@ -99,13 +100,13 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
         channelsData[0] = audioData;
       } else {
         var length = audioData.byteLength / audioData.BYTES_PER_ELEMENT;
-        for (let s = 0; s < length;s++) {
+        for (let s = 0; s < length; s++) {
           // the channel index
           const c = s % numberOfChannels;
           // the index inside the buffer channel
           const i = (s - c) / numberOfChannels;
           const channelData = channelsData[c] = (channelsData[c] ?? new Float32Array(length / numberOfChannels));
-          channelData [i] = audioData[s];
+          channelData[i] = audioData[s];
         }
       }
       for (let c = 0; c < numberOfChannels; c++) {
@@ -123,7 +124,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
   };
   gainNode = audioContext.createGain();
   const setVolume = (value) => gainNode.gain.value = value / 100;
-  console.debug("Stream volume: " + volume);
+  console.debug("main: stream volume: " + volume);
   setVolume(volume);
   sinkProcessorNode.connect(gainNode);
   audioCache.reset();
@@ -151,10 +152,12 @@ let worker = null;
  * @returns {Promise<Worker>}
  */
 export async function startWebsocketWorker(id, token, actions) {
-  const sinkConfig = {
+  const defaultSinkConfig = {
     volume: 100,
     stereo: false,
-  }
+  };
+  let sinkConfig = { ...defaultSinkConfig };
+  let remoteSpot = false;
   await setupAudio();
   function onSinkSpeaking(id, speaking) {
     const sinkContext = activeSinks.get(id);
@@ -179,7 +182,9 @@ export async function startWebsocketWorker(id, token, actions) {
         type: "module",
       });
       worker.onmessage = (ev) => {
-        console.debug("worker => main thread:", ev.data);
+        if (import.meta.env.DEV) {
+          console.debug("worker => main thread:", ev.data);
+        }
         switch (ev.data.cmd) {
           case WorkerOutCmd.CONFIGURE:
             // TODO: disallow configure after initialized
@@ -191,18 +196,21 @@ export async function startWebsocketWorker(id, token, actions) {
             if (sinkStereo != null) {
               sinkConfig.stereo = sinkStereo;
             }
+            remoteSpot = !!ev.data.remoteSpot;
             break;
           case WorkerOutCmd.INITIALIZED:
             actions.setOnline(true);
+            if (remoteSpot) {
+              console.debug("remote spot enabled, starting mic streaming");
+              startMicStreaming();
+            }
             break;
           case WorkerOutCmd.OFFLINE:
+            sinkConfig = { ...defaultSinkConfig };
+            remoteSpot = false;
             actions.setListening(false);
             actions.setOnline(false);
-            try {
-              processorNode.disconnect(audioContext.destination);
-            } catch (error) {
-              // ignore this error
-            }
+            stopMicStreaming();
             break;
           case WorkerOutCmd.SPEAK: {
             let sinkContext = activeSinks.get(ev.data.id);
@@ -215,20 +223,14 @@ export async function startWebsocketWorker(id, token, actions) {
           }
           case WorkerOutCmd.START_LISTENING:
             actions.setListening(true);
-            audioContext
-              .resume()
-              .then(() => setupAudio())
-              .then(() => {
-                processorNode.connect(audioContext.destination);
-              })
-              .catch((err) => console.error(err));
+            if (!remoteSpot) {
+              startMicStreaming();
+            }
             break;
           case WorkerOutCmd.STOP_LISTENING:
             actions.setListening(false);
-            try {
-              processorNode.disconnect(audioContext.destination);
-            } catch (ignored) {
-              // ignore the error
+            if (!remoteSpot) {
+              stopMicStreaming();
             }
             break;
           case WorkerOutCmd.SINK_VOLUME:
@@ -254,4 +256,27 @@ export async function startWebsocketWorker(id, token, actions) {
       reject(error);
     }
   });
+  function startMicStreaming() {
+    if (!micStreaming) {
+      console.debug("starting microphone audio streaming");
+      audioContext
+        .resume()
+        .then(() => setupAudio())
+        .then(() => {
+          processorNode.connect(audioContext.destination);
+        })
+        .catch((err) => console.error(err));
+      micStreaming = true;
+    }
+  }
+
+  function stopMicStreaming() {
+    if (micStreaming) {
+      console.debug("stopping microphone audio streaming");
+      try {
+        processorNode.disconnect(audioContext.destination);
+      } catch (ignored) { }
+      micStreaming = false;
+    }
+  }
 }

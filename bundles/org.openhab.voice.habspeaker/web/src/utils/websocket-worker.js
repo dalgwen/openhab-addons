@@ -38,7 +38,9 @@ export default class WebSocketWorker {
    */
   onMainThreadCommand(ev) {
     try {
-      console.debug("main => worker: ", ev.data);
+      if (import.meta.env.DEV) {
+        console.debug("main => worker: ", ev.data);
+      }
       switch (ev.data.cmd) {
         case WorkerInCmd.INITIALIZE:
           this.id = ev.data.id;
@@ -87,7 +89,9 @@ export default class WebSocketWorker {
 
   onWebSocketCommand(data) {
     try {
-      console.debug("websocket => worker: ", data);
+      if (import.meta.env.DEV) {
+        console.debug("websocket => worker: ", data);
+      }
       switch (data.cmd) {
         case WebSocketOutCmd.INITIALIZED:
           this.postToMainThread(WorkerOutCmd.INITIALIZED);
@@ -138,7 +142,9 @@ export default class WebSocketWorker {
         token: (this.token && this.token.length) ? this.token : null,
         sampleRate: this.sampleRate,
       });
-      console.debug("worker => websocket:", initMessage);
+      if (import.meta.env.DEV) {
+        console.debug("worker => websocket:", initMessage);
+      }
       wsRef.send(initMessage);
     });
     wsRef.addEventListener("message", (msg) => {
@@ -161,7 +167,9 @@ export default class WebSocketWorker {
                 buffer: floatBuffer,
               });
             });
-            console.debug("websocket => worker: Binary data");
+            if (import.meta.env.DEV) {
+              console.debug("websocket => worker: Binary data");
+            }
           }
           break;
         default:
