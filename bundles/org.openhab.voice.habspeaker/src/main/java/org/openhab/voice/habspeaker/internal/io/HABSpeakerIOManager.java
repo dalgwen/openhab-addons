@@ -13,6 +13,7 @@
 package org.openhab.voice.habspeaker.internal.io;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOManager.class);
     private final List<HABSpeakerWebSocketProtocol> ioProtocols;
-    private final Set<HABSpeakerIO> speakerConnections = new HashSet<>();
+    private final Set<HABSpeakerIO> speakerConnections = Collections.synchronizedSet(new HashSet<>());
     private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
 
     @Activate
@@ -55,13 +56,17 @@ public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
                 audioManager, voiceManager, userRegistry));
     }
 
-    public synchronized List<HABSpeakerIO> getSpeakerConnections() {
-        return new ArrayList<>(speakerConnections);
+    public List<HABSpeakerIO> getSpeakerConnections() {
+        synchronized (speakerConnections) {
+            return new ArrayList<>(speakerConnections);
+        }
     }
 
-    public synchronized @Nullable HABSpeakerIO getSpeakerConnection(String id) {
-        return speakerConnections.stream().filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id))
-                .findAny().orElse(null);
+    public @Nullable HABSpeakerIO getSpeakerConnection(String id) {
+        synchronized (speakerConnections) {
+            return speakerConnections.stream()
+                    .filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id)).findAny().orElse(null);
+        }
     }
 
     public void setProtocolListener(HABSpeakerIOProtocolListener protocolListener) {

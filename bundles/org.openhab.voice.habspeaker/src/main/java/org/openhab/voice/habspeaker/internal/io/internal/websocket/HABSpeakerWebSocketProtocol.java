@@ -61,7 +61,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     public static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketProtocol.class);
     private final HttpService httpService;
-    private final List<HABSpeakerWebSocketIO> handlers = new ArrayList<>();
+    private final List<HABSpeakerWebSocketIO> wsHandlers = new ArrayList<>();
     private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("OH-ui-habspeaker");
     protected final BundleContext bundleContext;
     protected final VoiceManager voiceManager;
@@ -83,7 +83,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         this.voiceManager = voiceManager;
         this.userRegistry = userRegistry;
         this.jwtHelper = new HABSpeakerJwtHelper();
-        pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
+        this.pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
     }
 
     @Override
@@ -99,10 +99,9 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
 
     @Override
     public void unregister() {
-        disconnectHandlers();
         httpService.unregister(WS_PATH);
         pingTask.cancel(true);
-        handlers.clear();
+        disconnectHandlers();
     }
 
     public HABSpeakerConfig getConfig() {
@@ -110,7 +109,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     }
 
     private void pingHandlers() {
-        logger.debug("Pinging {} clients...", handlers.size());
+        logger.debug("Pinging {} clients...", wsHandlers.size());
+        var handlers = new ArrayList<>(wsHandlers);
         for (var handler : handlers) {
             try {
                 if (handler != null) {
@@ -126,7 +126,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     }
 
     private void disconnectHandlers() {
-        logger.debug("Disconnecting {} clients...", handlers.size());
+        logger.debug("Disconnecting {} clients...", wsHandlers.size());
+        var handlers = new ArrayList<>(wsHandlers);
         for (var handler : handlers) {
             protocolListener.onDisconnected(handler);
             var session = handler.getSession();
@@ -172,12 +173,12 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     }
 
     public void addHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
-        handlers.add(habSpeakerWebSocketIO);
+        wsHandlers.add(habSpeakerWebSocketIO);
         protocolListener.onConnected(habSpeakerWebSocketIO);
     }
 
     public void removeHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
-        handlers.remove(habSpeakerWebSocketIO);
+        wsHandlers.remove(habSpeakerWebSocketIO);
         protocolListener.onDisconnected(habSpeakerWebSocketIO);
     }
 }
