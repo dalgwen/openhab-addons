@@ -35,6 +35,7 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.http.HttpService;
 import org.slf4j.Logger;
@@ -104,5 +105,10 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
             handler.setSpeakerIO(null);
             handler.updateStatus();
         }
+    }
+
+    @Deactivate
+    public void deactivate() {
+        ioManager.dispose();
     }
 }
