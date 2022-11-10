@@ -9,6 +9,7 @@
 		<description>Represents a connected speaker</description>
 		<channels>
 			<channel id="sink-volume" typeId="system.volume"/>
+			<channel id="spot" typeId="spot"/>
 		</channels>
 		<config-description>
 			<parameter-group name="audio">
@@ -64,4 +65,9 @@
 	</thing-type>
 
 	<!-- Client Channels -->
+	<channel-type id="spot">
+		<item-type>Switch</item-type>
+		<label>Spot</label>
+		<description>Starts dialog processing on the speaker</description>
+	</channel-type>
 </thing:thing-descriptions>

@@ -74,6 +74,11 @@ public interface HABSpeakerIO {
     void removeSourceListener(OutputStream out);
 
     /**
+     * Starts a dialog on the speaker
+     */
+    void spot();
+
+    /**
      * Forces a speaker disconnection.
      */
     void disconnect();

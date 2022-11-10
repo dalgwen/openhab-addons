@@ -47,8 +47,8 @@ These settings are stored on your browser local storage.
 
 | Config        |  Type   | Group | Description                                                                |
 |---------------|---------|-------|----------------------------------------------------------------------------|
-| sinkVolume    | String  | audio | Default sink volume                                                        |
-| sinkStereo    | Boolean | audio | Use dual channel audio                                                     |
+| sinkVolume    | String  | audio | Default sink volume.                                                       |
+| sinkStereo    | Boolean | audio | Use dual channel audio.                                                    |
 | stt           | String  | voice | The text-to-speech service to use, leave empty to use the default.         |
 | tts           | String  | voice | The speech-to-text service to use, leave empty to use the default.         |
 | voice         | String  | voice | The voice to use if no voice is specified, leave empty to use the default. |
@@ -58,9 +58,10 @@ These settings are stored on your browser local storage.
 
 ## Thing Channels
 
-| Channel     |  Type  | description                  |
-|-------------|--------|------------------------------|
-| sinkVolume  | Dimmer | Controls the sink volume     |
+| Channel     |  Type  | description                              |
+|-------------|--------|------------------------------------------|
+| sinkVolume  | Dimmer | Controls the sink volume of the speaker. |
+| spot        | Switch | Starts dialog processing on the speaker. |
 
 ## Thing Discovery
 

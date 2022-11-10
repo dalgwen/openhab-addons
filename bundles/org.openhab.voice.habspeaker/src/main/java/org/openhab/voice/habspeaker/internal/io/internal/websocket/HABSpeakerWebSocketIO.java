@@ -167,6 +167,11 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
+    public void spot() {
+        onRemoteSpot();
+    }
+
+    @Override
     public void onWebSocketConnect(@Nullable Session sess) {
         if (sess == null) {
             // never

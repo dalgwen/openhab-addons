@@ -13,12 +13,14 @@
 package org.openhab.voice.habspeaker.internal.handler;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPOT_CHANNEL;
 
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -111,6 +113,21 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         return;
                     }
                     break;
+                case SPOT_CHANNEL:
+                    if (command instanceof RefreshType) {
+                        if (isLinked(SPOT_CHANNEL)) {
+                            updateState(SPOT_CHANNEL, OnOffType.OFF);
+                        }
+                        return;
+                    }
+                    if (OnOffType.valueOf(command.toFullString()) == OnOffType.ON) {
+                        deviceIO.spot();
+                        if (isLinked(SPOT_CHANNEL)) {
+                            updateState(SPOT_CHANNEL, OnOffType.OFF);
+                        }
+                    }
+                    break;
+
             }
         } catch (Exception e) {
             logger.error("Unexpected error", e);

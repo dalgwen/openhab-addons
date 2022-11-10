@@ -55,17 +55,13 @@ public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
                 audioManager, voiceManager, userRegistry));
     }
 
-    public List<HABSpeakerIO> getSpeakerConnections() {
-        synchronized (speakerConnections) {
-            return new ArrayList<>(speakerConnections);
-        }
+    public synchronized List<HABSpeakerIO> getSpeakerConnections() {
+        return new ArrayList<>(speakerConnections);
     }
 
-    public @Nullable HABSpeakerIO getSpeakerConnection(String id) {
-        synchronized (speakerConnections) {
-            return speakerConnections.stream()
-                    .filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id)).findAny().orElse(null);
-        }
+    public synchronized @Nullable HABSpeakerIO getSpeakerConnection(String id) {
+        return speakerConnections.stream().filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id))
+                .findAny().orElse(null);
     }
 
     public void setProtocolListener(HABSpeakerIOProtocolListener protocolListener) {
@@ -73,13 +69,13 @@ public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
     }
 
     @Activate
-    public void activate() {
+    public synchronized void activate() {
         logger.debug("Registering protocols");
         ioProtocols.forEach(HABSpeakerIOProtocol::register);
     }
 
     @Deactivate
-    public void dispose() {
+    public synchronized void dispose() {
         logger.debug("Unregistering protocols");
         ioProtocols.forEach(HABSpeakerIOProtocol::unregister);
     }

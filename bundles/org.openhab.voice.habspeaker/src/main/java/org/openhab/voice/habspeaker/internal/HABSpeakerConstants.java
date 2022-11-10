@@ -23,7 +23,6 @@ import org.openhab.core.thing.ThingTypeUID;
  */
 @NonNullByDefault
 public class HABSpeakerConstants {
-
     /**
      * Service name
      */
@@ -50,4 +49,5 @@ public class HABSpeakerConstants {
     public static final ThingTypeUID SPEAKER_THING_TYPE = new ThingTypeUID(SERVICE_ID, "speaker");
     // CHANNELS
     public static final String SINK_VOLUME_CHANNEL = "sink-volume";
+    public static final String SPOT_CHANNEL = "spot";
 }
