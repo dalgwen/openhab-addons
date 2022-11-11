@@ -123,7 +123,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
     }
   };
   gainNode = audioContext.createGain();
-  const setVolume = (value) => gainNode.gain.value = value / 100;
+  const setVolume = (value) => gainNode.gain.setValueAtTime((value / 100) * 2, audioContext.currentTime);
   console.debug("main: stream volume: " + volume);
   setVolume(volume);
   sinkProcessorNode.connect(gainNode);
