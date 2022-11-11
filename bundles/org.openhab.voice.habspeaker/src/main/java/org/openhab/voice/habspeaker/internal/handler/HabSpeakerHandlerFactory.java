@@ -20,23 +20,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.AudioManager;
-import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
-import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
-import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.http.HttpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +51,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     private final HABSpeakerIOManager ioManager;
 
     @Activate
-    public HabSpeakerHandlerFactory(BundleContext bundleContext, final @Reference HttpService httpService,
-            final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
-            final @Reference UserRegistry userRegistry, @Reference HABSpeakerIOManager ioManager) {
+    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager) {
         ioManager.setProtocolListener(this);
         this.ioManager = ioManager;
     }
