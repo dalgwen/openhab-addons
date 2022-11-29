@@ -65,7 +65,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         logger.debug("Handling command {}", command);
         switch (command) {
             case INITIALIZE:
-                id = (String) data.getOrDefault("id", "");
                 var requiredSinkSampleRate = (int) data.get("sampleRate");
                 @Nullable
                 String token = (String) data.get("token");
@@ -76,6 +75,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 }
                 scheduledDisconnection.cancel(true);
                 if (isValidAccess(token)) {
+                    id = (String) data.getOrDefault("id", "");
                     servlet.addHandler(this);
                     try {
                         var thingHandler = this.thingHandler;
@@ -130,17 +130,17 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 ByteBuffer buff = ByteBuffer.wrap(new byte[id.length + b.length]);
                 buff.put(id);
                 buff.put(b);
-                remote.sendBytes(ByteBuffer.wrap(buff.array()));
+                remote.sendBytesByFuture(ByteBuffer.wrap(buff.array()));
             }
-        } catch (IOException e) {
-            logger.warn("IOException while sending audio");
+        } catch (IllegalStateException ignored) {
+            logger.warn("Unable to send audio buffer");
         }
     }
 
     public void addSourceListener(OutputStream output) {
         synchronized (listeners) {
-            listeners.add(output);
-            if (listeners.size() == (serverSpotting ? 2 : 1)) {
+            if (listeners.add(output) && listeners.size() == (serverSpotting ? 2 : 1)) {
+                logger.debug("Send start listening {}", getId());
                 sendClientCommand(WebsocketOutputCommand.START_LISTENING);
             }
         }
@@ -148,8 +148,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
 
     public void removeSourceListener(OutputStream output) {
         synchronized (listeners) {
-            listeners.remove(output);
-            if (listeners.size() == (serverSpotting ? 1 : 0)) {
+            if (listeners.remove(output) && listeners.size() == (serverSpotting ? 1 : 0)) {
+                logger.debug("Send stop listening {}", getId());
                 sendClientCommand(WebsocketOutputCommand.STOP_LISTENING);
             }
         }
@@ -198,11 +198,9 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         var remote = getRemote();
         if (remote != null) {
             try {
-                remote.sendString(new ObjectMapper().writeValueAsString(args));
+                remote.sendStringByFuture(new ObjectMapper().writeValueAsString(args));
             } catch (JsonProcessingException e) {
                 logger.warn("JsonProcessingException writing JSON message: ", e);
-            } catch (IOException e) {
-                logger.debug("IOException sending client command: ", e);
             }
         }
     }
@@ -247,6 +245,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         this.remote = null;
         logger.debug("Session closed with code {}: {}", statusCode, reason);
         servlet.removeHandler(this);
+        stopDropIn();
         unregisterSpeakerComponents(id);
     }
 

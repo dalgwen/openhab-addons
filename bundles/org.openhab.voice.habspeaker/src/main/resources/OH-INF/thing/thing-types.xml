@@ -10,6 +10,7 @@
 		<channels>
 			<channel id="sink-volume" typeId="system.volume"/>
 			<channel id="spot" typeId="spot"/>
+			<channel id="drop-in" typeId="drop-in"/>
 		</channels>
 		<config-description>
 			<parameter-group name="audio">
@@ -69,5 +70,10 @@
 		<item-type>Switch</item-type>
 		<label>Spot</label>
 		<description>Starts dialog processing on the speaker</description>
+	</channel-type>
+	<channel-type id="drop-in">
+		<item-type>String</item-type>
+		<label>Drop In</label>
+		<description>Starts an immediate call with other speaker (by id)</description>
 	</channel-type>
 </thing:thing-descriptions>

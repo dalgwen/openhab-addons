@@ -79,6 +79,17 @@ public interface HABSpeakerIO {
     void spot();
 
     /**
+     * Starts/stops communication with another speaker
+     */
+    void dropIn(@Nullable HABSpeakerIO anotherSpeakerIO) throws IllegalStateException;
+
+    /**
+     * Get current drop-in speaker
+     */
+    @Nullable
+    HABSpeakerIO getDropIn();
+
+    /**
      * Forces a speaker disconnection.
      */
     void disconnect();

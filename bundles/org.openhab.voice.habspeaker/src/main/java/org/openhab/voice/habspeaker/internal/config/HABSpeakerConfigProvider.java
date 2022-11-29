@@ -35,8 +35,6 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The {@link HABSpeakerConfigProvider} class defines the speaker configuration
@@ -51,7 +49,6 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     protected static final String SPEAKER_CONFIG_URI = "thing-type:habspeaker:speaker";
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     private final VoiceManager voiceManager;
     private final LocaleProvider localeProvider;
 

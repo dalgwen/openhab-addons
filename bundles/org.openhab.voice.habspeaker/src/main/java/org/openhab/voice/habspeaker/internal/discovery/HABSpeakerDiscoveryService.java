@@ -57,6 +57,7 @@ public class HABSpeakerDiscoveryService extends AbstractDiscoveryService {
 
     public void discoverDevice(HABSpeakerIO speaker) {
         var id = speaker.getId();
+        logger.debug("Speaker {} discovered", id);
         Map<String, Object> properties = new HashMap<>();
         properties.put(Thing.PROPERTY_SERIAL_NUMBER, id);
         thingDiscovered(DiscoveryResultBuilder.create(new ThingUID(SPEAKER_THING_TYPE, id))

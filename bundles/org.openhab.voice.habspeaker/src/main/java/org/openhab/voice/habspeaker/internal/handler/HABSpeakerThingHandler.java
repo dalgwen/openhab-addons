@@ -12,6 +12,7 @@
  */
 package org.openhab.voice.habspeaker.internal.handler;
 
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.DROP_IN_CHANNEL;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPOT_CHANNEL;
 
@@ -22,6 +23,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
+import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
@@ -31,6 +33,7 @@ import org.openhab.core.types.RefreshType;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,12 +46,14 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeakerIOHandler {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
+    private final HABSpeakerIOManager ioManager;
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
     private @Nullable HABSpeakerIO speakerIO = null;
     private @Nullable Integer sinkVolume = null;
 
-    public HABSpeakerThingHandler(Thing thing) {
+    public HABSpeakerThingHandler(Thing thing, HABSpeakerIOManager ioManager) {
         super(thing);
+        this.ioManager = ioManager;
     }
 
     @Override
@@ -64,6 +69,28 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         this.speakerIO = speakerIO;
         if (speakerIO != null) {
             speakerIO.setThingHandler(this);
+        }
+    }
+
+    public void dropIn(String speakerId) {
+        var anotherSpeaker = ioManager.getSpeakerConnection(speakerId);
+        if (anotherSpeaker == null) {
+            logger.warn("Speaker {} is not available", speakerId);
+            return;
+        }
+        try {
+            speakerIO.dropIn(anotherSpeaker);
+            try {
+                anotherSpeaker.dropIn(speakerIO);
+            } catch (IllegalStateException e) {
+                speakerIO.dropIn(null);
+                throw e;
+            }
+            if (isLinked(DROP_IN_CHANNEL)) {
+                updateState(DROP_IN_CHANNEL, StringType.valueOf(speakerId));
+            }
+        } catch (IllegalStateException e) {
+            logger.warn("Unable to drop-in: {}", e.getMessage());
         }
     }
 
@@ -96,8 +123,8 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
 
     public void handleCommand(String channelId, Command command) {
         try {
-            var deviceIO = this.speakerIO;
-            if (deviceIO == null) {
+            var speakerIO = this.speakerIO;
+            if (speakerIO == null) {
                 logger.warn("speaker {} is not connected", getSpeakerId());
                 return;
             }
@@ -109,7 +136,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                     }
                     if (command instanceof DecimalType) {
                         sinkVolume = ((DecimalType) command).intValue();
-                        deviceIO.setSinkVolume(sinkVolume);
+                        speakerIO.setSinkVolume(sinkVolume);
                         return;
                     }
                     break;
@@ -121,13 +148,28 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         return;
                     }
                     if (OnOffType.valueOf(command.toFullString()) == OnOffType.ON) {
-                        deviceIO.spot();
+                        speakerIO.spot();
                         if (isLinked(SPOT_CHANNEL)) {
                             updateState(SPOT_CHANNEL, OnOffType.OFF);
                         }
                     }
                     break;
-
+                case DROP_IN_CHANNEL:
+                    if (command instanceof RefreshType) {
+                        var dropInSpeaker = speakerIO.getDropIn();
+                        if (dropInSpeaker != null) {
+                            updateState(DROP_IN_CHANNEL, StringType.valueOf(dropInSpeaker.getId()));
+                        } else {
+                            updateState(DROP_IN_CHANNEL, OnOffType.OFF);
+                        }
+                        return;
+                    }
+                    if (command.toFullString().equals("OFF") || command.toFullString().equals("NULL")) {
+                        speakerIO.dropIn(null);
+                    } else if (!command.toFullString().isBlank()) {
+                        dropIn(command.toFullString());
+                    }
+                    break;
             }
         } catch (Exception e) {
             logger.error("Unexpected error", e);

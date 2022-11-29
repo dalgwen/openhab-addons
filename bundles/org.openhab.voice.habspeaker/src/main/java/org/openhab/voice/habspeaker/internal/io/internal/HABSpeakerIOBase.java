@@ -20,12 +20,17 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.audio.AudioSink;
 import org.openhab.core.audio.AudioSource;
+import org.openhab.core.audio.AudioStream;
+import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.KSService;
 import org.openhab.core.voice.STTService;
 import org.openhab.core.voice.TTSService;
@@ -57,8 +62,11 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private boolean initialized = false;
     protected boolean serverSpotting = false;
     private @Nullable HABSpeakerKS ks = null;
-
+    protected final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool("habspeaker");
     protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
+    private @Nullable HABSpeakerIO dropInSpeakerIO = null;
+    private @Nullable AudioStream dropInStream = null;
+    private @Nullable Future<?> dropInStreamTask = null;
 
     public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext) {
         this.audioManager = audioManager;
@@ -165,6 +173,68 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                 unregisterAudioComponent(sink);
             }
         }
+    }
+
+    @Override
+    public @Nullable HABSpeakerIO getDropIn() {
+        return dropInSpeakerIO;
+    }
+
+    @Override
+    public synchronized void dropIn(@Nullable HABSpeakerIO speakerIO) {
+        if (speakerIO == null) {
+            stopDropIn();
+            return;
+        }
+        if (dropInSpeakerIO != null) {
+            throw new IllegalStateException("Unable to drop-in, speaker is occupied");
+        }
+        dropInSpeakerIO = speakerIO;
+        var dropInSink = audioManager.getSink(getSinkId(speakerIO.getId()));
+        var source = audioManager.getSource(getSourceId(getId()));
+        if (dropInSink == null || source == null) {
+            stopDropIn();
+            throw new IllegalStateException("Unable to drop-in to speaker, missing audio components");
+        }
+        dropInStreamTask = scheduler.submit(() -> {
+            logger.debug("Starting drop-in to {}", speakerIO.getId());
+            try {
+                dropInSink.process(source.getInputStream(HABSpeakerAudioSource.HABSPEAKER_SOURCE_FORMAT));
+            } catch (AudioException | ArrayIndexOutOfBoundsException e) {
+                logger.warn("{} while running drop-in {}: ", e.getClass().getName(), getId(), e);
+                stopDropIn();
+            }
+        });
+    }
+
+    protected synchronized void stopDropIn() {
+        if (dropInSpeakerIO == null && dropInStream == null && dropInStreamTask == null) {
+            return;
+        }
+        logger.debug("Stopping drop-in {}", getId());
+        var speakerIO = dropInSpeakerIO;
+        var task = dropInStreamTask;
+        var stream = dropInStream;
+        dropInSpeakerIO = null;
+        dropInStreamTask = null;
+        dropInStream = null;
+        if (speakerIO != null) {
+            speakerIO.dropIn(null);
+        }
+        if (task != null) {
+            task.cancel(true);
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+            }
+        }
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+            }
+        }
+        logger.debug("Drop-in stopped {}", getId());
     }
 
     protected void onRemoteSpot() {

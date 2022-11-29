@@ -21,7 +21,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioStream;
-import org.openhab.core.audio.FixedLengthAudioStream;
 import org.openhab.core.voice.KSException;
 import org.openhab.core.voice.KSListener;
 import org.openhab.core.voice.KSService;
@@ -39,11 +38,9 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class HABSpeakerKS implements KSService {
     private static final HashSet<AudioFormat> SUPPORTED_FORMATS = new HashSet<>();
-    private static final HashSet<Class<? extends AudioStream>> SUPPORTED_STREAMS = new HashSet<>();
 
     static {
         SUPPORTED_FORMATS.add(AudioFormat.WAV);
-        SUPPORTED_STREAMS.add(FixedLengthAudioStream.class);
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerKS.class);
     private final HABSpeakerIO speakerIO;
@@ -75,12 +72,12 @@ public class HABSpeakerKS implements KSService {
 
     @Override
     public Set<Locale> getSupportedLocales() {
-        return Set.of();
+        return serverKsService != null ? serverKsService.getSupportedLocales() : Set.of();
     }
 
     @Override
     public Set<AudioFormat> getSupportedFormats() {
-        return SUPPORTED_FORMATS;
+        return serverKsService != null ? serverKsService.getSupportedFormats() : SUPPORTED_FORMATS;
     }
 
     @Override
@@ -88,11 +85,14 @@ public class HABSpeakerKS implements KSService {
             throws KSException {
         this.ksListener = ksListener;
         if (serverKsService == null) {
+            logger.debug("speaker {}: keyword spotting is disabled", speakerIO.getId());
             try {
                 audioStream.close();
             } catch (IOException ignored) {
             }
         } else {
+            logger.debug("speaker {}: keyword spotting is running on the server using {}", speakerIO.getId(),
+                    serverKsService.getId());
             serverKsServiceHandler = serverKsService.spot(ksListener, audioStream, locale, keyword);
         }
         return () -> {

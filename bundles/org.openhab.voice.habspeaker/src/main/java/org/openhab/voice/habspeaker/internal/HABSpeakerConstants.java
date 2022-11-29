@@ -50,4 +50,5 @@ public class HABSpeakerConstants {
     // CHANNELS
     public static final String SINK_VOLUME_CHANNEL = "sink-volume";
     public static final String SPOT_CHANNEL = "spot";
+    public static final String DROP_IN_CHANNEL = "drop-in";
 }

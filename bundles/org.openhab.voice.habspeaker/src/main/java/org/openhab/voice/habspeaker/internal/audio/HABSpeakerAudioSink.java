@@ -13,6 +13,7 @@
 package org.openhab.voice.habspeaker.internal.audio;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
@@ -85,10 +86,12 @@ public class HABSpeakerAudioSink implements AudioSink {
         if (audioStream == null) {
             return;
         }
-        try (ConvertedInputStream convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate,
-                targetChannels)) {
+        ConvertedInputStream convertedInputStream = null;
+        var outputStream = new HABSpeakerAudioOutputStream(speakerIO);
+        try {
+            convertedInputStream = new ConvertedInputStream(audioStream, targetSampleRate, targetChannels);
             Instant start = Instant.now();
-            convertedInputStream.transferTo(new HABSpeakerWebSocketOutputStream(speakerIO));
+            convertedInputStream.transferTo(outputStream);
             if (convertedInputStream.getDuration() != -1) {
                 Instant end = Instant.now();
                 long millisSecondTimedToSendAudioData = Duration.between(start, end).toMillis();
@@ -100,10 +103,32 @@ public class HABSpeakerAudioSink implements AudioSink {
             }
         } catch (UnsupportedAudioFileException e) {
             logger.warn("UnsupportedAudioFileException: {}", e.getMessage());
+        } catch (InterruptedIOException ignored) {
         } catch (IOException e) {
             logger.warn("IOException: {}", e.getMessage());
         } catch (InterruptedException e) {
-            logger.debug("InterruptedException: {}", e.getMessage());
+            logger.warn("InterruptedException: {}", e.getMessage());
+        } finally {
+            if (convertedInputStream != null) {
+                try {
+                    convertedInputStream.close();
+                    logger.debug("ConvertedAudioStream {} closed", speakerIO.getId());
+                } catch (IOException e) {
+                    logger.warn("IOException: {}", e.getMessage(), e);
+                }
+            }
+            try {
+                audioStream.close();
+                logger.debug("AudioStream {} closed", speakerIO.getId());
+            } catch (IOException e) {
+                logger.warn("IOException: {}", e.getMessage(), e);
+            }
+            try {
+                outputStream.close();
+                logger.debug("OutputStream {} closed", speakerIO.getId());
+            } catch (IOException e) {
+                logger.warn("IOException: {}", e.getMessage(), e);
+            }
         }
     }
 
@@ -127,11 +152,12 @@ public class HABSpeakerAudioSink implements AudioSink {
         speakerIO.setSinkVolume(percentType.intValue());
     }
 
-    private static class HABSpeakerWebSocketOutputStream extends OutputStream {
+    private static class HABSpeakerAudioOutputStream extends OutputStream {
         private final byte[] id = generateId();
         private final HABSpeakerIO speakerIO;
+        private boolean closed = false;
 
-        public HABSpeakerWebSocketOutputStream(HABSpeakerIO speakerIO) {
+        public HABSpeakerAudioOutputStream(HABSpeakerIO speakerIO) {
             this.speakerIO = speakerIO;
         }
 
@@ -142,12 +168,21 @@ public class HABSpeakerAudioSink implements AudioSink {
 
         @Override
         public void write(byte @Nullable [] b, int off, int len) throws IOException {
+            if (closed) {
+                throw new IOException("Stream closed");
+            }
             if (b != null) {
                 speakerIO.sendAudio(id, b);
             }
         }
 
-        private byte[] generateId() {
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
+        }
+
+        private static byte[] generateId() {
             SecureRandom sr = new SecureRandom();
             byte[] rndBytes = new byte[4];
             sr.nextBytes(rndBytes);

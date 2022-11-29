@@ -34,7 +34,7 @@ import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
  */
 @NonNullByDefault
 public class HABSpeakerAudioSource implements AudioSource {
-    private static final AudioFormat HABSPEAKER_SOURCE_FORMAT = new AudioFormat(AudioFormat.CONTAINER_WAVE,
+    public static final AudioFormat HABSPEAKER_SOURCE_FORMAT = new AudioFormat(AudioFormat.CONTAINER_WAVE,
             AudioFormat.CODEC_PCM_SIGNED, false, 16, null, 16000L, 1);
     private final Set<AudioFormat> supportedFormats = Set.of(HABSPEAKER_SOURCE_FORMAT);
     private final String sourceId;
@@ -66,7 +66,7 @@ public class HABSpeakerAudioSource implements AudioSource {
     public AudioStream getInputStream(AudioFormat audioFormat) throws AudioException {
         try {
             var pipeOutput = new PipedOutputStream();
-            var pipeInput = new PipedInputStream(pipeOutput, 2730 * 20) {
+            var pipeInput = new PipedInputStream(pipeOutput, 4096 * 4) {
                 @Override
                 public void close() throws IOException {
                     speakerIO.removeSourceListener(pipeOutput);
@@ -102,8 +102,7 @@ public class HABSpeakerAudioSource implements AudioSource {
             if (-1 == bytesRead) {
                 return bytesRead;
             }
-            Byte bb = Byte.valueOf(b[0]);
-            return bb.intValue();
+            return b[0];
         }
 
         @Override
@@ -113,11 +112,11 @@ public class HABSpeakerAudioSource implements AudioSource {
 
         @Override
         public int read(byte @Nullable [] b, int off, int len) throws IOException {
+            if (closed) {
+                throw new IOException("Stream closed");
+            }
             if (b == null) {
                 throw new IOException("Buffer is null");
-            }
-            if (closed) {
-                throw new IOException("Stream is closed");
             }
             return input.read(b, off, len);
         }

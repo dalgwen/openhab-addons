@@ -1,10 +1,23 @@
 import { WorkerInCmd, WorkerOutCmd } from "./websocket-worker";
+// detect IOS
+function iOS() {
+  return [
+    'iPad Simulator',
+    'iPhone Simulator',
+    'iPod Simulator',
+    'iPad',
+    'iPhone',
+    'iPod'
+  ].includes(navigator.platform)
+    // iPad on iOS 13 detection
+    || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+}
+const isIOS = iOS();
 /**@type {AudioContext} */
 let audioContext = null;
 let micStreaming = false;
-
+const BUFFER_SIZE = 2048;
 // Audio Record
-
 /**@type {ScriptProcessorNode} */
 let processorNode = null;
 /**@type {MediaStream} */
@@ -17,7 +30,12 @@ async function setupAudio() {
   }
   if (!stream) {
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
+      audio: {
+        autoGainControl: true,
+        echoCancellation: true,
+        noiseSuppression: true,
+        suppressLocalAudioPlayback: false,
+      },
       video: false,
     });
   }
@@ -27,7 +45,7 @@ async function setupAudio() {
 }
 
 class AudioCache {
-  silence = new Float32Array(4096);
+  silence = new Float32Array(BUFFER_SIZE);
   buffer = new Float32Array(0);
   readAudioData(n) {
     var segment = this.buffer.subarray(0, n);
@@ -72,11 +90,13 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
   let speakerOffTimeout = null;
   console.debug(`main: starting sink ${id}`);
   audioContext.resume();
+  var audioElement = document.createElement('audio');
   function stopSpeaker() {
     console.debug(`main: stopping sink ${id}`);
     gainNode.disconnect();
     sinkProcessorNode.disconnect();
     onStop(id);
+    audioElement.remove();
   }
   function debouncedStopSpeaker() {
     if (!speakerOffTimeout) {
@@ -89,7 +109,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
       speakerOffTimeout = null;
     }
   }
-  sinkProcessorNode = audioContext.createScriptProcessor(4096, 0, numberOfChannels);
+  sinkProcessorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 0, numberOfChannels);
   sinkProcessorNode.onaudioprocess = function (e) {
     if (audioCache.available()) {
       setSpeaking(id, true);
@@ -123,12 +143,15 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
     }
   };
   gainNode = audioContext.createGain();
-  const setVolume = (value) => gainNode.gain.setValueAtTime((value / 100) * 2, audioContext.currentTime);
+  const setVolume = (value) => gainNode.gain.setValueAtTime((value / 100) * isIOS ? 10 : 1, audioContext.currentTime);
   console.debug("main: stream volume: " + volume);
   setVolume(volume);
   sinkProcessorNode.connect(gainNode);
   audioCache.reset();
-  gainNode.connect(audioContext.destination);
+  var destination = audioContext.createMediaStreamDestination();
+  gainNode.connect(destination);
+  audioElement.srcObject = destination.stream;
+  audioElement.autoplay = true;
   return { audioCache, setVolume };
 }
 
@@ -159,12 +182,17 @@ export async function startWebsocketWorker(id, token, actions) {
   let sinkConfig = { ...defaultSinkConfig };
   let remoteSpot = false;
   await setupAudio();
+  let currentSpeaking = false;
   function onSinkSpeaking(id, speaking) {
     const sinkContext = activeSinks.get(id);
     if (sinkContext) {
       sinkContext.speaking = speaking;
     }
-    actions.setSpeaking(Array.from(activeSinks.values()).some(i => i.speaking));
+    const speakingValue = Array.from(activeSinks.values()).some(i => i.speaking);
+    if (speakingValue != currentSpeaking) {
+      currentSpeaking = speakingValue;
+      actions.setSpeaking(speakingValue);
+    }
   }
   return new Promise((resolve, reject) => {
     try {
@@ -176,7 +204,11 @@ export async function startWebsocketWorker(id, token, actions) {
         }
         worker.postMessage({ cmd: WorkerInCmd.LISTEN, buffers });
       };
-      sourceNode.connect(processorNode);
+      // Add a gain node to the microphone to reduce noise
+      var micGainNode = audioContext.createGain();
+      micGainNode.gain.value = 0.5;
+      micGainNode.connect(processorNode);
+      sourceNode.connect(micGainNode);
       worker = new Worker(new URL("./websocket-worker.js", import.meta.url), {
         name: "habspeaker-worker",
         type: "module",

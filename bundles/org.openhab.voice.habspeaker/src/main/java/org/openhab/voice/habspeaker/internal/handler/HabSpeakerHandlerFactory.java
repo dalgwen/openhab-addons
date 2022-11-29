@@ -65,7 +65,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
-            var handler = new HABSpeakerThingHandler(thing);
+            var handler = new HABSpeakerThingHandler(thing, ioManager);
             var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
             handler.setSpeakerIO(speakerIO);
             speakerHandlers.put(handler.getSpeakerId(), handler);
