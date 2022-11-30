@@ -1,33 +1,24 @@
 import { WorkerInCmd, WorkerOutCmd } from "./websocket-worker";
-// detect IOS
-function iOS() {
-  return [
-    'iPad Simulator',
-    'iPhone Simulator',
-    'iPod Simulator',
-    'iPad',
-    'iPhone',
-    'iPod'
-  ].includes(navigator.platform)
-    // iPad on iOS 13 detection
-    || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
-}
-const isIOS = iOS();
 /**@type {AudioContext} */
 let audioContext = null;
 let micStreaming = false;
 const BUFFER_SIZE = 2048;
 // Audio Record
-/**@type {ScriptProcessorNode} */
-let processorNode = null;
+/**
+ * sends microphone audio buffers to the worker
+ * @type {ScriptProcessorNode}
+ */
+let micProcessorNode = null;
 /**@type {MediaStream} */
 let stream = null;
 /**@type {MediaStreamAudioSourceNode} */
 let sourceNode = null;
-async function setupAudio() {
+function startAudioContext() {
   if (!audioContext) {
     audioContext = new AudioContext();
   }
+}
+async function startMicrophoneStream() {
   if (!stream) {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -41,9 +32,29 @@ async function setupAudio() {
   }
   if (!sourceNode) {
     sourceNode = audioContext.createMediaStreamSource(stream);
+    // connect processor to source
+    // Add a gain node to the microphone to reduce noise
+    var micGainNode = audioContext.createGain();
+    micGainNode.gain.value = 0.5;
+    micGainNode.connect(micProcessorNode);
+    sourceNode.connect(micGainNode);
   }
 }
-
+async function resumeMicrophoneStream() {
+  if (audioContext.state !== 'running') {
+    console.debug("main: resuming microphone audio context");
+    await audioContext.resume();
+  }
+  if (audioContext.state !== 'running') {
+    console.debug("main: microphone audio context not running");
+  } else if (!stream || !stream.active) {
+    console.debug("main: recreating microphone stream");
+    stream = null;
+    if (sourceNode) sourceNode.disconnect();
+    sourceNode = null;
+    await startMicrophoneStream();
+  }
+}
 class AudioCache {
   silence = new Float32Array(BUFFER_SIZE);
   buffer = new Float32Array(0);
@@ -143,7 +154,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
     }
   };
   gainNode = audioContext.createGain();
-  const setVolume = (value) => gainNode.gain.setValueAtTime((value / 100) * isIOS ? 10 : 1, audioContext.currentTime);
+  const setVolume = (value) => gainNode.gain.setValueAtTime((value / 100), audioContext.currentTime);
   console.debug("main: stream volume: " + volume);
   setVolume(volume);
   sinkProcessorNode.connect(gainNode);
@@ -157,6 +168,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
 
 /**@type {Map<string, {audioCache: AudioCache, setVolume: (value:number) => void, speaking: boolean}>} */
 const activeSinks = new Map();
+let currentSpeaking = false;
 /**
  * 
  * @param {string} id 
@@ -181,34 +193,25 @@ export async function startWebsocketWorker(id, token, actions) {
   };
   let sinkConfig = { ...defaultSinkConfig };
   let remoteSpot = false;
-  await setupAudio();
-  let currentSpeaking = false;
-  function onSinkSpeaking(id, speaking) {
-    const sinkContext = activeSinks.get(id);
-    if (sinkContext) {
-      sinkContext.speaking = speaking;
+  startAudioContext();
+  micProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
+  micProcessorNode.onaudioprocess = ({ inputBuffer }) => {
+    const buffers = [];
+    for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
+      buffers[i] = inputBuffer.getChannelData(i);
     }
-    const speakingValue = Array.from(activeSinks.values()).some(i => i.speaking);
-    if (speakingValue != currentSpeaking) {
-      currentSpeaking = speakingValue;
-      actions.setSpeaking(speakingValue);
+    worker.postMessage({ cmd: WorkerInCmd.LISTEN, buffers });
+  };
+  await startMicrophoneStream();
+  // microphone stream checker
+  setInterval(resumeMicrophoneStream, 15000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      resumeMicrophoneStream();
     }
-  }
+  });
   return new Promise((resolve, reject) => {
     try {
-      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-      processorNode.onaudioprocess = ({ inputBuffer }) => {
-        const buffers = [];
-        for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
-          buffers[i] = inputBuffer.getChannelData(i);
-        }
-        worker.postMessage({ cmd: WorkerInCmd.LISTEN, buffers });
-      };
-      // Add a gain node to the microphone to reduce noise
-      var micGainNode = audioContext.createGain();
-      micGainNode.gain.value = 0.5;
-      micGainNode.connect(processorNode);
-      sourceNode.connect(micGainNode);
       worker = new Worker(new URL("./websocket-worker.js", import.meta.url), {
         name: "habspeaker-worker",
         type: "module",
@@ -291,24 +294,32 @@ export async function startWebsocketWorker(id, token, actions) {
   function startMicStreaming() {
     if (!micStreaming) {
       console.debug("starting microphone audio streaming");
-      audioContext
-        .resume()
-        .then(() => setupAudio())
+      resumeMicrophoneStream()
         .then(() => {
-          processorNode.connect(audioContext.destination);
+          micProcessorNode.connect(audioContext.destination);
         })
         .catch((err) => console.error(err));
       micStreaming = true;
     }
   }
-
   function stopMicStreaming() {
     if (micStreaming) {
       console.debug("stopping microphone audio streaming");
       try {
-        processorNode.disconnect(audioContext.destination);
+        micProcessorNode.disconnect(audioContext.destination);
       } catch (ignored) { }
       micStreaming = false;
+    }
+  }
+  function onSinkSpeaking(id, speaking) {
+    const sinkContext = activeSinks.get(id);
+    if (sinkContext) {
+      sinkContext.speaking = speaking;
+    }
+    const speakingValue = Array.from(activeSinks.values()).some(i => i.speaking);
+    if (speakingValue != currentSpeaking) {
+      currentSpeaking = speakingValue;
+      actions.setSpeaking(speakingValue);
     }
   }
 }
