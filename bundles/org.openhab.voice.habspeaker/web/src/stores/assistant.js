@@ -47,9 +47,6 @@ export const useAssistantStore = defineStore("assistant", () => {
   function startListening() {
     postToWorker(WorkerInCmd.ON_SPOT);
   }
-  // TODO: allow manual abort?
-  function stopListening() {
-  }
   function resetConnection(id) {
     postToWorker(WorkerInCmd.RESET_CONNECTION, { id });
   }
@@ -70,7 +67,6 @@ export const useAssistantStore = defineStore("assistant", () => {
     online,
     speaking,
     startListening,
-    stopListening,
     startWorker,
     userInteractionDone,
     resetConnection,

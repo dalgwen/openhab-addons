@@ -4,10 +4,22 @@
 	xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0 https://openhab.org/schemas/config-description-1.0.0.xsd">
 	<config-description uri="voice:habspeaker">
-		<parameter name="secure" type="boolean">
+		<parameter-group name="service">
+			<label>Service</label>
+			<description>Service related configurations.</description>
+		</parameter-group>
+		<parameter-group name="voice">
+			<label>Voice Control</label>
+			<description>Define the phrases you can use to interact with the speaker (leave empty to disable).</description>
+		</parameter-group>
+		<parameter name="secure" type="boolean" groupName="service">
 			<label>Secure</label>
 			<description>Require the user to be authenticated though the main UI.</description>
 			<default>false</default>
+		</parameter>
+		<parameter name="stopDropInPhrase" type="text" groupName="voice">
+			<label>Stop Drop In Phrase</label>
+			<description>Phrase to stop drop-in on the current speaker.</description>
 		</parameter>
 	</config-description>
 </config-description:config-descriptions>

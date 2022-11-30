@@ -84,6 +84,7 @@ public class HABSpeakerKS implements KSService {
     public KSServiceHandle spot(KSListener ksListener, AudioStream audioStream, Locale locale, String keyword)
             throws KSException {
         this.ksListener = ksListener;
+        var serverKsService = this.serverKsService;
         if (serverKsService == null) {
             logger.debug("speaker {}: keyword spotting is disabled", speakerIO.getId());
             try {

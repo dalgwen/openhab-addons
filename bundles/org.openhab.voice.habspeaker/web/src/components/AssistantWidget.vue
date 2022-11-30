@@ -7,22 +7,16 @@ import router from "../router";
 const store = useAssistantStore();
 const settingsStore = useSettingsStore();
 const { getAccessToken } = useAuthStore();
-const { startListening, stopListening, startWorker, isAudioSupported } = store;
+const { startListening, startWorker, isAudioSupported } = store;
 const { listening, speaking, online, userInteractionDone } = storeToRefs(store);
 const { audioComponentId } = storeToRefs(settingsStore);
-function toggleListening() {
-  if (!listening.value) {
-    startListening();
-  } else {
-    stopListening();
-  }
-}
 function onPanelClick() {
   if (!userInteractionDone.value) {
     startWorker(
       audioComponentId.value,
       getAccessToken()
-    ).catch(() => {
+    ).catch((error) => {
+      console.error(error);
       router.replace("/error");
     });
     userInteractionDone.value = true;
@@ -46,7 +40,7 @@ if (!isAudioSupported()) {
       <button
         id="speech"
         :disabled="!online"
-        @click="toggleListening"
+        @click="startListening"
         :class="{ listening }"
         class="mic-btn"
       >

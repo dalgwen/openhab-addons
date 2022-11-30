@@ -21,9 +21,14 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public class HABSpeakerConfig {
-
+    // Service config
     /**
      * Require security to use the speaker.
      */
     public boolean secure = false;
+    // Voice control config
+    /**
+     * Phrase to stop drop-in on the current speaker
+     */
+    public String stopDropInPhrase = "";
 }

@@ -56,7 +56,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private int sinkVolume = 100;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, ScheduledExecutorService executor) {
-        super(servlet.audioManager, servlet.voiceManager, servlet.bundleContext);
+        super(servlet.audioManager, servlet.voiceManager, servlet.bundleContext, servlet::getConfig);
         this.servlet = servlet;
         this.executor = executor;
     }
