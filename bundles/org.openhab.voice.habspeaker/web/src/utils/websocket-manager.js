@@ -143,7 +143,7 @@ function setupSinkAudio(id, setSpeaking, onStop, volume, stereo) {
       for (let c = 0; c < numberOfChannels; c++) {
         e.outputBuffer
           .getChannelData(c)
-          .set(channelsData[0]);
+          .set(channelsData[c]);
       }
     } else {
       setSpeaking(id, false);
