@@ -89,7 +89,6 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         if (thingHandler == null) {
             return null;
         }
-        // send speaker configuration before initialization
         var config = thingHandler.getSpeakerConfig();
         var initializedConfig = new HashMap<String, Object>();
         var currentVolume = thingHandler.getSinkVolume();
@@ -138,27 +137,24 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         HumanLanguageInterpreter speakerInterpreter = new HABSpeakerLanguageInterpreter(this, configSupplier);
         List<HumanLanguageInterpreter> hlis = List.of(speakerInterpreter);
         if (thingHandler != null) {
-            if (!thingHandler.getSpeakerConfig().stt.isBlank()) {
-                stt = voiceManager.getSTT(thingHandler.getSpeakerConfig().hli);
+            var speakerConfig = thingHandler.getSpeakerConfig();
+            if (!speakerConfig.stt.isBlank()) {
+                stt = voiceManager.getSTT(speakerConfig.stt);
             }
-            if (!thingHandler.getSpeakerConfig().tts.isBlank()) {
-                tts = voiceManager.getTTS(thingHandler.getSpeakerConfig().hli);
+            if (!speakerConfig.tts.isBlank()) {
+                tts = voiceManager.getTTS(speakerConfig.tts);
             }
-            if (!thingHandler.getSpeakerConfig().voice.isBlank()) {
-                voice = voiceManager.getAllVoices().stream()
-                        .filter(v -> v.getUID().equals(thingHandler.getSpeakerConfig().voice)).findAny().orElse(null);
+            if (!speakerConfig.voice.isBlank()) {
+                voice = voiceManager.getAllVoices().stream().filter(v -> v.getUID().equals(speakerConfig.voice))
+                        .findAny().orElse(null);
             }
-            HumanLanguageInterpreter hli = null;
-            if (!thingHandler.getSpeakerConfig().hli.isBlank()) {
-                hli = voiceManager.getHLI(thingHandler.getSpeakerConfig().hli);
-            } else {
-                hli = voiceManager.getHLI();
-            }
+            HumanLanguageInterpreter hli = !speakerConfig.hli.isBlank() ? voiceManager.getHLI(speakerConfig.hli)
+                    : voiceManager.getHLI();
             if (hli != null) {
                 hlis = List.of(speakerInterpreter, hli);
             }
-            if (!thingHandler.getSpeakerConfig().ks.isBlank()) {
-                ks = voiceManager.getKS(thingHandler.getSpeakerConfig().ks);
+            if (!speakerConfig.ks.isBlank()) {
+                ks = voiceManager.getKS(speakerConfig.ks);
             }
         }
         var hsKS = new HABSpeakerKS(this, ks);
