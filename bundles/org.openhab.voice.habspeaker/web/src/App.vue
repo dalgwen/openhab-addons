@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "./stores/auth";
-
+import ScreenSaver from "./components/ScreenSaver.vue";
 const { isTokenRequired, authorize } = useAuthStore();
 isTokenRequired().then(async (requireToken) => {
   if (requireToken) {
@@ -14,6 +14,7 @@ isTokenRequired().then(async (requireToken) => {
 </script>
 
 <template>
+  <ScreenSaver></ScreenSaver>
   <header>
     <div class="title">
       <span>HAB </span>

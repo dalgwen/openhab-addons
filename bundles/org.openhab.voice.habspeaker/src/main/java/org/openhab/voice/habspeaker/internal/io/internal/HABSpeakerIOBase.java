@@ -93,10 +93,9 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         var config = thingHandler.getSpeakerConfig();
         var initializedConfig = new HashMap<String, Object>();
         var currentVolume = thingHandler.getSinkVolume();
-        var sinkVolume = currentVolume != null ? currentVolume : config.sinkVolume;
-        initializedConfig.put("sinkVolume", sinkVolume);
-        var sinkStereo = config.sinkStereo;
-        initializedConfig.put("sinkStereo", sinkStereo);
+        initializedConfig.put("sinkVolume", currentVolume != null ? currentVolume : config.sinkVolume);
+        initializedConfig.put("sinkStereo", config.sinkStereo);
+        initializedConfig.put("screenSaverTime", config.screenSaverTime);
         if (!thingHandler.getSpeakerConfig().ks.isBlank()
                 && voiceManager.getKS(thingHandler.getSpeakerConfig().ks) != null) {
             serverSpotting = true;

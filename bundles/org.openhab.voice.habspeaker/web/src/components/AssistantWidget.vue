@@ -90,7 +90,7 @@ $size: 100px;
   margin: 0;
   background: var(--color-assistant);
   position: relative;
-  z-index: 999;
+  z-index: 1;
   display: inline-block;
   line-height: $size;
   text-align: center;
@@ -174,7 +174,7 @@ $size: 100px;
 }
 
 .microphone-container .led {
-  z-index: 1;
+  z-index: 2;
   background-color: var(--color-assistant);
   border-radius: 50px;
   position: relative;

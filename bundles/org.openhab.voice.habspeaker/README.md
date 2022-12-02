@@ -45,16 +45,17 @@ These settings are stored on your browser local storage.
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config        |  Type   | Group | Description                                                                |
-|---------------|---------|-------|----------------------------------------------------------------------------|
-| sinkVolume    | String  | audio | Default sink volume.                                                       |
-| sinkStereo    | Boolean | audio | Use dual channel audio.                                                    |
-| stt           | String  | voice | The text-to-speech service to use, leave empty to use the default.         |
-| tts           | String  | voice | The speech-to-text service to use, leave empty to use the default.         |
-| voice         | String  | voice | The voice to use if no voice is specified, leave empty to use the default. |
-| hli           | String  | voice | The human language interpreter to use, leave empty to use the default.     |
-| ks            | String  | voice | Enables keyword spotting using the specified service.                      |
-| listeningItem | String  | voice | If provided, the item will be switched on during the voice recognition.    |
+| Config          |  Type   | Group | Description                                                                |
+|-----------------|---------|-------|----------------------------------------------------------------------------|
+| sinkVolume      | String  | audio | Default sink volume.                                                       |
+| sinkStereo      | Boolean | audio | Use dual channel audio.                                                    |
+| stt             | String  | voice | The text-to-speech service to use, leave empty to use the default.         |
+| tts             | String  | voice | The speech-to-text service to use, leave empty to use the default.         |
+| voice           | String  | voice | The voice to use if no voice is specified, leave empty to use the default. |
+| hli             | String  | voice | The human language interpreter to use, leave empty to use the default.     |
+| ks              | String  | voice | Enables keyword spotting using the specified service.                      |
+| listeningItem   | String  | voice | If provided, the item will be switched on during the voice recognition.    |
+| screenSaverTime | String  | ui    | Seconds to activate screen saver (0 for disabled).                         |
 
 ## Thing Channels
 

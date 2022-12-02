@@ -2,7 +2,9 @@ import { ref } from "vue";
 import { defineStore } from "pinia";
 import { startWebsocketWorker } from "../utils/websocket-manager";
 import { WorkerInCmd } from "../utils/websocket-worker";
+import { useScreenSaverStore } from "./screen-saver";
 export const useAssistantStore = defineStore("assistant", () => {
+  const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
   // state
   const listening = ref(false);
   const speaking = ref(false);
@@ -10,12 +12,15 @@ export const useAssistantStore = defineStore("assistant", () => {
   const userInteractionDone = ref(false);
   // worker actions
   function setListening(value) {
+    awakeScreenSaver();
     listening.value = value;
   }
   function setSpeaking(value) {
+    awakeScreenSaver();
     speaking.value = value;
   }
   function setOnline(value) {
+    awakeScreenSaver();
     online.value = value;
   }
   /**@type {Worker} */
@@ -35,6 +40,7 @@ export const useAssistantStore = defineStore("assistant", () => {
         setListening,
         setSpeaking,
         setOnline,
+        setScreenSaverTime,
       }).then((_worker) => {
         worker = _worker;
         console.info("worker running");

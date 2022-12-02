@@ -21,7 +21,11 @@
 				<label>Voice</label>
 				<description>Voice configuration options for this speaker.</description>
 			</parameter-group>
-			<!-- Sink config -->
+			<parameter-group name="ui">
+				<label>UI</label>
+				<description>Client UI options.</description>
+			</parameter-group>
+			<!-- Audio config -->
 			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Sink Volume</label>
 				<description>Default sink volume</description>
@@ -61,6 +65,12 @@
 				<label>Listening Switch</label>
 				<description>If provided, the item will be switched on during the period when the dialog processor has spotted the
 					keyword and is listening for commands.</description>
+			</parameter>
+			<!-- UI config -->
+			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
+				<label>Screen Saver Time</label>
+				<description>Seconds to activate screen saver (0 for disabled)</description>
+				<default>30</default>
 			</parameter>
 		</config-description>
 	</thing-type>

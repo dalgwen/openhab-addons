@@ -15,9 +15,9 @@ export default defineConfig({
         name: "HAB Speaker",
         short_name: "HABSpeaker",
         description: "Dialog processing over WebSocket for openHAB",
-        display: "standalone",
-        background_color: "#ffffff",
-        theme_color: "#ff6600",
+        display: "fullscreen",
+        background_color: "#ff6600",
+        theme_color: "#000000",
         icons: [
           {
             "src": "/habspeaker/icons/icon-72x72.png",

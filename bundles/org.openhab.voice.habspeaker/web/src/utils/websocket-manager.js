@@ -183,7 +183,7 @@ let worker = null;
  *
  * @param {string} id
  * @param {string|null} token
- * @param {{setListening:(value:boolean)=> void, setSpeaking:(value:boolean)=> void, setOnline:(value:boolean)=>void }} actions
+ * @param {{setListening:(value:boolean)=> void, setSpeaking:(value:boolean)=> void, setOnline:(value:boolean)=>void, setScreenSaverTime: (value:number)=>void,}} actions
  * @returns {Promise<Worker>}
  */
 export async function startWebsocketWorker(id, token, actions) {
@@ -232,6 +232,9 @@ export async function startWebsocketWorker(id, token, actions) {
               sinkConfig.stereo = sinkStereo;
             }
             remoteSpot = !!ev.data.remoteSpot;
+            if(ev.data.screenSaverTime != null && !isNaN(ev.data.screenSaverTime)) {
+              actions.setScreenSaverTime(ev.data.screenSaverTime);
+            }
             break;
           case WorkerOutCmd.INITIALIZED:
             actions.setOnline(true);

@@ -21,6 +21,11 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public class HABSpeakerThingConfig {
+    // UI config
+    /**
+     * Seconds to activate screen saver (0 for disabled)
+     */
+    public int screenSaverTime = 30;
     // Voice config
     /**
      * Custom tts service for this speaker
