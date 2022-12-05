@@ -11,29 +11,28 @@ export const useAssistantStore = defineStore("assistant", () => {
   const online = ref(false);
   const userInteractionDone = ref(false);
   // worker actions
-  function setListening(value) {
+  function setListening(value: boolean) {
     awakeScreenSaver();
     listening.value = value;
   }
-  function setSpeaking(value) {
+  function setSpeaking(value: boolean) {
     awakeScreenSaver();
     speaking.value = value;
   }
-  function setOnline(value) {
+  function setOnline(value: boolean) {
     awakeScreenSaver();
     online.value = value;
   }
-  /**@type {Worker} */
-  let worker = null;
-
-  function postToWorker(cmd, args = {}) {
+  
+  let worker: Worker|null = null;
+  function postToWorker(cmd: string, args = {}) {
     if (worker) {
       worker.postMessage({ cmd, ...args });
     } else {
       console.error("Worker not running");
     }
   }
-  function startWorker(id, token) {
+  function startWorker(id:string, token:string) {
     userInteractionDone.value = true;
     if (!worker) {
       return startWebsocketWorker(id, token, {
@@ -53,10 +52,10 @@ export const useAssistantStore = defineStore("assistant", () => {
   function startListening() {
     postToWorker(WorkerInCmd.ON_SPOT);
   }
-  function resetConnection(id) {
+  function resetConnection(id:string) {
     postToWorker(WorkerInCmd.RESET_CONNECTION, { id });
   }
-  function renewToken(token) {
+  function renewToken(token:string) {
     if (worker) {
       postToWorker(WorkerInCmd.TOKEN_RENEW, { token });
     }

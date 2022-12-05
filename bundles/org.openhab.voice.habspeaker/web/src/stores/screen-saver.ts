@@ -6,7 +6,7 @@ const USER_INPUT_EVENTS = [
 ];
 export const useScreenSaverStore = defineStore("screenSaver", () => {
   let screenSaverTime = 120;
-  let screenSaverTimeout = null;
+  let screenSaverTimeout: any = null;
   const screenSaverEnabled = ref(false);
   function configureScreenSaver() {
     if (screenSaverTime > 0) {
@@ -29,14 +29,14 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
       }, screenSaverTime * 1000);
     }
   }
-  function setScreenSaverTime(seconds) {
+  function setScreenSaverTime(seconds: number) {
     screenSaverTime = seconds;
     configureScreenSaver();
   }
   USER_INPUT_EVENTS.forEach((eventName) => {
     window.addEventListener(eventName, awakeScreenSaver);
   });
-  watch(screenSaverTime, configureScreenSaver);
+  watch(() => screenSaverTime, configureScreenSaver);
   configureScreenSaver();
   onUnmounted(()=>{
     USER_INPUT_EVENTS.forEach((eventName) => {

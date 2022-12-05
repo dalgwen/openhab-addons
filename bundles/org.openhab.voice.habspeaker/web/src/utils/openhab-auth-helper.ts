@@ -1,8 +1,10 @@
 import axios from "axios";
 export class OHAuthHelper {
     accessToken = "";
-    constructor(options = {}) {
-        this.options = options;
+    currentTokenExpireTime?: number;
+    refreshAccessTokenTimeoutRef: any;
+    refreshOnVisibilityChangeFn: (() => void) | null = null;
+    constructor(private options: { useCookie?: boolean, path?: string, setup?: boolean } = {}) {
     }
     getRedirectUri() {
         return window.location.origin + (this.options.path ?? '');
@@ -14,7 +16,7 @@ export class OHAuthHelper {
             sessionStorage.setItem('openhab.ui:codeVerifier', pkceChallenge.code_verifier)
             sessionStorage.setItem('openhab.ui:authState', authState)
             var redirectUri = this.getRedirectUri();
-            window.location = '/auth?' + urlEncodeObject({
+            (window.location as any) = '/auth?' + urlEncodeObject({
                 response_type: "code",
                 client_id: redirectUri,
                 redirect_uri: redirectUri,
@@ -31,7 +33,7 @@ export class OHAuthHelper {
      * @param {(err: Error|null, { access_token: string, refresh_token: string }) => void} callback 
      * @param {boolean} noRefresh 
      */
-    async refreshAccessToken(callback, refreshNow = true) {
+    async refreshAccessToken(callback: (err: Error | null, result: { access_token: string, refresh_token: string | null } | null) => void, refreshNow = true) {
         try {
             const refreshToken = this.getRefreshToken();
             if (!refreshToken) {
@@ -57,7 +59,7 @@ export class OHAuthHelper {
             }
             const result = { access_token: this.getAccessToken(), refresh_token: this.getRefreshToken() };
             if (callback) {
-                if(this.currentTokenExpireTime == null || isNaN(this.currentTokenExpireTime)) {
+                if (this.currentTokenExpireTime == null || isNaN(this.currentTokenExpireTime)) {
                     throw new Error("Missing token expire time");
                 }
                 callback(null, result);
@@ -84,7 +86,7 @@ export class OHAuthHelper {
         } catch (error) {
             console.error(error);
             if (callback) {
-                callback(error, null);
+                callback(error as Error, null);
             }
         }
     }
@@ -100,7 +102,7 @@ export class OHAuthHelper {
     getRefreshToken() {
         return localStorage.getItem("openhab.ui:refreshToken") || null;
     }
-    setRefreshToken(refreshToken) {
+    setRefreshToken(refreshToken: string) {
         localStorage.setItem("openhab.ui:refreshToken", refreshToken);
     }
     async tryExchangeAuthorizationCode() {
@@ -109,12 +111,15 @@ export class OHAuthHelper {
             const authState = sessionStorage.getItem('openhab.ui:authState')
             sessionStorage.removeItem('openhab.ui:authState');
             if (authState !== state) {
-                reject(new Error('Invalid state'));
+                throw new Error('Invalid state');
             }
             if (window.history) {
-                window.history.replaceState(null, window.title, window.location.href.replace('?code=' + code, '').replace('&state=' + authState, ''))
+                window.history.replaceState(null, window.document.title, window.location.href.replace('?code=' + code, '').replace('&state=' + authState, ''))
             }
             const codeVerifier = sessionStorage.getItem('openhab.ui:codeVerifier');
+            if (!codeVerifier) {
+                throw new Error('Missing code verifier.');
+            }
             sessionStorage.removeItem('openhab.ui:codeVerifier');
             var redirectUri = this.getRedirectUri();
             const payload = urlEncodeObject({
@@ -145,9 +150,9 @@ function getQueryParams() {
         var pair = paramText.split('=');
         params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
         return params;
-    }, {});
+    }, {} as { [key: string]: string });
 }
-function urlEncodeObject(payloadObj) {
+function urlEncodeObject(payloadObj: { [key: string]: string }) {
     return Object.entries(payloadObj).reduce(
         (text, [key, value]) => {
             if (text.length)
@@ -160,7 +165,7 @@ function urlEncodeObject(payloadObj) {
         ""
     );
 }
-function generateUUID(mask = null) {
+function generateUUID(mask?: string) {
     const uuidMask = mask ? mask : 'xxxxxxxxxx';
     let
         d = new Date().getTime(),

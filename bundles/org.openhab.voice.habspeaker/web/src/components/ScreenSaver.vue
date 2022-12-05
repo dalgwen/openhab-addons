@@ -23,7 +23,7 @@ function setupIconMovement() {
         clearInterval(iconMovementInterval);
     }
 }
-watch(screenSaverEnabled, setupIconMovement);
+watch(()=>screenSaverEnabled, setupIconMovement);
 setupIconMovement();
 onUnmounted(() => {
     clearInterval(iconMovementInterval);
