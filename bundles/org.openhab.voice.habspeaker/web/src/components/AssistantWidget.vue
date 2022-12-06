@@ -1,63 +1,25 @@
 <script setup>
 import { storeToRefs } from "pinia";
-import { useAuthStore } from "../stores/auth";
 import { useAssistantStore } from "../stores/assistant";
-import { useSettingsStore } from "../stores/settings";
-import router from "../router";
 const store = useAssistantStore();
-const settingsStore = useSettingsStore();
-const { getAccessToken } = useAuthStore();
-const { startListening, startWorker, isAudioSupported } = store;
+const { startListening } = store;
 const { listening, speaking, online, userInteractionDone } = storeToRefs(store);
-const { audioComponentId } = storeToRefs(settingsStore);
-function onPanelClick() {
-  if (!userInteractionDone.value) {
-    startWorker(
-      audioComponentId.value,
-      getAccessToken()
-    ).catch((error) => {
-      console.error(error);
-      router.replace("/error");
-    });
-    userInteractionDone.value = true;
-  }
-}
-// Check browser audio support
-if (!isAudioSupported()) {
-  router.replace("/audio-error");
-}
 </script>
 <template>
-  <div
-    @click="onPanelClick()"
-    class="container"
-    :class="{
-      clickable: !userInteractionDone,
-      loading: userInteractionDone && !online,
-    }"
-  >
-    <div>
-      <button
-        id="speech"
-        :disabled="!online"
-        @click="startListening"
-        :class="{ listening }"
-        class="mic-btn"
-      >
-        <div v-if="online" class="pulse-ring"></div>
-        <div v-if="userInteractionDone && !online" class="lds-ring">
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-        </div>
-        <div class="microphone-container">
-          <span class="led"></span>
-          <span class="microphone"></span>
-          <span class="leg"></span>
-          <span class="support"></span>
-        </div>
-      </button>
+    <button id="speech" :disabled="!online" @click="startListening" :class="{ listening }" class="mic-btn">
+      <div v-if="online" class="pulse-ring"></div>
+      <div v-if="userInteractionDone && !online" class="lds-ring">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="microphone-container">
+        <span class="led"></span>
+        <span class="microphone"></span>
+        <span class="leg"></span>
+        <span class="support"></span>
+      </div>
       <div v-if="online" class="sound-container sound-container-animated">
         <div class="sound" :class="{ 'sound-animated': speaking }">
           <div class="sound-bar"></div>
@@ -67,8 +29,7 @@ if (!isAudioSupported()) {
           <div class="sound-bar"></div>
         </div>
       </div>
-    </div>
-  </div>
+    </button>
 </template>
 
 <style lang="scss" scoped>
@@ -108,8 +69,8 @@ $size: 100px;
 
 .pulse-ring {
   content: "";
-  width: $size;
-  height: $size;
+  width: 100%;
+  height: 100%;
   background: transparent;
   border: 5px solid var(--color-assistant);
   border-radius: 50%;
@@ -131,14 +92,6 @@ $size: 100px;
   }
 }
 
-.container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 86vh;
-  background-color: var(--color-internal-background);
-}
-
 .listening .pulse-ring {
   animation: pulsate infinite 1.5s;
 }
@@ -150,27 +103,27 @@ $size: 100px;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 100px;
-  height: 86px;
+  width: 100%;
+  height: 86%;
 }
 
 .microphone-container .microphone {
   background-color: var(--color-microphone);
   border-radius: 100px;
-  width: 30px;
-  height: 70px;
+  width: 30%;
+  height: 70%;
 }
 
 .microphone-container .leg {
   background-color: var(--color-microphone);
-  width: 5px;
-  height: 20px;
+  width: 5%;
+  height: 20%;
 }
 
 .microphone-container .support {
   background-color: var(--color-microphone);
-  width: 30px;
-  height: 5px;
+  width: 30%;
+  height: 5%;
 }
 
 .microphone-container .led {
@@ -178,9 +131,9 @@ $size: 100px;
   background-color: var(--color-assistant);
   border-radius: 50px;
   position: relative;
-  top: 30px;
-  width: 5px;
-  height: 15px;
+  top: 30%;
+  width: 5%;
+  height: 15%;
 }
 
 .loading .microphone-container .led {
@@ -191,23 +144,25 @@ $size: 100px;
 
 @keyframes bodyanimation {
   0% {
-    height: 4px;
+    height: 17%;
   }
 
   100% {
-    height: 20px;
+    height: 60%;
   }
 }
 
 .sound-container {
   position: relative;
+  margin-top: 14%;
+  height: 30%;
 }
 
 .sound {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 30px;
+  height: 100%;
   width: 100%;
   border-radius: 50px;
 }
@@ -217,10 +172,10 @@ $size: 100px;
 }
 
 .sound-bar {
-  height: 4px;
+  height: 17%;
   background-color: var(--color-assistant);
-  width: 4px;
-  margin-right: 4px;
+  width: 5%;
+  margin-right: 5%;
   border-radius: 20px;
 }
 
@@ -248,19 +203,19 @@ $size: 100px;
 .lds-ring {
   display: inline-block;
   position: absolute;
-  width: 136px;
-  height: 136px;
-  top: -18px;
-  left: -18px;
+  width: 136%;
+  height: 136%;
+  top: -18%;
+  left: -18%;
 }
 
 .lds-ring div {
   box-sizing: border-box;
   display: block;
   position: absolute;
-  width: 120px;
-  height: 120px;
-  margin: 8px;
+  width: 86%;
+  height: 86%;
+  margin: 7%;
   border: 8px solid var(--color-assistant);
   border-radius: 50%;
   animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
