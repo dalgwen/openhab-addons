@@ -49,6 +49,17 @@ public class HABSpeakerConstants {
     public static final ThingTypeUID SPEAKER_THING_TYPE = new ThingTypeUID(SERVICE_ID, "speaker");
     // CHANNELS
     public static final String SINK_VOLUME_CHANNEL = "sink-volume";
+    public static final String MEDIA_CURRENT_SECOND_CHANNEL = "media-current-second";
+    public static final String MEDIA_TOTAL_SECONDS_CHANNEL = "media-total-seconds";
+    public static final String MEDIA_PROGRESS_CHANNEL = "media-progress";
+    public static final String MEDIA_CONTROL_CHANNEL = "media-control";
+    public static final String MEDIA_VOLUME_CHANNEL = "media-volume";
+    public static final String YOUTUBE_ID_CHANNEL = "youtube-id";
+    // public static final String YOUTUBE_SEARCH_CHANNEL = "youtube-search";
+    public static final String SPOTIFY_ID_CHANNEL = "spotify-id";
+    // public static final String SPOTIFY_SEARCH_CHANNEL = "spotify-search";
+    public static final String WEB_AUDIO_CHANNEL = "web-audio";
+    public static final String WEB_VIDEO_CHANNEL = "web-video";
     public static final String SPOT_CHANNEL = "spot";
     public static final String DROP_IN_CHANNEL = "drop-in";
 }

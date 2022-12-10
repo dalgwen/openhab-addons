@@ -86,17 +86,21 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     }
 
     protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler) {
-        if (thingHandler == null) {
+        if (handler == null) {
             return null;
         }
-        var config = thingHandler.getSpeakerConfig();
+        var config = handler.getSpeakerConfig();
         var initializedConfig = new HashMap<String, Object>();
-        var currentVolume = thingHandler.getSinkVolume();
+        var currentVolume = handler.getSinkVolume();
         initializedConfig.put("sinkVolume", currentVolume != null ? currentVolume : config.sinkVolume);
         initializedConfig.put("sinkStereo", config.sinkStereo);
         initializedConfig.put("screenSaverTime", config.screenSaverTime);
-        if (!thingHandler.getSpeakerConfig().ks.isBlank()
-                && voiceManager.getKS(thingHandler.getSpeakerConfig().ks) != null) {
+        initializedConfig.put("spotifyToken", handler.getSpotifyToken());
+        var label = handler.getLabel();
+        if (label != null) {
+            initializedConfig.put("label", label);
+        }
+        if (!handler.getSpeakerConfig().ks.isBlank() && voiceManager.getKS(handler.getSpeakerConfig().ks) != null) {
             serverSpotting = true;
             initializedConfig.put("remoteSpot", true);
         }
@@ -230,7 +234,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
             task.cancel(true);
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException ignored) {
             }
         }
         if (stream != null) {

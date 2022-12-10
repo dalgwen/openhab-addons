@@ -38,3 +38,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+iframe {
+  width: 100%!important;
+  height: 100%!important;
+}

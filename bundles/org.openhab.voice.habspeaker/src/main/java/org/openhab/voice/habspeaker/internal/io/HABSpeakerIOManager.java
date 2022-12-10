@@ -23,6 +23,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.voice.VoiceManager;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
 import org.osgi.framework.BundleContext;
@@ -42,18 +43,22 @@ import org.slf4j.LoggerFactory;
  */
 @Component(service = HABSpeakerIOManager.class)
 @NonNullByDefault
-public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
+public class HABSpeakerIOManager
+        implements HABSpeakerIOProtocolListener, HABSpeakerConfigProvider.HABSpeakerConfigProviderListener {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOManager.class);
     private final List<HABSpeakerWebSocketProtocol> ioProtocols;
     private final Set<HABSpeakerIO> speakerConnections = Collections.synchronizedSet(new HashSet<>());
+    private final HABSpeakerConfigProvider configProvider;
     private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
 
     @Activate
     public HABSpeakerIOManager(BundleContext bundleContext, final @Reference HttpService httpService,
             final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
             final @Reference UserRegistry userRegistry, final @Reference HABSpeakerConfigProvider configProvider) {
+        this.configProvider = configProvider;
         this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext, httpService,
                 audioManager, voiceManager, userRegistry));
+        configProvider.addListener(this);
     }
 
     public List<HABSpeakerIO> getSpeakerConnections() {
@@ -82,6 +87,7 @@ public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
     @Deactivate
     public synchronized void dispose() {
         logger.debug("Unregistering protocols");
+        configProvider.removeListener(this);
         ioProtocols.forEach(HABSpeakerIOProtocol::unregister);
     }
 
@@ -111,5 +117,15 @@ public class HABSpeakerIOManager implements HABSpeakerIOProtocolListener {
                 protocolListener.onDisconnected(speaker);
             }
         }
+    }
+
+    @Override
+    public void onSpotifyTokenUpdate(String accessToken) {
+        speakerConnections.forEach(speakerIO -> speakerIO.updateSpotifyToken(accessToken));
+    }
+
+    @Override
+    public void onGlobalConfigUpdate(HABSpeakerConfig config) {
+        // TODO: disconnect speakers?
     }
 }

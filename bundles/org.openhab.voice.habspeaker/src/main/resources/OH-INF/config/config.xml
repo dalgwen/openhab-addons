@@ -12,6 +12,10 @@
 			<label>Voice Control</label>
 			<description>Define the phrases you can use to interact with the speaker (leave empty to disable).</description>
 		</parameter-group>
+		<parameter-group name="media-providers">
+			<label>Media Providers</label>
+			<description>Configure required credentials for the supported media providers.</description>
+		</parameter-group>
 		<parameter name="secure" type="boolean" groupName="service">
 			<label>Secure</label>
 			<description>Require the user to be authenticated though the main UI.</description>
@@ -20,6 +24,11 @@
 		<parameter name="stopDropInPhrase" type="text" groupName="voice">
 			<label>Stop Drop In Phrase</label>
 			<description>Phrase to stop drop-in on the current speaker.</description>
+		</parameter>
+		<parameter name="spotifyClientId" type="text" groupName="media-providers">
+			<label>Spotify Client Id</label>
+			<description>Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify
+				integration)</description>
 		</parameter>
 	</config-description>
 </config-description:config-descriptions>

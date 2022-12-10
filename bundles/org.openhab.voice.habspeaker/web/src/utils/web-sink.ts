@@ -31,7 +31,6 @@ export class WebAudioSink {
     constructor(private id: string, private audioContext: AudioContext, private channels: number, private listener: (playing: boolean) => void) {
         this.audioElement = document.createElement('audio');
         this.gainNode = audioContext.createGain();
-        console.debug("main: stream volume: " + id);
         this.sinkProcessorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 0, channels);
         this.sinkProcessorNode.onaudioprocess = this.processAudio.bind(this);
         this.sinkProcessorNode.connect(this.gainNode);

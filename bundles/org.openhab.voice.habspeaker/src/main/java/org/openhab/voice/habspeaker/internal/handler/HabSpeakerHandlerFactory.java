@@ -25,6 +25,7 @@ import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
@@ -49,11 +50,14 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     private final Logger logger = LoggerFactory.getLogger(HabSpeakerHandlerFactory.class);
     private final Map<String, HABSpeakerThingHandler> speakerHandlers = new ConcurrentHashMap<>();
     private final HABSpeakerIOManager ioManager;
+    private final HABSpeakerConfigProvider configProvider;
 
     @Activate
-    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager) {
+    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager,
+            @Reference HABSpeakerConfigProvider configProvider) {
         ioManager.setProtocolListener(this);
         this.ioManager = ioManager;
+        this.configProvider = configProvider;
     }
 
     @Override
@@ -65,7 +69,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
-            var handler = new HABSpeakerThingHandler(thing, ioManager);
+            var handler = new HABSpeakerThingHandler(thing, ioManager, configProvider);
             var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
             handler.setSpeakerIO(speakerIO);
             speakerHandlers.put(handler.getSpeakerId(), handler);

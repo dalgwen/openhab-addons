@@ -1,27 +1,29 @@
 <script setup>
-const props = defineProps({
-    videoId: String,
-});
+import { watch, onUnmounted } from 'vue';
+import { useYoutubePlayerStore } from '../../stores/media-players/youtube-player';
 
+const props = defineProps({
+    mediaId: String,
+});
+const youtubePlayerStore = useYoutubePlayerStore();
+if (props.mediaId && props.mediaId.length) {
+    youtubePlayerStore.playVideo(props.mediaId);
+}
+watch(() => props.mediaId, (value) => {
+    console.debug("Playing youtube new video ", value);
+    youtubePlayerStore.playVideo(value);
+});
+onUnmounted(youtubePlayerStore.destroyPlayer);
 </script>
 <template>
-    <div class="container">
-        <span>{{ props.message }}</span>
+    <div id="youtube-player-container" class="yt-container">
+        <div id="youtube-player"></div>
     </div>
 </template>
 
 <style lang="scss" scoped>
-.container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 86vh;
-    background-color: var(--color-internal-background);
-    padding: 1rem;
-}
-
-.container span {
-    background-color: var(--color-alert-text);
-}
+    .yt-container {
+        width: 100%;
+        height: 100%;
+    }
 </style>

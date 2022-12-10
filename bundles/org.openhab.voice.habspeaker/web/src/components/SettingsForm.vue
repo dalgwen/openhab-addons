@@ -5,18 +5,18 @@ import { useAssistantStore } from "../stores/assistant";
 import { useSettingsStore } from "../stores/settings";
 const store = useSettingsStore();
 const assistantStore = useAssistantStore();
-const { audioComponentId } = storeToRefs(store);
+const { speakerId } = storeToRefs(store);
 const model = ref({
-  id: audioComponentId.value,
+  id: speakerId.value,
 });
 function reset() {
-  model.value.id = audioComponentId.value;
+  model.value.id = speakerId.value;
 }
 function save() {
-  audioComponentId.value = model.value.id;
+  speakerId.value = model.value.id;
   store.commit();
   assistantStore.resetConnection(
-    audioComponentId.value,
+    speakerId.value,
   );
 }
 </script>

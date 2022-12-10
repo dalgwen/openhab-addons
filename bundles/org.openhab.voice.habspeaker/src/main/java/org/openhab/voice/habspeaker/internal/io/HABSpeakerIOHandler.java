@@ -30,6 +30,11 @@ public interface HABSpeakerIOHandler {
     String getLabel();
 
     /**
+     * @return Returns the spotify token or empty
+     */
+    String getSpotifyToken();
+
+    /**
      * @return last sink volume if any
      */
     @Nullable
@@ -46,4 +51,14 @@ public interface HABSpeakerIOHandler {
      * @param value current volume level (range 0 - 100)
      */
     void onSinkVolumeUpdate(int value);
+
+    /**
+     * Is called on remote media playback updates
+     *
+     * @param currentSecond
+     * @param totalSeconds
+     * @param playbackState
+     */
+    void onMediaStateUpdate(String provider, String mediaId, int volume, long currentSecond, long totalSeconds,
+            HABSpeakerIO.PlaybackStates playbackState);
 }

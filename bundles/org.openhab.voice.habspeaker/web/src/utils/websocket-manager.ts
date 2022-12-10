@@ -1,6 +1,6 @@
 import { WebAudioSink } from "./web-sink";
 import { WebAudioSource } from "./web-source";
-import { WorkerInCmd, WorkerOutCmd } from "./websocket-worker";
+import { WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "./websocket-worker";
 /**@type {AudioContext} */
 let audioContext: AudioContext | null = null;
 let micStreaming = false;
@@ -50,7 +50,6 @@ function createAudioSink(id: string, volume: number, stereo: boolean, onSinkSpea
     if (!speakerOffTimeout) {
       speakerOffTimeout = setTimeout(() => stopSpeaker(), 1000);
     }
-    console.log("CHECK NO SPEAKING")
     onSinkSpeaking(false);
   }
   function cancelStopSpeaker() {
@@ -58,7 +57,6 @@ function createAudioSink(id: string, volume: number, stereo: boolean, onSinkSpea
       clearTimeout(speakerOffTimeout);
       speakerOffTimeout = null;
     }
-    console.log("CHECK SPEAKING")
     onSinkSpeaking(true);
   }
   return sink;
@@ -70,7 +68,16 @@ const activeSinks = new Map<string, WebAudioSink>();
 /**@type {Worker} */
 let worker: Worker | null = null;
 
-type WorkerActions = { setListening: (value: boolean) => void, setSpeaking: (value: boolean) => void, setOnline: (value: boolean) => void, setScreenSaverTime: (value: number) => void, };
+type WorkerActions = {
+  setListening: (value: boolean) => void,
+  setSpeaking: (value: boolean) => void,
+  setOnline: (value: boolean) => void,
+  setScreenSaverTime: (value: number) => void,
+  getMediaCtrl: () => MediaSessionCtrl | null,
+  startMedia: (provider: string, media: string) => void,
+  stopMedia: () => void,
+  updateSpotifyToken: (token: string) => void
+};
 /**
  *
  * @param {string} id
@@ -85,12 +92,12 @@ export async function startWebsocketWorker(id: string, token: string, actions: W
     stereo: false,
   };
   let sinkConfig = { ...defaultSinkConfig };
-  let remoteSpot = false;
+  let remoteSpotMode = false;
   startAudioContext();
   const audioSource = new WebAudioSource(getAudioContext(), (buffers) => worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers }));
   await audioSource.resume();
-  // microphone stream checker
-  setInterval(audioSource.resume.bind(audioSource), 15000);
+  // microphone stream checker, to keep the stream alive on undetected disconnections  
+  setInterval(audioSource.resume.bind(audioSource), 10000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       audioSource.resume();
@@ -98,7 +105,7 @@ export async function startWebsocketWorker(id: string, token: string, actions: W
   });
   return new Promise((resolve, reject) => {
     try {
-      worker = new Worker(new URL("./websocket-worker.js", import.meta.url), {
+      worker = new Worker(new URL("./websocket-worker.ts", import.meta.url), {
         name: "habspeaker-worker",
         type: "module",
       });
@@ -106,60 +113,113 @@ export async function startWebsocketWorker(id: string, token: string, actions: W
         if ((import.meta as any).env.DEV) {
           console.debug("worker => main thread:", ev.data);
         }
-        switch (ev.data.cmd) {
+        const command = ev.data.cmd as WorkerOutCmd;
+        switch (command) {
           case WorkerOutCmd.CONFIGURE:
             // TODO: disallow configure after initialized
-            const sinkVolume = ev.data.sinkVolume;
+            const { sinkVolume, sinkStereo, remoteSpot, screenSaverTime, spotifyToken, label } = ev.data as WorkerOutCmdType<typeof command>;
             if (sinkVolume != null) {
               sinkConfig.volume = sinkVolume;
             }
-            const sinkStereo = ev.data.sinkStereo;
             if (sinkStereo != null) {
               sinkConfig.stereo = sinkStereo;
             }
-            remoteSpot = !!ev.data.remoteSpot;
-            if (ev.data.screenSaverTime != null && !isNaN(ev.data.screenSaverTime)) {
-              actions.setScreenSaverTime(ev.data.screenSaverTime);
+            remoteSpotMode = !!remoteSpot;
+            if (screenSaverTime != null && !isNaN(screenSaverTime)) {
+              actions.setScreenSaverTime(screenSaverTime);
+            }
+            if (spotifyToken) {
+              actions.updateSpotifyToken(spotifyToken);
             }
             break;
           case WorkerOutCmd.INITIALIZED:
             actions.setOnline(true);
-            if (remoteSpot) {
+            if (remoteSpotMode) {
               console.debug("remote spot enabled, starting mic streaming");
               startMicStreaming();
             }
             break;
           case WorkerOutCmd.OFFLINE:
             sinkConfig = { ...defaultSinkConfig };
-            remoteSpot = false;
+            remoteSpotMode = false;
             actions.setListening(false);
             actions.setOnline(false);
             stopMicStreaming();
             break;
           case WorkerOutCmd.SPEAK: {
-            let sinkContext = activeSinks.get(ev.data.id);
+            const speakData = ev.data as WorkerOutCmdType<typeof command>;
+            let sinkContext = activeSinks.get(speakData.id);
             if (!sinkContext) {
-              sinkContext = createAudioSink(ev.data.id, sinkConfig.volume, sinkConfig.stereo, onSinkSpeaking);
-              activeSinks.set(ev.data.id, sinkContext);
+              sinkContext = createAudioSink(speakData.id, sinkConfig.volume, sinkConfig.stereo, onSinkSpeaking);
+              activeSinks.set(sinkContext.getId(), sinkContext);
             }
-            sinkContext.playAudio(ev.data.buffer);
+            sinkContext.playAudio(speakData.buffer);
             break;
           }
           case WorkerOutCmd.START_LISTENING:
             actions.setListening(true);
-            if (!remoteSpot) {
+            if (!remoteSpotMode) {
               startMicStreaming();
             }
             break;
           case WorkerOutCmd.STOP_LISTENING:
             actions.setListening(false);
-            if (!remoteSpot) {
+            if (!remoteSpotMode) {
               stopMicStreaming();
             }
             break;
           case WorkerOutCmd.SINK_VOLUME:
-            sinkConfig.volume = ev.data.value;
+            const { value } = ev.data as WorkerOutCmdType<typeof command>;
+            sinkConfig.volume = value;
             activeSinks.forEach(sink => sink.setVolume(sinkConfig.volume));
+            break;
+          case WorkerOutCmd.MEDIA_COMMAND:
+            const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
+            if ('start' === mediaCommandData.type) {
+              actions.startMedia(mediaCommandData.provider, mediaCommandData.id);
+              return;
+            }
+            const mediaSessionCtrl = actions.getMediaCtrl();
+            if (!mediaSessionCtrl) {
+              console.log("Media is not started");
+              return;
+            }
+            switch (mediaCommandData.type) {
+              case 'play':
+                mediaSessionCtrl.play();
+                break;
+              case 'pause':
+                mediaSessionCtrl.pause();
+                break;
+              case 'fast-forward':
+                mediaSessionCtrl.forward();
+                break;
+              case 'rewind':
+                mediaSessionCtrl.backward();
+                break;
+              case 'stop':
+                mediaSessionCtrl.stop();
+                actions.stopMedia();
+                break;
+              case 'next':
+                mediaSessionCtrl.next();
+                break;
+              case 'previous':
+                mediaSessionCtrl.previous();
+                break;
+              case 'seek':
+                mediaSessionCtrl.seek(mediaCommandData.second);
+                break;
+              case 'volume':
+                mediaSessionCtrl.setVolume(mediaCommandData.level);
+                break;
+              default:
+                console.error("Unsupported media command: ", mediaCommandData);
+            }
+            break;
+          case WorkerOutCmd.SPOTIFY_TOKEN:
+            const spotifyTokenData = ev.data as WorkerOutCmdType<typeof command>;
+            actions.updateSpotifyToken(spotifyTokenData.token);
             break;
         }
       };
@@ -198,8 +258,37 @@ export async function startWebsocketWorker(id: string, token: string, actions: W
     const speakingValue = Array.from(activeSinks.values()).some(i => i.isPlaying());
     if (speakingValue != currentSpeaking) {
       currentSpeaking = speakingValue;
-      console.log("SPEAKING: " + speakingValue)
       actions.setSpeaking(speakingValue);
     }
   }
+}
+export interface MediaSessionCtrl {
+  getId(): string;
+  getMediaId(): Promise<string>;
+  getAwakeScreen(): boolean;
+  getVolume(): Promise<number>;
+  setVolume(value: number): Promise<void>;
+  play(): Promise<void>;
+  pause(): Promise<void>;
+  stop(): Promise<void>;
+  backward(): Promise<void>;
+  forward(): Promise<void>;
+  previous(): Promise<void>;
+  next(): Promise<void>;
+  seek(second: number): Promise<void>;
+  getCurrentSecond(): Promise<number>;
+  getTotalSeconds(): Promise<number>;
+  getPlaybackState(): Promise<PlaybackState>;
+}
+export enum MediaProvider {
+  YOUTUBE = 'youtube',
+  SPOTIFY = 'spotify',
+  WEB_AUDIO = 'web-audio',
+  WEB_VIDEO = 'web-video',
+}
+export enum PlaybackState {
+  PLAYING = 'playing',
+  PAUSED = 'paused',
+  STOPPED = 'stopped',
+  BUFFERING = 'buffering',
 }

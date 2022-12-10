@@ -31,4 +31,8 @@ public class HABSpeakerConfig {
      * Phrase to stop drop-in on the current speaker
      */
     public String stopDropInPhrase = "";
+    /**
+     * Spotify app client id
+     */
+    public String spotifyClientId = "";
 }

@@ -11,6 +11,17 @@
 			<channel id="sink-volume" typeId="system.volume"/>
 			<channel id="spot" typeId="spot"/>
 			<channel id="drop-in" typeId="drop-in"/>
+			<channel id="media-current-second" typeId="media-current-second"/>
+			<channel id="media-total-seconds" typeId="media-total-seconds"/>
+			<channel id="media-progress" typeId="media-progress"/>
+			<channel id="media-control" typeId="system.media-control"/>
+			<channel id="media-volume" typeId="system.volume"/>
+			<channel id="youtube-id" typeId="youtube-id"/>
+			<channel id="youtube-search" typeId="youtube-search"/>
+			<channel id="spotify-id" typeId="spotify-id"/>
+			<channel id="spotify-search" typeId="spotify-search"/>
+			<channel id="web-audio" typeId="web-audio"/>
+			<channel id="web-video" typeId="web-video"/>
 		</channels>
 		<config-description>
 			<parameter-group name="audio">
@@ -85,5 +96,51 @@
 		<item-type>String</item-type>
 		<label>Drop In</label>
 		<description>Starts an immediate call with other speaker (by id)</description>
+	</channel-type>
+	<channel-type id="media-current-second">
+		<item-type>Number</item-type>
+		<label>Media Current Second</label>
+		<description>Current second for the media currently playing, allow seek</description>
+	</channel-type>
+	<channel-type id="media-total-seconds">
+		<item-type>Number</item-type>
+		<label>Media Total Seconds</label>
+		<description>Total seconds for the media currently playing</description>
+		<state readOnly="true"/>
+	</channel-type>
+	<channel-type id="media-progress">
+		<item-type>Dimmer</item-type>
+		<label>Media Progress</label>
+		<description>Played percentage for the media currently playing, allow seek</description>
+	</channel-type>
+	<channel-type id="youtube-id">
+		<item-type>String</item-type>
+		<label>YouTube Id</label>
+		<description>Start playing a YouTube video (by id)</description>
+	</channel-type>
+	<channel-type id="youtube-search">
+		<item-type>String</item-type>
+		<label>YouTube Search</label>
+		<description>Start playing a YouTube video (TODO! NOT WORKING)</description>
+	</channel-type>
+	<channel-type id="spotify-id">
+		<item-type>String</item-type>
+		<label>Spotify Id</label>
+		<description>Start playing a Spotify song (by id)</description>
+	</channel-type>
+	<channel-type id="spotify-search">
+		<item-type>String</item-type>
+		<label>Spotify Search</label>
+		<description>Start playing a Spotify video (TODO! NOT WORKING)</description>
+	</channel-type>
+	<channel-type id="web-audio">
+		<item-type>String</item-type>
+		<label>Play Music by URL</label>
+		<description>Start playing a song by url using the browser player</description>
+	</channel-type>
+	<channel-type id="web-video">
+		<item-type>String</item-type>
+		<label>Play Video by URL</label>
+		<description>Start playing a video by url using the browser player</description>
 	</channel-type>
 </thing:thing-descriptions>

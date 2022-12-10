@@ -3,10 +3,10 @@ import { storeToRefs } from "pinia";
 import { useAssistantStore } from "../stores/assistant";
 const store = useAssistantStore();
 const { startListening } = store;
-const { listening, speaking, online, userInteractionDone } = storeToRefs(store);
+const { listening, speaking, online, userInteractionDone, miniMode } = storeToRefs(store);
 </script>
 <template>
-    <button id="speech" :disabled="!online" @click="startListening" :class="{ listening }" class="mic-btn">
+    <button id="speech" :disabled="!online" @click="startListening" :class="{ listening, 'mic-btn-mini': miniMode }" class="mic-btn">
       <div v-if="online" class="pulse-ring"></div>
       <div v-if="userInteractionDone && !online" class="lds-ring">
         <div></div>
@@ -38,7 +38,6 @@ $size: 100px;
 .clickable {
   cursor: pointer;
 }
-
 .mic-btn {
   border: none;
   padding: 0;
@@ -66,6 +65,10 @@ $size: 100px;
   user-select: none;
   background-image: none;
 }
+.mic-btn-mini {
+  width: 4.3vh;
+  height: 4.3vh;
+}
 
 .pulse-ring {
   content: "";
@@ -79,7 +82,9 @@ $size: 100px;
   left: 0px;
   -webkit-transform: scale(1.9, 1.9);
 }
-
+.mic-btn-mini .pulse-ring {
+  border: 3px solid var(--color-assistant);
+}
 @-webkit-keyframes pulsate {
   0% {
     -webkit-transform: scale(1, 1);

@@ -16,6 +16,9 @@ import java.io.OutputStream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.library.types.NextPreviousType;
+import org.openhab.core.library.types.PlayPauseType;
+import org.openhab.core.library.types.RewindFastforwardType;
 
 /**
  * The {@link HABSpeakerIO} represents a speaker active connection.
@@ -33,9 +36,16 @@ public interface HABSpeakerIO {
     /**
      * Sets the speaker sink volume
      * 
-     * @param value
+     * @param value the desired volume level
      */
     void setSinkVolume(int value);
+
+    /**
+     * Sets the speaker media volume
+     *
+     * @param value the desired volume level
+     */
+    void setMediaVolume(int value);
 
     /**
      * Gets the speaker sink volume
@@ -90,7 +100,84 @@ public interface HABSpeakerIO {
     HABSpeakerIO getDropIn();
 
     /**
+     * Resume/pause media playback if any
+     */
+    void playerCommand(PlayPauseType event);
+
+    /**
+     * Go to next/previous media track
+     */
+    void playerCommand(NextPreviousType event);
+
+    /**
+     * Rewind/Fast-forward media playback
+     */
+    void playerCommand(RewindFastforwardType event);
+
+    /**
+     * Rewind/Fast-forward media playback
+     */
+    void playerSeek(long second);
+
+    /**
+     * Stops media playback
+     */
+    void playerStop();
+
+    /**
+     * Starts media playback from provider
+     */
+    void playerStart(MediaProvider provider, String id);
+
+    /**
      * Forces a speaker disconnection.
      */
     void disconnect();
+
+    /**
+     * Send a new spotify access token to the speaker
+     */
+    void updateSpotifyToken(String accessToken);
+
+    /**
+     * Media playback states
+     */
+    enum PlaybackStates {
+        PLAYING("playing"),
+        PAUSED("paused"),
+        STOPPED("stopped"),
+        BUFFERING("buffering");
+
+        private final String state;
+
+        PlaybackStates(String state) {
+            this.state = state;
+        }
+
+        @Override
+        public String toString() {
+            return this.state;
+        }
+    }
+
+    /**
+     * Available media providers
+     */
+    enum MediaProvider {
+        YOUTUBE("youtube"),
+        SPOTIFY("spotify"),
+        WEB_VIDEO("web-video"),
+        WEB_AUDIO("web-audio");
+
+        private final String name;
+
+        MediaProvider(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return this.name;
+        }
+    }
 }

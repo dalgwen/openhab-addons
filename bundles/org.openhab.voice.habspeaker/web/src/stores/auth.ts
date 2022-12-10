@@ -1,26 +1,24 @@
 import { defineStore } from "pinia";
 import axios from "axios";
 import { useAssistantStore } from "./assistant";
+import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
 export const useAuthStore = defineStore("auth", () => {
   const { renewToken } = useAssistantStore();
+  const { speakerId } = useSettingsStore();
   const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker' });
   function getAccessToken() {
     return ohAuthHelper.getAccessToken();
   }
-  async function isTokenRequired() {
-    let requireToken = true;
-    // determine whether the token is required for user operations
-    await axios
-      .get<{ secure: boolean }>("/rest/habspeaker/config")
-      .then((resp) => {
-        requireToken = resp.data.secure;
-      })
-      .catch((err) => {
-        if (err === "Unauthorized" || err === 401) requireToken = true;
-        return Promise.resolve();
-      });
-    return requireToken;
+  async function getUIConfig(): Promise<UIConfig> {
+    try {
+      return (await axios.get<UIConfig>(`/rest/habspeaker/config/${speakerId}`)).data;
+    } catch (error) {
+      if (error === "Unauthorized" || error === 401) {
+        return { secure: true, spotifyEnabled: false, label: "" };
+      }
+      throw error;
+    }
   }
   async function getSpeakerCookie() {
     const headers = {
@@ -60,5 +58,11 @@ export const useAuthStore = defineStore("auth", () => {
       return unauthorized();
     }
   }
-  return { isTokenRequired, getAccessToken, authorize };
+  return { getUIConfig, getAccessToken, authorize };
 });
+
+type UIConfig = {
+  secure: boolean;
+  spotifyEnabled: boolean;
+  label: string;
+};

@@ -30,11 +30,15 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
+import org.openhab.core.library.types.NextPreviousType;
+import org.openhab.core.library.types.PlayPauseType;
+import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.voice.habspeaker.internal.io.internal.HABSpeakerIOBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -45,6 +49,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @NonNullByDefault
 public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocketListener {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketIO.class);
+    private static final TypeReference<HashMap<String, Object>> WEBSOCKET_MAPPER_TYPE_REF = new TypeReference<>() {
+    };
+
     private volatile @Nullable Session session = null;
     private @Nullable RemoteEndpoint remote = null;
     private final HABSpeakerWebSocketProtocol servlet;
@@ -52,7 +59,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private String id = "";
     private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
     private @Nullable ScheduledFuture<?> scheduledDisconnection = null;
-
     private int sinkVolume = 100;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, ScheduledExecutorService executor) {
@@ -106,6 +112,16 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 } catch (NumberFormatException e) {
                     logger.warn("Unable to parse sink volume");
                 }
+            case MEDIA_STATE:
+                var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
+                var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
+                var playbackState = PlaybackStates
+                        .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
+                var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
+                var provider = data.getOrDefault("provider", "").toString();
+                var mediaId = data.getOrDefault("id", "").toString();
+                thingHandler.onMediaStateUpdate(provider, mediaId, volume, currentSecond, totalSeconds, playbackState);
+                break;
             default:
                 logger.warn("Unhandled JSON command: {}", data);
         }
@@ -167,8 +183,60 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
+    public void updateSpotifyToken(String accessToken) {
+        var data = new HashMap<String, Object>();
+        data.put("token", accessToken);
+        sendClientCommand(WebsocketOutputCommand.SPOTIFY_TOKEN, data);
+    }
+
+    @Override
     public void spot() {
         onRemoteSpot();
+    }
+
+    @Override
+    public void playerCommand(PlayPauseType event) {
+        var data = new HashMap<String, Object>();
+        data.put("type", PlayPauseType.PLAY.equals(event) ? "play" : "pause");
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerCommand(NextPreviousType event) {
+        var data = new HashMap<String, Object>();
+        data.put("type", NextPreviousType.NEXT.equals(event) ? "next" : "previous");
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerCommand(RewindFastforwardType event) {
+        var data = new HashMap<String, Object>();
+        data.put("type", RewindFastforwardType.REWIND.equals(event) ? "rewind" : "fast-forward");
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerSeek(long second) {
+        var data = new HashMap<String, Object>();
+        data.put("type", "seek");
+        data.put("second", second);
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerStop() {
+        var data = new HashMap<String, Object>();
+        data.put("type", "stop");
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerStart(MediaProvider provider, String id) {
+        var data = new HashMap<String, Object>();
+        data.put("type", "start");
+        data.put("provider", provider.toString());
+        data.put("id", id);
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 
     @Override
@@ -179,7 +247,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         }
         this.session = sess;
         this.remote = sess.getRemote();
-
         logger.info("New client connected.");
         scheduledDisconnection = executor.schedule(() -> {
             try {
@@ -226,7 +293,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     @Override
     public void onWebSocketText(@Nullable String message) {
         try {
-            var messageJson = new ObjectMapper().readValue(message, HashMap.class);
+            var messageJson = new ObjectMapper().readValue(message, WEBSOCKET_MAPPER_TYPE_REF);
             handleCommand(WebsocketInputCommand.valueOf((String) Objects.requireNonNull(messageJson.get("cmd"))),
                     messageJson);
         } catch (JsonProcessingException e) {
@@ -262,6 +329,14 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
+    public void setMediaVolume(int value) {
+        var data = new HashMap<String, Object>();
+        data.put("type", "volume");
+        data.put("level", value);
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
     public int getSinkVolume() {
         return sinkVolume;
     }
@@ -283,6 +358,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         INITIALIZE,
         ON_SPOT,
         SINK_VOLUME,
+        MEDIA_STATE,
     }
 
     private enum WebsocketOutputCommand {
@@ -291,5 +367,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         START_LISTENING,
         STOP_LISTENING,
         SINK_VOLUME,
+        MEDIA_COMMAND,
+        SPOTIFY_TOKEN,
     }
 }

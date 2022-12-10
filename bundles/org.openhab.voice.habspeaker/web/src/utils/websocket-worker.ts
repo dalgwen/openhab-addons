@@ -1,31 +1,28 @@
 export default class WebSocketWorker {
   /**@type {WebSocket} */
-  wsRef = null;
-  /**@type {(data: any) => void} */
-  postMessage = null;
+  wsRef?: WebSocket;
   /**@type {string} */
   id = "";
   /**@type {string} */
   token = "";
   /**@type {number} */
   sampleRate = 0;
-  constructor(postMessage) {
-    this.postMessage = postMessage;
+  constructor(private postMessage: (data: any) => void) {
   }
   /**
    *
    * @param {string} command
    * @param {any} args
    */
-  postToMainThread(cmd, args = {}) {
-    this.postMessage({ cmd, ...args });
+  postToMainThread<T extends WorkerOutCmd>(cmd: T, args?: WorkerOutCmdType<T>) {
+    this.postMessage({ cmd, ...(args ?? {}) });
   }
   /**
    *
    * @param {string} command
    * @param {any} args
    */
-  postToWebSocket(cmd, args = {}) {
+  postToWebSocket<T extends WebSocketInCmd>(cmd: T, args?: WebSocketInCmdType<T>) {
     if (this.wsRef && this.wsRef.readyState == this.wsRef.OPEN) {
       this.wsRef.send(JSON.stringify({ cmd, ...args }));
     } else {
@@ -36,36 +33,46 @@ export default class WebSocketWorker {
    *
    * @param {MessageEvent<{cmd: string, data: any}>} ev
    */
-  onMainThreadCommand(ev) {
+  onMainThreadCommand(ev: any) {
     try {
-      if (import.meta.env.DEV) {
-        console.debug("main => worker: ", ev.data);
+      if (ev.origin !== "" || typeof ev.data !== 'object') {
+        return;
       }
-      switch (ev.data.cmd) {
+      if ((import.meta as any).env.DEV) {
+        // console.debug("main => worker: ", ev.data);
+      }
+      const command = ev.data.cmd as WorkerInCmd;
+      switch (command) {
         case WorkerInCmd.INITIALIZE:
-          this.id = ev.data.id;
-          this.sampleRate = ev.data.sampleRate;
-          this.token = ev.data.token;
+          const initData = ev.data as WorkerInCmdType<typeof command>;
+          this.id = initData.id;
+          this.sampleRate = initData.sampleRate;
+          this.token = initData.token ?? '';
           this.connectWebSocket();
           break;
         case WorkerInCmd.LISTEN:
-          this.onListen(ev.data.buffers);
+          const listenData = ev.data as WorkerInCmdType<typeof command>;
+          this.onListen(listenData.buffers);
           break;
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
           break;
         case WorkerInCmd.SINK_VOLUME:
-          const sinkVolume = ev.data.value;
-          if (sinkVolume != null) {
-            this.postToWebSocket(WebSocketInCmd.SINK_VOLUME, { value: sinkVolume });
-          }
+          const volumeData = ev.data as WorkerInCmdType<typeof command>;
+          this.postToWebSocket(WebSocketInCmd.SINK_VOLUME, volumeData);
+          break;
+        case WorkerInCmd.MEDIA_STATE:
+          const mediaData = ev.data as WorkerInCmdType<typeof command>;
+          this.postToWebSocket(WebSocketInCmd.MEDIA_STATE, mediaData);
           break;
         case WorkerInCmd.TOKEN_RENEW:
-          this.token = ev.data.token;
+          const { token } = ev.data as WorkerInCmdType<typeof command>;
+          this.token = token;
           break;
         case WorkerInCmd.RESET_CONNECTION:
-          this.id = ev.data.id;
-          if (this.wsRef !== null) {
+          const { id } = ev.data as WorkerInCmdType<typeof command>;
+          this.id = id;
+          if (this.wsRef) {
             this.wsRef.close();
           } else {
             console.error("WebSocket is not connected");
@@ -78,8 +85,8 @@ export default class WebSocketWorker {
       console.error("Error handling command in worker: ", error);
     }
   }
-  onListen(buffers) {
-    if (this.wsRef !== null) {
+  onListen(buffers: Float32Array[]) {
+    if (this.wsRef) {
       // convert to websocket format and send as binary
       this.wsRef.send(encodeWAV16BitMonoPCM(buffers, this.sampleRate, 16000));
     } else {
@@ -87,12 +94,13 @@ export default class WebSocketWorker {
     }
   }
 
-  onWebSocketCommand(data) {
+  onWebSocketCommand(data: any) {
     try {
-      if (import.meta.env.DEV) {
+      if ((import.meta as any).env.DEV) {
         console.debug("websocket => worker: ", data);
       }
-      switch (data.cmd) {
+      const command = data.cmd as WebSocketOutCmd;
+      switch (command) {
         case WebSocketOutCmd.INITIALIZED:
           this.postToMainThread(WorkerOutCmd.INITIALIZED);
           break;
@@ -103,12 +111,20 @@ export default class WebSocketWorker {
           this.postToMainThread(WorkerOutCmd.STOP_LISTENING);
           break;
         case WebSocketOutCmd.CONFIGURE:
-          this.postToMainThread(WorkerOutCmd.CONFIGURE, data);
+          const configureData = data as WebSocketOutCmdType<typeof command>;
+          this.postToMainThread(WorkerOutCmd.CONFIGURE, configureData);
+          break;
         case WebSocketOutCmd.SINK_VOLUME:
-          const sinkVolume = data.value;
-          if (sinkVolume != null) {
-            this.postToMainThread(WorkerOutCmd.SINK_VOLUME, { value: sinkVolume });
-          }
+          const sinkVolumeData = data as WebSocketOutCmdType<typeof command>;
+          this.postToMainThread(WorkerOutCmd.SINK_VOLUME, sinkVolumeData);
+          break;
+        case WebSocketOutCmd.MEDIA_COMMAND:
+          const mediaCommandData = data as WebSocketOutCmdType<typeof command>;
+          this.postToMainThread(WorkerOutCmd.MEDIA_COMMAND, mediaCommandData);
+          break;
+        case WebSocketOutCmd.SPOTIFY_TOKEN:
+          const spotifyTokenData = data as WebSocketOutCmdType<typeof command>;
+          this.postToMainThread(WorkerOutCmd.SPOTIFY_TOKEN, spotifyTokenData);
           break;
         default:
           throw new Error("Unknown command: " + data.cmd);
@@ -142,8 +158,12 @@ export default class WebSocketWorker {
         token: (this.token && this.token.length) ? this.token : null,
         sampleRate: this.sampleRate,
       });
-      if (import.meta.env.DEV) {
+      if ((import.meta as any).env.DEV) {
         console.debug("worker => websocket:", initMessage);
+      }
+      if (!wsRef) {
+        console.error("Websocket is not connected!")
+        return;
       }
       wsRef.send(initMessage);
     });
@@ -158,7 +178,7 @@ export default class WebSocketWorker {
             var blob = msg.data;
             blob.arrayBuffer().then((buffer) => {
               var streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
-              var dataBuffer = buffer.slice(4, buffer.length);
+              var dataBuffer = buffer.slice(4);
               // transform the incoming buffer to native format, should be already in the correct sample rate.
               var floatBuffer = decodeWAV16BitPCM(dataBuffer);
               this.postMessage({
@@ -167,7 +187,7 @@ export default class WebSocketWorker {
                 buffer: floatBuffer,
               });
             });
-            if (import.meta.env.DEV) {
+            if ((import.meta as any).env.DEV) {
               console.debug("websocket => worker: Binary data");
             }
           }
@@ -180,7 +200,7 @@ export default class WebSocketWorker {
     });
     wsRef.addEventListener("close", () => {
       console.warn("websocket => worker: connection closed");
-      this.wsRef = null;
+      this.wsRef = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();
     });
@@ -188,46 +208,81 @@ export default class WebSocketWorker {
     return wsRef;
   }
 }
+// Some reused message types
+type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string };
+type SetVolumeCmd = { value: number };
+type ConfigureSpeakerCmd = { sinkVolume?: number, sinkStereo?: boolean, remoteSpot?: number, screenSaverTime?: number, spotifyToken?: string, label?: string };
+type MediaCommandCmd = { type: 'play' } | { type: 'pause' } | { type: 'stop' } | { type: 'next' } | { type: 'previous' } | { type: 'rewind' } | { type: 'fast-forward' } | { type: 'seek', second: number } | { type: 'volume', level: number } | { type: 'start', provider: string, id: string };
+type SpotifyTokenCmd = { token: string };
 // Commands from worker to server (no command for sending audio as is sent as binary).
-const WebSocketInCmd = {
-  INITIALIZE: "INITIALIZE",
-  ON_SPOT: "ON_SPOT",
-  SINK_VOLUME: "SINK_VOLUME",
+enum WebSocketInCmd {
+  INITIALIZE = "INITIALIZE",
+  ON_SPOT = "ON_SPOT",
+  SINK_VOLUME = "SINK_VOLUME",
+  MEDIA_STATE = "MEDIA_STATE",
 };
-// Commands from server to worker (no command for receiving audio as is sent as binary).
-const WebSocketOutCmd = {
-  CONFIGURE: "CONFIGURE",
-  INITIALIZED: "INITIALIZED",
-  START_LISTENING: "START_LISTENING",
-  STOP_LISTENING: "STOP_LISTENING",
-  SINK_VOLUME: "SINK_VOLUME",
-};
-// Commands from main thread to worker.
-export const WorkerInCmd = {
-  INITIALIZE: "INITIALIZE",
-  LISTEN: "LISTEN",
-  ON_SPOT: "ON_SPOT",
-  RESET_CONNECTION: "RESET_CONNECTION",
-  TOKEN_RENEW: "TOKEN_RENEW",
-  SINK_VOLUME: "SINK_VOLUME",
-};
-// Commands from worker to main thread.
-export const WorkerOutCmd = {
-  CONFIGURE: "CONFIGURE",
-  INITIALIZED: "INITIALIZED",
-  OFFLINE: "OFFLINE",
-  SPEAK: "SPEAK",
-  START_LISTENING: "START_LISTENING",
-  STOP_LISTENING: "STOP_LISTENING",
-  SINK_VOLUME: "SINK_VOLUME",
-};
+type WebSocketInCmdType<T extends WebSocketInCmd> = T extends WebSocketInCmd.SINK_VOLUME ? { value: number } :
+  T extends WebSocketInCmd.MEDIA_STATE ? MediaStateCmd :
+  never;
 
+// Commands from server to worker (no command for receiving audio as is sent as binary).
+enum WebSocketOutCmd {
+  CONFIGURE = "CONFIGURE",
+  INITIALIZED = "INITIALIZED",
+  START_LISTENING = "START_LISTENING",
+  STOP_LISTENING = "STOP_LISTENING",
+  SINK_VOLUME = "SINK_VOLUME",
+  MEDIA_COMMAND = "MEDIA_COMMAND",
+  SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
+}
+
+
+export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocketOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
+  T extends WebSocketOutCmd.SINK_VOLUME ? SetVolumeCmd :
+  T extends WebSocketOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
+  T extends WebSocketOutCmd.SPOTIFY_TOKEN ? SpotifyTokenCmd :
+  never;
+// Commands from main thread to worker.
+export enum WorkerInCmd {
+  INITIALIZE = "INITIALIZE",
+  LISTEN = "LISTEN",
+  ON_SPOT = "ON_SPOT",
+  RESET_CONNECTION = "RESET_CONNECTION",
+  TOKEN_RENEW = "TOKEN_RENEW",
+  SINK_VOLUME = "SINK_VOLUME",
+  MEDIA_STATE = "MEDIA_STATE",
+};
+export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, } :
+  T extends WorkerInCmd.LISTEN ? { buffers: Float32Array[] } :
+  T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
+  T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
+  T extends WorkerInCmd.RESET_CONNECTION ? { id: string } :
+  T extends WorkerInCmd.MEDIA_STATE ? MediaStateCmd :
+  never;
+// Commands from worker to main thread.
+export enum WorkerOutCmd {
+  CONFIGURE = "CONFIGURE",
+  INITIALIZED = "INITIALIZED",
+  OFFLINE = "OFFLINE",
+  SPEAK = "SPEAK",
+  START_LISTENING = "START_LISTENING",
+  STOP_LISTENING = "STOP_LISTENING",
+  SINK_VOLUME = "SINK_VOLUME",
+  MEDIA_COMMAND = "MEDIA_COMMAND",
+  SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
+};
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK ? { id: string, buffer: Float32Array } :
+  T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
+  T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
+  T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
+  T extends WorkerOutCmd.SPOTIFY_TOKEN ? SpotifyTokenCmd :
+  never;
 // WAV conversion utils
 /**
  * Convert float to 16bit PCM.
  * @param {Float32Array} input The input buffer.
  */
-function floatTo16BitPCM(input) {
+function floatTo16BitPCM(input: Float32Array) {
   const output = new DataView(new ArrayBuffer(input.length * 2));
   let offset = 0;
   for (let i = 0; i < input.length; i += 1, offset += 2) {
@@ -243,7 +298,7 @@ function floatTo16BitPCM(input) {
  * @param {int} targetSampleRate
  * @returns {Float32Array}
  */
-function downSampleBuffer(buffer, sampleRate, targetSampleRate) {
+function downSampleBuffer(buffer: Float32Array, sampleRate: number, targetSampleRate: number) {
   if (targetSampleRate == sampleRate) {
     return buffer;
   }
@@ -274,7 +329,7 @@ function downSampleBuffer(buffer, sampleRate, targetSampleRate) {
  * @param {Float32Array]} buffer
  * @returns Float32Array
  */
-function decodeWAV16BitPCM(buffer) {
+function decodeWAV16BitPCM(buffer: ArrayBuffer) {
   const view = new DataView(buffer);
   var result = new Float32Array(buffer.byteLength / 2);
   for (let i = 0, offset = 0; i < buffer.byteLength / 2; i += 1, offset += 2) {
@@ -293,7 +348,7 @@ function decodeWAV16BitPCM(buffer) {
  * @param {number} targetSampleRate
  * @returns ArrayBuffer
  */
-function encodeWAV16BitMonoPCM(audioBuffers, sampleRate, targetSampleRate) {
+function encodeWAV16BitMonoPCM(audioBuffers: Float32Array[], sampleRate: number, targetSampleRate: number) {
   /** @type {Float32Array[]}  */
   let channelBuffer = audioBuffers[0];
   const resampled = downSampleBuffer(

@@ -2,13 +2,23 @@
 import { RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import ScreenSaver from "./components/ScreenSaver.vue";
-const { isTokenRequired, authorize } = useAuthStore();
-isTokenRequired().then(async (requireToken) => {
-  if (requireToken) {
+import { useSpotifyPlayerStore } from "./stores/media-players/spotify-player";
+import { useAssistantStore } from "./stores/assistant";
+import { storeToRefs } from "pinia";
+const { getUIConfig, authorize } = useAuthStore();
+const { miniMode } = storeToRefs(useAssistantStore());
+const spotifyStore = useSpotifyPlayerStore();
+getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
+  if (secure) {
     console.debug("Authorization required!");
     await authorize();
   } else {
     console.debug("Authorization no required!");
+  }
+  if (spotifyEnabled) {
+    spotifyStore.initPlayer(label)
+      .then(console.log("Spotify initialized"))
+      .catch(err => console.error("Spotify error: ", err));
   }
 });
 </script>
@@ -27,14 +37,8 @@ isTokenRequired().then(async (requireToken) => {
   </header>
 
   <RouterView />
-  <div class="logo-container">
-    <img
-      alt="openHAB logo"
-      class="logo"
-      src="@/assets/openhab-logo.svg"
-      width="125"
-      height="48"
-    />
+  <div class="logo-container" :class="{'logo-container-mini': miniMode}">
+    <img alt="openHAB logo" class="logo" src="@/assets/openhab-logo.svg" width="125" height="48" />
   </div>
 </template>
 
@@ -77,10 +81,17 @@ header {
 }
 
 .logo-container {
-  text-align: right;
+  padding: 3.5vh;
   -webkit-user-select: none;
 }
-
+.logo-container img {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+.logo-container-mini {
+  padding: 4vh;
+}
 nav {
   position: relative;
   width: 100%;

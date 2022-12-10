@@ -1,27 +1,33 @@
 import { onUnmounted, ref, watch } from "vue";
-import { defineStore } from "pinia";
+import { defineStore, storeToRefs } from "pinia";
+import { useMediaSessionStore } from "./media-players/media-session";
 const USER_INPUT_EVENTS = [
   'click', 'contextmenu', 'auxclick', 'dblclick',
   'mouseup', 'pointerup', 'touchend', 'keyup'
 ];
 export const useScreenSaverStore = defineStore("screenSaver", () => {
+  const { mediaController } = storeToRefs(useMediaSessionStore());
   let screenSaverTime = 120;
   let screenSaverTimeout: any = null;
   const screenSaverEnabled = ref(false);
   function configureScreenSaver() {
-    if (screenSaverTime > 0) {
+    if (isScreenSaverEnabled()) {
       awakeScreenSaver();
     } else {
       disableScreenSaver();
     }
   }
+  function isScreenSaverEnabled() {
+    var mediaCtrl = mediaController.value;
+    return screenSaverTime > 0 && (!mediaCtrl || !mediaCtrl.getAwakeScreen());
+  }
   function disableScreenSaver() {
-    if(screenSaverEnabled.value) screenSaverEnabled.value = false;
+    if (screenSaverEnabled.value) screenSaverEnabled.value = false;
     if (screenSaverTimeout) clearTimeout(screenSaverTimeout);
   }
   function awakeScreenSaver() {
     disableScreenSaver();
-    if (screenSaverTime > 0) {
+    if (isScreenSaverEnabled()) {
       screenSaverTimeout = setTimeout(() => {
         screenSaverEnabled.value = true;
         screenSaverTimeout = null;
@@ -34,13 +40,14 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
     configureScreenSaver();
   }
   USER_INPUT_EVENTS.forEach((eventName) => {
-    window.addEventListener(eventName, awakeScreenSaver);
+    window.addEventListener(eventName, awakeScreenSaver, { capture: true });
   });
   watch(() => screenSaverTime, configureScreenSaver);
+  watch(mediaController, configureScreenSaver);
   configureScreenSaver();
-  onUnmounted(()=>{
+  onUnmounted(() => {
     USER_INPUT_EVENTS.forEach((eventName) => {
-      window.removeEventListener(eventName, awakeScreenSaver);
+      window.removeEventListener(eventName, awakeScreenSaver, { capture: true });
     });
     disableScreenSaver();
   });

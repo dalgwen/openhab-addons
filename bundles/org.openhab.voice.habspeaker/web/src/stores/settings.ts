@@ -4,15 +4,15 @@ export const useSettingsStore = defineStore("settings", () => {
   const storagePrefix = "habspeaker.ui:";
   const idLocalStorageKey = `${storagePrefix}id`;
   const storedAudioComponentId = localStorage.getItem(idLocalStorageKey);
-  const audioComponentId = ref(storedAudioComponentId ?? generateUUID());
+  const speakerId = ref(storedAudioComponentId ?? generateUUID());
   if (storedAudioComponentId == null) {
     commit();
   }
   function commit() {
-    localStorage.setItem(idLocalStorageKey, audioComponentId.value);
+    localStorage.setItem(idLocalStorageKey, speakerId.value);
   }
   return {
-    audioComponentId,
+    speakerId,
     commit,
   };
 });
