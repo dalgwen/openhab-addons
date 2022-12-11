@@ -70,57 +70,72 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     @Override
     public String interpret(Locale locale, String text) throws InterpretationException {
-        var config = configProvider.getConfig();
-        var lowerText = text.toLowerCase();
-        if (speakerIO.getDropIn() != null && compareTemplate(config.stopDropInPhrase, lowerText)) {
-            speakerIO.dropIn(null);
-            return config.commandSentMessage;
-        }
-        if (!config.listenOnSpotifyPhrase.isBlank()) {
-            var matcher = Arrays.stream(config.listenOnSpotifyPhrase.split(";")) //
-                    .map(template -> Pattern.compile(template.toLowerCase().replace("$*", "(?<search>.*)"))
-                            .matcher(lowerText)) //
-                    .filter(Matcher::matches).findAny();
-            if (matcher.isPresent()) {
-                listenTrackOnSpotify(matcher.get().group("search"));
+        try {
+            var config = configProvider.getConfig();
+            var lowerText = text.toLowerCase();
+            if (speakerIO.getDropIn() != null && compareTemplate(config.stopDropInPhrase, lowerText)) {
+                speakerIO.dropIn(null);
                 return config.commandSentMessage;
             }
-        }
-        if(compareTemplate(config.resumeMediaPhrase, lowerText)) {
-            speakerIO.playerCommand(PlayPauseType.PLAY);
-            return config.commandSentMessage;
-        }
-        if(compareTemplate(config.pauseMediaPhrase, lowerText)) {
-            speakerIO.playerCommand(PlayPauseType.PAUSE);
-            return config.commandSentMessage;
-        }
-        if(compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
-            var level = speakerIO.getMediaVolume();
-            if(level > config.mediaVolumeStep - 1) {
-                speakerIO.setMediaVolume(level - config.mediaVolumeStep);
-            } else {
-                speakerIO.setMediaVolume(0);
+            String spotifySearch = compareTemplateWithParameter(config.listenOnSpotifyPhrase, lowerText);
+            if (!spotifySearch.isBlank()) {
+                listenTrackOnSpotify(spotifySearch);
+                return config.commandSentMessage;
             }
-            return config.commandSentMessage;
-        }
-        if(compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
-            var level = speakerIO.getMediaVolume();
-            if(level < config.mediaVolumeStep + 1) {
-                speakerIO.setMediaVolume(level + config.mediaVolumeStep);
-            } else {
-                speakerIO.setMediaVolume(100);
+            String ytSearch = compareTemplateWithParameter(config.watchOnYouTubePhrase, lowerText);
+            if (!ytSearch.isBlank()) {
+                watchOnYouTube(ytSearch);
+                return config.commandSentMessage;
             }
-            return config.commandSentMessage;
-        }
-        if(compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
-            speakerIO.playerCommand(RewindFastforwardType.FASTFORWARD);
-            return config.commandSentMessage;
-        }
-        if(compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
-            speakerIO.playerCommand(RewindFastforwardType.REWIND);
-            return config.commandSentMessage;
+            if (compareTemplate(config.resumeMediaPhrase, lowerText)) {
+                speakerIO.playerCommand(PlayPauseType.PLAY);
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.pauseMediaPhrase, lowerText)) {
+                speakerIO.playerCommand(PlayPauseType.PAUSE);
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
+                var level = speakerIO.getMediaVolume();
+                if (level > config.mediaVolumeStep - 1) {
+                    speakerIO.setMediaVolume(level - config.mediaVolumeStep);
+                } else {
+                    speakerIO.setMediaVolume(0);
+                }
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
+                var level = speakerIO.getMediaVolume();
+                if (level < config.mediaVolumeStep + 1) {
+                    speakerIO.setMediaVolume(level + config.mediaVolumeStep);
+                } else {
+                    speakerIO.setMediaVolume(100);
+                }
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
+                speakerIO.playerCommand(RewindFastforwardType.FASTFORWARD);
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
+                speakerIO.playerCommand(RewindFastforwardType.REWIND);
+                return config.commandSentMessage;
+            }
+        } catch (Exception e) {
+            logger.warn("Speaker Interpretation error: ", e);
         }
         throw new InterpretationException("Unknown voice command");
+    }
+
+    private String compareTemplateWithParameter(String template, String lowerText) {
+        if (template.isBlank()) {
+            return "";
+        }
+        return Arrays.stream(template.split(";")) //
+                .map(templateOption -> Pattern.compile( //
+                        templateOption.trim().toLowerCase().replace("$*", "(?<search>.*)") //
+                ).matcher(lowerText)) //
+                .filter(Matcher::matches).findAny().map(m -> m.group("search")).orElse("");
     }
 
     private boolean compareTemplate(String template, String text) {
@@ -142,6 +157,22 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     @Override
     public Set<String> getSupportedGrammarFormats() {
         return Set.of();
+    }
+
+    public void watchOnYouTube(String name) {
+        if (name.isBlank()) {
+            logger.warn("Search is blank");
+            return;
+        }
+        try {
+            var youTubeId = searchYouTubeId(name);
+            if (youTubeId.isBlank()) {
+                throw new IllegalStateException("YouTube id can not be black");
+            }
+            speakerIO.playerStart(HABSpeakerIO.MediaProvider.YOUTUBE, youTubeId);
+        } catch (ExecutionException | InterruptedException | TimeoutException | JsonProcessingException e) {
+            logger.warn("watch on YouTube has failed:", e);
+        }
     }
 
     public void listenTrackOnSpotify(String name) {
@@ -177,6 +208,32 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             throw new IllegalStateException("Spotify return no results");
         }
         return jsonResponse.tracks.items.get(0).uri;
+    }
+
+    public String searchYouTubeId(String search) throws IllegalStateException, ExecutionException, InterruptedException,
+            TimeoutException, JsonProcessingException {
+        logger.warn("searching in youtube: {}", search);
+        var apiKey = configProvider.getConfig().youtubeAPIKey;
+        if (apiKey.isBlank()) {
+            throw new IllegalStateException("Missing Youtube api key");
+        }
+        var response = httpClient.newRequest("https://youtube.googleapis.com/youtube/v3/search") //
+                .header(HttpHeader.ACCEPT, "application/json") //
+                .param("q", search) //
+                .param("maxResults", "1") //
+                .param("type", "video") //
+                .param("key", apiKey).send();
+        var responseStatus = response.getStatus();
+        var responseContent = response.getContentAsString();
+        if (responseStatus > 299 || responseStatus < 200) {
+            throw new IllegalStateException(
+                    String.format("Youtube api returned an error %d: %s", responseStatus, responseContent));
+        }
+        var jsonResponse = new ObjectMapper().readValue(responseContent, YouTubeSearchResponse.class);
+        if (jsonResponse.items.isEmpty()) {
+            throw new IllegalStateException("Youtube return no results");
+        }
+        return jsonResponse.items.get(0).id.videoId;
     }
 
     private void listenOnSpotify(SpotifySearchType type, String name) {
@@ -225,5 +282,21 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class SpotifySearchResponse {
         public @Nullable SpotifyTracks tracks;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeSearchItemId {
+        public String kind = "";
+        public String videoId = "";
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeSearchItem {
+        public YouTubeSearchItemId id = new YouTubeSearchItemId();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeSearchResponse {
+        public List<YouTubeSearchItem> items = new ArrayList<>();
     }
 }

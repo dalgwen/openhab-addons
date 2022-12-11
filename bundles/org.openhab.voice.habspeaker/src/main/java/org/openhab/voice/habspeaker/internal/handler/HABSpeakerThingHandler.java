@@ -254,6 +254,13 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         playMedia(speakerIO, HABSpeakerIO.MediaProvider.YOUTUBE, command.toFullString());
                     }
                     break;
+                case YOUTUBE_SEARCH_CHANNEL:
+                    if (command instanceof RefreshType) {
+                        return;
+                    } else {
+                        speakerIO.getLanguageInterpreter().watchOnYouTube(command.toFullString());
+                    }
+                    break;
                 case SPOTIFY_ID_CHANNEL:
                     if (command instanceof RefreshType) {
                         return;

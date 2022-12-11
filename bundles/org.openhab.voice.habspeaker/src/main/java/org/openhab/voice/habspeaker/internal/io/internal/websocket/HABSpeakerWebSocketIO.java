@@ -64,7 +64,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private int sinkVolume;
     private int mediaVolume;
 
-
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
             HttpClient httpClient, ScheduledExecutorService executor) {
         super(servlet.audioManager, servlet.voiceManager, httpClient, servlet.bundleContext, configProvider);
@@ -352,6 +351,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     public int getMediaVolume() {
         return mediaVolume;
     }
+
     @Override
     public int getSinkVolume() {
         return sinkVolume;

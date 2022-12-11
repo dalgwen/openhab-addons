@@ -41,6 +41,10 @@ public class HABSpeakerConfig {
      */
     public String listenOnSpotifyPhrase = "";
     /**
+     * Phrase template to watch on YouTube
+     */
+    public String watchOnYouTubePhrase = "";
+    /**
      * Phrase template to resume media
      */
     public String resumeMediaPhrase = "";
@@ -74,4 +78,8 @@ public class HABSpeakerConfig {
      * Spotify app client id
      */
     public String spotifyClientId = "";
+    /**
+     * Youtube app api key
+     */
+    public String youtubeAPIKey = "";
 }
