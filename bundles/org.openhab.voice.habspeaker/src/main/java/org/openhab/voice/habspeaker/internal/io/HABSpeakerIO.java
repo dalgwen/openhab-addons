@@ -42,6 +42,13 @@ public interface HABSpeakerIO {
     void setSinkVolume(int value);
 
     /**
+     * Gets the speaker sink volume
+     *
+     * @return the speaker sink volume level
+     */
+    int getSinkVolume();
+
+    /**
      * Sets the speaker media volume
      *
      * @param value the desired volume level
@@ -49,11 +56,11 @@ public interface HABSpeakerIO {
     void setMediaVolume(int value);
 
     /**
-     * Gets the speaker sink volume
-     * 
-     * @return the speaker sink volume
+     * Gets the speaker media volume
+     *
+     * @return the speaker media volume level
      */
-    int getSinkVolume();
+    int getMediaVolume();
 
     /**
      * Set thing handler

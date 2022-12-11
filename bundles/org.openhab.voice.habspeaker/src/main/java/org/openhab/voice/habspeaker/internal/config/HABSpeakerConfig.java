@@ -25,8 +25,13 @@ public class HABSpeakerConfig {
     /**
      * Require security to use the speaker.
      */
-    public boolean secure = false;
+    public boolean secure;
     // Voice control config
+    /**
+     * Phrase to say on the speaker on command success
+     */
+    public String commandSentMessage = "done";
+
     /**
      * Phrase to stop drop-in on the current speaker
      */
@@ -35,6 +40,35 @@ public class HABSpeakerConfig {
      * Phrase template to listen on spotify
      */
     public String listenOnSpotifyPhrase = "";
+    /**
+     * Phrase template to resume media
+     */
+    public String resumeMediaPhrase = "";
+    /**
+     * Phrase template to pause media
+     */
+    public String pauseMediaPhrase = "";
+    /**
+     * Phrase template to decrease media volume
+     */
+    public String decreaseMediaVolumePhrase = "";
+    /**
+     * Phrase template to increase media volume
+     */
+    public String increaseMediaVolumePhrase = "";
+    /**
+     * Phrase fast-forward the media progress
+     */
+    public String fastForwardMediaProgressPhrase = "";
+    /**
+     * Phrase rewind the media progress
+     */
+    public String rewindMediaProgressPhrase = "";
+    /**
+     * Volume step used by the increase/decrease media volume phrases
+     */
+    public int mediaVolumeStep;
+
     // Credentials config
     /**
      * Spotify app client id

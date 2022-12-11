@@ -55,6 +55,9 @@ public interface HABSpeakerIOHandler {
     /**
      * Is called on remote media playback updates
      *
+     * @param provider
+     * @param mediaId
+     * @param volume
      * @param currentSecond
      * @param totalSeconds
      * @param playbackState

@@ -53,14 +53,17 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketIO.class);
     private static final TypeReference<HashMap<String, Object>> WEBSOCKET_MAPPER_TYPE_REF = new TypeReference<>() {
     };
-    private volatile @Nullable Session session = null;
-    private @Nullable RemoteEndpoint remote = null;
+    private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
+
+    private String id = "";
+    private volatile @Nullable Session session;
+    private @Nullable RemoteEndpoint remote;
     private final HABSpeakerWebSocketProtocol servlet;
     private final ScheduledExecutorService executor;
-    private String id = "";
-    private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
-    private @Nullable ScheduledFuture<?> scheduledDisconnection = null;
-    private int sinkVolume = 100;
+    private @Nullable ScheduledFuture<?> scheduledDisconnection;
+    private int sinkVolume;
+    private int mediaVolume;
+
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
             HttpClient httpClient, ScheduledExecutorService executor) {
@@ -125,6 +128,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
                 var provider = data.getOrDefault("provider", "").toString();
                 var mediaId = data.getOrDefault("id", "").toString();
+                mediaVolume = volume;
                 if (thingHandler != null) {
                     thingHandler.onMediaStateUpdate(provider, mediaId, volume, currentSecond, totalSeconds,
                             playbackState);
@@ -344,6 +348,10 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 
+    @Override
+    public int getMediaVolume() {
+        return mediaVolume;
+    }
     @Override
     public int getSinkVolume() {
         return sinkVolume;

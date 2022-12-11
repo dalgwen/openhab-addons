@@ -26,6 +26,8 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.http.HttpHeader;
+import org.openhab.core.library.types.PlayPauseType;
+import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.core.voice.text.InterpretationException;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
@@ -72,7 +74,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         var lowerText = text.toLowerCase();
         if (speakerIO.getDropIn() != null && compareTemplate(config.stopDropInPhrase, lowerText)) {
             speakerIO.dropIn(null);
-            return "done";
+            return config.commandSentMessage;
         }
         if (!config.listenOnSpotifyPhrase.isBlank()) {
             var matcher = Arrays.stream(config.listenOnSpotifyPhrase.split(";")) //
@@ -81,8 +83,42 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                     .filter(Matcher::matches).findAny();
             if (matcher.isPresent()) {
                 listenTrackOnSpotify(matcher.get().group("search"));
-                return "done";
+                return config.commandSentMessage;
             }
+        }
+        if(compareTemplate(config.resumeMediaPhrase, lowerText)) {
+            speakerIO.playerCommand(PlayPauseType.PLAY);
+            return config.commandSentMessage;
+        }
+        if(compareTemplate(config.pauseMediaPhrase, lowerText)) {
+            speakerIO.playerCommand(PlayPauseType.PAUSE);
+            return config.commandSentMessage;
+        }
+        if(compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
+            var level = speakerIO.getMediaVolume();
+            if(level > config.mediaVolumeStep - 1) {
+                speakerIO.setMediaVolume(level - config.mediaVolumeStep);
+            } else {
+                speakerIO.setMediaVolume(0);
+            }
+            return config.commandSentMessage;
+        }
+        if(compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
+            var level = speakerIO.getMediaVolume();
+            if(level < config.mediaVolumeStep + 1) {
+                speakerIO.setMediaVolume(level + config.mediaVolumeStep);
+            } else {
+                speakerIO.setMediaVolume(100);
+            }
+            return config.commandSentMessage;
+        }
+        if(compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
+            speakerIO.playerCommand(RewindFastforwardType.FASTFORWARD);
+            return config.commandSentMessage;
+        }
+        if(compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
+            speakerIO.playerCommand(RewindFastforwardType.REWIND);
+            return config.commandSentMessage;
         }
         throw new InterpretationException("Unknown voice command");
     }
