@@ -30,29 +30,33 @@ Once installed the web client will be listed on right panel of the main ui (home
 You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker** there are different sections:
 
 ### Service Settings
+
 Service related configurations:
 
 * **Secure** - Require user credentials to use the speaker (the ui will redirect you to the login page when needed).
 
 ### Voice Control
+
 Define the phrases you can use to interact with the speaker. For the phrases you can add multiple options separated by ';'. Leave a phrase empty to disable it
 
 Those are:
 
 * **Command Send Message** - Message to say on the speaker on command success. (Default: done)
 * **Stop Drop In Phrase** - Phrase to stop drop-in on the current speaker.
-* **Resume Media Phrase** - Phrase template to resume media.
-* **Pause Media Phrase** - Phrase template to pause media.
-* **Decrease Media Volume Phrase** - Phrase template to decrease the media volume by the configured step.
-* **Increase Media Volume Phrase** - Phrase template to increase the media volume by the configured step.
+* **Resume Media Phrase** - Phrase to resume media.
+* **Pause Media Phrase** - Phrase to pause media.
+* **Stop Media Phrase** - Phrase to pause media.
+* **Decrease Media Volume Phrase** - Phrase to decrease the media volume by the configured step.
+* **Increase Media Volume Phrase** - Phrase to increase the media volume by the configured step.
 * **Media Volume Step** - Volume step used by the increase/decrease media volume phrases.
-* **Fast-Forward Media Progress Phrase** - Phrase template to fast-forward the media progress.
-* **Rewind Media Progress Phrase** - Phrase template to rewind the media progress.
+* **Fast-Forward Media Progress Phrase** - Phrase to fast-forward the media progress.
+* **Rewind Media Progress Phrase** - Phrase to rewind the media progress.
 * **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
 * **Watch on Spotify Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
 
 
 ### Media Providers
+
 Configure required credentials for the supported media providers:
 
 * **Spotify Client Id** - Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify integration).

@@ -37,27 +37,31 @@ public class HABSpeakerConfig {
      */
     public String stopDropInPhrase = "";
     /**
-     * Phrase template to listen on spotify
+     * Phrase to listen on spotify
      */
     public String listenOnSpotifyPhrase = "";
     /**
-     * Phrase template to watch on YouTube
+     * Phrase to watch on YouTube
      */
     public String watchOnYouTubePhrase = "";
     /**
-     * Phrase template to resume media
+     * Phrase to resume media
      */
     public String resumeMediaPhrase = "";
     /**
-     * Phrase template to pause media
+     * Phrase to pause media
      */
     public String pauseMediaPhrase = "";
     /**
-     * Phrase template to decrease media volume
+     * Phrase to stop media
+     */
+    public String stopMediaPhrase = "";
+    /**
+     * Phrase to decrease media volume
      */
     public String decreaseMediaVolumePhrase = "";
     /**
-     * Phrase template to increase media volume
+     * Phrase to increase media volume
      */
     public String increaseMediaVolumePhrase = "";
     /**

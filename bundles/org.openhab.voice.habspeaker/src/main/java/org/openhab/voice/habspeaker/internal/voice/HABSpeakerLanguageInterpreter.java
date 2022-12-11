@@ -95,6 +95,10 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                 speakerIO.playerCommand(PlayPauseType.PAUSE);
                 return config.commandSentMessage;
             }
+            if (compareTemplate(config.stopMediaPhrase, lowerText)) {
+                speakerIO.playerStop();
+                return config.commandSentMessage;
+            }
             if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
                 var level = speakerIO.getMediaVolume();
                 if (level > config.mediaVolumeStep - 1) {

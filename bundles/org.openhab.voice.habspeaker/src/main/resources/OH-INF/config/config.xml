@@ -37,6 +37,10 @@
 			<label>Pause Media Phrase</label>
 			<description>Phrase template to pause media.</description>
 		</parameter>
+		<parameter name="stopMediaPhrase" type="text" groupName="voice">
+			<label>Stop Media Phrase</label>
+			<description>Phrase template to stop media.</description>
+		</parameter>
 		<parameter name="decreaseMediaVolumePhrase" type="text" groupName="voice">
 			<label>Decrease Media Volume Phrase</label>
 			<description>Phrase template to decrease the media volume by the configured step.</description>
