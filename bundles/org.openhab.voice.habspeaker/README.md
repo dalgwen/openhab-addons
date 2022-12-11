@@ -25,11 +25,38 @@ It is another step to have a full, open source, integrated voice assistant for y
 
 Once installed the web client will be listed on right panel of the main ui (home screen), or you can go to it by navigating to '<your openHAB url>/habspeaker'.
 
-## Service Settings
+## General Settings
 
-You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker**:
+You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker** there are different sections:
+
+### Service Settings
+Service related configurations:
 
 * **Secure** - Require user credentials to use the speaker (the ui will redirect you to the login page when needed).
+
+### Voice Control
+Define the phrases you can use to interact with the speaker. For the phrases you can add multiple options separated by ';'. Leave a phrase empty to disable it
+
+Those are:
+
+* **Command Send Message** - Message to say on the speaker on command success. (Default: done)
+* **Stop Drop In Phrase** - Phrase to stop drop-in on the current speaker.
+* **Resume Media Phrase** - Phrase template to resume media.
+* **Pause Media Phrase** - Phrase template to pause media.
+* **Decrease Media Volume Phrase** - Phrase template to decrease the media volume by the configured step.
+* **Increase Media Volume Phrase** - Phrase template to increase the media volume by the configured step.
+* **Media Volume Step** - Volume step used by the increase/decrease media volume phrases.
+* **Fast-Forward Media Progress Phrase** - Phrase template to fast-forward the media progress.
+* **Rewind Media Progress Phrase** - Phrase template to rewind the media progress.
+* **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
+* **Watch on Spotify Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
+
+
+### Media Providers
+Configure required credentials for the supported media providers:
+
+* **Spotify Client Id** - Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify integration).
+* **Youtube API Key** -API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for the YouTube search for functionality).
 
 ## Local Settings:
 
@@ -59,14 +86,24 @@ These settings are stored on your browser local storage.
 
 ## Thing Channels
 
-| Channel     |  Type  | description                              |
-|-------------|--------|------------------------------------------|
-| sinkVolume  | Dimmer | Controls the sink volume of the speaker. |
-| spot        | Switch | Starts dialog processing on the speaker. |
+| Channel ID           |  Type   | description                                                      |
+|----------------------|---------|------------------------------------------------------------------|
+| sink-volume          | Dimmer  | Controls the sink volume of the speaker.                         |
+| spot                 | Switch  | Starts dialog processing on the speaker.                         |
+| drop-in              | String  | Starts an immediate call with other speaker (by id).             |
+| media-current-second | Number  | Current second for the media currently playing, allow seek.      |
+| media-total-seconds  | Number  | Total seconds for the media currently playing.                   |
+| media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.   |
+| youtube-id           | String  | Start playing a YouTube video (by id).                           |
+| youtube-search       | String  | Start playing a YouTube video.                                   |
+| spotify-id           | String  | Start playing a Spotify song (by id).                            |
+| spotify-search       | String  | Start playing a Spotify song.                                    |
+| web-audio            | String  | Start playing a song by url using the browser player.            |
+| web-video            | String  | Start playing a video by url using the browser player.           |
 
 ## Thing Discovery
 
-The discovery service will register all the connected speakers.
+All the connected speakers can be automatically discovered using the main ui.
 
 ## Basic Usage:
 
@@ -77,6 +114,55 @@ The discovery service will register all the connected speakers.
 * The speaker icon dots part displays an animation while it's playing audio.
 * By clicking on the speaker icon a single shot audio dialog processing will start. It uses the registered audio components (sink/source) and the default processing services configured on the openHAB voice settings.
 * At this point you can discover the speaker using the main ui to add it as a thing in openHAB.
+
+## Media Providers
+
+Media providers are in a preview/unfinished state, this documentation will be updated when they are more stable.
+
+The idea behind this is take advance of the browser media capabilities and the official frameworks from legit projects or companies to display media on the ui allowing it's state to be controlled from the thing channels or the configured speaker voice commands.
+
+There are currently 4 media providers: 
+
+### WebVideo 
+
+Uses a video element to play the configured url. 
+
+There are things pending to implement, currently it can play videos using the related channel and play/pause/seek and media volume control seems to work.
+
+### WebAudio
+
+Uses a audio element to play the configured url.
+
+There are things pending to implement, currently it can play audio using the related channel and play/pause/seek and media volume control seems to work.
+
+
+### YouTube
+
+No YouTube code is loaded until you play a video. Uses the official YouTube iframe api. 
+
+For the search functionalities to work you need to have configured your api key for a Google Cloud project.
+You can check the first step on the 'Calling the API' section [here](https://developers.google.com/youtube/v3/docs#calling-the-api), then enable youtube data api with this link (with your project id) 'https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=$PROJECT_ID_HERE'.
+
+It only search by video name right now, needs to be improved. 
+
+Be aware the YouTube data api have quotas. (can be good adding a cache mechanism)
+
+### Spotify
+
+Requires a premium subscription.
+
+No Spotify code is loaded if you don't configure your spotify app client id. It make use of the official spotify web api.
+
+These are the required configuration steps:
+
+* You need to create an app in the spotify developers dashboard [here](https://developer.spotify.com/dashboard/login), when created add this allowed redirect url '<YOUR OPENHAB URL>/rest/habspeaker/spotify/login/callback'.
+* Then add the client id in the habspeaker general configuration **Settings / Other Services - HAB Speaker**.
+* Now you open '<YOUR OPENHAB URL>/rest/habspeaker/spotify/login/callback' in a browser and you should be redirected to the spotify login.
+* If the login goes ok you will see a confirmation text on the top left of the page.
+
+After this setup any speaker you start will be exposed as a remote player to spotify using its configured label. (opened speakers need to be restarted)
+
+You can also control the player using the related voice commands or thing channels. The ui controllers for spotify are still not developed.
 
 ## Audio Component Details:
 
