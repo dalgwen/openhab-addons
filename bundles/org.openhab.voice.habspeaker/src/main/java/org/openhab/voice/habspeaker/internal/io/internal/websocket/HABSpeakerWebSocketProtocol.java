@@ -27,6 +27,7 @@ import javax.servlet.ServletException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import org.openhab.core.audio.AudioManager;
@@ -38,7 +39,6 @@ import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.auth.HABSpeakerJwtHelper;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocol;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
@@ -71,10 +71,11 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     private final ScheduledFuture<?> pingTask;
     private final HABSpeakerIOProtocolListener protocolListener;
     private final HABSpeakerConfigProvider configProvider;
+    private final HttpClient httpClient;
 
     public HABSpeakerWebSocketProtocol(HABSpeakerIOProtocolListener protocolListener,
-            HABSpeakerConfigProvider configProvider, BundleContext bundleContext, HttpService httpService,
-            AudioManager audioManager, VoiceManager voiceManager, UserRegistry userRegistry) {
+            HABSpeakerConfigProvider configProvider, BundleContext bundleContext, HttpClient httpClient,
+            HttpService httpService, AudioManager audioManager, VoiceManager voiceManager, UserRegistry userRegistry) {
         this.protocolListener = protocolListener;
         this.configProvider = configProvider;
         this.bundleContext = bundleContext;
@@ -82,6 +83,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.userRegistry = userRegistry;
+        this.httpClient = httpClient;
         this.jwtHelper = new HABSpeakerJwtHelper();
         this.pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
     }
@@ -89,8 +91,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     @Override
     public void register() {
         try {
-            httpService.registerServlet(WS_PATH, this, null,
-                    new HABSpeakerWebsocketContext(this, userRegistry, httpService.createDefaultHttpContext()));
+            httpService.registerServlet(WS_PATH, this, null, new HABSpeakerWebsocketContext(this, userRegistry,
+                    configProvider, httpService.createDefaultHttpContext()));
             logger.debug("Started HABSpeaker at " + WS_PATH);
         } catch (NamespaceException | ServletException e) {
             logger.error("Error during HABSpeakerWebsocketIO, service will not work: {}", e.getMessage());
@@ -102,10 +104,6 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         httpService.unregister(WS_PATH);
         pingTask.cancel(true);
         disconnectHandlers();
-    }
-
-    public HABSpeakerConfig getConfig() {
-        return this.configProvider.getConfig();
     }
 
     private void pingHandlers() {
@@ -168,7 +166,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     public void configure(@Nullable WebSocketServletFactory webSocketServletFactory) {
         if (webSocketServletFactory != null) {
             webSocketServletFactory.getPolicy().setIdleTimeout(60000);
-            webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketIO(this, executor));
+            webSocketServletFactory.setCreator(
+                    (request, response) -> new HABSpeakerWebSocketIO(this, configProvider, httpClient, executor));
         }
     }
 

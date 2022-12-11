@@ -199,12 +199,13 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                             updateState(DROP_IN_CHANNEL, OnOffType.OFF);
                         }
                         return;
-                    }
-                    var commandText = command.toFullString();
-                    if (commandText.isBlank() || commandText.equals("OFF") || commandText.equals("NULL")) {
-                        speakerIO.dropIn(null);
-                    } else if (!commandText.isBlank()) {
-                        dropIn(commandText);
+                    } else {
+                        var commandText = command.toFullString();
+                        if (commandText.isBlank() || commandText.equals("OFF") || commandText.equals("NULL")) {
+                            speakerIO.dropIn(null);
+                        } else if (!commandText.isBlank()) {
+                            dropIn(commandText);
+                        }
                     }
                     break;
                 case MEDIA_CURRENT_SECOND_CHANNEL:
@@ -258,6 +259,13 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         return;
                     } else {
                         playMedia(speakerIO, HABSpeakerIO.MediaProvider.SPOTIFY, command.toFullString());
+                    }
+                    break;
+                case SPOTIFY_SEARCH_CHANNEL:
+                    if (command instanceof RefreshType) {
+                        return;
+                    } else {
+                        speakerIO.getLanguageInterpreter().listenTrackOnSpotify(command.toFullString());
                     }
                     break;
                 case WEB_AUDIO_CHANNEL:

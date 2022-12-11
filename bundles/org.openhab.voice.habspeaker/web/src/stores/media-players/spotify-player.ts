@@ -118,14 +118,14 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     playerRef.on('ready', readyCallback);
   }
   function playOnThisDevice(
-    spotify_uri: string,
+    spotifyUri: string,
     playerInstance: Spotify.Player,
   ) {
     const { getOAuthToken } = playerInstance._options;
     getOAuthToken(access_token => {
       fetch(`https://api.spotify.com/v1/me/player/play?device_id=${playerId}`, {
         method: 'PUT',
-        body: JSON.stringify({ context_uri: spotify_uri }),
+        body: JSON.stringify(spotifyUri.startsWith("spotify:track:") ? { uris: [spotifyUri] } : { context_uri: spotifyUri }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${access_token}`

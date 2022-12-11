@@ -22,6 +22,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.auth.UserRegistry;
+import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
@@ -49,15 +50,18 @@ public class HABSpeakerIOManager
     private final List<HABSpeakerWebSocketProtocol> ioProtocols;
     private final Set<HABSpeakerIO> speakerConnections = Collections.synchronizedSet(new HashSet<>());
     private final HABSpeakerConfigProvider configProvider;
+    private final HttpClientFactory httpClientFactory;
     private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
 
     @Activate
     public HABSpeakerIOManager(BundleContext bundleContext, final @Reference HttpService httpService,
             final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
-            final @Reference UserRegistry userRegistry, final @Reference HABSpeakerConfigProvider configProvider) {
+            final @Reference HttpClientFactory httpClientFactory, final @Reference UserRegistry userRegistry,
+            final @Reference HABSpeakerConfigProvider configProvider) {
         this.configProvider = configProvider;
-        this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext, httpService,
-                audioManager, voiceManager, userRegistry));
+        this.httpClientFactory = httpClientFactory;
+        this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext,
+                httpClientFactory.getCommonHttpClient(), httpService, audioManager, voiceManager, userRegistry));
         configProvider.addListener(this);
     }
 

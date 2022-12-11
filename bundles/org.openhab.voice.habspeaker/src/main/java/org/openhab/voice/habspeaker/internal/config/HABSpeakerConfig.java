@@ -32,6 +32,11 @@ public class HABSpeakerConfig {
      */
     public String stopDropInPhrase = "";
     /**
+     * Phrase template to listen on spotify
+     */
+    public String listenOnSpotifyPhrase = "";
+    // Credentials config
+    /**
      * Spotify app client id
      */
     public String spotifyClientId = "";

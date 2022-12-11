@@ -83,6 +83,7 @@ header {
 .logo-container {
   padding: 3.5vh;
   -webkit-user-select: none;
+  user-select: none;
 }
 .logo-container img {
   position: absolute;

@@ -27,12 +27,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.internal.HABSpeakerIOBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +53,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketIO.class);
     private static final TypeReference<HashMap<String, Object>> WEBSOCKET_MAPPER_TYPE_REF = new TypeReference<>() {
     };
-
     private volatile @Nullable Session session = null;
     private @Nullable RemoteEndpoint remote = null;
     private final HABSpeakerWebSocketProtocol servlet;
@@ -61,8 +62,9 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private @Nullable ScheduledFuture<?> scheduledDisconnection = null;
     private int sinkVolume = 100;
 
-    public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, ScheduledExecutorService executor) {
-        super(servlet.audioManager, servlet.voiceManager, servlet.bundleContext, servlet::getConfig);
+    public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
+            HttpClient httpClient, ScheduledExecutorService executor) {
+        super(servlet.audioManager, servlet.voiceManager, httpClient, servlet.bundleContext, configProvider);
         this.servlet = servlet;
         this.executor = executor;
     }
@@ -79,7 +81,10 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                     // Allow access to the websocket using user generated tokens
                     token = Objects.requireNonNull(session).getUpgradeRequest().getHeader(ALT_AUTH_HEADER);
                 }
-                scheduledDisconnection.cancel(true);
+                var scheduledDisconnection = this.scheduledDisconnection;
+                if (scheduledDisconnection != null) {
+                    scheduledDisconnection.cancel(true);
+                }
                 if (isValidAccess(token)) {
                     id = (String) data.getOrDefault("id", "");
                     servlet.addHandler(this);
@@ -120,7 +125,10 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                 var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
                 var provider = data.getOrDefault("provider", "").toString();
                 var mediaId = data.getOrDefault("id", "").toString();
-                thingHandler.onMediaStateUpdate(provider, mediaId, volume, currentSecond, totalSeconds, playbackState);
+                if (thingHandler != null) {
+                    thingHandler.onMediaStateUpdate(provider, mediaId, volume, currentSecond, totalSeconds,
+                            playbackState);
+                }
                 break;
             default:
                 logger.warn("Unhandled JSON command: {}", data);
@@ -128,7 +136,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     private boolean isValidAccess(@Nullable String token) {
-        if (!servlet.getConfig().secure) {
+        if (!this.configProvider.getConfig().secure) {
             return true;
         }
         if (token == null) {

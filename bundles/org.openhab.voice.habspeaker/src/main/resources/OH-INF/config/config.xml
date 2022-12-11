@@ -25,6 +25,10 @@
 			<label>Stop Drop In Phrase</label>
 			<description>Phrase to stop drop-in on the current speaker.</description>
 		</parameter>
+		<parameter name="listenOnSpotifyPhrase" type="text" groupName="voice">
+			<label>Listen on Spotify Phrase</label>
+			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>
+		</parameter>
 		<parameter name="spotifyClientId" type="text" groupName="media-providers">
 			<label>Spotify Client Id</label>
 			<description>Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify

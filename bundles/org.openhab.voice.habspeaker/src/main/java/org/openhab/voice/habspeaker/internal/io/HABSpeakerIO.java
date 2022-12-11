@@ -19,6 +19,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
+import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 
 /**
  * The {@link HABSpeakerIO} represents a speaker active connection.
@@ -98,6 +99,11 @@ public interface HABSpeakerIO {
      */
     @Nullable
     HABSpeakerIO getDropIn();
+
+    /**
+     * Get language interpreter linked to the speaker
+     */
+    HABSpeakerLanguageInterpreter getLanguageInterpreter();
 
     /**
      * Resume/pause media playback if any

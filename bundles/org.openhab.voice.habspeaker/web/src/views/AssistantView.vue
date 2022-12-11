@@ -72,6 +72,6 @@ function getMediaComponent() {
 }
 .speaker-btn-mini {
   position: absolute;
-  bottom: -7.3vh;
+  bottom: -7vh;
 }
 </style>

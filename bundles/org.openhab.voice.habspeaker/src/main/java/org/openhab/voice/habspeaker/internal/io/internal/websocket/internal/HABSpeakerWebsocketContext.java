@@ -27,6 +27,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.auth.ManagedUser;
 import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserRegistry;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
 import org.osgi.service.http.HttpContext;
 import org.osgi.service.http.HttpService;
@@ -45,16 +46,19 @@ public class HABSpeakerWebsocketContext implements HttpContext {
     private final UserRegistry userRegistry;
     private final HttpContext defaultHttpContext;
     private final HABSpeakerWebSocketProtocol servlet;
+    private final HABSpeakerConfigProvider configProvider;
 
     /**
      * Constructs an {@link HABSpeakerWebsocketContext} with will another {@link HttpContext} as a base.
      *
+     * @param configProvider
      * @param defaultHttpContext the base {@link HttpContext} - use {@link HttpService#createDefaultHttpContext()} to
      *            create a default one
      */
     public HABSpeakerWebsocketContext(HABSpeakerWebSocketProtocol servlet, UserRegistry userRegistry,
-            HttpContext defaultHttpContext) {
+            HABSpeakerConfigProvider configProvider, HttpContext defaultHttpContext) {
         this.servlet = servlet;
+        this.configProvider = configProvider;
         this.defaultHttpContext = defaultHttpContext;
         this.userRegistry = userRegistry;
     }
@@ -65,7 +69,7 @@ public class HABSpeakerWebsocketContext implements HttpContext {
         if (request == null) {
             return false;
         }
-        if (!servlet.getConfig().secure) {
+        if (!configProvider.getConfig().secure) {
             // security is disabled
             return defaultHttpContext.handleSecurity(request, response);
         }

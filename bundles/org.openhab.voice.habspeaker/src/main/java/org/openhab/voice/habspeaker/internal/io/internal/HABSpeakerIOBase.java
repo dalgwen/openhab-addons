@@ -22,10 +22,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Supplier;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
 import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.audio.AudioSink;
@@ -40,7 +40,7 @@ import org.openhab.core.voice.VoiceManager;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
@@ -61,7 +61,8 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private final AudioManager audioManager;
     private final VoiceManager voiceManager;
     private final BundleContext bundleContext;
-    private final Supplier<HABSpeakerConfig> configSupplier;
+    protected final HABSpeakerConfigProvider configProvider;
+    private final HABSpeakerLanguageInterpreter speakerLanguageInterpreter;
     protected @Nullable HABSpeakerIOHandler thingHandler = null;
     private boolean initialized = false;
     protected boolean serverSpotting = false;
@@ -72,12 +73,13 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private @Nullable AudioStream dropInStream = null;
     private @Nullable Future<?> dropInStreamTask = null;
 
-    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext,
-            Supplier<HABSpeakerConfig> configSupplier) {
+    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, HttpClient httpClient,
+            BundleContext bundleContext, HABSpeakerConfigProvider configProvider) {
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.bundleContext = bundleContext;
-        this.configSupplier = configSupplier;
+        this.configProvider = configProvider;
+        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, configProvider, httpClient);
     }
 
     @Override
@@ -138,8 +140,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         TTSService tts = null;
         Voice voice = null;
         KSService ks = null;
-        HumanLanguageInterpreter speakerInterpreter = new HABSpeakerLanguageInterpreter(this, configSupplier);
-        List<HumanLanguageInterpreter> hlis = List.of(speakerInterpreter);
+        List<HumanLanguageInterpreter> hlis = List.of(speakerLanguageInterpreter);
         if (thingHandler != null) {
             var speakerConfig = thingHandler.getSpeakerConfig();
             if (!speakerConfig.stt.isBlank()) {
@@ -155,7 +156,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
             HumanLanguageInterpreter hli = !speakerConfig.hli.isBlank() ? voiceManager.getHLI(speakerConfig.hli)
                     : voiceManager.getHLI();
             if (hli != null) {
-                hlis = List.of(speakerInterpreter, hli);
+                hlis = List.of(speakerLanguageInterpreter, hli);
             }
             if (!speakerConfig.ks.isBlank()) {
                 ks = voiceManager.getKS(speakerConfig.ks);
@@ -182,6 +183,10 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                 unregisterAudioComponent(sink);
             }
         }
+    }
+
+    public HABSpeakerLanguageInterpreter getLanguageInterpreter() {
+        return speakerLanguageInterpreter;
     }
 
     @Override
