@@ -1,12 +1,12 @@
 import { onUnmounted, ref, watch } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { useMediaSessionStore } from "./media-players/media-session";
+import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 const USER_INPUT_EVENTS = [
   'click', 'contextmenu', 'auxclick', 'dblclick',
   'mouseup', 'pointerup', 'touchend', 'keyup'
 ];
 export const useScreenSaverStore = defineStore("screenSaver", () => {
-  const { mediaController } = storeToRefs(useMediaSessionStore());
+  const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
   let screenSaverTime = 120;
   let screenSaverTimeout: any = null;
   const screenSaverEnabled = ref(false);
@@ -19,7 +19,7 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
   }
   function isScreenSaverEnabled() {
     var mediaCtrl = mediaController.value;
-    return screenSaverTime > 0 && (!mediaCtrl || !mediaCtrl.getAwakeScreen());
+    return screenSaverTime > 0 && (!mediaCtrl || !mediaCtrl.getAwakeScreen() || mediaState.value != PlaybackState.PLAYING);
   }
   function disableScreenSaver() {
     if (screenSaverEnabled.value) screenSaverEnabled.value = false;
@@ -44,6 +44,7 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
   });
   watch(() => screenSaverTime, configureScreenSaver);
   watch(mediaController, configureScreenSaver);
+  watch(mediaState, configureScreenSaver);
   configureScreenSaver();
   onUnmounted(() => {
     USER_INPUT_EVENTS.forEach((eventName) => {
