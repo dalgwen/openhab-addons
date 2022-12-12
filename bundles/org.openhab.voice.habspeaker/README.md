@@ -52,7 +52,7 @@ Those are:
 * **Fast-Forward Media Progress Phrase** - Phrase to fast-forward the media progress.
 * **Rewind Media Progress Phrase** - Phrase to rewind the media progress.
 * **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
-* **Watch on Spotify Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
+* **Watch on YouTube Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
 
 
 ### Media Providers
@@ -60,7 +60,7 @@ Those are:
 Configure required credentials for the supported media providers:
 
 * **Spotify Client Id** - Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify integration).
-* **Youtube API Key** -API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for the YouTube search for functionality).
+* **Youtube API Key** -API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for the YouTube search functionality).
 
 ## Local Settings:
 
@@ -159,9 +159,9 @@ No Spotify code is loaded if you don't configure your spotify app client id. It 
 
 These are the required configuration steps:
 
-* You need to create an app in the spotify developers dashboard [here](https://developer.spotify.com/dashboard/login), when created add this allowed redirect url '<YOUR OPENHAB URL>/rest/habspeaker/spotify/login/callback'.
+* You need to create an app in the spotify developers dashboard [here](https://developer.spotify.com/dashboard/login), when created add this allowed redirect url "$YOUR_OPENHAB_URL/rest/habspeaker/spotify/login/callback".
 * Then add the client id in the habspeaker general configuration **Settings / Other Services - HAB Speaker**.
-* Now you open '<YOUR OPENHAB URL>/rest/habspeaker/spotify/login/callback' in a browser and you should be redirected to the spotify login.
+* Now navigate to "$YOUR_OPENHAB_URL/rest/habspeaker/spotify/login/callback" and you should be redirected to the spotify login.
 * If the login goes ok you will see a confirmation text on the top left of the page.
 
 After this setup any speaker you start will be exposed as a remote player to spotify using its configured label. (opened speakers need to be restarted)
