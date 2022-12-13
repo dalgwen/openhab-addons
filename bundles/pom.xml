@@ -423,6 +423,7 @@
     <!-- voice -->
     <module>org.openhab.voice.googlestt</module>
     <module>org.openhab.voice.googletts</module>
+    <module>org.openhab.voice.habspeaker</module>
     <module>org.openhab.voice.mactts</module>
     <module>org.openhab.voice.marytts</module>
     <module>org.openhab.voice.mimictts</module>

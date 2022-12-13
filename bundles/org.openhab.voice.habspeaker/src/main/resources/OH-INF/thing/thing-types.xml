@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="habspeaker"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+	<!-- Sample Thing Type -->
+	<thing-type id="speaker">
+		<label>HAB Speaker Thing</label>
+		<description>Represents a connected speaker</description>
+		<channels>
+			<channel id="sink-volume" typeId="system.volume"/>
+			<channel id="spot" typeId="spot"/>
+			<channel id="drop-in" typeId="drop-in"/>
+			<channel id="media-current-second" typeId="media-current-second"/>
+			<channel id="media-total-seconds" typeId="media-total-seconds"/>
+			<channel id="media-progress" typeId="media-progress"/>
+			<channel id="media-control" typeId="system.media-control"/>
+			<channel id="media-volume" typeId="system.volume"/>
+			<channel id="youtube-id" typeId="youtube-id"/>
+			<channel id="youtube-search" typeId="youtube-search"/>
+			<channel id="spotify-id" typeId="spotify-id"/>
+			<channel id="spotify-search" typeId="spotify-search"/>
+			<channel id="web-audio" typeId="web-audio"/>
+			<channel id="web-video" typeId="web-video"/>
+		</channels>
+		<config-description>
+			<parameter-group name="audio">
+				<label>Audio</label>
+				<description>Sink and source options.</description>
+			</parameter-group>
+			<parameter-group name="voice">
+				<label>Voice</label>
+				<description>Voice configuration options for this speaker.</description>
+			</parameter-group>
+			<parameter-group name="ui">
+				<label>UI</label>
+				<description>Client UI options.</description>
+			</parameter-group>
+			<!-- Audio config -->
+			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
+				<label>Sink Volume</label>
+				<description>Default sink volume</description>
+				<default>80</default>
+			</parameter>
+			<parameter name="sinkStereo" type="boolean" groupName="audio">
+				<label>Sink Stereo</label>
+				<description>Use dual channel audio</description>
+				<default>false</default>
+			</parameter>
+			<!-- Voice config -->
+			<parameter name="tts" type="text" groupName="voice">
+				<label>Text-to-Speech</label>
+				<description>The text-to-speech service to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="stt" type="text" groupName="voice">
+				<label>Speech-to-Text</label>
+				<description>The speech-to-text service to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="voice" type="text" groupName="voice">
+				<label>Voice</label>
+				<description>The voice to use if no voice is specified, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="hli" type="text" groupName="voice">
+				<label>Human Language Interpreter</label>
+				<description>The human language interpreter to use, leave empty to use the default.</description>
+			</parameter>
+			<parameter name="ks" type="text" groupName="voice">
+				<label>Keyword Spotter</label>
+				<description>Enables keyword spotting using the specified service.</description>
+			</parameter>
+			<parameter name="listeningItem" type="text" groupName="voice">
+				<context>item</context>
+				<filter>
+					<criteria name="type">Switch</criteria>
+				</filter>
+				<label>Listening Switch</label>
+				<description>If provided, the item will be switched on during the period when the dialog processor has spotted the
+					keyword and is listening for commands.</description>
+			</parameter>
+			<!-- UI config -->
+			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
+				<label>Screen Saver Time</label>
+				<description>Seconds to activate screen saver (0 for disabled)</description>
+				<default>30</default>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<!-- Client Channels -->
+	<channel-type id="spot">
+		<item-type>Switch</item-type>
+		<label>Spot</label>
+		<description>Starts dialog processing on the speaker</description>
+	</channel-type>
+	<channel-type id="drop-in">
+		<item-type>String</item-type>
+		<label>Drop In</label>
+		<description>Starts an immediate call with other speaker (by id)</description>
+	</channel-type>
+	<channel-type id="media-current-second">
+		<item-type>Number</item-type>
+		<label>Media Current Second</label>
+		<description>Current second for the media currently playing, allow seek</description>
+	</channel-type>
+	<channel-type id="media-total-seconds">
+		<item-type>Number</item-type>
+		<label>Media Total Seconds</label>
+		<description>Total seconds for the media currently playing</description>
+		<state readOnly="true"/>
+	</channel-type>
+	<channel-type id="media-progress">
+		<item-type>Dimmer</item-type>
+		<label>Media Progress</label>
+		<description>Played percentage for the media currently playing, allow seek</description>
+	</channel-type>
+	<channel-type id="youtube-id">
+		<item-type>String</item-type>
+		<label>YouTube Id</label>
+		<description>Start playing a YouTube video (by id)</description>
+	</channel-type>
+	<channel-type id="youtube-search">
+		<item-type>String</item-type>
+		<label>YouTube Search</label>
+		<description>Start playing a YouTube video</description>
+	</channel-type>
+	<channel-type id="spotify-id">
+		<item-type>String</item-type>
+		<label>Spotify Id</label>
+		<description>Start playing a Spotify song (by id)</description>
+	</channel-type>
+	<channel-type id="spotify-search">
+		<item-type>String</item-type>
+		<label>Spotify Search</label>
+		<description>Start playing a Spotify song</description>
+	</channel-type>
+	<channel-type id="web-audio">
+		<item-type>String</item-type>
+		<label>Play Music by URL</label>
+		<description>Start playing a song by url using the browser player</description>
+	</channel-type>
+	<channel-type id="web-video">
+		<item-type>String</item-type>
+		<label>Play Video by URL</label>
+		<description>Start playing a video by url using the browser player</description>
+	</channel-type>
+</thing:thing-descriptions>

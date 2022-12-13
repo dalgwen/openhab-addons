@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config-description:config-descriptions
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0 https://openhab.org/schemas/config-description-1.0.0.xsd">
+	<config-description uri="voice:habspeaker">
+		<parameter-group name="service">
+			<label>Service</label>
+			<description>Service related configurations.</description>
+		</parameter-group>
+		<parameter-group name="voice">
+			<label>Voice Control</label>
+			<description>Define the phrases you can use to interact with the speaker (leave empty to disable).</description>
+		</parameter-group>
+		<parameter-group name="media-providers">
+			<label>Media Providers</label>
+			<description>Configure required credentials for the supported media providers.</description>
+		</parameter-group>
+		<parameter name="secure" type="boolean" groupName="service">
+			<label>Secure</label>
+			<description>Require the user to be authenticated in the openHAB server.</description>
+			<default>false</default>
+		</parameter>
+		<parameter name="stopDropInPhrase" type="text" groupName="voice">
+			<label>Stop Drop In Phrase</label>
+			<description>Phrase to stop drop-in on the current speaker.</description>
+		</parameter>
+		<parameter name="commandSentMessage" type="text" groupName="voice">
+			<label>Command send message</label>
+			<description>Phrase to say on the speaker on command success.</description>
+		</parameter>
+		<parameter name="resumeMediaPhrase" type="text" groupName="voice">
+			<label>Resume Media Phrase</label>
+			<description>Phrase template to resume media.</description>
+		</parameter>
+		<parameter name="pauseMediaPhrase" type="text" groupName="voice">
+			<label>Pause Media Phrase</label>
+			<description>Phrase template to pause media.</description>
+		</parameter>
+		<parameter name="stopMediaPhrase" type="text" groupName="voice">
+			<label>Stop Media Phrase</label>
+			<description>Phrase template to stop media.</description>
+		</parameter>
+		<parameter name="decreaseMediaVolumePhrase" type="text" groupName="voice">
+			<label>Decrease Media Volume Phrase</label>
+			<description>Phrase template to decrease the media volume by the configured step.</description>
+		</parameter>
+		<parameter name="increaseMediaVolumePhrase" type="text" groupName="voice">
+			<label>Increase Media Volume Phrase</label>
+			<description>Phrase template to increase the media volume by the configured step.</description>
+		</parameter>
+		<parameter name="mediaVolumeStep" type="integer" groupName="voice">
+			<label>Media Volume Step</label>
+			<description>Volume step used by the increase/decrease media volume phrases.</description>
+			<default>10</default>
+		</parameter>
+		<parameter name="fastForwardMediaProgressPhrase" type="text" groupName="voice">
+			<label>Fast-Forward Media Progress Phrase</label>
+			<description>Phrase template to fast-forward the media progress.</description>
+		</parameter>
+		<parameter name="rewindMediaProgressPhrase" type="text" groupName="voice">
+			<label>Rewind Media Progress Phrase</label>
+			<description>Phrase template to rewind the media progress.</description>
+		</parameter>
+		<parameter name="listenOnSpotifyPhrase" type="text" groupName="voice">
+			<label>Listen on Spotify Phrase</label>
+			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>
+		</parameter>
+		<parameter name="watchOnYouTubePhrase" type="text" groupName="voice">
+			<label>Watch on Spotify Phrase</label>
+			<description>Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').</description>
+		</parameter>
+		<parameter name="spotifyClientId" type="text" groupName="media-providers">
+			<label>Spotify Client Id</label>
+			<description>Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify
+				integration)</description>
+		</parameter>
+		<parameter name="youtubeAPIKey" type="text" groupName="media-providers">
+			<label>Youtube API Key</label>
+			<description>API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for YouTube
+				Search)</description>
+		</parameter>
+	</config-description>
+</config-description:config-descriptions>
