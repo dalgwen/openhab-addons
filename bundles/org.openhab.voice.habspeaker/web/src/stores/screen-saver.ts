@@ -10,13 +10,6 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
   let screenSaverTime = 120;
   let screenSaverTimeout: any = null;
   const screenSaverEnabled = ref(false);
-  function configureScreenSaver() {
-    if (isScreenSaverEnabled()) {
-      awakeScreenSaver();
-    } else {
-      disableScreenSaver();
-    }
-  }
   function isScreenSaverEnabled() {
     var mediaCtrl = mediaController.value;
     return screenSaverTime > 0 && (!mediaCtrl || !mediaCtrl.getAwakeScreen() || mediaState.value != PlaybackState.PLAYING);
@@ -29,7 +22,6 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
     disableScreenSaver();
     if (isScreenSaverEnabled()) {
       screenSaverTimeout = setTimeout(() => {
-        screenSaverEnabled.value = true;
         screenSaverTimeout = null;
         screenSaverEnabled.value = true;
       }, screenSaverTime * 1000);
@@ -37,15 +29,14 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
   }
   function setScreenSaverTime(seconds: number) {
     screenSaverTime = seconds;
-    configureScreenSaver();
+    awakeScreenSaver();
   }
   USER_INPUT_EVENTS.forEach((eventName) => {
     window.addEventListener(eventName, awakeScreenSaver, { capture: true });
   });
-  watch(() => screenSaverTime, configureScreenSaver);
-  watch(mediaController, configureScreenSaver);
-  watch(mediaState, configureScreenSaver);
-  configureScreenSaver();
+  watch(mediaController, awakeScreenSaver);
+  watch(mediaState, awakeScreenSaver);
+  awakeScreenSaver();
   onUnmounted(() => {
     USER_INPUT_EVENTS.forEach((eventName) => {
       window.removeEventListener(eventName, awakeScreenSaver, { capture: true });
