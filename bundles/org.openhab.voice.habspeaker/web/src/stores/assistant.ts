@@ -29,16 +29,18 @@ export const useAssistantStore = defineStore("assistant", () => {
   function setOnline(value: boolean) {
     awakeScreenSaver();
     if (spotifyStore.isEnabled()) {
-        console.log("Starting spotify");
-      if (value && !spotifyStore.isConnected()) {
+      console.log("Starting spotify");
+      if (value) {
         spotifyStore.connect()
           .then((connected) => console.debug("Spotify is connected: " + connected))
           .catch(() => console.error("Error connecting to spotify"));
-      } else if (!value && spotifyStore.isConnected() && mediaController.value?.getId() == MediaProvider.SPOTIFY) {
-        mediaController.value.pause();
+      } else if (!value) {
+        spotifyStore.disconnect()
+          .then(() => console.debug("Spotify is disconnected"))
+          .catch(() => console.error("Error connecting to spotify"));
       }
     }
-    if(!value) {
+    if (!value) {
       stopMedia();
     }
     online.value = value;

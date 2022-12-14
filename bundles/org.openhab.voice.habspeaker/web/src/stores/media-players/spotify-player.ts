@@ -51,6 +51,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
       console.log('Autoplay is not allowed by the browser autoplay rules');
     });
     playerRef.addListener('not_ready', ({ device_id }) => {
+      connected = false;
       console.log('Device ID has gone offline', device_id);
     });
     playerRef.addListener('initialization_error', ({ message }) => {
@@ -141,7 +142,8 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   }
   async function connect() {
     const playerRef = player.value;
-    if (playerRef && !connected) {
+    connected = true;
+    if (playerRef) {
       return connected = await playerRef.connect();
     }
     return false;
@@ -160,6 +162,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     return token.length && typeof window.Spotify !== 'undefined';
   }
   async function disconnect() {
+    connected = false;
     const playerRef = player.value;
     if (playerRef) {
       playerRef.disconnect();
