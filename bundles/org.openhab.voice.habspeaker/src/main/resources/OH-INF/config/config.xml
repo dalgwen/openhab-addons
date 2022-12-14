@@ -67,7 +67,7 @@
 			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>
 		</parameter>
 		<parameter name="watchOnYouTubePhrase" type="text" groupName="voice">
-			<label>Watch on Spotify Phrase</label>
+			<label>Watch on YouTube Phrase</label>
 			<description>Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').</description>
 		</parameter>
 		<parameter name="spotifyClientId" type="text" groupName="media-providers">
