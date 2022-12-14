@@ -81,8 +81,6 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
       stop: async () => player.stopVideo(),
       next: async () => player.nextVideo(),
       previous: async () => player.previousVideo(),
-      forward: async () => { },
-      backward: async () => { },
       seek: async (second) => player.seekTo(second, true),
       getCurrentSecond: async () => player.getCurrentTime(),
       getTotalSeconds: async () => player.getDuration(),

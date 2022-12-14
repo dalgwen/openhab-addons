@@ -128,9 +128,14 @@ public interface HABSpeakerIO {
     void playerCommand(RewindFastforwardType event);
 
     /**
-     * Rewind/Fast-forward media playback
+     * Seek media playback to second
      */
-    void playerSeek(long second);
+    void playerSeekToSecond(long second);
+
+    /**
+     * Seek media playback to percent
+     */
+    void playerSeekToPercent(int percent);
 
     /**
      * Stops media playback

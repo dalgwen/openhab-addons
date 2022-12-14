@@ -191,12 +191,6 @@ export async function startWebsocketWorker(id: string, token: string, actions: W
               case 'pause':
                 mediaSessionCtrl.pause();
                 break;
-              case 'fast-forward':
-                mediaSessionCtrl.forward();
-                break;
-              case 'rewind':
-                mediaSessionCtrl.backward();
-                break;
               case 'stop':
                 mediaSessionCtrl.stop();
                 actions.stopMedia();
@@ -271,8 +265,6 @@ export interface MediaSessionCtrl {
   play(): Promise<void>;
   pause(): Promise<void>;
   stop(): Promise<void>;
-  backward(): Promise<void>;
-  forward(): Promise<void>;
   previous(): Promise<void>;
   next(): Promise<void>;
   seek(second: number): Promise<void>;

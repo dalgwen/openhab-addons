@@ -82,8 +82,6 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
         stop: () => playerRef.pause(),
         next: () => playerRef.nextTrack(),
         previous: () => playerRef.previousTrack(),
-        forward: async () => { },
-        backward: async () => { },
         seek: (second) => playerRef.seek(second * 1000),
         getCurrentSecond: async () => {
           const position = (await playerRef.getCurrentState())?.position;

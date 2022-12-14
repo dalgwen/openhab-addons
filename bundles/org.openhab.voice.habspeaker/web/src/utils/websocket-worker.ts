@@ -212,7 +212,7 @@ export default class WebSocketWorker {
 type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string };
 type SetVolumeCmd = { value: number };
 type ConfigureSpeakerCmd = { sinkVolume?: number, sinkStereo?: boolean, remoteSpot?: number, screenSaverTime?: number, spotifyToken?: string, label?: string };
-type MediaCommandCmd = { type: 'play' } | { type: 'pause' } | { type: 'stop' } | { type: 'next' } | { type: 'previous' } | { type: 'rewind' } | { type: 'fast-forward' } | { type: 'seek', second: number } | { type: 'volume', level: number } | { type: 'start', provider: string, id: string };
+type MediaCommandCmd = { type: 'play' } | { type: 'pause' } | { type: 'stop' } | { type: 'next' } | { type: 'previous' } | { type: 'seek', second: number } | { type: 'volume', level: number } | { type: 'start', provider: string, id: string };
 type SpotifyTokenCmd = { token: string };
 // Commands from worker to server (no command for sending audio as is sent as binary).
 enum WebSocketInCmd {

@@ -55,8 +55,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     private @Nullable HABSpeakerIO speakerIO;
     private @Nullable Integer sinkVolume;
     private @Nullable Integer mediaVolume;
-    private long currentSecond;
-    private long totalSeconds;
     private String youtubeMediaId = "";
     private String spotifyMediaId = "";
     private String videoMediaUrl = "";
@@ -213,7 +211,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         return;
                     }
                     if (command instanceof DecimalType) {
-                        speakerIO.playerSeek(((DecimalType) command).longValue());
+                        speakerIO.playerSeekToSecond(((DecimalType) command).longValue());
                     }
                     break;
                 case MEDIA_TOTAL_SECONDS_CHANNEL:
@@ -226,11 +224,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         return;
                     }
                     if (command instanceof PercentType) {
-                        if (totalSeconds < 1L) {
-                            logger.error("Unable to seek missed media info");
-                        }
-                        speakerIO.playerSeek(
-                                (long) ((((PercentType) command).doubleValue() / 100.0) * (double) totalSeconds));
+                        speakerIO.playerSeekToPercent(((PercentType) command).intValue());
                     }
                     break;
                 case MEDIA_CONTROL_CHANNEL:
@@ -322,8 +316,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     @Override
     public void onMediaStateUpdate(String provider, String mediaId, int volume, long currentSecond, long totalSeconds,
             HABSpeakerIO.PlaybackStates playbackState) {
-        this.currentSecond = currentSecond;
-        this.totalSeconds = totalSeconds;
         String youtubeMediaId = "";
         String spotifyMediaId = "";
         String videoMediaUrl = "";

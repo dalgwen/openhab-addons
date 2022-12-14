@@ -35,8 +35,6 @@ export function getMediaSessionCtrl(provider: MediaProvider, playerRef: HTMLVide
     stop: async () => playerRef.pause(),
     next: async () => { console.error("Method implementation pending"); },
     previous: async () => { console.error("Method implementation pending"); },
-    forward: async () => { console.error("Method implementation pending"); },
-    backward: async () => { console.error("Method implementation pending"); },
     seek: async (second) => (!isNaN(playerRef.duration)) ? playerRef.fastSeek(second) : console.warn('Media is not seekable'),
     getCurrentSecond: async () => (!isNaN(playerRef.duration)) ? playerRef.currentTime : 0,
     getTotalSeconds: async () => (!isNaN(playerRef.duration)) ? playerRef.duration : 0,

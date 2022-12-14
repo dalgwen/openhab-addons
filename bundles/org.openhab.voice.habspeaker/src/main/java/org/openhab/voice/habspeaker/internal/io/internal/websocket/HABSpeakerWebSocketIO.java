@@ -63,6 +63,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private @Nullable ScheduledFuture<?> scheduledDisconnection;
     private int sinkVolume;
     private int mediaVolume;
+    private long currentSecond;
+    private long totalSeconds;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
             HttpClient httpClient, ScheduledExecutorService executor) {
@@ -122,6 +124,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
             case MEDIA_STATE:
                 var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
                 var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
+                this.currentSecond = currentSecond;
+                this.totalSeconds = totalSeconds;
                 var playbackState = PlaybackStates
                         .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
                 var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
@@ -206,32 +210,52 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
-    public void playerCommand(PlayPauseType event) {
+    public void playerCommand(PlayPauseType command) {
         var data = new HashMap<String, Object>();
-        data.put("type", PlayPauseType.PLAY.equals(event) ? "play" : "pause");
+        data.put("type", PlayPauseType.PLAY.equals(command) ? "play" : "pause");
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 
     @Override
-    public void playerCommand(NextPreviousType event) {
+    public void playerCommand(NextPreviousType command) {
         var data = new HashMap<String, Object>();
-        data.put("type", NextPreviousType.NEXT.equals(event) ? "next" : "previous");
+        data.put("type", NextPreviousType.NEXT.equals(command) ? "next" : "previous");
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 
     @Override
-    public void playerCommand(RewindFastforwardType event) {
-        var data = new HashMap<String, Object>();
-        data.put("type", RewindFastforwardType.REWIND.equals(event) ? "rewind" : "fast-forward");
-        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    public void playerCommand(RewindFastforwardType command) {
+        if (totalSeconds < 1L) {
+            logger.warn("Unable to seek missed media info");
+            return;
+        }
+        int newProgress = (int) ((((double) currentSecond) / ((double) totalSeconds)) * 100.0)
+                + (RewindFastforwardType.REWIND.equals(command) ? -3 : 3);
+        playerSeekToPercent(newProgress);
     }
 
     @Override
-    public void playerSeek(long second) {
+    public void playerSeekToSecond(long second) {
         var data = new HashMap<String, Object>();
         data.put("type", "seek");
         data.put("second", second);
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerSeekToPercent(int percent) {
+        if (totalSeconds < 1L) {
+            logger.error("Unable to seek missed media info");
+            return;
+        }
+        if (percent > 99) {
+            this.playerSeekToSecond(totalSeconds);
+        } else if (percent < 1) {
+            this.playerSeekToSecond(0);
+        } else {
+            var seekSecond = (long) ((((double) percent) / 100.0) * (double) totalSeconds);
+            this.playerSeekToSecond(seekSecond);
+        }
     }
 
     @Override
