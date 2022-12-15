@@ -35,25 +35,41 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
     await loadYoutubeApi();
     const Player = window.YT.Player;
     if (player.value) {
-      player.value.loadVideoById(mediaId);
+      if (mediaId.startsWith('playlist:')) {
+        player.value.loadPlaylist({ listType: "playlist", list: mediaId.replace('playlist:', '') })
+      } else {
+        player.value.loadVideoById(mediaId);
+      }
       return;
     }
-    player.value = new Player('youtube-player', {
+    const playerVars: YT.PlayerVars = {
+      modestbranding: 1,
+      playsinline: 1,
+      autoplay: 1,
+      autohide: 1,
+      enablejsapi: 1,
+    };
+    let videoId: string | undefined;
+    if (mediaId.startsWith('playlist:')) {
+      playerVars.listType = 'playlist';
+      playerVars.list = mediaId.replace('playlist:', '');
+    } else {
+      videoId = mediaId;
+    }
+    console.log(playerVars);
+    const playerOptions: YT.PlayerOptions = {
       height: '0', // iframe height/width is forced by the global styles
       width: '0',
-      videoId: mediaId,
-      playerVars: {
-        modestbranding: 1,
-        playsinline: 1,
-        autoplay: 1,
-        autohide: 1,
-        enablejsapi: 1,
-      },
+      playerVars,
       events: {
         'onReady': onPlayerReady,
         'onStateChange': onPlayerStateChange
       },
-    });
+    };
+    if (videoId != null) {
+      playerOptions.videoId = videoId;
+    }
+    player.value = new Player('youtube-player', playerOptions);
   }
   const onPlayerReady: YT.PlayerEventHandler<YT.PlayerEvent> = function (event) {
     const player = event.target;

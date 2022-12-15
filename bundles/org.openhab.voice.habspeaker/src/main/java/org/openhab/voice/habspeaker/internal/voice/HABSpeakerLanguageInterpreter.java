@@ -202,6 +202,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                 .param("include_external", "false").send();
         var responseStatus = response.getStatus();
         var responseContent = response.getContentAsString();
+        logger.debug("Spotify search api response {}: {}", responseStatus, responseContent);
         if (responseStatus > 299 || responseStatus < 200) {
             throw new IllegalStateException(
                     String.format("Spotify api returned an error %d: %s", responseStatus, responseContent));
@@ -225,10 +226,10 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                 .header(HttpHeader.ACCEPT, "application/json") //
                 .param("q", search) //
                 .param("maxResults", "1") //
-                .param("type", "video") //
                 .param("key", apiKey).send();
         var responseStatus = response.getStatus();
         var responseContent = response.getContentAsString();
+        logger.debug("YouTube search response {}: {}", responseStatus, responseContent);
         if (responseStatus > 299 || responseStatus < 200) {
             throw new IllegalStateException(
                     String.format("Youtube api returned an error %d: %s", responseStatus, responseContent));
@@ -237,7 +238,47 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         if (jsonResponse.items.isEmpty()) {
             throw new IllegalStateException("Youtube return no results");
         }
-        return jsonResponse.items.get(0).id.videoId;
+        var searchItem = jsonResponse.items.get(0);
+        switch (searchItem.id.kind) {
+            case "youtube#channel":
+                return "playlist:" + getYoutubeChannelUploadsPlaylist(searchItem.id.channelId);
+            case "youtube#playlist":
+                return "playlist:" + searchItem.id.playlistId;
+            case "youtube#video":
+                return searchItem.id.videoId;
+            default:
+                throw new IllegalStateException("YouTube returns an unsupported item type");
+        }
+    }
+
+    private String getYoutubeChannelUploadsPlaylist(String channelId)
+            throws ExecutionException, InterruptedException, TimeoutException, JsonProcessingException {
+        var apiKey = configProvider.getConfig().youtubeAPIKey;
+        if (apiKey.isBlank()) {
+            throw new IllegalStateException("Missing Youtube api key");
+        }
+        var response = httpClient.newRequest("https://youtube.googleapis.com/youtube/v3/channels") //
+                .header(HttpHeader.ACCEPT, "application/json") //
+                .param("part", "contentDetails") //
+                .param("id", channelId) //
+                .param("maxResults", "1") //
+                .param("key", apiKey).send();
+        var responseStatus = response.getStatus();
+        var responseContent = response.getContentAsString();
+        logger.debug("YouTube channels response {}: {}", responseStatus, responseContent);
+        if (responseStatus > 299 || responseStatus < 200) {
+            throw new IllegalStateException(
+                    String.format("Youtube api returned an error %d: %s", responseStatus, responseContent));
+        }
+        var jsonResponse = new ObjectMapper().readValue(responseContent, YouTubeChannelsResponse.class);
+        if (jsonResponse.items.isEmpty()) {
+            throw new IllegalStateException("Youtube return no results");
+        }
+        var uploadsPlayList = jsonResponse.items.get(0).contentDetails.relatedPlaylists.uploads;
+        if (uploadsPlayList.isEmpty()) {
+            throw new IllegalStateException("Youtube return no results");
+        }
+        return uploadsPlayList;
     }
 
     private void listenOnSpotify(SpotifySearchType type, String name) {
@@ -292,6 +333,8 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     private static class YouTubeSearchItemId {
         public String kind = "";
         public String videoId = "";
+        public String channelId = "";
+        public String playlistId = "";
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -300,7 +343,31 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class YouTubeSearchResponse {
-        public List<YouTubeSearchItem> items = new ArrayList<>();
+    private static class YouTubeChannelRelatedPlaylists {
+        public String likes = "";
+        public String uploads = "";
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeChannelContentDetails {
+        public YouTubeChannelRelatedPlaylists relatedPlaylists = new YouTubeChannelRelatedPlaylists();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeChannelItem {
+        public YouTubeChannelContentDetails contentDetails = new YouTubeChannelContentDetails();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeSearchResponse extends YouTubeItemsResponse<YouTubeSearchItem> {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeChannelsResponse extends YouTubeItemsResponse<YouTubeChannelItem> {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class YouTubeItemsResponse<T> {
+        public List<T> items = new ArrayList<>();
     }
 }
