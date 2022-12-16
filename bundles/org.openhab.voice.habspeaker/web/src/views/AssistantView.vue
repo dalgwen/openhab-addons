@@ -1,24 +1,27 @@
-<script setup>
+<script setup lang="ts">
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "../stores/auth";
 import { useAssistantStore } from "../stores/assistant";
 import { useSettingsStore } from "../stores/settings";
+import { useIOStore } from "../stores/io";
 import router from "../router";
 import AssistantWidget from "../components/AssistantWidget.vue";
 import YoutubePlayer from "../components/media-players/YoutubePlayer.vue";
 import SpotifyPlayer from "../components/media-players/SpotifyPlayer.vue";
 import WebAudioPlayer from "../components/media-players/WebAudioPlayer.vue";
 import WebVideoPlayer from "../components/media-players/WebVideoPlayer.vue";
-import { MediaProvider } from "../utils/websocket-manager";
+import { MediaProvider } from "../stores/media-players/media-session";
 const store = useAssistantStore();
+const ioStore = useIOStore();
 const settingsStore = useSettingsStore();
 const { getAccessToken } = useAuthStore();
-const { startWorker, isAudioSupported } = store;
-const { online, userInteractionDone, miniMode, mediaId, mediaProvider } = storeToRefs(store);
+const { startAssistant, isAudioSupported } = store;
+const { online } = storeToRefs(ioStore);
+const { userInteractionDone, miniMode, mediaId, mediaProvider } = storeToRefs(store);
 const { speakerId } = storeToRefs(settingsStore);
 function onPanelClick() {
   if (!userInteractionDone.value) {
-    startWorker(
+    startAssistant(
       speakerId.value,
       getAccessToken()
     ).catch((error) => {
@@ -33,7 +36,7 @@ if (!isAudioSupported()) {
   router.replace("/audio-error");
 }
 function getMediaComponent() {
-  switch(mediaProvider.value) {
+  switch (mediaProvider.value) {
     case MediaProvider.YOUTUBE:
       return YoutubePlayer;
     case MediaProvider.SPOTIFY:
@@ -52,7 +55,7 @@ function getMediaComponent() {
   <main>
     <div @click="onPanelClick()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
-      <AssistantWidget :class="{'speaker-btn-mini': miniMode}" />
+      <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
       <component v-if="mediaProvider" :is="getMediaComponent()" :mediaId="mediaId"></component>
     </div>
   </main>
@@ -67,9 +70,11 @@ function getMediaComponent() {
   height: 86vh;
   background-color: var(--color-internal-background);
 }
+
 .container-mini-mode {
   height: 84vh;
 }
+
 .speaker-btn-mini {
   position: absolute;
   bottom: -7vh;

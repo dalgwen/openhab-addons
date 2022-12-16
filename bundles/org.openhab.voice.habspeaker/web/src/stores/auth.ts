@@ -1,10 +1,10 @@
 import { defineStore } from "pinia";
 import axios from "axios";
-import { useAssistantStore } from "./assistant";
+import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
 export const useAuthStore = defineStore("auth", () => {
-  const { renewToken } = useAssistantStore();
+  const ioStore = useIOStore();
   const { speakerId } = useSettingsStore();
   const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker' });
   function getAccessToken() {
@@ -49,7 +49,7 @@ export const useAuthStore = defineStore("auth", () => {
           return unauthorized();
         }
         if (data) {
-          renewToken(data.access_token);
+          ioStore.setAuthToken(data.access_token);
           getSpeakerCookie().catch(err => console.error(err));
         }
       }, !authorized);

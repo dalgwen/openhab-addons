@@ -1,10 +1,10 @@
 <script setup>
 import { storeToRefs } from "pinia";
 import { ref } from "vue";
-import { useAssistantStore } from "../stores/assistant";
+import { useIOStore } from "../stores/io";
 import { useSettingsStore } from "../stores/settings";
 const store = useSettingsStore();
-const assistantStore = useAssistantStore();
+const ioStore = useIOStore();
 const { speakerId } = storeToRefs(store);
 const model = ref({
   id: speakerId.value,
@@ -15,7 +15,7 @@ function reset() {
 function save() {
   speakerId.value = model.value.id;
   store.commit();
-  assistantStore.resetConnection(
+  ioStore.resetConnection(
     speakerId.value,
   );
 }

@@ -1,7 +1,6 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { PlaybackState, useMediaSessionStore } from "./media-session";
-import { MediaProvider, MediaSessionCtrl } from "../../utils/websocket-manager";
+import { MediaProvider, MediaSessionCtrl, PlaybackState, useMediaSessionStore } from "./media-session";
 import { useAssistantStore } from "../assistant";
 export const useSpotifyPlayerStore = defineStore("spotify", () => {
   let token = "";

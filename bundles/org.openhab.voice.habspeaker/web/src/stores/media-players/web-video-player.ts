@@ -1,7 +1,6 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { PlaybackState, useMediaSessionStore } from "./media-session";
-import { MediaProvider } from "../../utils/websocket-manager";
+import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
 import { getMediaSessionCtrl } from "./web-audio-player";
 export const useWebVideoPlayerStore = defineStore("web-video", () => {
   const mediaSessionStore = useMediaSessionStore();

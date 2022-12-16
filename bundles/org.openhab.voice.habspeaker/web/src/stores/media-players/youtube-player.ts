@@ -1,7 +1,6 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { PlaybackState, useMediaSessionStore } from "./media-session";
-import { MediaProvider } from "../../utils/websocket-manager";
+import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
 export const useYoutubePlayerStore = defineStore("youtube", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);

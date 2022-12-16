@@ -1,56 +1,17 @@
 import { ref, watch } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { MediaProvider, startWebsocketWorker } from "../utils/websocket-manager";
-import { WorkerInCmd } from "../utils/websocket-worker";
-import { useScreenSaverStore } from "./screen-saver";
-import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
+import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
+import { useIOStore } from "./io";
 export const useAssistantStore = defineStore("assistant", () => {
+  const ioStore = useIOStore();
   const spotifyStore = useSpotifyPlayerStore();
   const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
-  const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
   // state
-  const listening = ref(false);
   const miniMode = ref(false);
-  const speaking = ref(false);
-  const online = ref(false);
+  const userInteractionDone = ref(false);
   const mediaProvider = ref("");
   const mediaId = ref("");
-  const userInteractionDone = ref(false);
-  // worker actions
-  function setListening(value: boolean) {
-    awakeScreenSaver();
-    listening.value = value;
-  }
-  function setSpeaking(value: boolean) {
-    awakeScreenSaver();
-    speaking.value = value;
-  }
-  function setOnline(value: boolean) {
-    awakeScreenSaver();
-    if (spotifyStore.isEnabled()) {
-      console.log("Starting spotify");
-      if (value) {
-        spotifyStore.connect()
-          .then((connected) => console.debug("Spotify is connected: " + connected))
-          .catch(() => console.error("Error connecting to spotify"));
-      } else if (!value) {
-        spotifyStore.disconnect()
-          .then(() => console.debug("Spotify is disconnected"))
-          .catch(() => console.error("Error connecting to spotify"));
-      }
-    }
-    if (!value) {
-      stopMedia();
-    }
-    online.value = value;
-  }
-  function getMediaCtrl() {
-    return mediaController.value
-  }
-  function updateSpotifyToken(token: string) {
-    spotifyStore.updateToken(token);
-  }
   function updateProvider(provider: string, media: string) {
     mediaProvider.value = provider;
     mediaId.value = media;
@@ -93,45 +54,16 @@ export const useAssistantStore = defineStore("assistant", () => {
     mediaId.value = "";
     miniMode.value = false;
   }
-  // worker setup
-  let worker: Worker | null = null;
-  function postToWorker(cmd: string, args: { [key: string]: any } = {}) {
-    try {
-      if (worker) {
-        worker.postMessage({ cmd, ...args });
-      } else {
-        console.error("Worker not running");
-      }
-    } catch (error) {
-      console.error("Unable to post to worker", error);
-    }
-  }
-  function startWorker(id: string, token: string) {
+  async function startAssistant(id: string, token: string) {
     userInteractionDone.value = true;
-    spotifyStore.activatePlayer();
-    if (!worker) {
-      return startWebsocketWorker(id, token, {
-        getMediaCtrl,
-        setListening,
-        setOnline,
-        setScreenSaverTime,
-        setSpeaking,
-        startMedia,
-        stopMedia,
-        updateSpotifyToken,
-      }).then(async (_worker: any) => {
-        worker = _worker;
-        console.info("worker running");
-        return worker;
-      });
-    }
-    return Promise.resolve(worker);
+    await spotifyStore.activatePlayer();
+    await ioStore.init(id, token);
   }
   // media control
   async function updateMediaState() {
     const player = mediaController.value;
     if (player == null) {
-      postToWorker(WorkerInCmd.MEDIA_STATE, {
+      ioStore.sendMediaState({
         totalSeconds: 0,
         currentSecond: 0,
         state: PlaybackState.STOPPED,
@@ -140,7 +72,7 @@ export const useAssistantStore = defineStore("assistant", () => {
         id: "",
       });
     } else {
-      postToWorker(WorkerInCmd.MEDIA_STATE, {
+      ioStore.sendMediaState({
         totalSeconds: Math.floor(await player.getTotalSeconds()),
         currentSecond: Math.floor(await player.getCurrentSecond()),
         volume: Math.floor(await player.getVolume()),
@@ -167,15 +99,10 @@ export const useAssistantStore = defineStore("assistant", () => {
   });
   // component actions
   function startListening() {
-    postToWorker(WorkerInCmd.ON_SPOT);
+    ioStore.sendSpot();
   }
   function resetConnection(id: string) {
-    postToWorker(WorkerInCmd.RESET_CONNECTION, { id });
-  }
-  function renewToken(token: string) {
-    if (worker) {
-      postToWorker(WorkerInCmd.TOKEN_RENEW, { token });
-    }
+    ioStore.resetConnection(id);
   }
   function isAudioSupported() {
     const getUserMediaSupported =
@@ -185,17 +112,13 @@ export const useAssistantStore = defineStore("assistant", () => {
     return AudioContext && getUserMediaSupported;
   }
   return {
-    listening,
-    online,
-    speaking,
     miniMode,
     mediaProvider,
     mediaId,
-    startListening,
-    startWorker,
     userInteractionDone,
+    startListening,
+    startAssistant,
     resetConnection,
-    renewToken,
     isAudioSupported,
     updateProvider,
     startMedia,
