@@ -110,7 +110,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             }
             if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
                 var level = speakerIO.getMediaVolume();
-                if (level < config.mediaVolumeStep + 1) {
+                if (level < 100 - config.mediaVolumeStep) {
                     speakerIO.setMediaVolume(level + config.mediaVolumeStep);
                 } else {
                     speakerIO.setMediaVolume(100);

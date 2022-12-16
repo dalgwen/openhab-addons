@@ -10,14 +10,16 @@ import YoutubePlayer from "../components/media-players/YoutubePlayer.vue";
 import SpotifyPlayer from "../components/media-players/SpotifyPlayer.vue";
 import WebAudioPlayer from "../components/media-players/WebAudioPlayer.vue";
 import WebVideoPlayer from "../components/media-players/WebVideoPlayer.vue";
-import { MediaProvider } from "../stores/media-players/media-session";
+import { MediaProvider, useMediaSessionStore } from "../stores/media-players/media-session";
 const store = useAssistantStore();
 const ioStore = useIOStore();
+const mediaSessionStore = useMediaSessionStore();
 const settingsStore = useSettingsStore();
 const { getAccessToken } = useAuthStore();
 const { startAssistant, isAudioSupported } = store;
 const { online } = storeToRefs(ioStore);
-const { userInteractionDone, miniMode, mediaId, mediaProvider } = storeToRefs(store);
+const { mediaId, mediaProvider } = storeToRefs(mediaSessionStore);
+const { userInteractionDone, miniMode } = storeToRefs(store);
 const { speakerId } = storeToRefs(settingsStore);
 function onPanelClick() {
   if (!userInteractionDone.value) {

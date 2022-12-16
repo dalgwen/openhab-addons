@@ -4,7 +4,7 @@ import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-sess
 export const useYoutubePlayerStore = defineStore("youtube", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
-  var player = ref<YT.Player | null>(null);
+  const player = ref<YT.Player | null>(null);
   function loadYoutubeApi() {
     return new Promise<void>((resolve, reject) => {
       try {
@@ -111,8 +111,9 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
   function destroyPlayer() {
     const playerRef = player.value;
     if (playerRef) {
-      playerRef.destroy();
+      mediaController.value = null;
       player.value = null;
+      playerRef.destroy();
     }
   }
   return {

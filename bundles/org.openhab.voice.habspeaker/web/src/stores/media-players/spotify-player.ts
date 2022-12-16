@@ -1,11 +1,10 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { MediaProvider, MediaSessionCtrl, PlaybackState, useMediaSessionStore } from "./media-session";
-import { useAssistantStore } from "../assistant";
 export const useSpotifyPlayerStore = defineStore("spotify", () => {
   let token = "";
   let playerId = "";
-  const assistantStore = useAssistantStore();
+  const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
   var player = ref<Spotify.Player | null>(null);
   function loadSpotifyApi() {
@@ -110,7 +109,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
       if (state == PlaybackState.PLAYING) {
         mediaController.value = _mediaController;
         console.log(playbackState);
-        assistantStore.updateProvider("spotify", playbackState.context.uri ?? '');
+        mediaSessionStore.updateProvider("spotify", playbackState.context.uri ?? '');
       }
     });
     playerRef.on('ready', readyCallback);

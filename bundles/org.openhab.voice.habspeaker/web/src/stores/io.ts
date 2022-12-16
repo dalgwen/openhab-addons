@@ -6,9 +6,7 @@ import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
-import { useAssistantStore } from "./assistant";
 export const useIOStore = defineStore("io", () => {
-  const assistantStore = useAssistantStore();
   let audioContext: AudioContext | null = null;
   let micStreaming = false;
   let currentSpeaking = false;
@@ -25,7 +23,8 @@ export const useIOStore = defineStore("io", () => {
     return audioContext;
   }
   const spotifyStore = useSpotifyPlayerStore();
-  const { mediaController } = storeToRefs(useMediaSessionStore());
+  const mediaSessionStore = useMediaSessionStore();
+  const { mediaController } = storeToRefs(mediaSessionStore);
   const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
   // state
   const listening = ref(false);
@@ -34,10 +33,12 @@ export const useIOStore = defineStore("io", () => {
   // worker actions
   function setListening(value: boolean) {
     awakeScreenSaver();
+    mediaSessionStore.muteMediaVolume(value);
     listening.value = value;
   }
   function setSpeaking(value: boolean) {
     awakeScreenSaver();
+    mediaSessionStore.muteMediaVolume(value);
     speaking.value = value;
   }
   function setOnline(value: boolean) {
@@ -55,7 +56,7 @@ export const useIOStore = defineStore("io", () => {
       }
     }
     if (!value) {
-      assistantStore.stopMedia();
+      mediaSessionStore.stopMedia();
     }
     online.value = value;
   }
@@ -180,7 +181,7 @@ export const useIOStore = defineStore("io", () => {
             case WorkerOutCmd.MEDIA_COMMAND:
               const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
               if ('start' === mediaCommandData.type) {
-                assistantStore.startMedia(mediaCommandData.provider, mediaCommandData.id);
+                mediaSessionStore.startMedia(mediaCommandData.provider, mediaCommandData.id);
                 return;
               }
               const mediaSessionCtrl = mediaController.value;
@@ -197,7 +198,7 @@ export const useIOStore = defineStore("io", () => {
                   break;
                 case 'stop':
                   mediaSessionCtrl.stop();
-                  assistantStore.stopMedia();
+                  mediaSessionStore.stopMedia();
                   break;
                 case 'next':
                   mediaSessionCtrl.next();
@@ -209,7 +210,7 @@ export const useIOStore = defineStore("io", () => {
                   mediaSessionCtrl.seek(mediaCommandData.second);
                   break;
                 case 'volume':
-                  mediaSessionCtrl.setVolume(mediaCommandData.level);
+                  mediaSessionStore.setMediaVolume(mediaCommandData.level);
                   break;
                 default:
                   console.error("Unsupported media command: ", mediaCommandData);
