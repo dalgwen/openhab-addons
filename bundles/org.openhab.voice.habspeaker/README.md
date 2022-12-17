@@ -90,20 +90,20 @@ These settings are stored on your browser local storage.
 
 ## Thing Channels
 
-| Channel ID           |  Type   | description                                                      |
-|----------------------|---------|------------------------------------------------------------------|
-| sink-volume          | Dimmer  | Controls the sink volume of the speaker.                         |
-| spot                 | Switch  | Starts dialog processing on the speaker.                         |
-| drop-in              | String  | Starts an immediate call with other speaker (by id).             |
-| media-current-second | Number  | Current second for the media currently playing, allow seek.      |
-| media-total-seconds  | Number  | Total seconds for the media currently playing.                   |
-| media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.   |
-| youtube-id           | String  | Start playing a YouTube video (by id).                           |
-| youtube-search       | String  | Start playing a YouTube video.                                   |
-| spotify-id           | String  | Start playing a Spotify song (by id).                            |
-| spotify-search       | String  | Start playing a Spotify song.                                    |
-| web-audio            | String  | Start playing a song by url using the browser player.            |
-| web-video            | String  | Start playing a video by url using the browser player.           |
+| Channel ID           |  Type   | description                                                                                      |
+|----------------------|---------|--------------------------------------------------------------------------------------------------|
+| sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                                         |
+| spot                 | Switch  | Starts dialog processing on the speaker.                                                         |
+| drop-in              | String  | Starts an immediate call with other speaker (by id).                                             |
+| media-current-second | Number  | Current second for the media currently playing, allow seek.                                      |
+| media-total-seconds  | Number  | Total seconds for the media currently playing.                                                   |
+| media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.                                   |
+| web-audio            | String  | Start playing a song by url using the browser player.                                            |
+| web-video            | String  | Start playing a video by url using the browser player.                                           |
+| youtube-id           | String  | Start playing a YouTube video (by id) (works for playlists adding the prefix 'playlist:').       |
+| youtube-search       | String  | Start playing a YouTube video.                                                                   |
+| spotify-id           | String  | Start playing a Spotify song (by id).                                                            |
+| spotify-search       | String  | Start playing a Spotify song.                                                                    |
 
 ## Thing Discovery
 
@@ -131,25 +131,25 @@ There are currently 4 media providers:
 
 Uses a video element to play the configured url. 
 
-There are things pending to implement, currently it can play videos using the related channel and play/pause/seek and media volume control seems to work.
+Currently you can just play videos here using the related channel.
 
 ### WebAudio
 
 Uses a audio element to play the configured url.
 
-There are things pending to implement, currently it can play audio using the related channel and play/pause/seek and media volume control seems to work.
+Currently you can just play music here using the related channel.
 
 
 ### YouTube
 
-No YouTube code is loaded until you play a video. Uses the official YouTube iframe api. 
+No YouTube code is loaded until you play a video. Uses the official YouTube iframe api.
 
 For the search functionalities to work you need to have configured your api key for a Google Cloud project.
 You can check the first step on the 'Calling the API' section [here](https://developers.google.com/youtube/v3/docs#calling-the-api), then enable youtube data api with this link (with your project id) 'https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=$PROJECT_ID_HERE'.
 
-It only search by video name right now, needs to be improved. 
+If the search returns a channel the its 'upload videos playlist' will be loaded on the iframe.
 
-Be aware the YouTube data api have quotas. (can be good adding a cache mechanism)
+Be aware that the YouTube data api have quotas. You can use the search around 100 times per day.
 
 ### Spotify
 
@@ -166,7 +166,9 @@ These are the required configuration steps:
 
 After this setup any speaker you start will be exposed as a remote player to spotify using its configured label. (opened speakers need to be restarted)
 
-You can also control the player using the related voice commands or thing channels. The ui controllers for spotify are still not developed.
+You can also control the player using the related voice commands, thing channels and the basic widget displayed on the HABSpeaker UI while playing.
+
+Note: spotify channel just search for individual songs now, pending to improve.
 
 ## Audio Component Details:
 
