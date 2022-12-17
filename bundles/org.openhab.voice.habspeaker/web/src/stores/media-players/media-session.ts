@@ -16,6 +16,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
     function setMediaVolume(value: number) {
         if (mediaVolumeBackup === -1) {
             mediaVolume = value;
+            mediaController.value?.setVolume(value);
         } else {
             mediaVolumeBackup = value;
         }
