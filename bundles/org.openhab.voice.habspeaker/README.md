@@ -51,6 +51,8 @@ Those are:
 * **Media Volume Step** - Volume step used by the increase/decrease media volume phrases.
 * **Fast-Forward Media Progress Phrase** - Phrase to fast-forward the media progress.
 * **Rewind Media Progress Phrase** - Phrase to rewind the media progress.
+* **Next Media Phrase** - Phrase template to go to the next media item.
+* **Previous Media Phrase** - Phrase template to go to the previous media item.
 * **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
 * **Watch on YouTube Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
 

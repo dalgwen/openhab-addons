@@ -62,6 +62,14 @@
 			<label>Rewind Media Progress Phrase</label>
 			<description>Phrase template to rewind the media progress.</description>
 		</parameter>
+		<parameter name="nextMediaPhrase" type="text" groupName="voice">
+			<label>Next Media Phrase</label>
+			<description>Phrase template to go to the next media item.</description>
+		</parameter>
+		<parameter name="previousMediaPhrase" type="text" groupName="voice">
+			<label>Previous Media Phrase</label>
+			<description>Phrase template to go to the previous media item.</description>
+		</parameter>
 		<parameter name="listenOnSpotifyPhrase" type="text" groupName="voice">
 			<label>Listen on Spotify Phrase</label>
 			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>

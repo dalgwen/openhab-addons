@@ -73,6 +73,14 @@ public class HABSpeakerConfig {
      */
     public String rewindMediaProgressPhrase = "";
     /**
+     * Phrase to go to the next media item
+     */
+    public String nextMediaPhrase = "";
+    /**
+     * Phrase to go to the previous media item
+     */
+    public String previousMediaPhrase = "";
+    /**
      * Volume step used by the increase/decrease media volume phrases
      */
     public int mediaVolumeStep;

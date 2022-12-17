@@ -26,6 +26,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.http.HttpHeader;
+import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
@@ -123,6 +124,14 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             }
             if (compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
                 speakerIO.playerCommand(RewindFastforwardType.REWIND);
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.nextMediaPhrase, lowerText)) {
+                speakerIO.playerCommand(NextPreviousType.NEXT);
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.previousMediaPhrase, lowerText)) {
+                speakerIO.playerCommand(NextPreviousType.PREVIOUS);
                 return config.commandSentMessage;
             }
         } catch (Exception e) {
