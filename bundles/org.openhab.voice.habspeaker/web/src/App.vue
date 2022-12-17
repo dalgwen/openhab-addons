@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import ScreenSaver from "./components/ScreenSaver.vue";
@@ -17,7 +17,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
   }
   if (spotifyEnabled) {
     spotifyStore.initPlayer(label)
-      .then(console.log("Spotify initialized"))
+      .then(() => console.log("Spotify web sdk loaded"))
       .catch(err => console.error("Spotify error: ", err));
   }
 });
@@ -37,7 +37,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
   </header>
 
   <RouterView />
-  <div class="logo-container" :class="{'logo-container-mini': miniMode}">
+  <div class="logo-container" :class="{ 'logo-container-mini': miniMode }">
     <img alt="openHAB logo" class="logo" src="@/assets/openhab-logo.svg" width="125" height="48" />
   </div>
 </template>
@@ -85,14 +85,17 @@ header {
   -webkit-user-select: none;
   user-select: none;
 }
+
 .logo-container img {
   position: absolute;
   right: 0;
   bottom: 0;
 }
+
 .logo-container-mini {
   padding: 4vh;
 }
+
 nav {
   position: relative;
   width: 100%;

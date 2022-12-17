@@ -7,6 +7,8 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
   var player = ref<Spotify.Player | null>(null);
+  var songName = ref<string>("");
+  var songImg = ref<string>("");
   function loadSpotifyApi() {
     return new Promise<void>((resolve, reject) => {
       try {
@@ -34,6 +36,9 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   let _mediaController: MediaSessionCtrl | null = null;
   function getMediaCtrl() {
     return _mediaController;
+  }
+  function getSpotifyPlayer() {
+    return player.value;
   }
   async function initPlayer(name: string) {
     await loadSpotifyApi();
@@ -111,6 +116,14 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
         console.log(playbackState);
         mediaSessionStore.updateProvider("spotify", playbackState.context.uri ?? '');
       }
+      // refresh media info
+      playerRef.getCurrentState().then(state => {
+        if (state) {
+          songName.value = state.track_window.current_track.name;
+          songImg.value = state.track_window.current_track.album.images[0].url;
+        }
+      });
+      return "";
     });
     playerRef.on('ready', readyCallback);
   }
@@ -171,6 +184,8 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     token = accessToken;
   }
   return {
+    songName,
+    songImg,
     activatePlayer,
     connect,
     disconnect,
@@ -178,6 +193,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     isConnected,
     isEnabled,
     getMediaCtrl,
+    getSpotifyPlayer,
     playUri,
     updateToken,
   };
