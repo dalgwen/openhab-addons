@@ -44,7 +44,6 @@ export const useIOStore = defineStore("io", () => {
   function setOnline(value: boolean) {
     awakeScreenSaver();
     if (spotifyStore.isEnabled()) {
-      console.log("Starting spotify");
       if (value) {
         spotifyStore.connect()
           .then((connected) => console.debug("Spotify is connected: " + connected))
@@ -186,7 +185,7 @@ export const useIOStore = defineStore("io", () => {
               }
               const mediaSessionCtrl = mediaController.value;
               if (!mediaSessionCtrl) {
-                console.log("Media is not started");
+                console.warn("Media is not started");
                 return;
               }
               switch (mediaCommandData.type) {

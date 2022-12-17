@@ -10,11 +10,10 @@ const store  = useWebVideoPlayerStore();
 onMounted(()=> {
     if(videoElement.value) {
         store.registerMediaController(videoElement.value)
-        console.log(videoElement.value);
     }
 });
 watch(() => props.mediaId, (value) => {
-    console.log("Playing new video ", value);
+    console.debug("Playing new video ", value);
     videoElement.value?.load();
 });
 function getVideoType(url: string): string {

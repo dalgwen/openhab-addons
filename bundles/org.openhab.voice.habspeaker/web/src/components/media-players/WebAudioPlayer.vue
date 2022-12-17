@@ -10,11 +10,10 @@ const store  = useWebAudioPlayerStore();
 onMounted(()=> {
     if(audioElement.value) {
         store.registerMediaController(audioElement.value)
-        console.log(audioElement.value);
     }
 });
 watch(() => props.mediaId, (value) => {
-    console.log("Playing new audio ", value);
+    console.debug("Playing new audio ", value);
     audioElement.value?.load();
 });
 function getAudioType(url: string): string {

@@ -78,17 +78,23 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         }
     }
     let mediaStateUpdateInterval: any = null;
+    function startMediaUpdateInterval() {
+        // TODO: made interval configurable
+        if (mediaStateUpdateInterval == null) {
+            mediaStateUpdateInterval = setInterval(updateMediaState, 10000);
+        }
+    }
+    function stopMediaUpdateInterval() {
+        if (mediaStateUpdateInterval) {
+            clearInterval(mediaStateUpdateInterval);
+            mediaStateUpdateInterval = null;
+        }
+    }
     watch(mediaState, (value) => {
         if (value == PlaybackState.PLAYING) {
-            // TODO: made interval configurable
-            if (mediaStateUpdateInterval == null) {
-                mediaStateUpdateInterval = setInterval(updateMediaState, 10000);
-            }
+            startMediaUpdateInterval();
         } else {
-            if (mediaStateUpdateInterval) {
-                clearInterval(mediaStateUpdateInterval);
-                mediaStateUpdateInterval = null;
-            }
+            stopMediaUpdateInterval();
         }
         updateMediaState();
     });
@@ -97,10 +103,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         mediaId.value = media;
     }
     function startMedia(provider: string, media: string) {
-        if (mediaStateUpdateInterval) {
-            clearInterval(mediaStateUpdateInterval);
-            mediaStateUpdateInterval = null;
-        }
+        stopMediaUpdateInterval();
         console.debug(`starting media ${provider}: ${media}`)
         switch (provider) {
             case MediaProvider.WEB_AUDIO:
@@ -111,6 +114,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                     const mediaCtrl = mediaController.value;
                     mediaCtrl.seek(0)
                         .then(() => mediaCtrl.play())
+                        .then(() => startMediaUpdateInterval())
                         .catch((err) => console.error("Error reloading media: ", err));
                     // TODO: restart the media state interval is needed?
                 } else {
@@ -119,7 +123,9 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                 break;
             case 'spotify':
                 if (spotifyStore.isConnected()) {
-                    spotifyStore.playUri(media);
+                    spotifyStore.playUri(media)
+                    .then(() => startMediaUpdateInterval())
+                    .catch((err) => console.error("Error playing spotify media: ", err));
                 }
                 break;
             default:
@@ -128,9 +134,11 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         }
     }
     function stopMedia() {
+        stopMediaUpdateInterval();
         mediaController.value = null;
         mediaProvider.value = "";
         mediaId.value = "";
+        updateMediaState();
     }
     return {
         mediaController,

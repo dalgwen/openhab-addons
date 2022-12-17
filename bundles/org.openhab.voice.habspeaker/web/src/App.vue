@@ -17,7 +17,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
   }
   if (spotifyEnabled) {
     spotifyStore.initPlayer(label)
-      .then(() => console.log("Spotify web sdk loaded"))
+      .then(() => console.debug("Spotify web sdk loaded"))
       .catch(err => console.error("Spotify error: ", err));
   }
 });

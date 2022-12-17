@@ -16,13 +16,12 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
           if (!firstScriptTag || !firstScriptTag.parentNode)
             throw new Error('Unable to load youtube api');
           (window as any).onYouTubeIframeAPIReady = function () {
-            console.log("youtube api loaded!");
+            console.debug("youtube api loaded!");
             delete (window as any).onYouTubeIframeAPIReady;
             resolve();
           };
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         } else {
-          console.log("youtube api already loaded!");
           resolve();
         }
       } catch (error) {
@@ -55,7 +54,6 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
     } else {
       videoId = mediaId;
     }
-    console.log(playerVars);
     const playerOptions: YT.PlayerOptions = {
       height: '0', // iframe height/width is forced by the global styles
       width: '0',
@@ -111,7 +109,6 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
   function destroyPlayer() {
     const playerRef = player.value;
     if (playerRef) {
-      mediaController.value = null;
       player.value = null;
       playerRef.destroy();
     }

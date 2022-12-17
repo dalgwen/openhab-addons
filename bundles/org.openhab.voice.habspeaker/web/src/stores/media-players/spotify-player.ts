@@ -19,13 +19,12 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
           if (!firstScriptTag || !firstScriptTag.parentNode)
             throw new Error('Unable to load spotify api');
           (window as any).onSpotifyWebPlaybackSDKReady = function () {
-            console.log("spotify api loaded!");
+            console.debug("spotify api loaded!");
             delete (window as any).onSpotifyWebPlaybackSDKReady;
             resolve();
           };
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         } else {
-          console.log("spotify api already loaded!");
           resolve();
         }
       } catch (error) {
@@ -48,14 +47,14 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     });
     playerRef.addListener('ready', ({ device_id }) => {
       playerId = device_id;
-      console.log('Ready with Device ID', device_id);
+      console.debug('Ready with Device ID', device_id);
     });
     playerRef.addListener('autoplay_failed', () => {
-      console.log('Autoplay is not allowed by the browser autoplay rules');
+      console.warn('Autoplay is not allowed by the browser autoplay rules');
     });
     playerRef.addListener('not_ready', ({ device_id }) => {
       connected = false;
-      console.log('Device ID has gone offline', device_id);
+      console.debug('Device ID has gone offline', device_id);
     });
     playerRef.addListener('initialization_error', ({ message }) => {
       console.error(message);
@@ -113,7 +112,6 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
       const state = mediaState.value = parseSpotifyPlayerState(playbackState);
       if (state == PlaybackState.PLAYING) {
         mediaController.value = _mediaController;
-        console.log(playbackState);
         mediaSessionStore.updateProvider("spotify", playbackState.context.uri ?? '');
       }
       // refresh media info
