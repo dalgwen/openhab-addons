@@ -16,15 +16,6 @@ watch(() => props.mediaId, (value) => {
     console.debug("Playing new audio ", value);
     audioElement.value?.load();
 });
-function getAudioType(url: string): string {
-    const fileParts = url.split('/')[0]?.split('.');
-    // presume mp4
-    let type = "mp4";
-    if (fileParts.length > 1) {
-        type = fileParts[fileParts.length - 1];
-    }
-    return `audio/${type}`;
-}
 </script>
 <template>
     <div class="media-container">
