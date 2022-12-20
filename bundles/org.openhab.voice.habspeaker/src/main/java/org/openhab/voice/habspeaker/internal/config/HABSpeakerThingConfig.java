@@ -51,6 +51,10 @@ public class HABSpeakerThingConfig {
      * Custom listeningItem for this speaker
      */
     public String listeningItem = "";
+    /**
+     * Location item for this speaker
+     */
+    public String location = "";
     // Sink config
     /**
      * Default volume for the sink

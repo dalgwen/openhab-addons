@@ -77,6 +77,15 @@
 				<description>If provided, the item will be switched on during the period when the dialog processor has spotted the
 					keyword and is listening for commands.</description>
 			</parameter>
+			<parameter name="location" type="text" groupName="voice">
+				<label>Speaker Location</label>
+				<description>Link this speaker to a location item.</description>
+				<filter>
+					<criteria name="type">Group</criteria>
+					<criteria name="tag">Location</criteria>
+				</filter>
+				<context>item</context>
+			</parameter>
 			<!-- UI config -->
 			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
 				<label>Screen Saver Time</label>
