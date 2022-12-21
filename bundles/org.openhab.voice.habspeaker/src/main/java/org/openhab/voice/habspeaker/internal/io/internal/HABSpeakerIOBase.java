@@ -168,6 +168,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
 
     protected synchronized void unregisterSpeakerComponents(String id) {
         if (initialized) {
+            stopDropIn();
             var source = audioManager.getSource(getSourceId(id));
             if (source != null) {
                 try {
@@ -199,17 +200,20 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
             stopDropIn();
             return;
         }
+        if (speakerIO.equals(dropInSpeakerIO)) {
+            return;
+        }
         if (dropInSpeakerIO != null) {
             throw new IllegalStateException("Unable to drop-in, speaker is occupied");
         }
         dropInSpeakerIO = speakerIO;
-        var dropInSink = audioManager.getSink(getSinkId(speakerIO.getId()));
-        var source = audioManager.getSource(getSourceId(getId()));
-        if (dropInSink == null || source == null) {
-            stopDropIn();
-            throw new IllegalStateException("Unable to drop-in to speaker, missing audio components");
-        }
         dropInStreamTask = scheduler.submit(() -> {
+            var dropInSink = audioManager.getSink(getSinkId(speakerIO.getId()));
+            var source = audioManager.getSource(getSourceId(getId()));
+            if (dropInSink == null || source == null) {
+                stopDropIn();
+                throw new IllegalStateException("Unable to drop-in to speaker, missing audio components");
+            }
             logger.debug("Starting drop-in to {}", speakerIO.getId());
             try {
                 dropInSink.process(source.getInputStream(HABSpeakerAudioSource.HABSPEAKER_SOURCE_FORMAT));
@@ -218,6 +222,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                 stopDropIn();
             }
         });
+        speakerIO.dropIn(this);
     }
 
     protected synchronized void stopDropIn() {

@@ -90,15 +90,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
         try {
             speakerIO.dropIn(anotherSpeaker);
-            try {
-                anotherSpeaker.dropIn(speakerIO);
-            } catch (IllegalStateException e) {
-                speakerIO.dropIn(null);
-                throw e;
-            }
-            if (isLinked(DROP_IN_CHANNEL)) {
-                updateState(DROP_IN_CHANNEL, StringType.valueOf(speakerId));
-            }
         } catch (IllegalStateException e) {
             logger.warn("Unable to drop-in: {}", e.getMessage());
         }
