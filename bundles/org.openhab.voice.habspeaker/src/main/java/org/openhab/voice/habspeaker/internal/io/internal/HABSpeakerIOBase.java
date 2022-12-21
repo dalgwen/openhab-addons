@@ -93,8 +93,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         }
         var config = handler.getSpeakerConfig();
         var initializedConfig = new HashMap<String, Object>();
-        var currentVolume = handler.getSinkVolume();
-        initializedConfig.put("sinkVolume", currentVolume != null ? currentVolume : config.sinkVolume);
+        initializedConfig.put("sinkVolume", config.sinkVolume);
         initializedConfig.put("screenSaverTime", config.screenSaverTime);
         initializedConfig.put("spotifyToken", handler.getSpotifyToken());
         var label = handler.getLabel();

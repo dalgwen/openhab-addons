@@ -375,10 +375,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
     }
 
-    public @Nullable Integer getSinkVolume() {
-        return sinkVolume;
-    }
-
     @Override
     public void dispose() {
         var deviceIO = this.speakerIO;

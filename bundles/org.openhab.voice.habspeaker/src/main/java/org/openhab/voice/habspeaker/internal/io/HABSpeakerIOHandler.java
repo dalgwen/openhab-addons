@@ -35,12 +35,6 @@ public interface HABSpeakerIOHandler {
     String getSpotifyToken();
 
     /**
-     * @return last sink volume if any
-     */
-    @Nullable
-    Integer getSinkVolume();
-
-    /**
      * Returns the speaker config
      */
     HABSpeakerThingConfig getSpeakerConfig();
