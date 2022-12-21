@@ -11,12 +11,20 @@ export const useIOStore = defineStore("io", () => {
   let micStreaming = false;
   let currentSpeaking = false;
   const activeSinks = new Map<string, WebAudioSink>();
-  function startAudioContext() {
+  function startVoiceAudioContext() {
     if (!audioContext) {
-      audioContext = new AudioContext();
+      // initialize to 16000 to avoid resampling, some browsers can ignore this
+      const voiceSampleRate = 16000;
+      var isChromium = !!(window as any).chrome;
+      let options: AudioContextOptions = {};
+      if(isChromium) {
+        options.sampleRate = voiceSampleRate;
+      }
+      audioContext = new AudioContext(options);
+      console.debug("Audio resample is needed: " + (audioContext.sampleRate !== voiceSampleRate));
     }
   }
-  function getAudioContext(): AudioContext {
+  function getVoiceAudioContext(): AudioContext {
     if (!audioContext) {
       throw new Error('AudioContext not initialized');
     }
@@ -93,12 +101,11 @@ export const useIOStore = defineStore("io", () => {
   async function init(id: string, token: string) {
     const defaultSinkConfig = {
       volume: 100,
-      stereo: false,
     };
     let sinkConfig = { ...defaultSinkConfig };
     let remoteSpotMode = false;
-    startAudioContext();
-    const audioSource = new WebAudioSource(getAudioContext(), (buffers) => worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers }));
+    startVoiceAudioContext();
+    const audioSource = new WebAudioSource(getVoiceAudioContext(), (buffers) => worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers }));
     await audioSource.resume();
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(audioSource.resume.bind(audioSource), 10000);
@@ -121,12 +128,9 @@ export const useIOStore = defineStore("io", () => {
           switch (command) {
             case WorkerOutCmd.CONFIGURE:
               // TODO: disallow configure after initialized
-              const { sinkVolume, sinkStereo, remoteSpot, screenSaverTime, spotifyToken, label } = ev.data as WorkerOutCmdType<typeof command>;
+              const { sinkVolume, remoteSpot, screenSaverTime, spotifyToken } = ev.data as WorkerOutCmdType<typeof command>;
               if (sinkVolume != null) {
                 sinkConfig.volume = sinkVolume;
-              }
-              if (sinkStereo != null) {
-                sinkConfig.stereo = sinkStereo;
               }
               remoteSpotMode = !!remoteSpot;
               if (screenSaverTime != null && !isNaN(screenSaverTime)) {
@@ -154,7 +158,7 @@ export const useIOStore = defineStore("io", () => {
               const speakData = ev.data as WorkerOutCmdType<typeof command>;
               let sinkContext = activeSinks.get(speakData.id);
               if (!sinkContext) {
-                sinkContext = createAudioSink(speakData.id, sinkConfig.volume, sinkConfig.stereo, onSinkSpeaking);
+                sinkContext = createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, onSinkSpeaking);
                 activeSinks.set(sinkContext.getId(), sinkContext);
               }
               sinkContext.playAudio(speakData.buffer);
@@ -229,7 +233,7 @@ export const useIOStore = defineStore("io", () => {
           cmd: WorkerInCmd.INITIALIZE,
           id,
           token,
-          sampleRate: getAudioContext().sampleRate,
+          sampleRate: getVoiceAudioContext().sampleRate,
         });
         resolve(worker);
       } catch (error) {
@@ -264,10 +268,9 @@ export const useIOStore = defineStore("io", () => {
   /**
    *
    */
-  function createAudioSink(id: string, volume: number, stereo: boolean, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
-    let numberOfChannels = stereo ? 2 : 1;
-    const audioContext = getAudioContext();
-    const sink = new WebAudioSink(id, audioContext, numberOfChannels, (value) => {
+  function createAudioSink(id: string, volume: number, channels: number, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
+    const audioContext = getVoiceAudioContext();
+    const sink = new WebAudioSink(id, audioContext, channels, (value) => {
       if (value) {
         cancelStopSpeaker();
       } else {

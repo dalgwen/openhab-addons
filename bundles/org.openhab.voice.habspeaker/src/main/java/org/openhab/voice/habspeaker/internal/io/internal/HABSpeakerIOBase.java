@@ -95,7 +95,6 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         var initializedConfig = new HashMap<String, Object>();
         var currentVolume = handler.getSinkVolume();
         initializedConfig.put("sinkVolume", currentVolume != null ? currentVolume : config.sinkVolume);
-        initializedConfig.put("sinkStereo", config.sinkStereo);
         initializedConfig.put("screenSaverTime", config.screenSaverTime);
         initializedConfig.put("spotifyToken", handler.getSpotifyToken());
         var label = handler.getLabel();
@@ -133,7 +132,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         var source = new HABSpeakerAudioSource(getSourceId(id), label, this);
         registerAudioComponent(source);
         // register sink
-        var sink = new HABSpeakerAudioSink(getSinkId(id), label, requiredSinkSampleRate, sinkStereo ? 2 : 1, this);
+        var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1);
         registerAudioComponent(sink);
         // init dialog
         STTService stt = null;

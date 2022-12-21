@@ -1,9 +1,16 @@
 
-// types
+// raw audio
+export enum StreamType {
+  // 16000Hz 16bit int 1 channel little-endian
+  PCM16BitMono = "1",
+  // 16000Hz 16bit int 2 channel little-endian
+  PCM16BitStereo = "2",
+}
+// message types
 // Some reused message types
 export type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string };
 type SetVolumeCmd = { value: number };
-type ConfigureSpeakerCmd = { sinkVolume?: number, sinkStereo?: boolean, remoteSpot?: number, screenSaverTime?: number, spotifyToken?: string, label?: string };
+type ConfigureSpeakerCmd = { sinkVolume?: number, remoteSpot?: boolean, screenSaverTime?: number, spotifyToken?: string, label?: string };
 type MediaCommandCmd = { type: 'play' } | { type: 'pause' } | { type: 'stop' } | { type: 'next' } | { type: 'previous' } | { type: 'seek', second: number } | { type: 'volume', level: number } | { type: 'start', provider: string, id: string };
 type SpotifyTokenCmd = { token: string };
 // Commands from worker to server (no command for sending audio as is sent as binary).
@@ -63,7 +70,7 @@ export enum WorkerOutCmd {
   MEDIA_COMMAND = "MEDIA_COMMAND",
   SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 };
-export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK ? { id: string, buffer: Float32Array } :
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK ? { id: string, buffer: Float32Array, channels: number } :
   T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :

@@ -16,7 +16,6 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
-import java.util.Objects;
 import javazoom.spi.mpeg.sampled.convert.MpegFormatConversionProvider;
 import javazoom.spi.mpeg.sampled.file.MpegAudioFileReader;
 
@@ -31,7 +30,6 @@ import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioStream;
 import org.openhab.core.audio.FixedLengthAudioStream;
 import org.openhab.core.audio.UnsupportedAudioFormatException;
-import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tritonus.share.sampled.file.TAudioFileFormat;
@@ -132,18 +130,10 @@ public class ConvertedInputStream extends InputStream {
      */
     private AudioInputStream getPCMStream(InputStream innerInputStream)
             throws UnsupportedAudioFileException, IOException, UnsupportedAudioFormatException {
-        if (innerInputStream instanceof HABSpeakerAudioSource.HABSpeakerAudioStream) {
-            var jFormat = new javax.sound.sampled.AudioFormat(Objects.requireNonNull(audioFormat.getFrequency()),
-                    Objects.requireNonNull(audioFormat.getBitDepth()),
-                    Objects.requireNonNull(audioFormat.getChannels()), true,
-                    Objects.requireNonNull(audioFormat.isBigEndian()));
-            return new AudioInputStream(innerInputStream, jFormat, AudioSystem.NOT_SPECIFIED);
-        }
         // A stream supporting reset operation (reset is mandatory to parse formation without loosing data)
         InputStream resettableInnerInputStream = new BufferedInputStream(innerInputStream);
         if (AudioFormat.MP3.isCompatible(audioFormat)) {
             MpegAudioFileReader mpegAudioFileReader = new MpegAudioFileReader();
-
             if (length > 0) { // compute duration if possible
                 AudioFileFormat audioFileFormat = mpegAudioFileReader.getAudioFileFormat(resettableInnerInputStream);
                 if (audioFileFormat instanceof TAudioFileFormat) {
@@ -177,7 +167,7 @@ public class ConvertedInputStream extends InputStream {
                 float frameRate = audioInputStream.getFormat().getFrameRate();
                 float durationInSeconds = (length / (frameSize * frameRate));
                 duration = Math.round(durationInSeconds * 1000);
-                logger.debug("Duration of input stream : {}", duration);
+                logger.debug("Duration of input stream : {}ms", duration);
             }
             return audioInputStream;
         } else {
