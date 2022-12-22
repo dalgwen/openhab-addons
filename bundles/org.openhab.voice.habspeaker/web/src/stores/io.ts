@@ -7,6 +7,7 @@ import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 export const useIOStore = defineStore("io", () => {
+  let speakerLabel = ref("HAB Speaker");
   let audioContext: AudioContext | null = null;
   let micStreaming = false;
   let currentSpeaking = false;
@@ -17,7 +18,7 @@ export const useIOStore = defineStore("io", () => {
       const voiceSampleRate = 16000;
       var isChromium = !!(window as any).chrome;
       let options: AudioContextOptions = {};
-      if(isChromium) {
+      if (isChromium) {
         options.sampleRate = voiceSampleRate;
       }
       audioContext = new AudioContext(options);
@@ -51,9 +52,11 @@ export const useIOStore = defineStore("io", () => {
   }
   function setOnline(value: boolean) {
     awakeScreenSaver();
+    online.value = value;
     if (spotifyStore.isEnabled()) {
       if (value) {
-        spotifyStore.connect()
+        spotifyStore.initPlayer(speakerLabel.value)
+          .then(() => spotifyStore.connect())
           .then((connected) => console.debug("Spotify is connected: " + connected))
           .catch(() => console.error("Error connecting to spotify"));
       } else if (!value) {
@@ -65,7 +68,6 @@ export const useIOStore = defineStore("io", () => {
     if (!value) {
       mediaSessionStore.stopMedia();
     }
-    online.value = value;
   }
   function updateSpotifyToken(token: string) {
     spotifyStore.updateToken(token);
@@ -85,13 +87,17 @@ export const useIOStore = defineStore("io", () => {
   }
   // io exposed actions
   function sendSpot() {
-    postToWorker(WorkerInCmd.ON_SPOT);
+    if (online.value) {
+      postToWorker(WorkerInCmd.ON_SPOT);
+    }
   }
   function resetConnection(id: string) {
     postToWorker(WorkerInCmd.RESET_CONNECTION, { id });
   }
   function sendMediaState(state: MediaStateCmd) {
-    postToWorker(WorkerInCmd.MEDIA_STATE, state);
+    if (online.value) {
+      postToWorker(WorkerInCmd.MEDIA_STATE, state);
+    }
   }
   function setAuthToken(token: string) {
     if (worker) {
@@ -128,7 +134,10 @@ export const useIOStore = defineStore("io", () => {
           switch (command) {
             case WorkerOutCmd.CONFIGURE:
               // TODO: disallow configure after initialized
-              const { sinkVolume, remoteSpot, screenSaverTime, spotifyToken } = ev.data as WorkerOutCmdType<typeof command>;
+              const { sinkVolume, remoteSpot, screenSaverTime, spotifyToken, label } = ev.data as WorkerOutCmdType<typeof command>;
+              if (label) {
+                speakerLabel.value = label;
+              }
               if (sinkVolume != null) {
                 sinkConfig.volume = sinkVolume;
               }

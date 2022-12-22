@@ -40,7 +40,11 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     return player.value;
   }
   async function initPlayer(name: string) {
-    await loadSpotifyApi();
+    if (player.value != null) {
+      await disconnect();
+    } else {
+      await loadSpotifyApi();
+    }
     const playerRef = player.value = new window.Spotify.Player({
       name,
       getOAuthToken: cb => cb(token),
