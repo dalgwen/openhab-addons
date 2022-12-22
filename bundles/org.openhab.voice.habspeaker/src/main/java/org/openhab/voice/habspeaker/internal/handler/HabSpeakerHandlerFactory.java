@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
@@ -51,12 +52,14 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     private final Map<String, HABSpeakerThingHandler> speakerHandlers = new ConcurrentHashMap<>();
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
+    private final ItemRegistry itemRegistry;
 
     @Activate
-    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager,
+    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager, @Reference ItemRegistry itemRegistry,
             @Reference HABSpeakerConfigProvider configProvider) {
         ioManager.setProtocolListener(this);
         this.ioManager = ioManager;
+        this.itemRegistry = itemRegistry;
         this.configProvider = configProvider;
     }
 
@@ -69,7 +72,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
-            var handler = new HABSpeakerThingHandler(thing, ioManager, configProvider);
+            var handler = new HABSpeakerThingHandler(thing, itemRegistry, ioManager, configProvider);
             var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
             handler.setSpeakerIO(speakerIO);
             speakerHandlers.put(handler.getSpeakerId(), handler);

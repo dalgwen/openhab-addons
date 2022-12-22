@@ -63,6 +63,14 @@ public interface HABSpeakerIO {
     int getMediaVolume();
 
     /**
+     * Get thing handler
+     *
+     * @return the associated thing handler
+     */
+    @Nullable
+    HABSpeakerIOHandler getThingHandler();
+
+    /**
      * Set thing handler
      * 
      * @param handler the associated thing handler

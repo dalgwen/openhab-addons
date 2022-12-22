@@ -40,8 +40,8 @@ import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.auth.HABSpeakerJwtHelper;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocol;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
 import org.openhab.voice.habspeaker.internal.io.internal.websocket.internal.HABSpeakerWebsocketContext;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.http.HttpService;
@@ -69,14 +69,14 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     private final UserRegistry userRegistry;
     private final HABSpeakerJwtHelper jwtHelper;
     private final ScheduledFuture<?> pingTask;
-    private final HABSpeakerIOProtocolListener protocolListener;
+    private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
     private final HttpClient httpClient;
 
-    public HABSpeakerWebSocketProtocol(HABSpeakerIOProtocolListener protocolListener,
-            HABSpeakerConfigProvider configProvider, BundleContext bundleContext, HttpClient httpClient,
-            HttpService httpService, AudioManager audioManager, VoiceManager voiceManager, UserRegistry userRegistry) {
-        this.protocolListener = protocolListener;
+    public HABSpeakerWebSocketProtocol(HABSpeakerIOManager ioManager, HABSpeakerConfigProvider configProvider,
+            BundleContext bundleContext, HttpClient httpClient, HttpService httpService, AudioManager audioManager,
+            VoiceManager voiceManager, UserRegistry userRegistry) {
+        this.ioManager = ioManager;
         this.configProvider = configProvider;
         this.bundleContext = bundleContext;
         this.httpService = httpService;
@@ -127,7 +127,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         logger.debug("Disconnecting {} clients...", wsHandlers.size());
         var handlers = new ArrayList<>(wsHandlers);
         for (var handler : handlers) {
-            protocolListener.onDisconnected(handler);
+            ioManager.onDisconnected(handler);
             var session = handler.getSession();
             if (session != null) {
                 try {
@@ -166,18 +166,18 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     public void configure(@Nullable WebSocketServletFactory webSocketServletFactory) {
         if (webSocketServletFactory != null) {
             webSocketServletFactory.getPolicy().setIdleTimeout(60000);
-            webSocketServletFactory.setCreator(
-                    (request, response) -> new HABSpeakerWebSocketIO(this, configProvider, httpClient, executor));
+            webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketIO(this, configProvider,
+                    httpClient, executor, ioManager));
         }
     }
 
     public void addHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
         wsHandlers.add(habSpeakerWebSocketIO);
-        protocolListener.onConnected(habSpeakerWebSocketIO);
+        ioManager.onConnected(habSpeakerWebSocketIO);
     }
 
     public void removeHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
         wsHandlers.remove(habSpeakerWebSocketIO);
-        protocolListener.onDisconnected(habSpeakerWebSocketIO);
+        ioManager.onDisconnected(habSpeakerWebSocketIO);
     }
 }

@@ -43,6 +43,7 @@ import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 import org.osgi.framework.BundleContext;
@@ -74,17 +75,23 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private @Nullable Future<?> dropInStreamTask = null;
 
     public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, HttpClient httpClient,
-            BundleContext bundleContext, HABSpeakerConfigProvider configProvider) {
+            BundleContext bundleContext, HABSpeakerConfigProvider configProvider, HABSpeakerIOManager ioManager) {
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.bundleContext = bundleContext;
         this.configProvider = configProvider;
-        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, configProvider, httpClient);
+        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, ioManager, configProvider,
+                httpClient);
     }
 
     @Override
     public void setThingHandler(@Nullable HABSpeakerIOHandler handler) {
         thingHandler = handler;
+    }
+
+    @Override
+    public @Nullable HABSpeakerIOHandler getThingHandler() {
+        return thingHandler;
     }
 
     protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler) {

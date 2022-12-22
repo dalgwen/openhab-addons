@@ -18,6 +18,8 @@ import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.items.ItemNotFoundException;
+import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.OnOffType;
@@ -51,6 +53,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider globalConfigProvider;
+    private final ItemRegistry itemRegistry;
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
     private @Nullable HABSpeakerIO speakerIO;
     private @Nullable Integer sinkVolume;
@@ -60,9 +63,11 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     private String videoMediaUrl = "";
     private String audioMediaUrl = "";
 
-    public HABSpeakerThingHandler(Thing thing, HABSpeakerIOManager ioManager, HABSpeakerConfigProvider configProvider) {
+    public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry, HABSpeakerIOManager ioManager,
+            HABSpeakerConfigProvider configProvider) {
         super(thing);
         this.ioManager = ioManager;
+        this.itemRegistry = itemRegistry;
         this.globalConfigProvider = configProvider;
     }
 
@@ -111,6 +116,18 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     @Override
     public @Nullable String getLabel() {
         return getThing().getLabel();
+    }
+
+    @Override
+    public @Nullable String getLocationLabel() {
+        if (!config.location.isBlank()) {
+            try {
+                return itemRegistry.getItem(config.location).getLabel();
+            } catch (ItemNotFoundException e) {
+                logger.warn("location item {} for speaker {} not found", getSpeakerId(), config.location);
+            }
+        }
+        return null;
     }
 
     @Override

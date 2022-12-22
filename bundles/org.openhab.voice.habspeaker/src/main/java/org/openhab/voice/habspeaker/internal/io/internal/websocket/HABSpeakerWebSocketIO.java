@@ -35,6 +35,7 @@ import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.io.internal.HABSpeakerIOBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,8 +68,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private long totalSeconds;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
-            HttpClient httpClient, ScheduledExecutorService executor) {
-        super(servlet.audioManager, servlet.voiceManager, httpClient, servlet.bundleContext, configProvider);
+            HttpClient httpClient, ScheduledExecutorService executor, HABSpeakerIOManager ioManager) {
+        super(servlet.audioManager, servlet.voiceManager, httpClient, servlet.bundleContext, configProvider, ioManager);
         this.servlet = servlet;
         this.executor = executor;
     }

@@ -30,6 +30,12 @@ public interface HABSpeakerIOHandler {
     String getLabel();
 
     /**
+     * @return the label of the linked location if any
+     */
+    @Nullable
+    String getLocationLabel();
+
+    /**
      * @return Returns the spotify token or empty
      */
     String getSpotifyToken();

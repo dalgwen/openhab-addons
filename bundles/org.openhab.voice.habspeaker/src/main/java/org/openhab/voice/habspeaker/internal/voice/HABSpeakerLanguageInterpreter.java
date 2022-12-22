@@ -33,6 +33,7 @@ import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.core.voice.text.InterpretationException;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +50,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerLanguageInterpreter.class);
     private final HABSpeakerIO speakerIO;
+    private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
     private final HttpClient httpClient;
 
-    public HABSpeakerLanguageInterpreter(HABSpeakerIO speakerIO, HABSpeakerConfigProvider configProvider,
-            HttpClient httpClient) {
+    public HABSpeakerLanguageInterpreter(HABSpeakerIO speakerIO, HABSpeakerIOManager ioManager,
+            HABSpeakerConfigProvider configProvider, HttpClient httpClient) {
         this.speakerIO = speakerIO;
+        this.ioManager = ioManager;
         this.configProvider = configProvider;
         this.httpClient = httpClient;
     }
@@ -74,10 +77,30 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         try {
             var config = configProvider.getConfig();
             var lowerText = text.toLowerCase();
-            if (speakerIO.getDropIn() != null && compareTemplate(config.stopDropInPhrase, lowerText)) {
-                speakerIO.dropIn(null);
-                return config.commandSentMessage;
+            // drop-in phrases
+            if (speakerIO.getDropIn() == null) {
+                String speakerName = compareTemplateWithParameter(config.startDropInPhrase, lowerText);
+                if (!speakerName.isBlank()) {
+                    var optionalSpeakerIO = ioManager.getSpeakerConnections().stream().filter(io -> {
+                        var handler = io.getThingHandler();
+                        if (handler == null) {
+                            return false;
+                        }
+                        return speakerName.equalsIgnoreCase(handler.getLabel()) || //
+                        speakerName.equalsIgnoreCase(handler.getLocationLabel());
+                    }).findAny();
+                    if (optionalSpeakerIO.isPresent()) {
+                        speakerIO.dropIn(optionalSpeakerIO.get());
+                        return config.commandSentMessage;
+                    }
+                }
+            } else {
+                if (compareTemplate(config.stopDropInPhrase, lowerText)) {
+                    speakerIO.dropIn(null);
+                    return config.commandSentMessage;
+                }
             }
+            // media search phrases
             String spotifySearch = compareTemplateWithParameter(config.listenOnSpotifyPhrase, lowerText);
             if (!spotifySearch.isBlank()) {
                 listenTrackOnSpotify(spotifySearch);
@@ -88,6 +111,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                 watchOnYouTube(ytSearch);
                 return config.commandSentMessage;
             }
+            // media playback control phrases
             if (compareTemplate(config.resumeMediaPhrase, lowerText)) {
                 speakerIO.playerCommand(PlayPauseType.PLAY);
                 return config.commandSentMessage;
@@ -98,24 +122,6 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             }
             if (compareTemplate(config.stopMediaPhrase, lowerText)) {
                 speakerIO.playerStop();
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
-                var level = speakerIO.getMediaVolume();
-                if (level > config.mediaVolumeStep - 1) {
-                    speakerIO.setMediaVolume(level - config.mediaVolumeStep);
-                } else {
-                    speakerIO.setMediaVolume(0);
-                }
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
-                var level = speakerIO.getMediaVolume();
-                if (level < 100 - config.mediaVolumeStep) {
-                    speakerIO.setMediaVolume(level + config.mediaVolumeStep);
-                } else {
-                    speakerIO.setMediaVolume(100);
-                }
                 return config.commandSentMessage;
             }
             if (compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
@@ -132,6 +138,25 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             }
             if (compareTemplate(config.previousMediaPhrase, lowerText)) {
                 speakerIO.playerCommand(NextPreviousType.PREVIOUS);
+                return config.commandSentMessage;
+            }
+            // media playback volume phrases
+            if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
+                var level = speakerIO.getMediaVolume();
+                if (level > config.mediaVolumeStep - 1) {
+                    speakerIO.setMediaVolume(level - config.mediaVolumeStep);
+                } else {
+                    speakerIO.setMediaVolume(0);
+                }
+                return config.commandSentMessage;
+            }
+            if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
+                var level = speakerIO.getMediaVolume();
+                if (level < 100 - config.mediaVolumeStep) {
+                    speakerIO.setMediaVolume(level + config.mediaVolumeStep);
+                } else {
+                    speakerIO.setMediaVolume(100);
+                }
                 return config.commandSentMessage;
             }
         } catch (Exception e) {
