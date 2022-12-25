@@ -91,8 +91,9 @@ public class HABSpeakerAudioSink implements AudioSink {
         ConvertedInputStream convertedInputStream = null;
         OutputStream outputStream = null;
         try {
-            if (isDirectStreamSupported(format)) {
-                logger.debug("The audio format can be streamed");
+            if (audioStream instanceof HABSpeakerAudioSource.HABSpeakerAudioStream && isDirectStreamSupported(format)) {
+                // the ui expect a raw wav stream (no format header),
+                // we don't know this so we restrict the direct stream to only hab speaker audio streams
                 var channels = format.getChannels();
                 var bitDepth = format.getBitDepth();
                 var sampleRate = format.getFrequency();
@@ -110,7 +111,6 @@ public class HABSpeakerAudioSink implements AudioSink {
                 outputStream = new HABSpeakerAudioOutputStream(speakerIO, type);
                 transferAudio(audioStream, outputStream, duration);
             } else {
-                logger.debug("The audio format can't be streamed, try to convert");
                 // we try to convert to one of the supported stream formats
                 var requiredSampleRate = 16000;
                 var streamType = preferredChannels == 1 ? StreamType.PCM16BitMono : StreamType.PCM16BitStereo;
