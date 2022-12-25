@@ -42,6 +42,14 @@ public class HABSpeakerConfig {
      */
     public String stopDropInPhrase = "";
     /**
+     * Phrase to listen on web audio player
+     */
+    public String listenOnWebPhrase = "";
+    /**
+     * Phrase to watch on web video player
+     */
+    public String watchOnWebPhrase = "";
+    /**
      * Phrase to listen on spotify
      */
     public String listenOnSpotifyPhrase = "";

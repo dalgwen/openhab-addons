@@ -12,8 +12,13 @@
  */
 package org.openhab.voice.habspeaker.internal.voice;
 
+import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.*;
+
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -39,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -101,14 +107,44 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
                 }
             }
             // media search phrases
+            String webAudioSearch = compareTemplateWithParameter(config.listenOnWebPhrase, lowerText);
+            if (!webAudioSearch.isBlank()) {
+                // assume a valid url
+                var localResult = searchMediaFile(WEB_AUDIO_MEDIA_PATH, webAudioSearch);
+                if (!localResult.isBlank()) {
+                    listenOnWebPlayer(localResult);
+                    return config.commandSentMessage;
+                }
+            }
+            String webVideoSearch = compareTemplateWithParameter(config.watchOnWebPhrase, lowerText);
+            if (!webVideoSearch.isBlank()) {
+                // assume a valid url
+                var localResult = searchMediaFile(WEB_VIDEO_MEDIA_PATH, webVideoSearch);
+                if (!localResult.isBlank()) {
+                    watchOnWebPlayer(localResult);
+                    return config.commandSentMessage;
+                }
+            }
             String spotifySearch = compareTemplateWithParameter(config.listenOnSpotifyPhrase, lowerText);
             if (!spotifySearch.isBlank()) {
-                listenTrackOnSpotify(spotifySearch);
+                // assume a valid spotify URI
+                var localResult = searchMediaFile(SPOTIFY_MEDIA_PATH, spotifySearch);
+                if (!localResult.isBlank()) {
+                    listenOnSpotify(localResult);
+                } else {
+                    listenTrackOnSpotify(spotifySearch);
+                }
                 return config.commandSentMessage;
             }
             String ytSearch = compareTemplateWithParameter(config.watchOnYouTubePhrase, lowerText);
             if (!ytSearch.isBlank()) {
-                watchOnYouTube(ytSearch);
+                // assume a valid YouTube video id or a list id prefixed by 'playlist:'
+                var localResult = searchMediaFile(YOUTUBE_MEDIA_PATH, ytSearch);
+                if (!localResult.isBlank()) {
+                    playOnYouTube(localResult);
+                } else {
+                    watchOnYouTube(ytSearch);
+                }
                 return config.commandSentMessage;
             }
             // media playback control phrases
@@ -197,6 +233,29 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         return Set.of();
     }
 
+    // Search media
+    private String searchMediaFile(Path mediaPath, String name) {
+        if (mediaPath.toFile().exists()) {
+            try (var is = HashMap.class.getResourceAsStream(mediaPath.toAbsolutePath().toString())) {
+                var mediaMap = new ObjectMapper().readValue(is, new TypeReference<HashMap<String, String>>() {
+                });
+                var value = mediaMap.get(name);
+                if (value != null && !value.isBlank()) {
+                    return value;
+                }
+            } catch (IOException e) {
+                logger.warn("Unable to read media file: {}", e.getMessage());
+            }
+        }
+        return "";
+    }
+
+    // Third party integrations
+
+    public void playOnYouTube(String ytId) {
+        speakerIO.playerStart(HABSpeakerIO.MediaProvider.YOUTUBE, ytId);
+    }
+
     public void watchOnYouTube(String name) {
         if (name.isBlank()) {
             logger.warn("Search is blank");
@@ -207,7 +266,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             if (youTubeId.isBlank()) {
                 throw new IllegalStateException("YouTube id can not be black");
             }
-            speakerIO.playerStart(HABSpeakerIO.MediaProvider.YOUTUBE, youTubeId);
+            playOnYouTube(youTubeId);
         } catch (ExecutionException | InterruptedException | TimeoutException | JsonProcessingException e) {
             logger.warn("watch on YouTube has failed:", e);
         }
@@ -325,10 +384,22 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             if (trackUri.isBlank()) {
                 throw new IllegalStateException("Spotify uri can not be black");
             }
-            speakerIO.playerStart(HABSpeakerIO.MediaProvider.SPOTIFY, trackUri);
+            listenOnSpotify(trackUri);
         } catch (ExecutionException | InterruptedException | TimeoutException | JsonProcessingException e) {
             logger.warn("listen on spotify has failed:", e);
         }
+    }
+
+    private void listenOnSpotify(String spotifyUri) {
+        speakerIO.playerStart(HABSpeakerIO.MediaProvider.SPOTIFY, spotifyUri);
+    }
+
+    private void listenOnWebPlayer(String url) {
+        speakerIO.playerStart(HABSpeakerIO.MediaProvider.WEB_AUDIO, url);
+    }
+
+    private void watchOnWebPlayer(String url) {
+        speakerIO.playerStart(HABSpeakerIO.MediaProvider.WEB_VIDEO, url);
     }
 
     private enum SpotifySearchType {

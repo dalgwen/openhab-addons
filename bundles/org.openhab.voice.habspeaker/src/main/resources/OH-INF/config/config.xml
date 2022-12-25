@@ -70,6 +70,14 @@
 			<label>Previous Media Phrase</label>
 			<description>Phrase template to go to the previous media item.</description>
 		</parameter>
+		<parameter name="listenOnWebPhrase" type="text" groupName="voice">
+			<label>Listen on Web Phrase</label>
+			<description>Phrase to listen on web audio player (Example: 'tune $*').</description>
+		</parameter>
+		<parameter name="watchOnWebPhrase" type="text" groupName="voice">
+			<label>Watch on Web Phrase</label>
+			<description>Phrase to watch on web audio player (Example: 'watch channel $*').</description>
+		</parameter>
 		<parameter name="listenOnSpotifyPhrase" type="text" groupName="voice">
 			<label>Listen on Spotify Phrase</label>
 			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>

@@ -80,17 +80,27 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     protected static final String SPEAKER_CONFIG_URI = "thing-type:habspeaker:speaker";
-    private static final String HABSPEAKER_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "habspeaker").toString();
+    public static final String HABSPEAKER_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "habspeaker").toString();
+    private static final String MEDIA_FOLDER = Path.of(HABSPEAKER_FOLDER, "media").toString();
     private static final String CREDENTIALS_FOLDER = Path.of(HABSPEAKER_FOLDER, "credentials").toString();
     private static final String SPOTIFY_REFRESH_TOKEN_FILE = Path.of(CREDENTIALS_FOLDER, "spotify_refresh_token")
             .toString();
-
+    public static final Path WEB_VIDEO_MEDIA_PATH = Path.of(MEDIA_FOLDER, "web-video.json");
+    public static final Path WEB_AUDIO_MEDIA_PATH = Path.of(MEDIA_FOLDER, "web-audio.json");
+    public static final Path SPOTIFY_MEDIA_PATH = Path.of(MEDIA_FOLDER, "spotify.json");
+    public static final Path YOUTUBE_MEDIA_PATH = Path.of(MEDIA_FOLDER, "youtube.json");
     static {
         Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
         File root = new File(HABSPEAKER_FOLDER);
         if (!root.exists()) {
             if (root.mkdir()) {
                 logger.info("habspeaker dir created {}", HABSPEAKER_FOLDER);
+            }
+        }
+        File media = new File(MEDIA_FOLDER);
+        if (!media.exists()) {
+            if (media.mkdir()) {
+                logger.info("media dir created {}", MEDIA_FOLDER);
             }
         }
         File credentials = new File(CREDENTIALS_FOLDER);
