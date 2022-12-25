@@ -42,6 +42,7 @@ Define the phrases you can use to interact with the speaker. For the phrases you
 Those are:
 
 * **Command Send Message** - Message to say on the speaker on command success. (Default: done)
+* **Start Drop In Phrase** - Phrase to start drop-in to another speaker.
 * **Stop Drop In Phrase** - Phrase to stop drop-in on the current speaker.
 * **Resume Media Phrase** - Phrase to resume media.
 * **Pause Media Phrase** - Phrase to pause media.
@@ -53,8 +54,10 @@ Those are:
 * **Rewind Media Progress Phrase** - Phrase to rewind the media progress.
 * **Next Media Phrase** - Phrase template to go to the next media item.
 * **Previous Media Phrase** - Phrase template to go to the previous media item.
+* **Listen on Web Phrase** - Phrase to listen a song on the current speaker (Example: 'play $*').
+* **Watch on Web Phrase** - Phrase to watch a video on the current speaker (Example: 'watch $*').
 * **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
-* **Watch on YouTube Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').
+* **Watch on YouTube Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'watch $* on youtube').
 
 
 ### Media Providers
@@ -104,7 +107,7 @@ These settings are stored on your browser local storage.
 | web-video            | String  | Start playing a video by url using the browser player.                                           |
 | youtube-id           | String  | Start playing a YouTube video (by id) (works for playlists adding the prefix 'playlist:').       |
 | youtube-search       | String  | Start playing a YouTube video.                                                                   |
-| spotify-id           | String  | Start playing a Spotify song (by id).                                                            |
+| spotify-id           | String  | Start playing in Spotify (by spotify uri).                                                       |
 | spotify-search       | String  | Start playing a Spotify song.                                                                    |
 
 ## Thing Discovery
@@ -123,33 +126,38 @@ All the connected speakers can be automatically discovered using the main ui.
 
 ## Media Providers
 
-Media providers are in a preview/unfinished state, this documentation will be updated when they are more stable.
-
 The idea behind this is take advance of the browser media capabilities and the official frameworks from legit projects or companies to display media on the ui allowing it's state to be controlled from the thing channels or the configured speaker voice commands.
 
-There are currently 4 media providers: 
+Sources for each media providers can be locally configured in a json file containing an object where the keys are the human name of the source and the value the source id (url, youtube id, spotify uri...).
+
+There are currently 4 media providers:
 
 ### WebVideo 
 
-Uses a video element to play the configured url. 
+Uses a web video element to play the provided url.
 
-Currently you can just play videos here using the related channel.
+You can send a url using the associated channel.
+
+The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/web-audio.json'.
 
 ### WebAudio
 
-Uses a audio element to play the configured url.
+Uses a web audio element to play the configured url.
 
-Currently you can just play music here using the related channel.
+You can send a url using the associated channel.
 
+The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/web-video.json'.
 
 ### YouTube
 
 No YouTube code is loaded until you play a video. Uses the official YouTube iframe api.
 
-For the search functionalities to work you need to have configured your api key for a Google Cloud project.
-You can check the first step on the 'Calling the API' section [here](https://developers.google.com/youtube/v3/docs#calling-the-api), then enable youtube data api with this link (with your project id) 'https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=$PROJECT_ID_HERE'.
+The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/youtube.json' or fallback to the YouTube search.
 
-If the search returns a channel the its 'upload videos playlist' will be loaded on the iframe.
+For the YouTube search functionalities to work you need to have configured your api key for a Google Cloud project.
+You can check the first step on the 'Calling the API' section [here](https://developers.google.com/youtube/v3/docs#calling-the-api), then enable YouTube Data API with this link (with your project id) 'https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=$PROJECT_ID_HERE'.
+
+If the search returns a channel, its 'uploaded videos playlist' will be loaded on the iframe.
 
 Be aware that the YouTube data api have quotas. You can use the search around 100 times per day.
 
@@ -170,11 +178,13 @@ After this setup any speaker you start will be exposed as a remote player to spo
 
 You can also control the player using the related voice commands, thing channels and the basic widget displayed on the HABSpeaker UI while playing.
 
-Note: spotify channel just search for individual songs now, pending to improve.
+The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/youtube.json' or fallback to the Spotify search.
+
+Note: spotify search just search by individual songs now, pending to improve.
 
 ## Audio Component Details:
 
 The audio sink registered supports the following audio format: WAV PCM-SIGNED 16000hz 16-bit mono (single channel).
 It's supported by most if not all the speech-to-text services available at openHAB. 
 
-The audio source registered supports any wav audio format as it will try to convert it to the appropriate format (PCM-SIGNED 16-bit mono (or stereo) at required sample rate).
+The audio source registered supports any wav audio format as it will try to convert it to the appropriate format (PCM-SIGNED 16-bit mono (or stereo) at 16000HZ).
