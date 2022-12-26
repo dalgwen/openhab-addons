@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
@@ -14,7 +14,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       return (await axios.get<UIConfig>(`/rest/habspeaker/config/${speakerId}`)).data;
     } catch (error) {
-      if (error === "Unauthorized" || error === 401) {
+      if (error instanceof AxiosError && error.response?.status === 401) {
         return { secure: true, spotifyEnabled: false, label: "" };
       }
       throw error;
