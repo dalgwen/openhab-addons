@@ -14,6 +14,7 @@ package org.openhab.voice.habspeaker.internal.ui;
 
 import static java.util.stream.Collectors.joining;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -164,6 +165,27 @@ public class HABSpeakerResource implements RESTResource {
                 !config.spotifyClientId.isBlank() && !configProvider.getSpotifyToken().isBlank());
         configResp.put("label", (label != null && !label.isBlank()) ? label : "HAB Speaker");
         return Response.ok(configResp).build();
+    }
+
+    @GET
+    @RolesAllowed({ Role.USER, Role.ADMIN })
+    @Path("/rustpotter/{model_name}")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    @Operation(summary = "Retrieves a rustpotter model.", responses = {
+            @ApiResponse(responseCode = "200", description = "Model file bytes"),
+            @ApiResponse(responseCode = "404", description = "Not Found") })
+    public Response getRustpotterModel(@PathParam("model_name") String modelName) {
+        String fileName = modelName + ".rpw";
+        var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
+        if (!modelFile.exists()) {
+            // fallback to rustpotter add-on dir
+            modelFile = java.nio.file.Path.of(RUSTPOTTER_ADDON_FOLDER, fileName).toFile();
+            if (!modelFile.exists()) {
+                return Response.status(Response.Status.NOT_FOUND).entity("Entity model not found: " + modelName)
+                        .build();
+            }
+        }
+        return Response.ok(modelFile, MediaType.APPLICATION_OCTET_STREAM).build();
     }
 
     @GET

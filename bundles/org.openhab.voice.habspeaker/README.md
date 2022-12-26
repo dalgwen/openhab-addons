@@ -124,6 +124,18 @@ All the connected speakers can be automatically discovered using the main ui.
 * By clicking on the speaker icon a single shot audio dialog processing will start. It uses the registered audio components (sink/source) and the default processing services configured on the openHAB voice settings.
 * At this point you can discover the speaker using the main ui to add it as a thing in openHAB.
 
+## Client keyword spotting
+
+### Rustpotter
+
+To run keyword spotting on the browser using rustpotter:
+
+* Select 'Ruspotter Web' as ks in the thing configuration 'Voice' section.
+* Configure the speaker keyword on the thing configuration 'Rustpotter Web' section.
+* The rustpotter model should be available under '$OPENHAB_USERDATA/habspeaker/ks/rustpotter' or '$OPENHAB_USERDATA/rustpotter'.
+
+For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
+
 ## Media Providers
 
 The idea behind this is take advance of the browser media capabilities and the official frameworks from legit projects or companies to display media on the ui allowing it's state to be controlled from the thing channels or the configured speaker voice commands.
@@ -187,4 +199,4 @@ Note: spotify search just search by individual songs now, pending to improve.
 The audio sink registered supports the following audio format: WAV PCM-SIGNED 16000hz 16-bit mono (single channel).
 It's supported by most if not all the speech-to-text services available at openHAB. 
 
-The audio source registered supports any wav audio format as it will try to convert it to the appropriate format (PCM-SIGNED 16-bit mono (or stereo) at 16000HZ).
+The audio source registered supports any wav or mp3 audio as it will try to convert it to the appropriate format (PCM-SIGNED 16-bit mono (or stereo) at 16000HZ).

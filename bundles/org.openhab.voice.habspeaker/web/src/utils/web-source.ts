@@ -1,10 +1,13 @@
 export class WebAudioSource {
-    private micProcessorNode: ScriptProcessorNode;
     private stream?: MediaStream;
     private sourceNode?: MediaStreamAudioSourceNode;
-    constructor(private audioContext: AudioContext, private onAudioBuffer: (buffers: Float32Array[]) => void) {
-        this.micProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
-        this.micProcessorNode.onaudioprocess = this.processAudio.bind(this);
+    private micGainNode: GainNode;
+    private nodeProcessors?: AudioNode[];
+    constructor(private audioContext: AudioContext) {
+        // Add a gain node to the microphone to reduce noise
+        this.micGainNode = this.audioContext.createGain();
+        // TODO: customize this
+        this.micGainNode.gain.value = 0.75;
     }
     private async init() {
         if (!this.stream) {
@@ -18,14 +21,10 @@ export class WebAudioSource {
                 video: false,
             });
         }
-        if (!this.sourceNode && this.audioContext && this.micProcessorNode) {
+        if (!this.sourceNode && this.audioContext) {
             this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
             // connect processor to source
-            // Add a gain node to the microphone to reduce noise
-            var micGainNode = this.audioContext.createGain();
-            micGainNode.gain.value = 0.5;
-            micGainNode.connect(this.micProcessorNode);
-            this.sourceNode.connect(micGainNode);
+            this.sourceNode.connect(this.micGainNode);
         }
     }
     async resume() {
@@ -43,18 +42,35 @@ export class WebAudioSource {
             await this.init();
         }
     }
-    async start() {
+    async start(...audioProcessors: AudioNode[]) {
         await this.resume();
-        this.micProcessorNode.connect(this.audioContext.destination);
+        const currentProcessors = this.nodeProcessors ?? [];
+        audioProcessors
+            .filter(p => !currentProcessors.includes(p))
+            .forEach((audioNode) => this.connectNode(audioNode));
+        currentProcessors
+            .filter(p => !audioProcessors.includes(p))
+            .forEach((audioNode) => this.disconnectNode(audioNode));
+        this.nodeProcessors = audioProcessors;
     }
     stop() {
-        this.micProcessorNode.disconnect(this.audioContext.destination);
-    }
-    private processAudio({ inputBuffer }: AudioProcessingEvent) {
-        const buffers: Float32Array[] = [];
-        for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
-            buffers[i] = inputBuffer.getChannelData(i);
+        if (this.nodeProcessors) {
+            for (const audioNode of this.nodeProcessors) {
+                this.disconnectNode(audioNode);
+            }
+            this.nodeProcessors = undefined;
         }
-        this.onAudioBuffer(buffers);
+    }
+    private connectNode(audioNode: AudioNode) {
+        this.micGainNode.connect(audioNode);
+        if (audioNode.numberOfOutputs > 0) {
+            audioNode.connect(this.audioContext.destination);
+        }
+    }
+    private disconnectNode(audioNode: AudioNode) {
+        this.micGainNode.disconnect(audioNode);
+        if (audioNode.numberOfOutputs > 0) {
+            audioNode.disconnect(this.audioContext.destination);
+        }
     }
 }

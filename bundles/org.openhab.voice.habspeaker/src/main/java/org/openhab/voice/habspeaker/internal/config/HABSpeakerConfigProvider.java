@@ -34,6 +34,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.ws.rs.HttpMethod;
 
@@ -80,8 +81,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     protected static final String SPEAKER_CONFIG_URI = "thing-type:habspeaker:speaker";
+    public static final String RUSTPOTTER_WEB_KS_ID = "habspeaker::rustpotter_web::ks";
     public static final String HABSPEAKER_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "habspeaker").toString();
     private static final String MEDIA_FOLDER = Path.of(HABSPEAKER_FOLDER, "media").toString();
+    private static final String KS_FOLDER = Path.of(HABSPEAKER_FOLDER, "ks").toString();
+    public static final String RUSTPOTTER_FOLDER = Path.of(KS_FOLDER, "rustpotter").toString();
+    public static final String RUSTPOTTER_ADDON_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "rustpotter").toString();
     private static final String CREDENTIALS_FOLDER = Path.of(HABSPEAKER_FOLDER, "credentials").toString();
     private static final String SPOTIFY_REFRESH_TOKEN_FILE = Path.of(CREDENTIALS_FOLDER, "spotify_refresh_token")
             .toString();
@@ -91,25 +96,22 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     public static final Path YOUTUBE_MEDIA_PATH = Path.of(MEDIA_FOLDER, "youtube.json");
     static {
         Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
-        File root = new File(HABSPEAKER_FOLDER);
-        if (!root.exists()) {
-            if (root.mkdir()) {
-                logger.info("habspeaker dir created {}", HABSPEAKER_FOLDER);
-            }
-        }
-        File media = new File(MEDIA_FOLDER);
-        if (!media.exists()) {
-            if (media.mkdir()) {
-                logger.info("media dir created {}", MEDIA_FOLDER);
-            }
-        }
-        File credentials = new File(CREDENTIALS_FOLDER);
+        ensureDir("root", HABSPEAKER_FOLDER, logger);
+        ensureDir("media", MEDIA_FOLDER, logger);
+        ensureDir("ks", KS_FOLDER, logger);
+        ensureDir("rustpotter", RUSTPOTTER_FOLDER, logger);
+        ensureDir("credentials", CREDENTIALS_FOLDER, logger);
+    }
+
+    private static void ensureDir(String name, String path, Logger logger) {
+        File credentials = new File(path);
         if (!credentials.exists()) {
             if (credentials.mkdir()) {
-                logger.info("credentials dir created {}", CREDENTIALS_FOLDER);
+                logger.info("habspeaker {} dir created {}", name, path);
             }
         }
     }
+
     private final VoiceManager voiceManager;
     private final LocaleProvider localeProvider;
     private final HttpClient httpClient;
@@ -254,10 +256,12 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
                             .map(hli -> new ParameterOption(hli.getId(), hli.getLabel(locale)))
                             .collect(Collectors.toList());
                 case "ks":
-                    return voiceManager.getKSs().stream()
+                    var clientKsServices = Stream
+                            .of(new ParameterOption(RUSTPOTTER_WEB_KS_ID, "Rustpotter Web (Client Spotter)"));
+                    var serverKsServices = voiceManager.getKSs().stream()
                             .sorted((ks1, ks2) -> ks1.getLabel(locale).compareToIgnoreCase(ks2.getLabel(locale)))
-                            .map(ks -> new ParameterOption(ks.getId(), ks.getLabel(locale)))
-                            .collect(Collectors.toList());
+                            .map(ks -> new ParameterOption(ks.getId(), ks.getLabel(locale)));
+                    return Stream.concat(clientKsServices, serverKsServices).collect(Collectors.toList());
                 case "stt":
                     return voiceManager.getSTTs().stream()
                             .sorted((stt1, stt2) -> stt1.getLabel(locale).compareToIgnoreCase(stt2.getLabel(locale)))

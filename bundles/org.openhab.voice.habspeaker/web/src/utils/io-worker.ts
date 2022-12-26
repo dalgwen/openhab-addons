@@ -33,7 +33,7 @@ export default class IOWorker {
     if (this.wsRef && this.wsRef.readyState == this.wsRef.OPEN) {
       this.wsRef.send(JSON.stringify({ cmd, ...args }));
     } else {
-      console.error("WebSocket is not connected");
+      console.error("post cmd " + cmd + ": WebSocket is not connected");
     }
   }
   /**
@@ -82,7 +82,7 @@ export default class IOWorker {
           if (this.wsRef) {
             this.wsRef.close();
           } else {
-            console.error("WebSocket is not connected");
+            console.error("reset connection: WebSocket is not connected");
           }
           break;
         default:
@@ -103,7 +103,7 @@ export default class IOWorker {
       const resampled = resampler.resample(channelBuffer);
       this.wsRef.send(audioToInt16Buffer(resampled));
     } else {
-      console.error("WebSocket is not connected");
+      console.error("on listen: WebSocket is not connected");
     }
   }
 
@@ -175,7 +175,7 @@ export default class IOWorker {
         console.debug("worker => websocket:", initMessage);
       }
       if (!wsRef) {
-        console.error("Websocket is not connected!")
+        console.error("on open: Websocket is not connected!")
         return;
       }
       wsRef.send(initMessage);
@@ -199,7 +199,7 @@ export default class IOWorker {
                   streamSampleRate = 16000;
                   streamChannels = 1;
                   break;
-                  case StreamType.PCM16BitStereo:
+                case StreamType.PCM16BitStereo:
                   streamSampleRate = 16000;
                   streamChannels = 2;
                   break;

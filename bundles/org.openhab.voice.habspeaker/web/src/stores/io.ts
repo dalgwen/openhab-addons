@@ -1,17 +1,33 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { useScreenSaverStore } from "./screen-saver";
+import { useAuthStore } from "./auth";
 import { useMediaSessionStore } from "./media-players/media-session";
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 export const useIOStore = defineStore("io", () => {
-  let speakerLabel = ref("HAB Speaker");
   let audioContext: AudioContext | null = null;
+  let audioSource: WebAudioSource | null = null;
+  let worker: Worker | null = null;
   let micStreaming = false;
   let currentSpeaking = false;
   const activeSinks = new Map<string, WebAudioSink>();
+  let webSocketProcessorNode: AudioNode;
+  let localKsProcessorNode: AudioNode | null = null;
+  let stopLocalKsProcessorNode: (() => void) | null = null;
+  let speakerLabel = ref("HAB Speaker");
+  const authStore = useAuthStore();
+  const spotifyStore = useSpotifyPlayerStore();
+  const mediaSessionStore = useMediaSessionStore();
+  const { mediaController } = storeToRefs(mediaSessionStore);
+  const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
+  // state
+  const listening = ref(false);
+  const speaking = ref(false);
+  const online = ref(false);
+  // voice setup
   function startVoiceAudioContext() {
     if (!audioContext) {
       // initialize to 16000 to avoid resampling, some browsers can ignore this
@@ -31,14 +47,67 @@ export const useIOStore = defineStore("io", () => {
     }
     return audioContext;
   }
-  const spotifyStore = useSpotifyPlayerStore();
-  const mediaSessionStore = useMediaSessionStore();
-  const { mediaController } = storeToRefs(mediaSessionStore);
-  const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
-  // state
-  const listening = ref(false);
-  const speaking = ref(false);
-  const online = ref(false);
+  /**
+   * Returns a processor node that sends data through the websocket 
+  */
+  function getWSProcessorNode() {
+    if (webSocketProcessorNode) {
+      return webSocketProcessorNode;
+    }
+    const audioContext = getVoiceAudioContext();
+    const _webSocketProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
+    _webSocketProcessorNode.onaudioprocess = ({ inputBuffer }: AudioProcessingEvent) => {
+      const buffers: Float32Array[] = [];
+      for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
+        buffers[i] = inputBuffer.getChannelData(i);
+      }
+      worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers });
+    }
+    return webSocketProcessorNode = _webSocketProcessorNode;
+  }
+  /**
+   * Returns a processor node that spots for the keyword
+   */
+  async function initLocalKsProcessor(keyword: string, options: { averagedThreshold?: number, threshold?: number, eagerMode?: boolean, }) {
+    console.debug("main: starting local keyword spotting using rustpotter");
+    const { RustpotterService } = await import("rustpotter-worklet");
+    const wasmModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter_wasm_bg.wasm', import.meta.url);
+    const workletModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotterWorklet.js', import.meta.url);
+    const rp = new RustpotterService({
+      workletPath: workletModuleUrl.href,
+      wasmPath: wasmModuleUrl.href,
+      averagedThreshold: options.averagedThreshold ?? 0.2,
+      threshold: options.threshold ?? 0.5,
+      eagerMode: options.eagerMode ?? true,
+    });
+    rp.onspot = (name, score) => {
+      console.debug(`main: spotted '${name}' with score: ${score}`);
+      sendSpot();
+    };
+    if (stopLocalKsProcessorNode) {
+      stopLocalKsProcessorNode();
+    }
+    stopLocalKsProcessorNode = async () => {
+      console.debug("main: stopping local keyword spotting");
+      try {
+        await rp.close();
+      } catch (error) {
+        console.warn(error)
+      }
+    };
+    const node = await rp.getProcessorNode(getVoiceAudioContext());
+    let headers: HeadersInit = {};
+    const accessToken = authStore.getAccessToken();
+    if (accessToken.length) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+    await rp.addWakewordByPath(`/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
+    try {
+      node.disconnect();
+    } catch (ignored) {
+    }
+    return node;
+  }
   // worker actions
   function setListening(value: boolean) {
     awakeScreenSaver();
@@ -73,7 +142,6 @@ export const useIOStore = defineStore("io", () => {
     spotifyStore.updateToken(token);
   }
   // worker setup
-  let worker: Worker | null = null;
   function postToWorker(cmd: string, args: { [key: string]: any } = {}) {
     try {
       if (worker) {
@@ -111,13 +179,13 @@ export const useIOStore = defineStore("io", () => {
     let sinkConfig = { ...defaultSinkConfig };
     let remoteSpotMode = false;
     startVoiceAudioContext();
-    const audioSource = new WebAudioSource(getVoiceAudioContext(), (buffers) => worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers }));
+    audioSource = new WebAudioSource(getVoiceAudioContext());
     await audioSource.resume();
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(audioSource.resume.bind(audioSource), 10000);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
-        audioSource.resume();
+        audioSource?.resume();
       }
     });
     return new Promise((resolve, reject) => {
@@ -134,14 +202,34 @@ export const useIOStore = defineStore("io", () => {
           switch (command) {
             case WorkerOutCmd.CONFIGURE:
               // TODO: disallow configure after initialized
-              const { sinkVolume, remoteSpot, screenSaverTime, spotifyToken, label } = ev.data as WorkerOutCmdType<typeof command>;
+              const { sinkVolume, spotMode, screenSaverTime, spotifyToken, label, spotConfig, } = ev.data as WorkerOutCmdType<typeof command>;
               if (label) {
                 speakerLabel.value = label;
               }
               if (sinkVolume != null) {
                 sinkConfig.volume = sinkVolume;
               }
-              remoteSpotMode = !!remoteSpot;
+              remoteSpotMode = false;
+              switch (spotMode) {
+                case "server":
+                  remoteSpotMode = true;
+                  break;
+                case "rustpotter_web":
+                  if (spotConfig?.keyword) {
+                    initLocalKsProcessor(spotConfig?.keyword, { ...spotConfig })
+                      .then((audioProcessor) => {
+                        localKsProcessorNode = audioProcessor;
+                        audioSource?.start(localKsProcessorNode).catch((err) => console.error(err));
+                      })
+                      .catch(err => console.error(err));
+                  } else {
+                    console.warn("Missed spotConfig configuration");
+                  }
+                  break;
+                case "none":
+                default:
+                  break;
+              }
               if (screenSaverTime != null && !isNaN(screenSaverTime)) {
                 setScreenSaverTime(screenSaverTime);
               }
@@ -161,7 +249,7 @@ export const useIOStore = defineStore("io", () => {
               remoteSpotMode = false;
               setListening(false);
               setOnline(false);
-              stopMicStreaming();
+              stopAllMicProcessors();
               break;
             case WorkerOutCmd.SPEAK: {
               const speakData = ev.data as WorkerOutCmdType<typeof command>;
@@ -252,17 +340,37 @@ export const useIOStore = defineStore("io", () => {
     function startMicStreaming() {
       if (!micStreaming) {
         console.debug("starting microphone audio streaming");
-        audioSource.start().catch((err) => console.error(err));
+        const processors: AudioNode[] = [getWSProcessorNode()];
+        if (localKsProcessorNode) {
+          processors.unshift(localKsProcessorNode)
+        }
+        audioSource?.start(...processors).catch((err) => console.error(err));
         micStreaming = true;
       }
     }
     function stopMicStreaming() {
       if (micStreaming) {
         console.debug("stopping microphone audio streaming");
-        try {
-          audioSource.stop();
-        } catch (ignored) { }
+        const processors: AudioNode[] = [];
+        if (localKsProcessorNode) {
+          processors.unshift(localKsProcessorNode);
+        }
+        if (processors.length > 0) {
+          audioSource?.start(...processors).catch((err) => console.error(err));
+        } else {
+          audioSource?.stop();
+        }
         micStreaming = false;
+      }
+    }
+    function stopAllMicProcessors() {
+      audioSource?.stop();
+      if (localKsProcessorNode) {
+        localKsProcessorNode = null;
+        if (stopLocalKsProcessorNode) {
+          stopLocalKsProcessorNode();
+          stopLocalKsProcessorNode = null;
+        }
       }
     }
     function onSinkSpeaking(speaking: boolean) {

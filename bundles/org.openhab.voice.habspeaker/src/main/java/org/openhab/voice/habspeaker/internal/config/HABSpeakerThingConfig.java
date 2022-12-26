@@ -64,4 +64,21 @@ public class HABSpeakerThingConfig {
      * Use dual channel audio sink
      */
     public boolean sinkStereo = false;
+    // Rustpotter web config
+    /**
+     * Rustpotter web keyword
+     */
+    public String rustpotterKeyword = "";
+    /**
+     * Rustpotter web threshold
+     */
+    public float rustpotterThreshold = 0.5f;
+    /**
+     * Rustpotter web averaged threshold
+     */
+    public float rustpotterAvgThreshold = 0.2f;
+    /**
+     * Rustpotter web threshold
+     */
+    public boolean rustpotterEagerMode = true;
 }

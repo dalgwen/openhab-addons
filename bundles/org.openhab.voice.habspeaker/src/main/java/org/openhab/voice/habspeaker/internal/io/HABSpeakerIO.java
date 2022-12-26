@@ -206,4 +206,24 @@ public interface HABSpeakerIO {
             return this.name;
         }
     }
+
+    /**
+     * Available media providers
+     */
+    enum SpotMode {
+        SERVER("server"),
+        RUSTPOTTER_WEB("rustpotter_web"),
+        NONE("none");
+
+        private final String name;
+
+        SpotMode(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return this.name;
+        }
+    }
 }

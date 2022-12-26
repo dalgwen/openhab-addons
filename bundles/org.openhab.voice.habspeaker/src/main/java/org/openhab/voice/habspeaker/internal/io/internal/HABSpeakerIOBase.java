@@ -13,6 +13,7 @@
 package org.openhab.voice.habspeaker.internal.io.internal;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -94,7 +95,8 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         return thingHandler;
     }
 
-    protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler) {
+    protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler)
+            throws IllegalStateException {
         if (handler == null) {
             return null;
         }
@@ -107,11 +109,45 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         if (label != null) {
             initializedConfig.put("label", label);
         }
-        if (!handler.getSpeakerConfig().ks.isBlank() && voiceManager.getKS(handler.getSpeakerConfig().ks) != null) {
-            serverSpotting = true;
-            initializedConfig.put("remoteSpot", true);
+        serverSpotting = false;
+        var spotMode = SpotMode.NONE;
+        if (!config.ks.isBlank()) {
+            if (config.ks.equals(HABSpeakerConfigProvider.RUSTPOTTER_WEB_KS_ID)) {
+                var modelName = config.rustpotterKeyword.toLowerCase();
+                if (config.rustpotterKeyword.isBlank()) {
+                    logger.warn("Missing rustpotter keyword, keyword spotting disabled");
+                } else if (validateKeyword(modelName)) {
+                    spotMode = SpotMode.RUSTPOTTER_WEB;
+                    var spotConfig = new HashMap<String, Object>();
+                    spotConfig.put("keyword", modelName);
+                    spotConfig.put("averagedThreshold", config.rustpotterAvgThreshold);
+                    spotConfig.put("threshold", config.rustpotterThreshold);
+                    spotConfig.put("eagerMode", config.rustpotterEagerMode);
+                    initializedConfig.put("spotConfig", spotConfig);
+                } else {
+                    logger.warn("Missing rustpotter model for '{}', keyword spotting disabled", modelName);
+                }
+            } else if (voiceManager.getKS(config.ks) != null) {
+                serverSpotting = true;
+                spotMode = SpotMode.SERVER;
+            } else {
+                logger.warn("Missing ks service {}", config.ks);
+            }
         }
+        initializedConfig.put("spotMode", spotMode.toString());
         return initializedConfig;
+    }
+
+    private boolean validateKeyword(String modelName) {
+        String fileName = modelName + ".rpw";
+        var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
+        if (modelFile.exists()) {
+            return true;
+
+        }
+        // fallback to rustpotter add-on dir
+        modelFile = java.nio.file.Path.of(RUSTPOTTER_ADDON_FOLDER, fileName).toFile();
+        return modelFile.exists();
     }
 
     protected synchronized void registerSpeakerComponents(String id, long requiredSinkSampleRate,
