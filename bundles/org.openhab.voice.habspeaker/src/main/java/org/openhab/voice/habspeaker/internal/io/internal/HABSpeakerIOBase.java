@@ -139,11 +139,10 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     }
 
     private boolean validateKeyword(String modelName) {
-        String fileName = modelName + ".rpw";
+        String fileName = modelName.replaceAll("\\s", "_") + ".rpw";
         var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
         if (modelFile.exists()) {
             return true;
-
         }
         // fallback to rustpotter add-on dir
         modelFile = java.nio.file.Path.of(RUSTPOTTER_ADDON_FOLDER, fileName).toFile();
