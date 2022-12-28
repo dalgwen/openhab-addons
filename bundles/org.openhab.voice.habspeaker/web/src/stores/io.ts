@@ -7,6 +7,7 @@ import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
+import { getUrlOpenHAB } from "../platforms";
 export const useIOStore = defineStore("io", () => {
   let audioContext: AudioContext | null = null;
   let audioSource: WebAudioSource | null = null;
@@ -101,7 +102,7 @@ export const useIOStore = defineStore("io", () => {
     if (accessToken.length) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
-    await rp.addWakewordByPath(`/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
+    await rp.addWakewordByPath(`${await getUrlOpenHAB()}/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
     try {
       node.disconnect();
     } catch (ignored) {
@@ -122,18 +123,20 @@ export const useIOStore = defineStore("io", () => {
   function setOnline(value: boolean) {
     awakeScreenSaver();
     online.value = value;
-    if (spotifyStore.isEnabled()) {
-      if (value) {
-        spotifyStore.initPlayer(speakerLabel.value)
-          .then(() => spotifyStore.connect())
-          .then((connected) => console.debug("Spotify is connected: " + connected))
-          .catch(() => console.error("Error connecting to spotify"));
-      } else if (!value) {
-        spotifyStore.disconnect()
-          .then(() => console.debug("Spotify is disconnected"))
-          .catch(() => console.error("Error connecting to spotify"));
+    spotifyStore.isEnabled().then(spotifyEnabled => {
+      if (spotifyEnabled) {
+        if (value) {
+          spotifyStore.initPlayer(speakerLabel.value)
+            .then(() => spotifyStore.connect())
+            .then((connected) => console.debug("Spotify is connected: " + connected))
+            .catch(() => console.error("Error connecting to spotify"));
+        } else if (!value) {
+          spotifyStore.disconnect()
+            .then(() => console.debug("Spotify is disconnected"))
+            .catch(() => console.error("Error connecting to spotify"));
+        }
       }
-    }
+    });
     if (!value) {
       mediaSessionStore.stopMedia();
     }
@@ -326,13 +329,16 @@ export const useIOStore = defineStore("io", () => {
           console.error(err);
           reject(err);
         };
-        worker.postMessage({
-          cmd: WorkerInCmd.INITIALIZE,
-          id,
-          token,
-          sampleRate: getVoiceAudioContext().sampleRate,
-        });
-        resolve(worker);
+        getUrlOpenHAB().then((ohUrl) => {
+          worker?.postMessage({
+            cmd: WorkerInCmd.INITIALIZE,
+            id,
+            token,
+            sampleRate: getVoiceAudioContext().sampleRate,
+            ohUrl,
+          });
+          resolve(worker);
+        }).catch(reject);
       } catch (error) {
         reject(error);
       }

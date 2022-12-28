@@ -1,19 +1,27 @@
-import { ref } from "vue";
+import { Ref, ref } from "vue";
 import { defineStore } from "pinia";
+import { getSpeakerId as getPlatformSpeakerId } from "../platforms";
 export const useSettingsStore = defineStore("settings", () => {
   const storagePrefix = "habspeaker.ui:";
   const idLocalStorageKey = `${storagePrefix}id`;
-  const storedAudioComponentId = localStorage.getItem(idLocalStorageKey);
-  const speakerId = ref(storedAudioComponentId ?? generateUUID());
-  if (storedAudioComponentId == null) {
-    commit();
+  const speakerId: Ref<string | null> = ref(null);
+  async function getSpeakerId() {
+    if (speakerId.value === null) {
+      const storedAudioComponentId = await getPlatformSpeakerId();
+      speakerId.value = storedAudioComponentId ?? generateUUID();
+      if (storedAudioComponentId == null) {
+        setSpeakerId(speakerId.value);
+      }
+    }
+    return speakerId.value;
   }
-  function commit() {
-    localStorage.setItem(idLocalStorageKey, speakerId.value);
+  function setSpeakerId(id: string) {
+    localStorage.setItem(idLocalStorageKey, id);
+    speakerId.value = id;
   }
   return {
-    speakerId,
-    commit,
+    getSpeakerId,
+    setSpeakerId,
   };
 });
 function generateUUID() {

@@ -38,7 +38,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
 
   <RouterView />
   <div class="logo-container" :class="{ 'logo-container-mini': miniMode }">
-    <img alt="openHAB logo" class="logo" src="@/assets/openhab-logo.svg" width="125" height="48" />
+    <img alt="openHAB logo" class="logo" src="./assets/openhab-logo.svg" width="125" height="48" />
   </div>
 </template>
 

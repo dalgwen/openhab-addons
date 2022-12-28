@@ -7,7 +7,22 @@ const mediaSessionStore = useMediaSessionStore();
 const { mediaState } = storeToRefs(mediaSessionStore);
 const spotifyPlayerStore = useSpotifyPlayerStore();
 const { songImg, songName } = storeToRefs(spotifyPlayerStore);
-onUnmounted(() => spotifyPlayerStore.getMediaCtrl()?.stop());
+onUnmounted(() => spotifyPlayerStore.getMediaCtrl()?.then(pl => pl?.stop()));
+async function play() {
+    (await spotifyPlayerStore.getMediaCtrl())?.play();
+}
+async function pause() {
+    (await spotifyPlayerStore.getMediaCtrl())?.pause()
+}
+async function next() {
+    (await spotifyPlayerStore.getMediaCtrl())?.next()
+}
+async function previous() {
+    (await spotifyPlayerStore.getMediaCtrl())?.previous()
+}
+function isPlaying(state: PlaybackState) {
+    return state == PlaybackState.PLAYING;
+}
 </script>
 <template>
     <div class="sp-container">
@@ -23,14 +38,10 @@ onUnmounted(() => spotifyPlayerStore.getMediaCtrl()?.stop());
                     <div class="controls">
                         <i class='fas fa-random'></i>
                         <div class="controls-center">
-                            <fa-icon class="item" icon="fa-solid fa-fast-backward"
-                                @click="spotifyPlayerStore.getMediaCtrl()?.previous()" />
-                            <fa-icon v-if="mediaState == PlaybackState.PLAYING" class="item" icon="fa-solid fa-pause"
-                                @click="spotifyPlayerStore.getMediaCtrl()?.pause()" />
-                            <fa-icon v-else class="item" icon="fa-solid fa-play"
-                                @click="spotifyPlayerStore.getMediaCtrl()?.play()" />
-                            <fa-icon class="item" icon="fa-solid fa-fast-forward"
-                                @click="spotifyPlayerStore.getMediaCtrl()?.next()" />
+                            <fa-icon class="item" icon="fa-solid fa-fast-backward" @click="previous" />
+                            <fa-icon v-if="isPlaying(mediaState)" icon="fa-solid fa-pause" @click="pause" class="item" />
+                            <fa-icon v-else class="item" icon="fa-solid fa-play" @click="play" />
+                            <fa-icon class="item" icon="fa-solid fa-fast-forward" @click="next" />
                         </div>
                         <i class='fas fa-expand-arrows-alt'></i>
                     </div>

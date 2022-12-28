@@ -1,23 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { storeToRefs } from "pinia";
 import { ref } from "vue";
 import { useIOStore } from "../stores/io";
 import { useSettingsStore } from "../stores/settings";
-const store = useSettingsStore();
+const { getSpeakerId, setSpeakerId } = useSettingsStore();
 const ioStore = useIOStore();
-const { speakerId } = storeToRefs(store);
 const model = ref({
-  id: speakerId.value,
+  id: "",
 });
-function reset() {
-  model.value.id = speakerId.value;
+reset();
+async function reset() {
+  model.value.id = await getSpeakerId();
 }
 function save() {
-  speakerId.value = model.value.id;
-  store.commit();
-  ioStore.resetConnection(
-    speakerId.value,
-  );
+  var id = model.value.id;
+  setSpeakerId(id);
+  ioStore.resetConnection(id);
 }
 </script>
 <template>
@@ -25,13 +23,8 @@ function save() {
     <div class="form">
       <div class="form-group">
         <label for="id">Speaker Id</label>
-        <input
-          type="text"
-          id="id"
-          class="form-control"
-          v-model="model.id"
-          onkeydown="return /[0-9a-zA-Z\-\_]/i.test(event.key)"
-        />
+        <input type="text" id="id" class="form-control" v-model="model.id"
+          onkeydown="return /[0-9a-zA-Z\-\_]/i.test(event.key)" />
       </div>
       <div class="form-buttons">
         <button @click="save()">Save</button>

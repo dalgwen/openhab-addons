@@ -14,6 +14,7 @@ export default class IOWorker {
   sampleRate = 0;
   inputResampler?: Resampler;
   sinkResamplers = new Map<string, Resampler>();
+  ohUrl: string = '';
   constructor(private postMessage: (data: any) => void) {
   }
   /**
@@ -55,6 +56,9 @@ export default class IOWorker {
           this.id = initData.id;
           this.sampleRate = initData.sampleRate;
           this.token = initData.token ?? '';
+          this.ohUrl = initData.ohUrl
+            .replace('https:', 'wss:')
+            .replace('http:', 'ws:');
           this.connectWebSocket();
           break;
         case WorkerInCmd.LISTEN:
@@ -157,8 +161,7 @@ export default class IOWorker {
     let wsRef = this.wsRef;
     try {
       wsRef = this.wsRef = new WebSocket(
-        `${location.protocol === "http:" ? "ws" : "wss"}://${location.host
-        }/habspeaker/ws`
+        `${this.ohUrl}/habspeaker/ws`
       );
     } catch (error) {
       console.error(error);

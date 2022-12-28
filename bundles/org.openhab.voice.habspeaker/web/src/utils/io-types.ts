@@ -51,7 +51,7 @@ export enum WorkerInCmd {
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_STATE = "MEDIA_STATE",
 };
-export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, } :
+export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
   T extends WorkerInCmd.LISTEN ? { buffers: Float32Array[] } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :

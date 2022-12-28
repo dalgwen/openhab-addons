@@ -31,7 +31,7 @@ onUnmounted(() => {
 </script>
 <template>
     <div v-if="screenSaverEnabled" class="background">
-        <img alt="openHAB logo" src="@/assets/openhab-logo.svg" width="125" height="48" ref="logo" unselectable="on" />
+        <img alt="openHAB logo" src="../assets/openhab-logo.svg" width="125" height="48" ref="logo" unselectable="on" />
     </div>
 </template>
 

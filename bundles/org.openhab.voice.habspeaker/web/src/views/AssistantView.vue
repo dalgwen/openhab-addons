@@ -14,17 +14,16 @@ import { MediaProvider, useMediaSessionStore } from "../stores/media-players/med
 const store = useAssistantStore();
 const ioStore = useIOStore();
 const mediaSessionStore = useMediaSessionStore();
-const settingsStore = useSettingsStore();
+const { getSpeakerId } = useSettingsStore();
 const { getAccessToken } = useAuthStore();
 const { startAssistant, isAudioSupported } = store;
 const { online } = storeToRefs(ioStore);
 const { mediaId, mediaProvider } = storeToRefs(mediaSessionStore);
 const { userInteractionDone, miniMode } = storeToRefs(store);
-const { speakerId } = storeToRefs(settingsStore);
-function onPanelClick() {
+async function onPanelClick() {
   if (!userInteractionDone.value) {
     startAssistant(
-      speakerId.value,
+      await getSpeakerId(),
       getAccessToken()
     ).catch((error) => {
       console.error(error);

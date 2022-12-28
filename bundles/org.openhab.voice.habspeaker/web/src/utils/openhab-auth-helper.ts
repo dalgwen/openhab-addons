@@ -4,7 +4,7 @@ export class OHAuthHelper {
     currentTokenExpireTime?: number;
     refreshAccessTokenTimeoutRef: any;
     refreshOnVisibilityChangeFn: (() => void) | null = null;
-    constructor(private options: { useCookie?: boolean, path?: string, setup?: boolean } = {}) {
+    constructor(private options: { useCookie?: boolean, path?: string, setup?: boolean, ohUrl?: () => Promise<string> } = {}) {
     }
     getRedirectUri() {
         return window.location.origin + (this.options.path ?? '');
@@ -47,7 +47,7 @@ export class OHAuthHelper {
                     redirect_uri: redirectUri,
                     refresh_token: refreshToken,
                 });
-                const resp = await axios.post("/rest/auth/token", payload, {
+                const resp = await axios.post(`${await this.getUrl()}/rest/auth/token`, payload, {
                     headers: {
                         "content-type": "application/x-www-form-urlencoded",
                         accept: "application/json",
@@ -130,7 +130,7 @@ export class OHAuthHelper {
                 'code_verifier': codeVerifier
             });
             this.clearAccessToken();
-            const resp = await axios.post('/rest/auth/token?useCookie=' + (this.options.useCookie ?? false), payload, {
+            const resp = await axios.post(`${await this.getUrl()}/rest/auth/token?useCookie=${this.options.useCookie ?? false}`, payload, {
                 headers: {
                     "content-type": "application/x-www-form-urlencoded",
                     accept: "application/json",
@@ -142,6 +142,9 @@ export class OHAuthHelper {
             return true;
         }
         return false;
+    }
+    private async getUrl() {
+        return (this.options.ohUrl?.() ?? Promise.resolve(''))
     }
 }
 function getQueryParams() {

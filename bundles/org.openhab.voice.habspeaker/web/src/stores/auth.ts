@@ -3,16 +3,17 @@ import axios, { AxiosError } from "axios";
 import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
+import { getUrlOpenHAB } from "../platforms";
 export const useAuthStore = defineStore("auth", () => {
   const ioStore = useIOStore();
-  const { speakerId } = useSettingsStore();
-  const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker' });
+  const { getSpeakerId } = useSettingsStore();
+  const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getUrlOpenHAB });
   function getAccessToken() {
     return ohAuthHelper.getAccessToken();
   }
   async function getUIConfig(): Promise<UIConfig> {
     try {
-      return (await axios.get<UIConfig>(`/rest/habspeaker/config/${speakerId}`)).data;
+      return (await axios.get<UIConfig>(`${await getUrlOpenHAB()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
     } catch (error) {
       if (error instanceof AxiosError && error.response?.status === 401) {
         return { secure: true, spotifyEnabled: false, label: "" };
@@ -31,7 +32,7 @@ export const useAuthStore = defineStore("auth", () => {
       throw new Error('Missing refresh token.');
     }
     await axios
-      .post("/rest/habspeaker/cookie", `${encodeURIComponent("refresh_token")}=${encodeURIComponent(refreshToken)}`, { headers });
+      .post(`${await getUrlOpenHAB()}/rest/habspeaker/cookie`, `${encodeURIComponent("refresh_token")}=${encodeURIComponent(refreshToken)}`, { headers });
   }
   function unauthorized() {
     console.debug("Unauthorized, redirecting to login");

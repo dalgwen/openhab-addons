@@ -70,7 +70,7 @@
               <goal>npm</goal>
             </goals>
             <configuration>
-              <arguments>ci</arguments>
+              <arguments>ci --omit=optional</arguments>
             </configuration>
           </execution>
 
