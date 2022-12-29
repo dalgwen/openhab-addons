@@ -1,12 +1,5 @@
 package org.asamk.signal.manager.storage.messageCache;
 
-import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.asamk.signal.manager.util.IOUtils;
-import org.asamk.signal.manager.util.MessageCacheUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,6 +8,13 @@ import java.util.Collections;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.asamk.signal.manager.storage.recipients.RecipientId;
+import org.asamk.signal.manager.util.IOUtils;
+import org.asamk.signal.manager.util.MessageCacheUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
 
 public class MessageCache {
 
@@ -71,12 +71,31 @@ public class MessageCache {
         return new CachedMessage(cacheFile);
     }
 
+    public void deleteMessages(final RecipientId recipientId) {
+        final var recipientMessageCachePath = getMessageCachePath(recipientId);
+        if (!recipientMessageCachePath.exists()) {
+            return;
+        }
+
+        for (var file : Objects.requireNonNull(recipientMessageCachePath.listFiles())) {
+            if (!file.isFile()) {
+                continue;
+            }
+
+            try {
+                Files.delete(file.toPath());
+            } catch (IOException e) {
+                logger.warn("Failed to delete cache file “{}”, ignoring: {}", file, e.getMessage());
+            }
+        }
+    }
+
     private File getMessageCachePath(RecipientId recipientId) {
         if (recipientId == null) {
             return messageCachePath;
         }
 
-        var sender = String.valueOf(recipientId.getId());
+        var sender = String.valueOf(recipientId.id());
         return new File(messageCachePath, sender.replace("/", "_"));
     }
 

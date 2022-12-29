@@ -11,3 +11,11 @@ https://www.eclipse.org/legal/epl-2.0/.
 == Source Code
 
 https://github.com/openhab/openhab-addons
+
+== Third-party Content
+This binding includes code (under the org.asamk package) from the signal-cli project
+The code have been slightly modified (backport to java 11)  
+
+signal-cli
+* GNU GENERAL PUBLIC LICENSE Version 3
+* https://github.com/AsamK/signal-cli/

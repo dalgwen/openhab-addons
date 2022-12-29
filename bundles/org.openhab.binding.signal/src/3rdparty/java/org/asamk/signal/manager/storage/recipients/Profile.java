@@ -3,6 +3,7 @@ package org.asamk.signal.manager.storage.recipients;
 import org.whispersystems.signalservice.internal.util.Util;
 
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 
 public class Profile {
@@ -19,6 +20,8 @@ public class Profile {
 
     private final String avatarUrlPath;
 
+    private final byte[] mobileCoinAddress;
+
     private final UnidentifiedAccessMode unidentifiedAccessMode;
 
     private final Set<Capability> capabilities;
@@ -30,6 +33,7 @@ public class Profile {
             final String about,
             final String aboutEmoji,
             final String avatarUrlPath,
+            final byte[] mobileCoinAddress,
             final UnidentifiedAccessMode unidentifiedAccessMode,
             final Set<Capability> capabilities
     ) {
@@ -39,6 +43,7 @@ public class Profile {
         this.about = about;
         this.aboutEmoji = aboutEmoji;
         this.avatarUrlPath = avatarUrlPath;
+        this.mobileCoinAddress = mobileCoinAddress;
         this.unidentifiedAccessMode = unidentifiedAccessMode;
         this.capabilities = capabilities;
     }
@@ -50,6 +55,7 @@ public class Profile {
         about = builder.about;
         aboutEmoji = builder.aboutEmoji;
         avatarUrlPath = builder.avatarUrlPath;
+        mobileCoinAddress = builder.mobileCoinAddress;
         unidentifiedAccessMode = builder.unidentifiedAccessMode;
         capabilities = builder.capabilities;
     }
@@ -66,6 +72,7 @@ public class Profile {
         builder.about = copy.getAbout();
         builder.aboutEmoji = copy.getAboutEmoji();
         builder.avatarUrlPath = copy.getAvatarUrlPath();
+        builder.mobileCoinAddress = copy.getMobileCoinAddress();
         builder.unidentifiedAccessMode = copy.getUnidentifiedAccessMode();
         builder.capabilities = copy.getCapabilities();
         return builder;
@@ -117,6 +124,10 @@ public class Profile {
         return avatarUrlPath;
     }
 
+    public byte[] getMobileCoinAddress() {
+        return mobileCoinAddress;
+    }
+
     public UnidentifiedAccessMode getUnidentifiedAccessMode() {
         return unidentifiedAccessMode;
     }
@@ -141,7 +152,6 @@ public class Profile {
     }
 
     public enum Capability {
-        gv2,
         storage,
         gv1Migration,
         senderKey,
@@ -156,6 +166,33 @@ public class Profile {
         }
     }
 
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final Profile profile = (Profile) o;
+        return lastUpdateTimestamp == profile.lastUpdateTimestamp
+                && Objects.equals(givenName, profile.givenName)
+                && Objects.equals(familyName, profile.familyName)
+                && Objects.equals(about, profile.about)
+                && Objects.equals(aboutEmoji, profile.aboutEmoji)
+                && Objects.equals(avatarUrlPath, profile.avatarUrlPath)
+                && unidentifiedAccessMode == profile.unidentifiedAccessMode
+                && Objects.equals(capabilities, profile.capabilities);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(lastUpdateTimestamp,
+                givenName,
+                familyName,
+                about,
+                aboutEmoji,
+                avatarUrlPath,
+                unidentifiedAccessMode,
+                capabilities);
+    }
+
     public static final class Builder {
 
         private String givenName;
@@ -163,6 +200,7 @@ public class Profile {
         private String about;
         private String aboutEmoji;
         private String avatarUrlPath;
+        private byte[] mobileCoinAddress;
         private UnidentifiedAccessMode unidentifiedAccessMode = UnidentifiedAccessMode.UNKNOWN;
         private Set<Capability> capabilities = Collections.emptySet();
         private long lastUpdateTimestamp = 0;
@@ -211,6 +249,11 @@ public class Profile {
 
         public Builder withLastUpdateTimestamp(final long val) {
             lastUpdateTimestamp = val;
+            return this;
+        }
+
+        public Builder withMobileCoinAddress(final byte[] val) {
+            mobileCoinAddress = val;
             return this;
         }
     }
