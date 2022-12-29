@@ -131,6 +131,7 @@ signalAction.sendSignal("+33123456789", "Hello world!")
 ```
 
 When using the linked bridge thing, you can use the special recipient "self" to send note to yourself. When sending note to yourself, there is no notification on your other devices.
+
 If you want notification when sending message to your own account, use the send action with your full number.
 
 ## Full Example
