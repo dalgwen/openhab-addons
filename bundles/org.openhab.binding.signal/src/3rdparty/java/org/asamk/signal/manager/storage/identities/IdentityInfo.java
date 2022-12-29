@@ -1,29 +1,27 @@
 package org.asamk.signal.manager.storage.identities;
 
-import org.asamk.signal.manager.TrustLevel;
-import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.whispersystems.libsignal.IdentityKey;
-
-import java.util.Date;
+import org.asamk.signal.manager.api.TrustLevel;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.whispersystems.signalservice.api.push.ServiceId;
 
 public class IdentityInfo {
 
-    private final RecipientId recipientId;
+    private final ServiceId serviceId;
     private final IdentityKey identityKey;
     private final TrustLevel trustLevel;
-    private final Date added;
+    private final long addedTimestamp;
 
     IdentityInfo(
-            final RecipientId recipientId, IdentityKey identityKey, TrustLevel trustLevel, Date added
+            final ServiceId serviceId, IdentityKey identityKey, TrustLevel trustLevel, long addedTimestamp
     ) {
-        this.recipientId = recipientId;
+        this.serviceId = serviceId;
         this.identityKey = identityKey;
         this.trustLevel = trustLevel;
-        this.added = added;
+        this.addedTimestamp = addedTimestamp;
     }
 
-    public RecipientId getRecipientId() {
-        return recipientId;
+    public ServiceId getServiceId() {
+        return serviceId;
     }
 
     public IdentityKey getIdentityKey() {
@@ -38,11 +36,7 @@ public class IdentityInfo {
         return trustLevel == TrustLevel.TRUSTED_UNVERIFIED || trustLevel == TrustLevel.TRUSTED_VERIFIED;
     }
 
-    public Date getDateAdded() {
-        return this.added;
-    }
-
-    public byte[] getFingerprint() {
-        return identityKey.getPublicKey().serialize();
+    public long getDateAddedTimestamp() {
+        return this.addedTimestamp;
     }
 }
