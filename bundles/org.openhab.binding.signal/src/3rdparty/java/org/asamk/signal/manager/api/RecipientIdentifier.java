@@ -1,127 +1,122 @@
 package org.asamk.signal.manager.api;
 
-import org.asamk.signal.manager.groups.GroupId;
-import org.asamk.signal.manager.storage.recipients.RecipientAddress;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.api.util.InvalidNumberException;
-import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
-import org.whispersystems.signalservice.api.util.UuidUtil;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.UUID;
 
-public abstract class RecipientIdentifier {
+import org.asamk.signal.manager.groups.GroupId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 
-    public static class NoteToSelf extends RecipientIdentifier {
+public interface RecipientIdentifier {
 
-        public static NoteToSelf INSTANCE = new NoteToSelf();
+    String getIdentifier();
 
-        private NoteToSelf() {
+    static class NoteToSelf implements RecipientIdentifier {
+
+        public static final NoteToSelf INSTANCE = new NoteToSelf();
+
+        @Override
+        public String getIdentifier() {
+            return "Note-To-Self";
         }
     }
 
-    public abstract static class Single extends RecipientIdentifier {
+    interface Single extends RecipientIdentifier {
 
-        public static Single fromString(String identifier, String localNumber) throws InvalidNumberException {
-            return UuidUtil.isUuid(identifier)
-                    ? new Uuid(UUID.fromString(identifier))
-                    : new Number(PhoneNumberFormatter.formatNumber(identifier, localNumber));
+        static Single fromString(String identifier, String localNumber) throws InvalidNumberException {
+            try {
+                if (UuidUtil.isUuid(identifier)) {
+                    return new Uuid(UUID.fromString(identifier));
+                }
+
+                final var normalizedNumber = PhoneNumberFormatter.formatNumber(identifier, localNumber);
+                if (!normalizedNumber.equals(identifier)) {
+                    final Logger logger = LoggerFactory.getLogger(RecipientIdentifier.class);
+                    logger.debug("Normalized number {} to {}.", identifier, normalizedNumber);
+                }
+                return new Number(normalizedNumber);
+            } catch (org.whispersystems.signalservice.api.util.InvalidNumberException e) {
+                throw new InvalidNumberException(e.getMessage(), e);
+            }
         }
 
-        public static Single fromAddress(SignalServiceAddress address) {
-            return new Uuid(address.getUuid());
-        }
-
-        public static Single fromAddress(RecipientAddress address) {
-            if (address.getNumber().isPresent()) {
-                return new Number(address.getNumber().get());
-            } else if (address.getUuid().isPresent()) {
-                return new Uuid(address.getUuid().get());
+        static Single fromAddress(RecipientAddress address) {
+            if (address.number().isPresent()) {
+                return new Number(address.number().get());
+            } else if (address.uuid().isPresent()) {
+                return new Uuid(address.uuid().get());
             }
             throw new AssertionError("RecipientAddress without identifier");
         }
 
-        public abstract String getIdentifier();
+        RecipientAddress toPartialRecipientAddress();
     }
 
-    public static class Uuid extends Single {
+    public static class Uuid implements Single {
+        private final UUID uuid;
 
-        public final UUID uuid;
-
-        public Uuid(final UUID uuid) {
+        public Uuid(@JsonProperty("uuid") UUID uuid) {
+            super();
             this.uuid = uuid;
-        }
-
-        @Override
-        public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            final Uuid uuid1 = (Uuid) o;
-
-            return uuid.equals(uuid1.uuid);
-        }
-
-        @Override
-        public int hashCode() {
-            return uuid.hashCode();
         }
 
         @Override
         public String getIdentifier() {
             return uuid.toString();
         }
+
+        @Override
+        public RecipientAddress toPartialRecipientAddress() {
+            return new RecipientAddress(uuid);
+        }
+
+        public UUID uuid() {
+            return uuid;
+        }
     }
 
-    public static class Number extends Single {
+    public static class Number implements Single {
+        private final String number;
 
-        public final String number;
-
-        public Number(final String number) {
+        public Number(@JsonProperty("number") String number) {
+            super();
             this.number = number;
-        }
-
-        @Override
-        public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            final Number number1 = (Number) o;
-
-            return number.equals(number1.number);
-        }
-
-        @Override
-        public int hashCode() {
-            return number.hashCode();
         }
 
         @Override
         public String getIdentifier() {
             return number;
         }
+
+        @Override
+        public RecipientAddress toPartialRecipientAddress() {
+            return new RecipientAddress(null, number);
+        }
+
+        public String number() {
+            return number;
+        }
     }
 
-    public static class Group extends RecipientIdentifier {
+    public static class Group implements RecipientIdentifier {
+        private final GroupId groupId;
 
-        public final GroupId groupId;
-
-        public Group(final GroupId groupId) {
+        public Group(@JsonProperty("groupId") GroupId groupId) {
+            super();
             this.groupId = groupId;
         }
 
         @Override
-        public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            final Group group = (Group) o;
-
-            return groupId.equals(group.groupId);
+        public String getIdentifier() {
+            return groupId.toBase64();
         }
 
-        @Override
-        public int hashCode() {
-            return groupId.hashCode();
+        public GroupId groupId() {
+            return groupId;
         }
     }
 }
