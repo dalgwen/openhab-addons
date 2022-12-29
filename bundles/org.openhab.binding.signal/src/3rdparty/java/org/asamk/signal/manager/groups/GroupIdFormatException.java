@@ -1,5 +1,6 @@
 package org.asamk.signal.manager.groups;
 
+@SuppressWarnings("serial")
 public class GroupIdFormatException extends Exception {
 
     public GroupIdFormatException(String groupId, Throwable e) {
