@@ -168,7 +168,7 @@ public class SignalService {
             if (oldMessageReceiverThread != null) {
                 oldMessageReceiverThread.stopReceiving();
             }
-            ReceivingThread newMessageReceiverThread = new ReceivingThread(newManager);
+            ReceivingThread newMessageReceiverThread = new ReceivingThread();
             connectionStateListener.newStateEvent(ConnectionState.CONNECTING, null);
             this.messageReceiverThread = newMessageReceiverThread;
             newMessageReceiverThread.start();
@@ -320,15 +320,12 @@ public class SignalService {
 
         private boolean shouldRun = false;
 
-        final Manager m;
-
         public void stopReceiving() {
             shouldRun = false;
             interrupt();
         }
 
-        public ReceivingThread(Manager m) {
-            this.m = m;
+        public ReceivingThread() {
             this.setName("OH-binding-signal-" + phoneNumber);
             this.setDaemon(true);
         }
@@ -344,7 +341,12 @@ public class SignalService {
                         logger.debug("Waiting for messages...");
                         // CONNECTED
                         SignalService.this.connectionStateListener.newStateEvent(ConnectionState.CONNECTED, null);
-                        m.receiveMessages(Optional.empty(), Optional.empty(), this);
+                        Manager managerFinal = manager;
+                        if (managerFinal == null) {
+                            logger.error("Manager should not be null !?! Cannot receive message !");
+                        } else {
+                            managerFinal.receiveMessages(Optional.empty(), Optional.empty(), this);
+                        }
                     } catch (IOException e) {
                         SignalService.this.connectionStateListener.newStateEvent(ConnectionState.DISCONNECTED,
                                 e.getMessage());
@@ -361,11 +363,9 @@ public class SignalService {
                 // we should let an option to investigate :
                 logger.debug("Exception details :", e);
                 SignalService.this.connectionStateListener.newStateEvent(ConnectionState.DISCONNECTED, null);
-                stopReceiving();
             } catch (AlreadyReceivingException e) {
                 logger.error("Already processing message. Should not happen", e);
                 SignalService.this.connectionStateListener.newStateEvent(ConnectionState.DISCONNECTED, null);
-                stopReceiving();
             } catch (Exception e) {
                 SignalService.this.connectionStateListener.newStateEvent(ConnectionState.DISCONNECTED, e.getMessage());
                 logger.error("Fatal exception inside the signal receiving thread for {}. Cannot wait for message",
