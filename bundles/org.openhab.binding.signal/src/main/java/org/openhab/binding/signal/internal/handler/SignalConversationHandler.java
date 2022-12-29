@@ -12,12 +12,12 @@
  */
 package org.openhab.binding.signal.internal.handler;
 
+import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalConversationConfiguration;
 import org.openhab.binding.signal.internal.protocol.DeliveryReport;
-import org.openhab.binding.signal.internal.protocol.Utils;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
@@ -31,8 +31,7 @@ import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 
 /**
  * The {@link SignalConversationHandler} is responsible for managing
@@ -58,10 +57,14 @@ public class SignalConversationHandler extends BaseThingHandler {
 
     public String getRecipient() {
         String recipient = config.recipient.trim();
-        if (Utils.isUUID(recipient)) {
+        if (UuidUtil.isUuid(recipient)) {
             return recipient;
         } else {
-            return "+" + recipient;
+            if (recipient.startsWith("+")) {
+                return recipient;
+            } else {
+                return "+" + recipient;
+            }
         }
     }
 
@@ -85,15 +88,13 @@ public class SignalConversationHandler extends BaseThingHandler {
         return this.bridgeHandler;
     }
 
-    protected void checkAndReceive(SignalServiceAddress address, SignalServiceDataMessage messageData) {
+    protected void checkAndReceive(RecipientAddress address, String message) {
         String conversationRecipient = getRecipient();
         // is the recipient the one handled by this conversation ? :
-        String uuid = address.getAci().toString();
-        String number = address.getNumber().orNull();
+        String uuid = address.getServiceId().toString();
+        String number = address.getLegacyIdentifier();
         if (conversationRecipient.equals(uuid) || conversationRecipient.equals(number)) {
-            if (messageData.getBody().isPresent()) {
-                updateState(SignalBindingConstants.CHANNEL_RECEIVED, new StringType(messageData.getBody().get()));
-            }
+            updateState(SignalBindingConstants.CHANNEL_RECEIVED, new StringType(message));
         }
     }
 

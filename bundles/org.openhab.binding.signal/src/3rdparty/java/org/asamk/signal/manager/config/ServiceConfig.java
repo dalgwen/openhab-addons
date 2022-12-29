@@ -1,17 +1,16 @@
 package org.asamk.signal.manager.config;
 
-import org.signal.zkgroup.internal.Native;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.account.AccountAttributes;
-import org.whispersystems.signalservice.api.push.TrustStore;
-
 import java.io.IOException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.account.AccountAttributes;
+import org.whispersystems.signalservice.api.push.TrustStore;
 
 import okhttp3.Interceptor;
 
@@ -25,26 +24,14 @@ public class ServiceConfig {
     public final static long MAX_ENVELOPE_SIZE = 0;
     public final static long AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE = 10 * 1024 * 1024;
     public final static boolean AUTOMATIC_NETWORK_RETRY = true;
+    public final static int GROUP_MAX_SIZE = 1001;
 
     private final static KeyStore iasKeyStore;
 
     public static final AccountAttributes.Capabilities capabilities;
 
     static {
-        boolean zkGroupAvailable;
-        try {
-            Native.serverPublicParamsCheckValidContentsJNI(new byte[]{});
-            zkGroupAvailable = true;
-        } catch (Throwable e) {
-            logger.warn("Failed to call libzkgroup: {}", e.getMessage());
-            zkGroupAvailable = false;
-        }
-        capabilities = new AccountAttributes.Capabilities(false,
-                zkGroupAvailable,
-                false,
-                zkGroupAvailable,
-                true,
-                true,
+        capabilities = new AccountAttributes.Capabilities(false, true, false, true, true, true, true, true, false,
                 false);
 
         try {
@@ -62,7 +49,11 @@ public class ServiceConfig {
 
     public static boolean isSignalClientAvailable() {
         try {
-            org.signal.client.internal.Native.DeviceTransfer_GeneratePrivateKey();
+            try {
+                org.signal.libsignal.internal.Native.UuidCiphertext_CheckValidContents(new byte[0]);
+            } catch (Exception e) {
+                logger.trace("Expected exception when checking libsignal-client: {}", e.getMessage());
+            }
             return true;
         } catch (UnsatisfiedLinkError e) {
             logger.warn("Failed to call libsignal-client: {}", e.getMessage());
@@ -70,37 +61,31 @@ public class ServiceConfig {
         }
     }
 
-    public static AccountAttributes.Capabilities getCapabilities() {
-        return capabilities;
-    }
-
     public static KeyStore getIasKeyStore() {
         return iasKeyStore;
     }
 
-    public static ServiceEnvironmentConfig getServiceEnvironmentConfig(
-            ServiceEnvironment serviceEnvironment, String userAgent
-    ) {
-        final Interceptor userAgentInterceptor = chain -> chain.proceed(chain.request()
-                .newBuilder()
-                .header("User-Agent", userAgent)
-                .build());
+    public static ServiceEnvironmentConfig getServiceEnvironmentConfig(ServiceEnvironment serviceEnvironment,
+            String userAgent) {
+        final Interceptor userAgentInterceptor = chain -> chain
+                .proceed(chain.request().newBuilder().header("User-Agent", userAgent).build());
 
         final var interceptors = List.of(userAgentInterceptor);
 
         switch (serviceEnvironment) {
             case LIVE:
-                return new ServiceEnvironmentConfig(LiveConfig.createDefaultServiceConfiguration(interceptors),
-                        LiveConfig.getUnidentifiedSenderTrustRoot(),
-                        LiveConfig.createKeyBackupConfig(),
-                        LiveConfig.getCdsMrenclave());
-            case SANDBOX:
-                return new ServiceEnvironmentConfig(SandboxConfig.createDefaultServiceConfiguration(interceptors),
-                        SandboxConfig.getUnidentifiedSenderTrustRoot(),
-                        SandboxConfig.createKeyBackupConfig(),
-                        SandboxConfig.getCdsMrenclave());
             default:
-                throw new IllegalArgumentException("Unsupported environment");
+                return new ServiceEnvironmentConfig(serviceEnvironment,
+                        LiveConfig.createDefaultServiceConfiguration(interceptors),
+                        LiveConfig.getUnidentifiedSenderTrustRoot(), LiveConfig.createKeyBackupConfig(),
+                        LiveConfig.createFallbackKeyBackupConfigs(), LiveConfig.getCdsMrenclave(),
+                        LiveConfig.getCdsiMrenclave());
+            case STAGING:
+                return new ServiceEnvironmentConfig(serviceEnvironment,
+                        StagingConfig.createDefaultServiceConfiguration(interceptors),
+                        StagingConfig.getUnidentifiedSenderTrustRoot(), StagingConfig.createKeyBackupConfig(),
+                        StagingConfig.createFallbackKeyBackupConfigs(), StagingConfig.getCdsMrenclave(),
+                        StagingConfig.getCdsiMrenclave());
         }
     }
 }

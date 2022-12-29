@@ -7,7 +7,7 @@ This binding rely on a binary library compiled for specific architecture. These 
 * amd64 for Windows
 * amd64 for Linux
 * arm for Linux
-* armv7 for Linux
+* aarch64/arm64 for Linux
 * aarch64 for OSX
 * amd64 for OSX
 
@@ -78,6 +78,8 @@ This is also a several steps registration process.
 | Parameter Name | type | required | description    |
 |----------------|------|----------|----------------|
 |deviceName| text | no | A friendly name for display|
+|phoneNumber| text | yes | The shared phone number |
+
 
 ### Conversation
 
@@ -103,7 +105,7 @@ The *signalconversation* supports the following channels :
 |----------|--------|------------------------------|
 | receive | String| The last message received |
 | send | String| A message to send |
-|deliverystatus| String| Delivery status (either UNKNOWN_RECIPIENT, FAILED, SENT)|
+|deliverystatus| String| Delivery status (either SENT, DELIVERED, READ, FAILED)|
 
 
 ## Rule action
@@ -127,6 +129,9 @@ Once this action instance is retrieved, you can invoke the 'sendSignal' method o
 ```
 signalAction.sendSignal("+33123456789", "Hello world!")
 ```
+
+When using the linked bridge thing, you can use the special recipient "self" to send note to yourself. When sending note to yourself, there is no notification on your other devices.
+If you want notification when sending message to your own account, use the send action with your full number.
 
 ## Full Example
 

@@ -1,42 +1,49 @@
 package org.asamk.signal.manager.helper;
 
-import org.asamk.signal.manager.AvatarStore;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.config.ServiceConfig;
+import org.asamk.signal.manager.groups.GroupNotFoundException;
+import org.asamk.signal.manager.groups.NotAGroupMemberException;
 import org.asamk.signal.manager.storage.SignalAccount;
+import org.asamk.signal.manager.storage.groups.GroupInfoV2;
 import org.asamk.signal.manager.storage.recipients.Profile;
+import org.asamk.signal.manager.storage.recipients.RecipientAddress;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.asamk.signal.manager.util.IOUtils;
+import org.asamk.signal.manager.util.KeyUtils;
+import org.asamk.signal.manager.util.PaymentUtils;
 import org.asamk.signal.manager.util.ProfileUtils;
 import org.asamk.signal.manager.util.Utils;
-import org.signal.zkgroup.profiles.ProfileKey;
-import org.signal.zkgroup.profiles.ProfileKeyCredential;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.zkgroup.profiles.ExpiringProfileKeyCredential;
+import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
+import org.whispersystems.signalservice.api.profiles.AvatarUploadParams;
 import org.whispersystems.signalservice.api.profiles.ProfileAndCredential;
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.exceptions.NotFoundException;
 import org.whispersystems.signalservice.api.push.exceptions.PushNetworkException;
 import org.whispersystems.signalservice.api.services.ProfileService;
-import org.whispersystems.signalservice.internal.ServiceResponse;
+import org.whispersystems.signalservice.api.util.ExpiringProfileCredentialUtil;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.util.Base64;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 
 public final class ProfileHelper {
@@ -45,83 +52,100 @@ public final class ProfileHelper {
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
-    private final AvatarStore avatarStore;
-    private final UnidentifiedAccessProvider unidentifiedAccessProvider;
-    private final SignalServiceAddressResolver addressResolver;
+    private final Context context;
 
-    public ProfileHelper(
-            final SignalAccount account,
-            final SignalDependencies dependencies,
-            final AvatarStore avatarStore,
-            final UnidentifiedAccessProvider unidentifiedAccessProvider,
-            final SignalServiceAddressResolver addressResolver
-    ) {
-        this.account = account;
-        this.dependencies = dependencies;
-        this.avatarStore = avatarStore;
-        this.unidentifiedAccessProvider = unidentifiedAccessProvider;
-        this.addressResolver = addressResolver;
+    public ProfileHelper(final Context context) {
+        this.account = context.getAccount();
+        this.dependencies = context.getDependencies();
+        this.context = context;
+    }
+
+    public void rotateProfileKey() throws IOException {
+        // refresh our profile, before creating a new profile key
+        getSelfProfile();
+        var profileKey = KeyUtils.createProfileKey();
+        account.setProfileKey(profileKey);
+        context.getAccountHelper().updateAccountAttributes();
+        setProfile(true, true, null, null, null, null, null, null);
+        // TODO update profile key in storage
+
+        final var recipientIds = account.getRecipientStore().getRecipientIdsWithEnabledProfileSharing();
+        for (final var recipientId : recipientIds) {
+            context.getSendHelper().sendProfileKey(recipientId);
+        }
+
+        final var selfRecipientId = account.getSelfRecipientId();
+        final var activeGroupIds = account.getGroupStore().getGroups().stream()
+                .filter(g -> g instanceof GroupInfoV2 && g.isMember(selfRecipientId)).map(g -> (GroupInfoV2) g)
+                .map(GroupInfoV2::getGroupId).collect(Collectors.toList());
+        for (final var groupId : activeGroupIds) {
+            try {
+                context.getGroupHelper().updateGroupProfileKey(groupId);
+            } catch (GroupNotFoundException | NotAGroupMemberException | IOException e) {
+                logger.warn("Failed to update group profile key: {}", e.getMessage());
+            }
+        }
     }
 
     public Profile getRecipientProfile(RecipientId recipientId) {
         return getRecipientProfile(recipientId, false);
     }
 
+    public List<Profile> getRecipientProfiles(Collection<RecipientId> recipientIds) {
+        return getRecipientProfiles(recipientIds, false);
+    }
+
     public void refreshRecipientProfile(RecipientId recipientId) {
         getRecipientProfile(recipientId, true);
     }
 
-    public ProfileKeyCredential getRecipientProfileKeyCredential(RecipientId recipientId) {
-        var profileKeyCredential = account.getProfileStore().getProfileKeyCredential(recipientId);
-        if (profileKeyCredential != null) {
+    public void refreshRecipientProfiles(Collection<RecipientId> recipientIds) {
+        getRecipientProfiles(recipientIds, true);
+    }
+
+    public List<ExpiringProfileKeyCredential> getExpiringProfileKeyCredential(List<RecipientId> recipientIds) {
+        final var profileFetches = Flowable.fromIterable(recipientIds)
+                .filter(recipientId -> !ExpiringProfileCredentialUtil
+                        .isValid(account.getProfileStore().getExpiringProfileKeyCredential(recipientId)))
+                .map(recipientId -> retrieveProfile(recipientId,
+                        SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL).onErrorComplete());
+        Maybe.merge(profileFetches, 10).blockingSubscribe();
+
+        return recipientIds.stream().map(r -> account.getProfileStore().getExpiringProfileKeyCredential(r))
+                .collect(Collectors.toList());
+    }
+
+    public ExpiringProfileKeyCredential getExpiringProfileKeyCredential(RecipientId recipientId) {
+        var profileKeyCredential = account.getProfileStore().getExpiringProfileKeyCredential(recipientId);
+        if (ExpiringProfileCredentialUtil.isValid(profileKeyCredential)) {
             return profileKeyCredential;
         }
 
-        ProfileAndCredential profileAndCredential;
         try {
-            profileAndCredential = retrieveProfileAndCredential(recipientId,
-                    SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL);
+            blockingGetProfile(retrieveProfile(recipientId, SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL));
         } catch (IOException e) {
             logger.warn("Failed to retrieve profile key credential, ignoring: {}", e.getMessage());
             return null;
         }
 
-        profileKeyCredential = profileAndCredential.getProfileKeyCredential().orNull();
-        account.getProfileStore().storeProfileKeyCredential(recipientId, profileKeyCredential);
-
-        var profileKey = account.getProfileStore().getProfileKey(recipientId);
-        if (profileKey != null) {
-            final var profile = decryptProfileAndDownloadAvatar(recipientId,
-                    profileKey,
-                    profileAndCredential.getProfile());
-            account.getProfileStore().storeProfile(recipientId, profile);
-        }
-
-        return profileKeyCredential;
+        return account.getProfileStore().getExpiringProfileKeyCredential(recipientId);
     }
 
     /**
-     * @param givenName  if null, the previous givenName will be kept
+     * @param givenName if null, the previous givenName will be kept
      * @param familyName if null, the previous familyName will be kept
-     * @param about      if null, the previous about text will be kept
+     * @param about if null, the previous about text will be kept
      * @param aboutEmoji if null, the previous about emoji will be kept
-     * @param avatar     if avatar is null the image from the local avatar store is used (if present),
+     * @param avatar if avatar is null the image from the local avatar store is used (if present),
      */
-    public void setProfile(
-            String givenName, final String familyName, String about, String aboutEmoji, Optional<File> avatar
-    ) throws IOException {
-        setProfile(true, givenName, familyName, about, aboutEmoji, avatar);
+    public void setProfile(String givenName, final String familyName, String about, String aboutEmoji,
+            Optional<String> avatar, byte[] mobileCoinAddress) throws IOException {
+        setProfile(true, false, givenName, familyName, about, aboutEmoji, avatar, mobileCoinAddress);
     }
 
-    public void setProfile(
-            boolean uploadProfile,
-            String givenName,
-            final String familyName,
-            String about,
-            String aboutEmoji,
-            Optional<File> avatar
-    ) throws IOException {
-        var profile = getRecipientProfile(account.getSelfRecipientId());
+    public void setProfile(boolean uploadProfile, boolean forceUploadAvatar, String givenName, final String familyName,
+            String about, String aboutEmoji, Optional<String> avatar, byte[] mobileCoinAddress) throws IOException {
+        var profile = getSelfProfile();
         var builder = profile == null ? Profile.newBuilder() : Profile.newBuilder(profile);
         if (givenName != null) {
             builder.withGivenName(givenName);
@@ -135,151 +159,114 @@ public final class ProfileHelper {
         if (aboutEmoji != null) {
             builder.withAboutEmoji(aboutEmoji);
         }
+        if (mobileCoinAddress != null) {
+            builder.withMobileCoinAddress(mobileCoinAddress);
+        }
         var newProfile = builder.build();
 
         if (uploadProfile) {
-            try (final var streamDetails = avatar == null
-                    ? avatarStore.retrieveProfileAvatar(account.getSelfAddress())
-                    : avatar.isPresent() ? Utils.createStreamDetailsFromFile(avatar.get()) : null) {
-                final var avatarPath = dependencies.getAccountManager()
-                        .setVersionedProfile(account.getUuid(),
-                                account.getProfileKey(),
-                                newProfile.getInternalServiceName(),
-                                newProfile.getAbout() == null ? "" : newProfile.getAbout(),
-                                newProfile.getAboutEmoji() == null ? "" : newProfile.getAboutEmoji(),
-                                Optional.absent(),
-                                streamDetails,
-                                List.of(/* TODO */));
-                builder.withAvatarUrlPath(avatarPath.orNull());
+            final var streamDetails = avatar != null && avatar.isPresent()
+                    ? Utils.createStreamDetails(avatar.get()).first()
+                    : forceUploadAvatar && avatar == null
+                            ? context.getAvatarStore().retrieveProfileAvatar(account.getSelfRecipientAddress())
+                            : null;
+            try (streamDetails) {
+                final var avatarUploadParams = streamDetails != null ? AvatarUploadParams.forAvatar(streamDetails)
+                        : avatar == null ? AvatarUploadParams.unchanged(true) : AvatarUploadParams.unchanged(false);
+                final var paymentsAddress = Optional.ofNullable(newProfile.getMobileCoinAddress())
+                        .map(address -> PaymentUtils.signPaymentsAddress(address,
+                                account.getAciIdentityKeyPair().getPrivateKey()));
+                logger.debug("Uploading new profile");
+                final var avatarPath = dependencies.getAccountManager().setVersionedProfile(account.getAci(),
+                        account.getProfileKey(), newProfile.getInternalServiceName(),
+                        newProfile.getAbout() == null ? "" : newProfile.getAbout(),
+                        newProfile.getAboutEmoji() == null ? "" : newProfile.getAboutEmoji(), paymentsAddress,
+                        avatarUploadParams, List.of(/* TODO implement support for badges */));
+                if (!avatarUploadParams.keepTheSame) {
+                    builder.withAvatarUrlPath(avatarPath.orElse(null));
+                }
                 newProfile = builder.build();
             }
         }
 
         if (avatar != null) {
             if (avatar.isPresent()) {
-                avatarStore.storeProfileAvatar(account.getSelfAddress(),
-                        outputStream -> IOUtils.copyFileToStream(avatar.get(), outputStream));
+                final var streamDetails = Utils.createStreamDetails(avatar.get()).first();
+
+                context.getAvatarStore().storeProfileAvatar(account.getSelfRecipientAddress(),
+                        outputStream -> IOUtils.copyStream(streamDetails.getStream(), outputStream));
+
             } else {
-                avatarStore.deleteProfileAvatar(account.getSelfAddress());
+                context.getAvatarStore().deleteProfileAvatar(account.getSelfRecipientAddress());
             }
         }
         account.getProfileStore().storeProfile(account.getSelfRecipientId(), newProfile);
     }
 
-    private final Set<RecipientId> pendingProfileRequest = new HashSet<>();
+    public Profile getSelfProfile() {
+        return getRecipientProfile(account.getSelfRecipientId());
+    }
+
+    private List<Profile> getRecipientProfiles(Collection<RecipientId> recipientIds, boolean force) {
+        final var profileStore = account.getProfileStore();
+        final var profileFetches = Flowable.fromIterable(recipientIds)
+                .filter(recipientId -> force || isProfileRefreshRequired(profileStore.getProfile(recipientId)))
+                .map(recipientId -> retrieveProfile(recipientId, SignalServiceProfile.RequestType.PROFILE)
+                        .onErrorComplete());
+        Maybe.merge(profileFetches, 10).blockingSubscribe();
+
+        return recipientIds.stream().map(profileStore::getProfile).collect(Collectors.toList());
+    }
 
     private Profile getRecipientProfile(RecipientId recipientId, boolean force) {
         var profile = account.getProfileStore().getProfile(recipientId);
 
-        var now = System.currentTimeMillis();
-        // Profiles are cached for 24h before retrieving them again, unless forced
-        if (!force && profile != null && now - profile.getLastUpdateTimestamp() < 24 * 60 * 60 * 1000) {
+        if (!force && !isProfileRefreshRequired(profile)) {
             return profile;
         }
 
-        synchronized (pendingProfileRequest) {
-            if (pendingProfileRequest.contains(recipientId)) {
-                return profile;
-            }
-            pendingProfileRequest.add(recipientId);
-        }
-        final SignalServiceProfile encryptedProfile;
         try {
-            encryptedProfile = retrieveEncryptedProfile(recipientId);
-        } finally {
-            synchronized (pendingProfileRequest) {
-                pendingProfileRequest.remove(recipientId);
-            }
-        }
-        if (encryptedProfile == null) {
-            return null;
-        }
-
-        profile = decryptProfileIfKeyKnown(recipientId, encryptedProfile);
-        account.getProfileStore().storeProfile(recipientId, profile);
-
-        return profile;
-    }
-
-    private Profile decryptProfileIfKeyKnown(
-            final RecipientId recipientId, final SignalServiceProfile encryptedProfile
-    ) {
-        var profileKey = account.getProfileStore().getProfileKey(recipientId);
-        if (profileKey == null) {
-            return new Profile(System.currentTimeMillis(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    ProfileUtils.getUnidentifiedAccessMode(encryptedProfile, null),
-                    ProfileUtils.getCapabilities(encryptedProfile));
-        }
-
-        return decryptProfileAndDownloadAvatar(recipientId, profileKey, encryptedProfile);
-    }
-
-    private SignalServiceProfile retrieveEncryptedProfile(RecipientId recipientId) {
-        try {
-            return retrieveProfileAndCredential(recipientId, SignalServiceProfile.RequestType.PROFILE).getProfile();
+            blockingGetProfile(retrieveProfile(recipientId, SignalServiceProfile.RequestType.PROFILE));
         } catch (IOException e) {
             logger.warn("Failed to retrieve profile, ignoring: {}", e.getMessage());
-            return null;
         }
+
+        return account.getProfileStore().getProfile(recipientId);
     }
 
-    private SignalServiceProfile retrieveProfileSync(String username) throws IOException {
-        final var locale = Locale.getDefault();
-        return dependencies.getMessageReceiver().retrieveProfileByUsername(username, Optional.absent(), locale);
-    }
-
-    private ProfileAndCredential retrieveProfileAndCredential(
-            final RecipientId recipientId, final SignalServiceProfile.RequestType requestType
-    ) throws IOException {
-        final var profileAndCredential = retrieveProfileSync(recipientId, requestType);
-        final var profile = profileAndCredential.getProfile();
-
-        try {
-            var newIdentity = account.getIdentityKeyStore()
-                    .saveIdentity(recipientId,
-                            new IdentityKey(Base64.getDecoder().decode(profile.getIdentityKey())),
-                            new Date());
-
-            if (newIdentity) {
-                account.getSessionStore().archiveSessions(recipientId);
-            }
-        } catch (InvalidKeyException ignored) {
-            logger.warn("Got invalid identity key in profile for {}",
-                    addressResolver.resolveSignalServiceAddress(recipientId).getIdentifier());
+    private boolean isProfileRefreshRequired(final Profile profile) {
+        if (profile == null) {
+            return true;
         }
-        return profileAndCredential;
+        // Profiles are cached for 6h before retrieving them again, unless forced
+        final var now = System.currentTimeMillis();
+        return now - profile.getLastUpdateTimestamp() >= 6 * 60 * 60 * 1000;
     }
 
-    private Profile decryptProfileAndDownloadAvatar(
-            final RecipientId recipientId, final ProfileKey profileKey, final SignalServiceProfile encryptedProfile
-    ) {
+    private Profile decryptProfileAndDownloadAvatar(final RecipientId recipientId, final ProfileKey profileKey,
+            final SignalServiceProfile encryptedProfile) {
         final var avatarPath = encryptedProfile.getAvatar();
         downloadProfileAvatar(recipientId, avatarPath, profileKey);
 
         return ProfileUtils.decryptProfile(profileKey, encryptedProfile);
     }
 
-    public void downloadProfileAvatar(
-            final RecipientId recipientId, final String avatarPath, final ProfileKey profileKey
-    ) {
+    public void downloadProfileAvatar(final RecipientId recipientId, final String avatarPath,
+            final ProfileKey profileKey) {
         var profile = account.getProfileStore().getProfile(recipientId);
         if (profile == null || !Objects.equals(avatarPath, profile.getAvatarUrlPath())) {
-            downloadProfileAvatar(addressResolver.resolveSignalServiceAddress(recipientId), avatarPath, profileKey);
+            logger.trace("Downloading profile avatar for {}", recipientId);
+            downloadProfileAvatar(account.getRecipientAddressResolver().resolveRecipientAddress(recipientId),
+                    avatarPath, profileKey);
             var builder = profile == null ? Profile.newBuilder() : Profile.newBuilder(profile);
             account.getProfileStore().storeProfile(recipientId, builder.withAvatarUrlPath(avatarPath).build());
         }
     }
 
-    private ProfileAndCredential retrieveProfileSync(
-            RecipientId recipientId, SignalServiceProfile.RequestType requestType
-    ) throws IOException {
+    @SuppressWarnings("null")
+    private ProfileAndCredential blockingGetProfile(Single<ProfileAndCredential> profile) throws IOException {
         try {
-            return retrieveProfile(recipientId, requestType).blockingGet();
+            return profile.blockingGet();
         } catch (RuntimeException e) {
             if (e.getCause() instanceof PushNetworkException) {
                 throw (PushNetworkException) e.getCause();
@@ -291,57 +278,87 @@ public final class ProfileHelper {
         }
     }
 
-    private Single<ProfileAndCredential> retrieveProfile(
-            RecipientId recipientId, SignalServiceProfile.RequestType requestType
-    ) {
+    private Single<ProfileAndCredential> retrieveProfile(RecipientId recipientId,
+            SignalServiceProfile.RequestType requestType) {
         var unidentifiedAccess = getUnidentifiedAccess(recipientId);
-        var profileKey = Optional.fromNullable(account.getProfileStore().getProfileKey(recipientId));
+        var profileKey = Optional.ofNullable(account.getProfileStore().getProfileKey(recipientId));
 
-        final var address = addressResolver.resolveSignalServiceAddress(recipientId);
-        return retrieveProfile(address, profileKey, unidentifiedAccess, requestType);
+        logger.trace("Retrieving profile for {} {}", recipientId,
+                profileKey.isPresent() ? "with profile key" : "without profile key");
+        final var address = context.getRecipientHelper().resolveSignalServiceAddress(recipientId);
+        return retrieveProfile(address, profileKey, unidentifiedAccess, requestType).doOnSuccess(p -> {
+            logger.trace("Got new profile for {}", recipientId);
+            final var encryptedProfile = p.getProfile();
+
+            if (requestType == SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL || !ExpiringProfileCredentialUtil
+                    .isValid(account.getProfileStore().getExpiringProfileKeyCredential(recipientId))) {
+                logger.trace("Storing profile credential");
+                final var profileKeyCredential = p.getExpiringProfileKeyCredential().orElse(null);
+                account.getProfileStore().storeExpiringProfileKeyCredential(recipientId, profileKeyCredential);
+            }
+
+            final var profile = account.getProfileStore().getProfile(recipientId);
+
+            Profile newProfile = null;
+            if (profileKey.isPresent()) {
+                logger.trace("Decrypting profile");
+                newProfile = decryptProfileAndDownloadAvatar(recipientId, profileKey.get(), encryptedProfile);
+            }
+
+            if (newProfile == null) {
+                newProfile = (profile == null ? Profile.newBuilder() : Profile.newBuilder(profile))
+                        .withLastUpdateTimestamp(System.currentTimeMillis())
+                        .withUnidentifiedAccessMode(ProfileUtils.getUnidentifiedAccessMode(encryptedProfile, null))
+                        .withCapabilities(ProfileUtils.getCapabilities(encryptedProfile)).build();
+            }
+
+            try {
+                logger.trace("Storing identity");
+                final var identityKey = new IdentityKey(Base64.getDecoder().decode(encryptedProfile.getIdentityKey()));
+                account.getIdentityKeyStore().saveIdentity(p.getProfile().getServiceId(), identityKey);
+            } catch (InvalidKeyException ignored) {
+                logger.warn("Got invalid identity key in profile for {}",
+                        context.getRecipientHelper().resolveSignalServiceAddress(recipientId).getIdentifier());
+            }
+
+            logger.trace("Storing profile");
+            account.getProfileStore().storeProfile(recipientId, newProfile);
+
+            logger.trace("Done handling retrieved profile");
+        }).doOnError(e -> {
+            logger.warn("Failed to retrieve profile, ignoring: {}", e.getMessage());
+            final var profile = account.getProfileStore().getProfile(recipientId);
+            final var newProfile = (profile == null ? Profile.newBuilder() : Profile.newBuilder(profile))
+                    .withLastUpdateTimestamp(System.currentTimeMillis())
+                    .withUnidentifiedAccessMode(Profile.UnidentifiedAccessMode.UNKNOWN).withCapabilities(Set.of())
+                    .build();
+
+            account.getProfileStore().storeProfile(recipientId, newProfile);
+        });
     }
 
-    private Single<ProfileAndCredential> retrieveProfile(
-            SignalServiceAddress address,
-            Optional<ProfileKey> profileKey,
-            Optional<UnidentifiedAccess> unidentifiedAccess,
-            SignalServiceProfile.RequestType requestType
-    ) {
-        var profileService = dependencies.getProfileService();
+    private Single<ProfileAndCredential> retrieveProfile(SignalServiceAddress address, Optional<ProfileKey> profileKey,
+            Optional<UnidentifiedAccess> unidentifiedAccess, SignalServiceProfile.RequestType requestType) {
+        final var profileService = dependencies.getProfileService();
+        final var locale = Utils.getDefaultLocale(Locale.US);
 
-        Single<ServiceResponse<ProfileAndCredential>> responseSingle;
-        final var locale = Locale.getDefault();
-        try {
-            responseSingle = profileService.getProfile(address, profileKey, unidentifiedAccess, requestType, locale);
-        } catch (NoClassDefFoundError e) {
-            // Native zkgroup lib not available for ProfileKey
-            responseSingle = profileService.getProfile(address,
-                    Optional.absent(),
-                    unidentifiedAccess,
-                    requestType,
-                    locale);
-        }
-
-        return responseSingle.map(pair -> {
+        return profileService.getProfile(address, profileKey, unidentifiedAccess, requestType, locale).map(pair -> {
             var processor = new ProfileService.ProfileResponseProcessor(pair);
             if (processor.hasResult()) {
                 return processor.getResult();
             } else if (processor.notFound()) {
                 throw new NotFoundException("Profile not found");
             } else {
-                throw pair.getExecutionError()
-                        .or(pair.getApplicationError())
-                        .or(new IOException("Unknown error while retrieving profile"));
+                throw pair.getExecutionError().or(pair::getApplicationError)
+                        .orElseThrow(() -> new IOException("Unknown error while retrieving profile"));
             }
         });
     }
 
-    private void downloadProfileAvatar(
-            SignalServiceAddress address, String avatarPath, ProfileKey profileKey
-    ) {
+    private void downloadProfileAvatar(RecipientAddress address, String avatarPath, ProfileKey profileKey) {
         if (avatarPath == null) {
             try {
-                avatarStore.deleteProfileAvatar(address);
+                context.getAvatarStore().deleteProfileAvatar(address);
             } catch (IOException e) {
                 logger.warn("Failed to delete local profile avatar, ignoring: {}", e.getMessage());
             }
@@ -349,45 +366,37 @@ public final class ProfileHelper {
         }
 
         try {
-            avatarStore.storeProfileAvatar(address,
+            context.getAvatarStore().storeProfileAvatar(address,
                     outputStream -> retrieveProfileAvatar(avatarPath, profileKey, outputStream));
         } catch (Throwable e) {
-            if (e instanceof AssertionError && e.getCause() instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
             logger.warn("Failed to download profile avatar, ignoring: {}", e.getMessage());
         }
     }
 
-    private void retrieveProfileAvatar(
-            String avatarPath, ProfileKey profileKey, OutputStream outputStream
-    ) throws IOException {
+    private void retrieveProfileAvatar(String avatarPath, ProfileKey profileKey, OutputStream outputStream)
+            throws IOException {
         var tmpFile = IOUtils.createTempFile();
-        try (var input = dependencies.getMessageReceiver()
-                .retrieveProfileAvatar(avatarPath,
-                        tmpFile,
-                        profileKey,
-                        ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE)) {
+        try (var input = dependencies.getMessageReceiver().retrieveProfileAvatar(avatarPath, tmpFile, profileKey,
+                ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE)) {
             // Use larger buffer size to prevent AssertionError: Need: 12272 but only have: 8192 ...
             IOUtils.copyStream(input, outputStream, (int) ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE);
         } finally {
             try {
                 Files.delete(tmpFile.toPath());
             } catch (IOException e) {
-                logger.warn("Failed to delete received profile avatar temp file “{}”, ignoring: {}",
-                        tmpFile,
+                logger.warn("Failed to delete received profile avatar temp file “{}”, ignoring: {}", tmpFile,
                         e.getMessage());
             }
         }
     }
 
     private Optional<UnidentifiedAccess> getUnidentifiedAccess(RecipientId recipientId) {
-        var unidentifiedAccess = unidentifiedAccessProvider.getAccessFor(recipientId);
+        var unidentifiedAccess = context.getUnidentifiedAccessHelper().getAccessFor(recipientId, true);
 
         if (unidentifiedAccess.isPresent()) {
             return unidentifiedAccess.get().getTargetUnidentifiedAccess();
         }
 
-        return Optional.absent();
+        return Optional.empty();
     }
 }

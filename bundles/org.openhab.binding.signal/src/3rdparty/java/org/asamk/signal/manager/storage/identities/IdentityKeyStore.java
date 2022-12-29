@@ -1,282 +1,238 @@
 package org.asamk.signal.manager.storage.identities;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.asamk.signal.manager.TrustLevel;
-import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.asamk.signal.manager.storage.recipients.RecipientResolver;
-import org.asamk.signal.manager.util.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Date;
-import java.util.HashMap;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class IdentityKeyStore implements org.whispersystems.libsignal.state.IdentityKeyStore {
+import org.asamk.signal.manager.api.TrustLevel;
+import org.asamk.signal.manager.storage.Database;
+import org.asamk.signal.manager.storage.Utils;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.state.IdentityKeyStore.Direction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.push.ServiceId;
+
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+
+public class IdentityKeyStore {
 
     private final static Logger logger = LoggerFactory.getLogger(IdentityKeyStore.class);
-    private final ObjectMapper objectMapper = org.asamk.signal.manager.storage.Utils.createStorageObjectMapper();
-
-    private final Map<RecipientId, IdentityInfo> cachedIdentities = new HashMap<>();
-
-    private final File identitiesPath;
-
-    private final RecipientResolver resolver;
-    private final IdentityKeyPair identityKeyPair;
-    private final int localRegistrationId;
+    private static final String TABLE_IDENTITY = "identity";
+    private final Database database;
     private final TrustNewIdentity trustNewIdentity;
+    private final PublishSubject<ServiceId> identityChanges = PublishSubject.create();
 
-    public IdentityKeyStore(
-            final File identitiesPath,
-            final RecipientResolver resolver,
-            final IdentityKeyPair identityKeyPair,
-            final int localRegistrationId,
-            final TrustNewIdentity trustNewIdentity
-    ) {
-        this.identitiesPath = identitiesPath;
-        this.resolver = resolver;
-        this.identityKeyPair = identityKeyPair;
-        this.localRegistrationId = localRegistrationId;
+    private boolean isRetryingDecryption = false;
+
+    public static void createSql(Connection connection) throws SQLException {
+        // When modifying the CREATE statement here, also add a migration in AccountDatabase.java
+        try (final var statement = connection.createStatement()) {
+            statement.executeUpdate("                    CREATE TABLE identity (\n"
+                    + "                      _id INTEGER PRIMARY KEY,\n"
+                    + "                      uuid BLOB UNIQUE NOT NULL,\n"
+                    + "                      identity_key BLOB NOT NULL,\n"
+                    + "                      added_timestamp INTEGER NOT NULL,\n"
+                    + "                      trust_level INTEGER NOT NULL\n" + "                    ) STRICT;\n" + "");
+        }
+    }
+
+    public IdentityKeyStore(final Database database, final TrustNewIdentity trustNewIdentity) {
+        this.database = database;
         this.trustNewIdentity = trustNewIdentity;
     }
 
-    @Override
-    public IdentityKeyPair getIdentityKeyPair() {
-        return identityKeyPair;
+    public Observable<ServiceId> getIdentityChanges() {
+        return identityChanges;
     }
 
-    @Override
-    public int getLocalRegistrationId() {
-        return localRegistrationId;
-    }
-
-    @Override
-    public boolean saveIdentity(SignalProtocolAddress address, IdentityKey identityKey) {
-        final var recipientId = resolveRecipient(address.getName());
-
-        return saveIdentity(recipientId, identityKey, new Date());
-    }
-
-    public boolean saveIdentity(final RecipientId recipientId, final IdentityKey identityKey, Date added) {
-        synchronized (cachedIdentities) {
-            final var identityInfo = loadIdentityLocked(recipientId);
+    public boolean saveIdentity(final ServiceId serviceId, final IdentityKey identityKey) {
+        if (isRetryingDecryption) {
+            return false;
+        }
+        try (final var connection = database.getConnection()) {
+            final var identityInfo = loadIdentity(connection, serviceId);
             if (identityInfo != null && identityInfo.getIdentityKey().equals(identityKey)) {
                 // Identity already exists, not updating the trust level
+                logger.trace("Not storing new identity for recipient {}, identity already stored", serviceId);
                 return false;
             }
 
-            final var trustLevel = trustNewIdentity == TrustNewIdentity.ALWAYS || (
-                    trustNewIdentity == TrustNewIdentity.ON_FIRST_USE && identityInfo == null
-            ) ? TrustLevel.TRUSTED_UNVERIFIED : TrustLevel.UNTRUSTED;
-            logger.debug("Storing new identity for recipient {} with trust {}", recipientId, trustLevel);
-            final var newIdentityInfo = new IdentityInfo(recipientId, identityKey, trustLevel, added);
-            storeIdentityLocked(recipientId, newIdentityInfo);
+            saveNewIdentity(connection, serviceId, identityKey, identityInfo == null);
             return true;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update identity store", e);
         }
     }
 
-    public boolean setIdentityTrustLevel(
-            RecipientId recipientId, IdentityKey identityKey, TrustLevel trustLevel
-    ) {
-        synchronized (cachedIdentities) {
-            final var identityInfo = loadIdentityLocked(recipientId);
-            if (identityInfo == null || !identityInfo.getIdentityKey().equals(identityKey)) {
-                // Identity not found, not updating the trust level
+    public void setRetryingDecryption(final boolean retryingDecryption) {
+        isRetryingDecryption = retryingDecryption;
+    }
+
+    public boolean setIdentityTrustLevel(ServiceId serviceId, IdentityKey identityKey, TrustLevel trustLevel) {
+        try (final var connection = database.getConnection()) {
+            final var identityInfo = loadIdentity(connection, serviceId);
+            if (identityInfo == null) {
+                logger.debug("Not updating trust level for recipient {}, identity not found", serviceId);
+                return false;
+            }
+            if (!identityInfo.getIdentityKey().equals(identityKey)) {
+                logger.debug("Not updating trust level for recipient {}, different identity found", serviceId);
+                return false;
+            }
+            if (identityInfo.getTrustLevel() == trustLevel) {
+                logger.trace("Not updating trust level for recipient {}, trust level already matches", serviceId);
                 return false;
             }
 
-            final var newIdentityInfo = new IdentityInfo(recipientId,
-                    identityKey,
-                    trustLevel,
-                    identityInfo.getDateAdded());
-            storeIdentityLocked(recipientId, newIdentityInfo);
+            logger.debug("Updating trust level for recipient {} with trust {}", serviceId, trustLevel);
+            final var newIdentityInfo = new IdentityInfo(serviceId, identityKey, trustLevel,
+                    identityInfo.getDateAddedTimestamp());
+            storeIdentity(connection, newIdentityInfo);
             return true;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update identity store", e);
         }
     }
 
-    @Override
-    public boolean isTrustedIdentity(SignalProtocolAddress address, IdentityKey identityKey, Direction direction) {
+    public boolean isTrustedIdentity(ServiceId serviceId, IdentityKey identityKey, Direction direction) {
         if (trustNewIdentity == TrustNewIdentity.ALWAYS) {
             return true;
         }
 
-        var recipientId = resolveRecipient(address.getName());
-
-        synchronized (cachedIdentities) {
-            final var identityInfo = loadIdentityLocked(recipientId);
-            if (identityInfo == null) {
-                // Identity not found
-                return trustNewIdentity == TrustNewIdentity.ON_FIRST_USE;
-            }
-
+        try (final var connection = database.getConnection()) {
             // TODO implement possibility for different handling of incoming/outgoing trust decisions
-            if (!identityInfo.getIdentityKey().equals(identityKey)) {
+            var identityInfo = loadIdentity(connection, serviceId);
+            if (identityInfo == null) {
+                logger.debug("Initial identity found for {}, saving.", serviceId);
+                saveNewIdentity(connection, serviceId, identityKey, true);
+                identityInfo = loadIdentity(connection, serviceId);
+            } else if (!identityInfo.getIdentityKey().equals(identityKey)) {
                 // Identity found, but different
-                return false;
+                if (direction == Direction.SENDING) {
+                    logger.debug("Changed identity found for {}, saving.", serviceId);
+                    saveNewIdentity(connection, serviceId, identityKey, false);
+                    identityInfo = loadIdentity(connection, serviceId);
+                } else {
+                    logger.trace("Trusting identity for {} for {}: {}", serviceId, direction, false);
+                    return false;
+                }
             }
 
-            return identityInfo.isTrusted();
+            final var isTrusted = identityInfo != null && identityInfo.isTrusted();
+            logger.trace("Trusting identity for {} for {}: {}", serviceId, direction, isTrusted);
+            return isTrusted;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from identity store", e);
         }
     }
 
-    @Override
-    public IdentityKey getIdentity(SignalProtocolAddress address) {
-        var recipientId = resolveRecipient(address.getName());
-
-        synchronized (cachedIdentities) {
-            var identity = loadIdentityLocked(recipientId);
-            return identity == null ? null : identity.getIdentityKey();
+    public IdentityInfo getIdentityInfo(ServiceId serviceId) {
+        try (final var connection = database.getConnection()) {
+            return loadIdentity(connection, serviceId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from identity store", e);
         }
     }
-
-    public IdentityInfo getIdentity(RecipientId recipientId) {
-        synchronized (cachedIdentities) {
-            return loadIdentityLocked(recipientId);
-        }
-    }
-
-    final Pattern identityFileNamePattern = Pattern.compile("([0-9]+)");
 
     public List<IdentityInfo> getIdentities() {
-        final var files = identitiesPath.listFiles();
-        if (files == null) {
-            return List.of();
-        }
-        return Arrays.stream(files)
-                .filter(f -> identityFileNamePattern.matcher(f.getName()).matches())
-                .map(f -> RecipientId.of(Integer.parseInt(f.getName())))
-                .map(this::loadIdentityLocked)
-                .collect(Collectors.toList());
-    }
-
-    public void mergeRecipients(final RecipientId recipientId, final RecipientId toBeMergedRecipientId) {
-        synchronized (cachedIdentities) {
-            deleteIdentityLocked(toBeMergedRecipientId);
-        }
-    }
-
-    /**
-     * @param identifier can be either a serialized uuid or a e164 phone number
-     */
-    private RecipientId resolveRecipient(String identifier) {
-        return resolver.resolveRecipient(identifier);
-    }
-
-    private File getIdentityFile(final RecipientId recipientId) {
-        try {
-            IOUtils.createPrivateDirectories(identitiesPath);
-        } catch (IOException e) {
-            throw new AssertionError("Failed to create identities path", e);
-        }
-        return new File(identitiesPath, String.valueOf(recipientId.getId()));
-    }
-
-    private IdentityInfo loadIdentityLocked(final RecipientId recipientId) {
-        {
-            final var session = cachedIdentities.get(recipientId);
-            if (session != null) {
-                return session;
+        try (final var connection = database.getConnection()) {
+            final var sql = String
+                    .format("                    SELECT i.uuid, i.identity_key, i.added_timestamp, i.trust_level\n"
+                            + "                    FROM %s AS i\n", TABLE_IDENTITY);
+            try (final var statement = connection.prepareStatement(sql)) {
+                return Utils.executeQueryForStream(statement, this::getIdentityInfoFromResultSet)
+                        .collect(Collectors.toList());
             }
-        }
-
-        final var file = getIdentityFile(recipientId);
-        if (!file.exists()) {
-            return null;
-        }
-        try (var inputStream = new FileInputStream(file)) {
-            var storage = objectMapper.readValue(inputStream, IdentityStorage.class);
-
-            var id = new IdentityKey(Base64.getDecoder().decode(storage.getIdentityKey()));
-            var trustLevel = TrustLevel.fromInt(storage.getTrustLevel());
-            var added = new Date(storage.getAddedTimestamp());
-
-            final var identityInfo = new IdentityInfo(recipientId, id, trustLevel, added);
-            cachedIdentities.put(recipientId, identityInfo);
-            return identityInfo;
-        } catch (IOException | InvalidKeyException e) {
-            logger.warn("Failed to load identity key: {}", e.getMessage());
-            return null;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from identity store", e);
         }
     }
 
-    private void storeIdentityLocked(final RecipientId recipientId, final IdentityInfo identityInfo) {
-        cachedIdentities.put(recipientId, identityInfo);
+    public void deleteIdentity(final ServiceId serviceId) {
+        try (final var connection = database.getConnection()) {
+            deleteIdentity(connection, serviceId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update identity store", e);
+        }
+    }
 
-        var storage = new IdentityStorage(Base64.getEncoder().encodeToString(identityInfo.getIdentityKey().serialize()),
-                identityInfo.getTrustLevel().ordinal(),
-                identityInfo.getDateAdded().getTime());
-
-        final var file = getIdentityFile(recipientId);
-        // Write to memory first to prevent corrupting the file in case of serialization errors
-        try (var inMemoryOutput = new ByteArrayOutputStream()) {
-            objectMapper.writeValue(inMemoryOutput, storage);
-
-            var input = new ByteArrayInputStream(inMemoryOutput.toByteArray());
-            try (var outputStream = new FileOutputStream(file)) {
-                input.transferTo(outputStream);
+    void addLegacyIdentities(final Collection<IdentityInfo> identities) {
+        logger.debug("Migrating legacy identities to database");
+        long start = System.nanoTime();
+        try (final var connection = database.getConnection()) {
+            connection.setAutoCommit(false);
+            for (final var identityInfo : identities) {
+                storeIdentity(connection, identityInfo);
             }
-        } catch (Exception e) {
-            logger.error("Error saving identity file: {}", e.getMessage());
+            connection.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update identity store", e);
+        }
+        logger.debug("Complete identities migration took {}ms", (System.nanoTime() - start) / 1000000);
+    }
+
+    private IdentityInfo loadIdentity(final Connection connection, final ServiceId serviceId) throws SQLException {
+        final var sql = String
+                .format("                SELECT i.uuid, i.identity_key, i.added_timestamp, i.trust_level\n"
+                        + "                FROM %s AS i\n" + "                WHERE i.uuid = ?\n", TABLE_IDENTITY);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, serviceId.toByteArray());
+            return Utils.executeQueryForOptional(statement, this::getIdentityInfoFromResultSet).orElse(null);
         }
     }
 
-    private void deleteIdentityLocked(final RecipientId recipientId) {
-        cachedIdentities.remove(recipientId);
+    private void saveNewIdentity(final Connection connection, final ServiceId serviceId, final IdentityKey identityKey,
+            final boolean firstIdentity) throws SQLException {
+        final var trustLevel = trustNewIdentity == TrustNewIdentity.ALWAYS
+                || (trustNewIdentity == TrustNewIdentity.ON_FIRST_USE && firstIdentity) ? TrustLevel.TRUSTED_UNVERIFIED
+                        : TrustLevel.UNTRUSTED;
+        logger.debug("Storing new identity for recipient {} with trust {}", serviceId, trustLevel);
+        final var newIdentityInfo = new IdentityInfo(serviceId, identityKey, trustLevel, System.currentTimeMillis());
+        storeIdentity(connection, newIdentityInfo);
+        identityChanges.onNext(serviceId);
+    }
 
-        final var file = getIdentityFile(recipientId);
-        if (!file.exists()) {
-            return;
+    private void storeIdentity(final Connection connection, final IdentityInfo identityInfo) throws SQLException {
+        logger.trace("Storing identity info for {}, trust: {}, added: {}", identityInfo.getServiceId(),
+                identityInfo.getTrustLevel(), identityInfo.getDateAddedTimestamp());
+        final var sql = String
+                .format("                INSERT OR REPLACE INTO %s (uuid, identity_key, added_timestamp, trust_level)\n"
+                        + "                VALUES (?, ?, ?, ?)\n", TABLE_IDENTITY);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, identityInfo.getServiceId().toByteArray());
+            statement.setBytes(2, identityInfo.getIdentityKey().serialize());
+            statement.setLong(3, identityInfo.getDateAddedTimestamp());
+            statement.setInt(4, identityInfo.getTrustLevel().ordinal());
+            statement.executeUpdate();
         }
+    }
+
+    private void deleteIdentity(final Connection connection, final ServiceId serviceId) throws SQLException {
+        final var sql = String.format("                DELETE FROM %s AS i\n" + "                WHERE i.uuid = ?\n",
+                TABLE_IDENTITY);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, serviceId.toByteArray());
+            statement.executeUpdate();
+        }
+    }
+
+    private IdentityInfo getIdentityInfoFromResultSet(ResultSet resultSet) throws SQLException {
         try {
-            Files.delete(file.toPath());
-        } catch (IOException e) {
-            logger.error("Failed to delete identity file {}: {}", file, e.getMessage());
-        }
-    }
+            final var serviceId = ServiceId.parseOrThrow(resultSet.getBytes("uuid"));
+            final var id = new IdentityKey(resultSet.getBytes("identity_key"));
+            final var trustLevel = TrustLevel.fromInt(resultSet.getInt("trust_level"));
+            final var added = resultSet.getLong("added_timestamp");
 
-    private static final class IdentityStorage {
-
-        private String identityKey;
-        private int trustLevel;
-        private long addedTimestamp;
-
-        // For deserialization
-        private IdentityStorage() {
-        }
-
-        private IdentityStorage(final String identityKey, final int trustLevel, final long addedTimestamp) {
-            this.identityKey = identityKey;
-            this.trustLevel = trustLevel;
-            this.addedTimestamp = addedTimestamp;
-        }
-
-        public String getIdentityKey() {
-            return identityKey;
-        }
-
-        public int getTrustLevel() {
-            return trustLevel;
-        }
-
-        public long getAddedTimestamp() {
-            return addedTimestamp;
+            return new IdentityInfo(serviceId, id, trustLevel, added);
+        } catch (InvalidKeyException e) {
+            logger.warn("Failed to load identity key, resetting: {}", e.getMessage());
+            return null;
         }
     }
 }

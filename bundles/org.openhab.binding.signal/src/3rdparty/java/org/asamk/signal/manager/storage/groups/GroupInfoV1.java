@@ -6,12 +6,13 @@ import org.asamk.signal.manager.groups.GroupInviteLinkUrl;
 import org.asamk.signal.manager.groups.GroupPermission;
 import org.asamk.signal.manager.groups.GroupUtils;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
+import org.whispersystems.signalservice.api.push.DistributionId;
 
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public class GroupInfoV1 extends GroupInfo {
+public final class GroupInfoV1 extends GroupInfo {
 
     private final GroupIdV1 groupId;
 
@@ -42,7 +43,7 @@ public class GroupInfoV1 extends GroupInfo {
         this.groupId = groupId;
         this.expectedV2Id = expectedV2Id;
         this.name = name;
-        this.members = members;
+        this.members = new HashSet<>(members);
         this.color = color;
         this.messageExpirationTime = messageExpirationTime;
         this.blocked = blocked;
@@ -52,6 +53,11 @@ public class GroupInfoV1 extends GroupInfo {
     @Override
     public GroupIdV1 getGroupId() {
         return groupId;
+    }
+
+    @Override
+    public DistributionId getDistributionId() {
+        return null;
     }
 
     public GroupIdV2 getExpectedV2Id() {
@@ -72,7 +78,7 @@ public class GroupInfoV1 extends GroupInfo {
     }
 
     public Set<RecipientId> getMembers() {
-        return members;
+        return new HashSet<>(members);
     }
 
     @Override

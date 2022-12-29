@@ -1,5 +1,6 @@
 package org.asamk.signal.manager.groups;
 
+@SuppressWarnings("serial")
 public class NotAGroupMemberException extends Exception {
 
     public NotAGroupMemberException(GroupId groupId, String groupName) {
