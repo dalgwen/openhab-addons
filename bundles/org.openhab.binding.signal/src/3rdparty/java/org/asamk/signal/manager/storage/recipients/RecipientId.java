@@ -1,38 +1,46 @@
 package org.asamk.signal.manager.storage.recipients;
 
-public class RecipientId {
+import java.util.Objects;
 
-    private final long id;
+public final class RecipientId {
 
-    RecipientId(final long id) {
+    public long id;
+    public final RecipientStore recipientStore;
+
+    RecipientId(long id, final RecipientStore recipientStore) {
         this.id = id;
+        this.recipientStore = recipientStore;
     }
 
-    public static RecipientId of(long id) {
-        return new RecipientId(id);
-    }
-
-    public long getId() {
-        return id;
+    public long id() {
+        if (recipientStore != null) {
+            final var actualRecipientId = recipientStore.getActualRecipientId(this.id);
+            if (actualRecipientId != this.id) {
+                this.id = actualRecipientId;
+            }
+        }
+        return this.id;
     }
 
     @Override
-    public String toString() {
-        return "RecipientId{" + "id=" + id + '}';
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        final RecipientId that = (RecipientId) o;
-
-        return id == that.id;
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
+        var that = (RecipientId) obj;
+        return this.id() == that.id();
     }
 
     @Override
     public int hashCode() {
-        return (int) (id ^ (id >>> 32));
+        return Objects.hash(id());
+    }
+
+    @Override
+    public String toString() {
+        return "RecipientId[" + "id=" + id() + ']';
     }
 }

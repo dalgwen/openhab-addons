@@ -23,7 +23,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public enum DeliveryStatus {
     UNKNOWN,
-    UNKNOWN_RECIPIENT,
     FAILED,
     SENT,
     DELIVERED,

@@ -13,6 +13,11 @@
 		</channels>
 
 		<config-description>
+			<parameter name="deviceName" type="text" required="false">
+				<label>Device Name</label>
+				<description>This device will be registered under this name. Choose a user-friendly and descriptive name.</description>
+				<default>openHAB</default>
+			</parameter>
 			<parameter name="phoneNumber" type="text" required="true">
 				<label>Telephone Number</label>
 				<description>Telephone Number, international format.</description>
@@ -50,15 +55,19 @@
 		</channels>
 
 		<config-description>
+			<parameter name="phoneNumber" type="text" required="true">
+				<label>Telephone Number</label>
+				<description>Telephone Number, international format.</description>
+				<default></default>
+			</parameter>
 			<parameter name="deviceName" type="text" required="false">
 				<label>Device Name</label>
-				<description>Name this device will be registered under. Choose a user-friendly and descriptive name. Used at
-					creation only</description>
+				<description>This device will be registered under this name. Choose a user-friendly and descriptive name.</description>
 				<default>openHAB</default>
 			</parameter>
 			<parameter name="qrCode" type="text" required="false">
 				<label>QR Code Link</label>
-				<description>Scan this QR Code with your Signal application on your primary device to enable the linked account</description>
+				<description>Scan this QR Code with your Signal application on your primary device to enable the linked account.</description>
 				<context>qrcode</context>
 			</parameter>
 		</config-description>

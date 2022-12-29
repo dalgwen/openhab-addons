@@ -13,6 +13,7 @@
 package org.openhab.binding.signal.internal.protocol;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * Connectivity information interface
@@ -30,7 +31,7 @@ public interface StateListener {
         DISCONNECTED;
     };
 
-    public void newStateEvent(ConnectionState connectionState);
+    public void newStateEvent(ConnectionState connectionState, @Nullable String detailledMessage);
 
     public void qrCodeToScan(String qrCode);
 }
