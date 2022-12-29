@@ -1,18 +1,18 @@
 package org.asamk.signal.manager.storage.protocol;
 
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.InvalidKeyIdException;
-import org.whispersystems.libsignal.NoSessionException;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.groups.state.SenderKeyRecord;
-import org.whispersystems.libsignal.state.IdentityKeyStore;
-import org.whispersystems.libsignal.state.PreKeyRecord;
-import org.whispersystems.libsignal.state.PreKeyStore;
-import org.whispersystems.libsignal.state.SessionRecord;
-import org.whispersystems.libsignal.state.SignedPreKeyRecord;
-import org.whispersystems.libsignal.state.SignedPreKeyStore;
-import org.whispersystems.signalservice.api.SignalServiceDataStore;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.IdentityKeyPair;
+import org.signal.libsignal.protocol.InvalidKeyIdException;
+import org.signal.libsignal.protocol.NoSessionException;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.groups.state.SenderKeyRecord;
+import org.signal.libsignal.protocol.state.IdentityKeyStore;
+import org.signal.libsignal.protocol.state.PreKeyRecord;
+import org.signal.libsignal.protocol.state.PreKeyStore;
+import org.signal.libsignal.protocol.state.SessionRecord;
+import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
+import org.signal.libsignal.protocol.state.SignedPreKeyStore;
+import org.whispersystems.signalservice.api.SignalServiceAccountDataStore;
 import org.whispersystems.signalservice.api.SignalServiceSenderKeyStore;
 import org.whispersystems.signalservice.api.SignalServiceSessionStore;
 import org.whispersystems.signalservice.api.push.DistributionId;
@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-public class SignalProtocolStore implements SignalServiceDataStore {
+public class SignalProtocolStore implements SignalServiceAccountDataStore {
 
     private final PreKeyStore preKeyStore;
     private final SignedPreKeyStore signedPreKeyStore;
@@ -131,6 +131,7 @@ public class SignalProtocolStore implements SignalServiceDataStore {
     @Override
     public void archiveSession(final SignalProtocolAddress address) {
         sessionStore.archiveSession(address);
+        senderKeyStore.clearSenderKeySharedWith(List.of(address));
     }
 
     @Override
@@ -195,12 +196,5 @@ public class SignalProtocolStore implements SignalServiceDataStore {
     @Override
     public boolean isMultiDevice() {
         return isMultiDevice.get();
-    }
-
-    @Override
-    public Transaction beginTransaction() {
-        return () -> {
-            // No-op transaction should be safe, as it's only a performance improvement
-        };
     }
 }

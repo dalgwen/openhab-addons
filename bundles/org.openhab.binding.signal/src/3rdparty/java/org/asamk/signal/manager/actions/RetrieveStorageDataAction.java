@@ -1,6 +1,6 @@
 package org.asamk.signal.manager.actions;
 
-import org.asamk.signal.manager.jobs.Context;
+import org.asamk.signal.manager.helper.Context;
 
 public class RetrieveStorageDataAction implements HandleAction {
 
@@ -15,12 +15,6 @@ public class RetrieveStorageDataAction implements HandleAction {
 
     @Override
     public void execute(Context context) throws Throwable {
-        if (context.getAccount().getStorageKey() != null) {
-            context.getStorageHelper().readDataFromStorage();
-        } else {
-            if (!context.getAccount().isMasterDevice()) {
-                context.getSyncHelper().requestAllSyncData();
-            }
-        }
+        context.getStorageHelper().readDataFromStorage();
     }
 }

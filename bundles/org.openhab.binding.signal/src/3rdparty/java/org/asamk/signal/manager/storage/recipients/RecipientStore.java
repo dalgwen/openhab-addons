@@ -1,598 +1,887 @@
 package org.asamk.signal.manager.storage.recipients;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.asamk.signal.manager.storage.Utils;
-import org.asamk.signal.manager.storage.contacts.ContactsStore;
-import org.asamk.signal.manager.storage.profiles.ProfileStore;
-import org.signal.zkgroup.InvalidInputException;
-import org.signal.zkgroup.profiles.ProfileKey;
-import org.signal.zkgroup.profiles.ProfileKeyCredential;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.libsignal.util.Pair;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserException;
-import org.whispersystems.signalservice.api.util.UuidUtil;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Base64;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-public class RecipientStore implements RecipientResolver, ContactsStore, ProfileStore {
+import org.asamk.signal.manager.api.Pair;
+import org.asamk.signal.manager.api.UnregisteredRecipientException;
+import org.asamk.signal.manager.storage.Database;
+import org.asamk.signal.manager.storage.Utils;
+import org.asamk.signal.manager.storage.contacts.ContactsStore;
+import org.asamk.signal.manager.storage.profiles.ProfileStore;
+import org.signal.libsignal.zkgroup.InvalidInputException;
+import org.signal.libsignal.zkgroup.profiles.ExpiringProfileKeyCredential;
+import org.signal.libsignal.zkgroup.profiles.ProfileKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.push.ACI;
+import org.whispersystems.signalservice.api.push.PNI;
+import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.util.UuidUtil;
+
+public class RecipientStore
+        implements RecipientIdCreator, RecipientResolver, RecipientTrustedResolver, ContactsStore, ProfileStore {
 
     private final static Logger logger = LoggerFactory.getLogger(RecipientStore.class);
+    private static final String TABLE_RECIPIENT = "recipient";
+    private static final String SQL_IS_CONTACT = "r.given_name IS NOT NULL OR r.family_name IS NOT NULL OR r.expiration_time > 0 OR r.profile_sharing = TRUE OR r.color IS NOT NULL OR r.blocked = TRUE OR r.archived = TRUE";
 
-    private final ObjectMapper objectMapper;
-    private final File file;
     private final RecipientMergeHandler recipientMergeHandler;
+    private final SelfAddressProvider selfAddressProvider;
+    private final Database database;
 
-    private final Map<RecipientId, Recipient> recipients;
-    private final Map<RecipientId, RecipientId> recipientsMerged = new HashMap<>();
+    private final Object recipientsLock = new Object();
+    private final Map<Long, Long> recipientsMerged = new HashMap<>();
 
-    private long lastId;
-
-    public static RecipientStore load(File file, RecipientMergeHandler recipientMergeHandler) throws IOException {
-        final var objectMapper = Utils.createStorageObjectMapper();
-        try (var inputStream = new FileInputStream(file)) {
-            final var storage = objectMapper.readValue(inputStream, Storage.class);
-            final var recipients = storage.recipients.stream().map(r -> {
-                final var recipientId = new RecipientId(r.id);
-                final var address = new RecipientAddress(Optional.ofNullable(r.uuid).map(UuidUtil::parseOrThrow),
-                        Optional.ofNullable(r.number));
-
-                Contact contact = null;
-                if (r.contact != null) {
-                    contact = new Contact(r.contact.name,
-                            r.contact.color,
-                            r.contact.messageExpirationTime,
-                            r.contact.blocked,
-                            r.contact.archived);
-                }
-
-                ProfileKey profileKey = null;
-                if (r.profileKey != null) {
-                    try {
-                        profileKey = new ProfileKey(Base64.getDecoder().decode(r.profileKey));
-                    } catch (InvalidInputException ignored) {
-                    }
-                }
-
-                ProfileKeyCredential profileKeyCredential = null;
-                if (r.profileKeyCredential != null) {
-                    try {
-                        profileKeyCredential = new ProfileKeyCredential(Base64.getDecoder()
-                                .decode(r.profileKeyCredential));
-                    } catch (Throwable ignored) {
-                    }
-                }
-
-                Profile profile = null;
-                if (r.profile != null) {
-                    profile = new Profile(r.profile.lastUpdateTimestamp,
-                            r.profile.givenName,
-                            r.profile.familyName,
-                            r.profile.about,
-                            r.profile.aboutEmoji,
-                            r.profile.avatarUrlPath,
-                            Profile.UnidentifiedAccessMode.valueOfOrUnknown(r.profile.unidentifiedAccessMode),
-                            r.profile.capabilities.stream()
-                                    .map(Profile.Capability::valueOfOrNull)
-                                    .filter(Objects::nonNull)
-                                    .collect(Collectors.toSet()));
-                }
-
-                return new Recipient(recipientId, address, contact, profileKey, profileKeyCredential, profile);
-            }).collect(Collectors.toMap(Recipient::getRecipientId, r -> r));
-
-            return new RecipientStore(objectMapper, file, recipientMergeHandler, recipients, storage.lastId);
-        } catch (FileNotFoundException e) {
-            logger.debug("Creating new recipient store.");
-            return new RecipientStore(objectMapper, file, recipientMergeHandler, new HashMap<>(), 0);
+    public static void createSql(Connection connection) throws SQLException {
+        // When modifying the CREATE statement here, also add a migration in AccountDatabase.java
+        try (final var statement = connection.createStatement()) {
+            statement.executeUpdate("                    CREATE TABLE recipient (\n"
+                    + "                      _id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+                    + "                      number TEXT UNIQUE,\n" + "                      uuid BLOB UNIQUE,\n"
+                    + "                      pni BLOB UNIQUE,\n" + "                      profile_key BLOB,\n"
+                    + "                      profile_key_credential BLOB,\n" + "\n"
+                    + "                      given_name TEXT,\n" + "                      family_name TEXT,\n"
+                    + "                      color TEXT,\n" + "\n"
+                    + "                      expiration_time INTEGER NOT NULL DEFAULT 0,\n"
+                    + "                      blocked INTEGER NOT NULL DEFAULT FALSE,\n"
+                    + "                      archived INTEGER NOT NULL DEFAULT FALSE,\n"
+                    + "                      profile_sharing INTEGER NOT NULL DEFAULT FALSE,\n" + "\n"
+                    + "                      profile_last_update_timestamp INTEGER NOT NULL DEFAULT 0,\n"
+                    + "                      profile_given_name TEXT,\n"
+                    + "                      profile_family_name TEXT,\n"
+                    + "                      profile_about TEXT,\n"
+                    + "                      profile_about_emoji TEXT,\n"
+                    + "                      profile_avatar_url_path TEXT,\n"
+                    + "                      profile_mobile_coin_address BLOB,\n"
+                    + "                      profile_unidentified_access_mode TEXT,\n"
+                    + "                      profile_capabilities TEXT\n" + "                    ) STRICT;\n" + "");
         }
     }
 
-    private RecipientStore(
-            final ObjectMapper objectMapper,
-            final File file,
-            final RecipientMergeHandler recipientMergeHandler,
-            final Map<RecipientId, Recipient> recipients,
-            final long lastId
-    ) {
-        this.objectMapper = objectMapper;
-        this.file = file;
+    public RecipientStore(final RecipientMergeHandler recipientMergeHandler,
+            final SelfAddressProvider selfAddressProvider, final Database database) {
         this.recipientMergeHandler = recipientMergeHandler;
-        this.recipients = recipients;
-        this.lastId = lastId;
+        this.selfAddressProvider = selfAddressProvider;
+        this.database = database;
     }
 
     public RecipientAddress resolveRecipientAddress(RecipientId recipientId) {
-        synchronized (recipients) {
-            return getRecipient(recipientId).getAddress();
+        final var sql = String.format("SELECT r.number, r.uuid, r.pni \n" + " FROM %s r\n" + " WHERE r._id = ?\n",
+                TABLE_RECIPIENT);
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                statement.setLong(1, recipientId.id);
+                return Utils.executeQuerySingleRow(statement, this::getRecipientAddressFromResultSet);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
         }
     }
 
-    public Recipient getRecipient(RecipientId recipientId) {
-        synchronized (recipients) {
-            while (recipientsMerged.containsKey(recipientId)) {
-                recipientId = recipientsMerged.get(recipientId);
+    public Collection<RecipientId> getRecipientIdsWithEnabledProfileSharing() {
+        final var sql = String.format(
+                "SELECT r._id\n" + " FROM %s r\n" + " WHERE r.blocked = FALSE AND r.profile_sharing = TRUE\n",
+                TABLE_RECIPIENT);
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                try (var result = Utils.executeQueryForStream(statement, this::getRecipientIdFromResultSet)) {
+                    return result.collect(Collectors.toList());
+                }
             }
-            return recipients.get(recipientId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
         }
     }
 
     @Override
-    public RecipientId resolveRecipient(UUID uuid) {
-        return resolveRecipient(new RecipientAddress(uuid), false);
+    public RecipientId resolveRecipient(final long rawRecipientId) {
+        final var sql = String.format("SELECT r._id\n" + "FROM %s r\n" + "WHERE r._id = ?\n", TABLE_RECIPIENT);
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                statement.setLong(1, rawRecipientId);
+                return Utils.executeQueryForOptional(statement, this::getRecipientIdFromResultSet).orElse(null);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
     }
 
     @Override
     public RecipientId resolveRecipient(final String identifier) {
-        return resolveRecipient(Utils.getRecipientAddressFromIdentifier(identifier), false);
+        if (UuidUtil.isUuid(identifier)) {
+            return resolveRecipient(ServiceId.parseOrThrow(identifier));
+        } else {
+            return resolveRecipientByNumber(identifier);
+        }
     }
 
-    public RecipientId resolveRecipient(
-            final String number, Supplier<UUID> uuidSupplier
-    ) throws UnregisteredUserException {
-        final Optional<Recipient> byNumber;
-        synchronized (recipients) {
-            byNumber = findByNumberLocked(number);
-        }
-        if (byNumber.isEmpty() || byNumber.get().getAddress().getUuid().isEmpty()) {
-            final var uuid = uuidSupplier.get();
-            if (uuid == null) {
-                throw new UnregisteredUserException(number, null);
+    private RecipientId resolveRecipientByNumber(final String number) {
+        synchronized (recipientsLock) {
+            final RecipientId recipientId;
+            try (final var connection = database.getConnection()) {
+                connection.setAutoCommit(false);
+                recipientId = resolveRecipientLocked(connection, number);
+                connection.commit();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed read recipient store", e);
             }
-
-            return resolveRecipient(new RecipientAddress(uuid, number), false);
-        }
-        return byNumber.get().getRecipientId();
-    }
-
-    public RecipientId resolveRecipient(RecipientAddress address) {
-        return resolveRecipient(address, false);
-    }
-
-    @Override
-    public RecipientId resolveRecipient(final SignalServiceAddress address) {
-        return resolveRecipient(new RecipientAddress(address), false);
-    }
-
-    public RecipientId resolveRecipientTrusted(RecipientAddress address) {
-        return resolveRecipient(address, true);
-    }
-
-    public RecipientId resolveRecipientTrusted(SignalServiceAddress address) {
-        return resolveRecipient(new RecipientAddress(address), true);
-    }
-
-    public List<RecipientId> resolveRecipientsTrusted(List<RecipientAddress> addresses) {
-        final List<RecipientId> recipientIds;
-        final List<Pair<RecipientId, RecipientId>> toBeMerged = new ArrayList<>();
-        synchronized (recipients) {
-            recipientIds = addresses.stream().map(address -> {
-                final var pair = resolveRecipientLocked(address, true);
-                if (pair.second().isPresent()) {
-                    toBeMerged.add(new Pair<>(pair.first(), pair.second().get()));
-                }
-                return pair.first();
-            }).collect(Collectors.toList());
-        }
-        for (var pair : toBeMerged) {
-            recipientMergeHandler.mergeRecipients(pair.first(), pair.second());
-        }
-        return recipientIds;
-    }
-
-    @Override
-    public void storeContact(final RecipientId recipientId, final Contact contact) {
-        synchronized (recipients) {
-            final var recipient = recipients.get(recipientId);
-            storeRecipientLocked(recipientId, Recipient.newBuilder(recipient).withContact(contact).build());
+            return recipientId;
         }
     }
 
     @Override
-    public Contact getContact(final RecipientId recipientId) {
-        final var recipient = getRecipient(recipientId);
-        return recipient == null ? null : recipient.getContact();
-    }
-
-    @Override
-    public List<Pair<RecipientId, Contact>> getContacts() {
-        return recipients.entrySet()
-                .stream()
-                .filter(e -> e.getValue().getContact() != null)
-                .map(e -> new Pair<>(e.getKey(), e.getValue().getContact()))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Profile getProfile(final RecipientId recipientId) {
-        final var recipient = getRecipient(recipientId);
-        return recipient == null ? null : recipient.getProfile();
-    }
-
-    @Override
-    public ProfileKey getProfileKey(final RecipientId recipientId) {
-        final var recipient = getRecipient(recipientId);
-        return recipient == null ? null : recipient.getProfileKey();
-    }
-
-    @Override
-    public ProfileKeyCredential getProfileKeyCredential(final RecipientId recipientId) {
-        final var recipient = getRecipient(recipientId);
-        return recipient == null ? null : recipient.getProfileKeyCredential();
-    }
-
-    @Override
-    public void storeProfile(final RecipientId recipientId, final Profile profile) {
-        synchronized (recipients) {
-            final var recipient = recipients.get(recipientId);
-            storeRecipientLocked(recipientId, Recipient.newBuilder(recipient).withProfile(profile).build());
-        }
-    }
-
-    @Override
-    public void storeProfileKey(final RecipientId recipientId, final ProfileKey profileKey) {
-        synchronized (recipients) {
-            final var recipient = recipients.get(recipientId);
-            if (profileKey != null && profileKey.equals(recipient.getProfileKey())) {
-                return;
+    public RecipientId resolveRecipient(final ServiceId serviceId) {
+        synchronized (recipientsLock) {
+            final RecipientId recipientId;
+            try (final var connection = database.getConnection()) {
+                connection.setAutoCommit(false);
+                recipientId = resolveRecipientLocked(connection, serviceId);
+                connection.commit();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed read recipient store", e);
             }
-
-            final var newRecipient = Recipient.newBuilder(recipient)
-                    .withProfileKey(profileKey)
-                    .withProfileKeyCredential(null)
-                    .withProfile(recipient.getProfile() == null
-                            ? null
-                            : Profile.newBuilder(recipient.getProfile()).withLastUpdateTimestamp(0).build())
-                    .build();
-            storeRecipientLocked(recipientId, newRecipient);
-        }
-    }
-
-    @Override
-    public void storeProfileKeyCredential(
-            final RecipientId recipientId, final ProfileKeyCredential profileKeyCredential
-    ) {
-        synchronized (recipients) {
-            final var recipient = recipients.get(recipientId);
-            storeRecipientLocked(recipientId,
-                    Recipient.newBuilder(recipient).withProfileKeyCredential(profileKeyCredential).build());
-        }
-    }
-
-    public boolean isEmpty() {
-        synchronized (recipients) {
-            return recipients.isEmpty();
+            return recipientId;
         }
     }
 
     /**
-     * @param isHighTrust true, if the number/uuid connection was obtained from a trusted source.
-     *                    Has no effect, if the address contains only a number or a uuid.
+     * Should only be used for recipientIds from the database.
+     * Where the foreign key relations ensure a valid recipientId.
      */
-    private RecipientId resolveRecipient(RecipientAddress address, boolean isHighTrust) {
-        final Pair<RecipientId, Optional<RecipientId>> pair;
-        synchronized (recipients) {
-            pair = resolveRecipientLocked(address, isHighTrust);
-            if (pair.second().isPresent()) {
-                recipientsMerged.put(pair.second().get(), pair.first());
+    @Override
+    public RecipientId create(final long recipientId) {
+        return new RecipientId(recipientId, this);
+    }
+
+    public RecipientId resolveRecipient(final String number, Supplier<ServiceId> serviceIdSupplier)
+            throws UnregisteredRecipientException {
+        final Optional<RecipientWithAddress> byNumber;
+        try (final var connection = database.getConnection()) {
+            byNumber = findByNumber(connection, number);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+        if (byNumber.isEmpty() || byNumber.get().address.serviceId().isEmpty()) {
+            final var serviceId = serviceIdSupplier.get();
+            if (serviceId == null) {
+                throw new UnregisteredRecipientException(
+                        new org.asamk.signal.manager.api.RecipientAddress(null, number));
+            }
+
+            return resolveRecipient(serviceId);
+        }
+        return byNumber.get().id;
+    }
+
+    @Override
+    public RecipientId resolveRecipient(RecipientAddress address) {
+        synchronized (recipientsLock) {
+            final RecipientId recipientId;
+            try (final var connection = database.getConnection()) {
+                connection.setAutoCommit(false);
+                recipientId = resolveRecipientLocked(connection, address);
+                connection.commit();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed read recipient store", e);
+            }
+            return recipientId;
+        }
+    }
+
+    @Override
+    public RecipientId resolveSelfRecipientTrusted(RecipientAddress address) {
+        return resolveRecipientTrusted(address, true);
+    }
+
+    public RecipientId resolveRecipientTrusted(RecipientAddress address) {
+        return resolveRecipientTrusted(address, false);
+    }
+
+    @Override
+    public RecipientId resolveRecipientTrusted(SignalServiceAddress address) {
+        return resolveRecipientTrusted(new RecipientAddress(address), false);
+    }
+
+    @Override
+    public RecipientId resolveRecipientTrusted(final Optional<ACI> aci, final Optional<PNI> pni,
+            final Optional<String> number) {
+        final var serviceId = aci.map(a -> (ServiceId) a).or(() -> pni);
+        return resolveRecipientTrusted(new RecipientAddress(serviceId, pni, number), false);
+    }
+
+    @Override
+    public void storeContact(RecipientId recipientId, final Contact contact) {
+        try (final var connection = database.getConnection()) {
+            storeContact(connection, recipientId, contact);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    @Override
+    public Contact getContact(RecipientId recipientId) {
+        try (final var connection = database.getConnection()) {
+            return getContact(connection, recipientId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    @Override
+    public List<Pair<RecipientId, Contact>> getContacts() {
+        final var sql = String.format(
+                "                SELECT r._id, r.given_name, r.family_name, r.expiration_time, r.profile_sharing, r.color, r.blocked, r.archived\n"
+                        + "                FROM %s r\n"
+                        + "                WHERE (r.number IS NOT NULL OR r.uuid IS NOT NULL) AND %s\n" + "",
+                TABLE_RECIPIENT, SQL_IS_CONTACT);
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                try (var result = Utils.executeQueryForStream(statement,
+                        resultSet -> new Pair<>(getRecipientIdFromResultSet(resultSet),
+                                getContactFromResultSet(resultSet)))) {
+                    return result.collect(Collectors.toList());
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    public List<Recipient> getRecipients(boolean onlyContacts, Optional<Boolean> blocked, Set<RecipientId> recipientIds,
+            Optional<String> name) {
+        final var sqlWhere = new ArrayList<String>();
+        if (onlyContacts) {
+            sqlWhere.add("(" + SQL_IS_CONTACT + ")");
+        }
+        if (blocked.isPresent()) {
+            sqlWhere.add("r.blocked = ?");
+        }
+        if (!recipientIds.isEmpty()) {
+            final var recipientIdsCommaSeparated = recipientIds.stream()
+                    .map(recipientId -> String.valueOf(recipientId.id)).collect(Collectors.joining(","));
+            sqlWhere.add("r._id IN (" + recipientIdsCommaSeparated + ")");
+        }
+        final var sql = String.format("                SELECT r._id,\n"
+                + "                       r.number, r.uuid, r.pni\n"
+                + "                       r.profile_key, r.profile_key_credential,\n"
+                + "                       r.given_name, r.family_name, r.expiration_time, r.profile_sharing, r.color, r.blocked, r.archived,\n"
+                + "                       r.profile_last_update_timestamp, r.profile_given_name, r.profile_family_name, r.profile_about, r.profile_about_emoji, r.profile_avatar_url_path, r.profile_mobile_coin_address, r.profile_unidentified_access_mode, r.profile_capabilities\n"
+                + "                FROM %s r\n"
+                + "                WHERE (r.number IS NOT NULL OR r.uuid IS NOT NULL) AND %s\n", TABLE_RECIPIENT,
+                sqlWhere.size() == 0 ? "TRUE" : String.join(" AND ", sqlWhere));
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                if (blocked.isPresent()) {
+                    statement.setBoolean(1, blocked.get());
+                }
+                try (var result = Utils.executeQueryForStream(statement, this::getRecipientFromResultSet)) {
+                    return result
+                            .filter(r -> name.isEmpty()
+                                    || (r.getContact() != null && name.get().equals(r.getContact().getName()))
+                                    || (r.getProfile() != null && name.get().equals(r.getProfile().getDisplayName())))
+                            .collect(Collectors.toList());
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    public Map<ServiceId, ProfileKey> getServiceIdToProfileKeyMap() {
+        final var sql = String.format("                SELECT r.uuid, r.profile_key\n" + "                FROM %s r\n"
+                + "                WHERE r.uuid IS NOT NULL AND r.profile_key IS NOT NULL", TABLE_RECIPIENT);
+        try (final var connection = database.getConnection()) {
+            try (final var statement = connection.prepareStatement(sql)) {
+                return Utils.executeQueryForStream(statement, resultSet -> {
+                    final var serviceId = ServiceId.parseOrThrow(resultSet.getBytes("uuid"));
+                    final var profileKey = getProfileKeyFromResultSet(resultSet);
+                    return new Pair<>(serviceId, profileKey);
+                }).filter(Objects::nonNull).collect(Collectors.toMap(p -> p.first(), p -> p.second()));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    @Override
+    public void deleteContact(RecipientId recipientId) {
+        storeContact(recipientId, null);
+    }
+
+    public void deleteRecipientData(RecipientId recipientId) {
+        logger.debug("Deleting recipient data for {}", recipientId);
+        try (final var connection = database.getConnection()) {
+            connection.setAutoCommit(false);
+            storeContact(connection, recipientId, null);
+            storeProfile(connection, recipientId, null);
+            storeProfileKey(connection, recipientId, null, false);
+            storeExpiringProfileKeyCredential(connection, recipientId, null);
+            deleteRecipient(connection, recipientId);
+            connection.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    @Override
+    public Profile getProfile(final RecipientId recipientId) {
+        try (final var connection = database.getConnection()) {
+            return getProfile(connection, recipientId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    @Override
+    public ProfileKey getProfileKey(final RecipientId recipientId) {
+        try (final var connection = database.getConnection()) {
+            return getProfileKey(connection, recipientId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    @Override
+    public ExpiringProfileKeyCredential getExpiringProfileKeyCredential(final RecipientId recipientId) {
+        try (final var connection = database.getConnection()) {
+            return getExpiringProfileKeyCredential(connection, recipientId);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+    }
+
+    @Override
+    public void storeProfile(RecipientId recipientId, final Profile profile) {
+        try (final var connection = database.getConnection()) {
+            storeProfile(connection, recipientId, profile);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    @Override
+    public void storeSelfProfileKey(final RecipientId recipientId, final ProfileKey profileKey) {
+        try (final var connection = database.getConnection()) {
+            storeProfileKey(connection, recipientId, profileKey, false);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    @Override
+    public void storeProfileKey(RecipientId recipientId, final ProfileKey profileKey) {
+        try (final var connection = database.getConnection()) {
+            storeProfileKey(connection, recipientId, profileKey, true);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    @Override
+    public void storeExpiringProfileKeyCredential(RecipientId recipientId,
+            final ExpiringProfileKeyCredential profileKeyCredential) {
+        try (final var connection = database.getConnection()) {
+            storeExpiringProfileKeyCredential(connection, recipientId, profileKeyCredential);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+    }
+
+    void addLegacyRecipients(final Map<RecipientId, Recipient> recipients) {
+        logger.debug("Migrating legacy recipients to database");
+        long start = System.nanoTime();
+        final var sql = String.format(
+                "                INSERT INTO %s (_id, number, uuid)\n" + "                VALUES (?, ?, ?)\n",
+                TABLE_RECIPIENT);
+        try (final var connection = database.getConnection()) {
+            connection.setAutoCommit(false);
+            try (final var statement = connection.prepareStatement(String.format("DELETE FROM %s", TABLE_RECIPIENT))) {
+                statement.executeUpdate();
+            }
+            try (final var statement = connection.prepareStatement(sql)) {
+                for (final var recipient : recipients.values()) {
+                    statement.setLong(1, recipient.getRecipientId().id);
+                    statement.setString(2, recipient.getAddress().number().orElse(null));
+                    statement.setBytes(3, recipient.getAddress().serviceId().map(ServiceId::uuid)
+                            .map(UuidUtil::toByteArray).orElse(null));
+                    statement.executeUpdate();
+                }
+            }
+            logger.debug("Initial inserts took {}ms", (System.nanoTime() - start) / 1000000);
+
+            for (final var recipient : recipients.values()) {
+                if (recipient.getContact() != null) {
+                    storeContact(connection, recipient.getRecipientId(), recipient.getContact());
+                }
+                if (recipient.getProfile() != null) {
+                    storeProfile(connection, recipient.getRecipientId(), recipient.getProfile());
+                }
+                if (recipient.getProfileKey() != null) {
+                    storeProfileKey(connection, recipient.getRecipientId(), recipient.getProfileKey(), false);
+                }
+                if (recipient.getExpiringProfileKeyCredential() != null) {
+                    storeExpiringProfileKeyCredential(connection, recipient.getRecipientId(),
+                            recipient.getExpiringProfileKeyCredential());
+                }
+            }
+            connection.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update recipient store", e);
+        }
+        logger.debug("Complete recipients migration took {}ms", (System.nanoTime() - start) / 1000000);
+    }
+
+    @SuppressWarnings("null")
+    long getActualRecipientId(long recipientId) {
+        long _recipientId = recipientId;
+        while (recipientsMerged.containsKey(recipientId)) {
+            final var newRecipientId = recipientsMerged.get(recipientId);
+            logger.debug("Using {} instead of {}, because recipients have been merged", newRecipientId, recipientId);
+            _recipientId = newRecipientId;
+        }
+        return _recipientId;
+    }
+
+    private void storeContact(final Connection connection, final RecipientId recipientId, final Contact contact)
+            throws SQLException {
+        final var sql = String.format("                UPDATE %s\n"
+                + "                SET given_name = ?, family_name = ?, expiration_time = ?, profile_sharing = ?, color = ?, blocked = ?, archived = ?\n"
+                + "                WHERE _id = ?\n", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, contact == null ? null : contact.getGivenName());
+            statement.setString(2, contact == null ? null : contact.getFamilyName());
+            statement.setInt(3, contact == null ? 0 : contact.getMessageExpirationTime());
+            statement.setBoolean(4, contact != null && contact.isProfileSharingEnabled());
+            statement.setString(5, contact == null ? null : contact.getColor());
+            statement.setBoolean(6, contact != null && contact.isBlocked());
+            statement.setBoolean(7, contact != null && contact.isArchived());
+            statement.setLong(8, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
+
+    private void storeExpiringProfileKeyCredential(final Connection connection, final RecipientId recipientId,
+            final ExpiringProfileKeyCredential profileKeyCredential) throws SQLException {
+        final var sql = String.format("                UPDATE %s\n" + "                SET profile_key_credential = ?\n"
+                + "                WHERE _id = ?\n", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, profileKeyCredential == null ? null : profileKeyCredential.serialize());
+            statement.setLong(2, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
+
+    private void storeProfile(final Connection connection, final RecipientId recipientId, final Profile profile)
+            throws SQLException {
+        final var sql = String.format("                UPDATE %s\n"
+                + "                SET profile_last_update_timestamp = ?, profile_given_name = ?, profile_family_name = ?, profile_about = ?, profile_about_emoji = ?, profile_avatar_url_path = ?, profile_mobile_coin_address = ?, profile_unidentified_access_mode = ?, profile_capabilities = ?\n"
+                + "                WHERE _id = ?\n", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, profile == null ? 0 : profile.getLastUpdateTimestamp());
+            statement.setString(2, profile == null ? null : profile.getGivenName());
+            statement.setString(3, profile == null ? null : profile.getFamilyName());
+            statement.setString(4, profile == null ? null : profile.getAbout());
+            statement.setString(5, profile == null ? null : profile.getAboutEmoji());
+            statement.setString(6, profile == null ? null : profile.getAvatarUrlPath());
+            statement.setBytes(7, profile == null ? null : profile.getMobileCoinAddress());
+            statement.setString(8, profile == null ? null : profile.getUnidentifiedAccessMode().name());
+            statement.setString(9, profile == null ? null
+                    : profile.getCapabilities().stream().map(Enum::name).collect(Collectors.joining(",")));
+            statement.setLong(10, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
+
+    private void storeProfileKey(Connection connection, RecipientId recipientId, final ProfileKey profileKey,
+            boolean resetProfile) throws SQLException {
+        if (profileKey != null) {
+            final var recipientProfileKey = getProfileKey(recipientId);
+            if (profileKey.equals(recipientProfileKey)) {
+                final var recipientProfile = getProfile(recipientId);
+                if (recipientProfile == null || (recipientProfile
+                        .getUnidentifiedAccessMode() != Profile.UnidentifiedAccessMode.UNKNOWN
+                        && recipientProfile.getUnidentifiedAccessMode() != Profile.UnidentifiedAccessMode.DISABLED)) {
+                    return;
+                }
             }
         }
 
-        if (pair.second().isPresent()) {
-            recipientMergeHandler.mergeRecipients(pair.first(), pair.second().get());
+        final var sql = String.format(
+                "                UPDATE %s\n" + "                SET profile_key = ?, profile_key_credential = NULL%s\n"
+                        + "                WHERE _id = ?",
+                TABLE_RECIPIENT, resetProfile ? ", profile_last_update_timestamp = 0" : "");
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, profileKey == null ? null : profileKey.serialize());
+            statement.setLong(2, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
+
+    private RecipientId resolveRecipientTrusted(RecipientAddress address, boolean isSelf) {
+        final Pair<RecipientId, List<RecipientId>> pair;
+        synchronized (recipientsLock) {
+            try (final var connection = database.getConnection()) {
+                connection.setAutoCommit(false);
+                if (address.hasSingleIdentifier()
+                        || (!isSelf && selfAddressProvider.getSelfAddress().matches(address))) {
+                    pair = new Pair<>(resolveRecipientLocked(connection, address), List.of());
+                } else {
+                    pair = MergeRecipientHelper.resolveRecipientTrustedLocked(new HelperStore(connection), address);
+
+                    for (final var toBeMergedRecipientId : pair.second()) {
+                        mergeRecipientsLocked(connection, pair.first(), toBeMergedRecipientId);
+                    }
+                }
+                connection.commit();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed update recipient store", e);
+            }
+        }
+
+        if (pair.second().size() > 0) {
+            try (final var connection = database.getConnection()) {
+                for (final var toBeMergedRecipientId : pair.second()) {
+                    recipientMergeHandler.mergeRecipients(connection, pair.first(), toBeMergedRecipientId);
+                    deleteRecipient(connection, toBeMergedRecipientId);
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed update recipient store", e);
+            }
         }
         return pair.first();
     }
 
-    private Pair<RecipientId, Optional<RecipientId>> resolveRecipientLocked(
-            RecipientAddress address, boolean isHighTrust
-    ) {
-        final var byNumber = address.getNumber().isEmpty()
-                ? Optional.<Recipient>empty()
-                : findByNumberLocked(address.getNumber().get());
-        final var byUuid = address.getUuid().isEmpty()
-                ? Optional.<Recipient>empty()
-                : findByUuidLocked(address.getUuid().get());
+    private RecipientId resolveRecipientLocked(Connection connection, RecipientAddress address) throws SQLException {
+        final var byServiceId = address.serviceId().isEmpty() ? Optional.<RecipientWithAddress> empty()
+                : findByServiceId(connection, address.serviceId().get());
 
-        if (byNumber.isEmpty() && byUuid.isEmpty()) {
-            logger.debug("Got new recipient, both uuid and number are unknown");
+        if (byServiceId.isPresent()) {
+            return byServiceId.get().id;
+        }
 
-            if (isHighTrust || address.getUuid().isEmpty() || address.getNumber().isEmpty()) {
-                return new Pair<>(addNewRecipientLocked(address), Optional.empty());
+        final var byPni = address.pni().isEmpty() ? Optional.<RecipientWithAddress> empty()
+                : findByServiceId(connection, address.pni().get());
+
+        if (byPni.isPresent()) {
+            return byPni.get().id;
+        }
+
+        final var byNumber = address.number().isEmpty() ? Optional.<RecipientWithAddress> empty()
+                : findByNumber(connection, address.number().get());
+
+        if (byNumber.isPresent()) {
+            return byNumber.get().id;
+        }
+
+        logger.debug("Got new recipient, both serviceId and number are unknown");
+
+        if (address.serviceId().isEmpty()) {
+            return addNewRecipient(connection, address);
+        }
+
+        return addNewRecipient(connection, new RecipientAddress(address.serviceId().get()));
+    }
+
+    private RecipientId resolveRecipientLocked(Connection connection, ServiceId serviceId) throws SQLException {
+        final var recipient = findByServiceId(connection, serviceId);
+
+        if (recipient.isEmpty()) {
+            logger.debug("Got new recipient, serviceId is unknown");
+            return addNewRecipient(connection, new RecipientAddress(serviceId));
+        }
+
+        return recipient.get().id;
+    }
+
+    private RecipientId resolveRecipientLocked(Connection connection, String number) throws SQLException {
+        final var recipient = findByNumber(connection, number);
+
+        if (recipient.isEmpty()) {
+            logger.debug("Got new recipient, number is unknown");
+            return addNewRecipient(connection, new RecipientAddress(null, number));
+        }
+
+        return recipient.get().id;
+    }
+
+    private RecipientId addNewRecipient(final Connection connection, final RecipientAddress address)
+            throws SQLException {
+        final var sql = String.format(
+                "                INSERT INTO %s (number, uuid, pni)\n" + "                VALUES (?, ?, ?)\n",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, address.number().orElse(null));
+            statement.setBytes(2, address.serviceId().map(ServiceId::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.setBytes(3, address.pni().map(PNI::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.executeUpdate();
+            final var generatedKeys = statement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                final var recipientId = new RecipientId(generatedKeys.getLong(1), this);
+                logger.debug("Added new recipient {} with address {}", recipientId, address);
+                return recipientId;
+            } else {
+                throw new RuntimeException("Failed to add new recipient to database");
             }
-
-            return new Pair<>(addNewRecipientLocked(new RecipientAddress(address.getUuid().get())), Optional.empty());
-        }
-
-        if (!isHighTrust || address.getUuid().isEmpty() || address.getNumber().isEmpty() || byNumber.equals(byUuid)) {
-            return new Pair<>(byUuid.or(() -> byNumber).map(Recipient::getRecipientId).get(), Optional.empty());
-        }
-
-        if (byNumber.isEmpty()) {
-            logger.debug("Got recipient existing with uuid, updating with high trust number");
-            updateRecipientAddressLocked(byUuid.get().getRecipientId(), address);
-            return new Pair<>(byUuid.get().getRecipientId(), Optional.empty());
-        }
-
-        if (byUuid.isEmpty()) {
-            if (byNumber.get().getAddress().getUuid().isPresent()) {
-                logger.debug(
-                        "Got recipient existing with number, but different uuid, so stripping its number and adding new recipient");
-
-                updateRecipientAddressLocked(byNumber.get().getRecipientId(),
-                        new RecipientAddress(byNumber.get().getAddress().getUuid().get()));
-                return new Pair<>(addNewRecipientLocked(address), Optional.empty());
-            }
-
-            logger.debug("Got recipient existing with number and no uuid, updating with high trust uuid");
-            updateRecipientAddressLocked(byNumber.get().getRecipientId(), address);
-            return new Pair<>(byNumber.get().getRecipientId(), Optional.empty());
-        }
-
-        if (byNumber.get().getAddress().getUuid().isPresent()) {
-            logger.debug(
-                    "Got separate recipients for high trust number and uuid, recipient for number has different uuid, so stripping its number");
-
-            updateRecipientAddressLocked(byNumber.get().getRecipientId(),
-                    new RecipientAddress(byNumber.get().getAddress().getUuid().get()));
-            updateRecipientAddressLocked(byUuid.get().getRecipientId(), address);
-            return new Pair<>(byUuid.get().getRecipientId(), Optional.empty());
-        }
-
-        logger.debug("Got separate recipients for high trust number and uuid, need to merge them");
-        updateRecipientAddressLocked(byUuid.get().getRecipientId(), address);
-        mergeRecipientsLocked(byUuid.get().getRecipientId(), byNumber.get().getRecipientId());
-        return new Pair<>(byUuid.get().getRecipientId(), byNumber.map(Recipient::getRecipientId));
-    }
-
-    private RecipientId addNewRecipientLocked(final RecipientAddress address) {
-        final var nextRecipientId = nextIdLocked();
-        storeRecipientLocked(nextRecipientId, new Recipient(nextRecipientId, address, null, null, null, null));
-        return nextRecipientId;
-    }
-
-    private void updateRecipientAddressLocked(
-            final RecipientId recipientId, final RecipientAddress address
-    ) {
-        final var recipient = recipients.get(recipientId);
-        storeRecipientLocked(recipientId, Recipient.newBuilder(recipient).withAddress(address).build());
-    }
-
-    private void storeRecipientLocked(
-            final RecipientId recipientId, final Recipient recipient
-    ) {
-        recipients.put(recipientId, recipient);
-        saveLocked();
-    }
-
-    private void mergeRecipientsLocked(RecipientId recipientId, RecipientId toBeMergedRecipientId) {
-        final var recipient = recipients.get(recipientId);
-        final var toBeMergedRecipient = recipients.get(toBeMergedRecipientId);
-        recipients.put(recipientId,
-                new Recipient(recipientId,
-                        recipient.getAddress(),
-                        recipient.getContact() != null ? recipient.getContact() : toBeMergedRecipient.getContact(),
-                        recipient.getProfileKey() != null
-                                ? recipient.getProfileKey()
-                                : toBeMergedRecipient.getProfileKey(),
-                        recipient.getProfileKeyCredential() != null
-                                ? recipient.getProfileKeyCredential()
-                                : toBeMergedRecipient.getProfileKeyCredential(),
-                        recipient.getProfile() != null ? recipient.getProfile() : toBeMergedRecipient.getProfile()));
-        recipients.remove(toBeMergedRecipientId);
-        saveLocked();
-    }
-
-    private Optional<Recipient> findByNumberLocked(final String number) {
-        return recipients.entrySet()
-                .stream()
-                .filter(entry -> entry.getValue().getAddress().getNumber().isPresent() && number.equals(entry.getValue()
-                        .getAddress()
-                        .getNumber()
-                        .get()))
-                .findFirst()
-                .map(Map.Entry::getValue);
-    }
-
-    private Optional<Recipient> findByUuidLocked(final UUID uuid) {
-        return recipients.entrySet()
-                .stream()
-                .filter(entry -> entry.getValue().getAddress().getUuid().isPresent() && uuid.equals(entry.getValue()
-                        .getAddress()
-                        .getUuid()
-                        .get()))
-                .findFirst()
-                .map(Map.Entry::getValue);
-    }
-
-    private RecipientId nextIdLocked() {
-        return new RecipientId(++this.lastId);
-    }
-
-    private void saveLocked() {
-        final var base64 = Base64.getEncoder();
-        var storage = new Storage(recipients.entrySet().stream().map(pair -> {
-            final var recipient = pair.getValue();
-            final var contact = recipient.getContact() == null
-                    ? null
-                    : new Storage.Recipient.Contact(recipient.getContact().getName(),
-                            recipient.getContact().getColor(),
-                            recipient.getContact().getMessageExpirationTime(),
-                            recipient.getContact().isBlocked(),
-                            recipient.getContact().isArchived());
-            final var profile = recipient.getProfile() == null
-                    ? null
-                    : new Storage.Recipient.Profile(recipient.getProfile().getLastUpdateTimestamp(),
-                            recipient.getProfile().getGivenName(),
-                            recipient.getProfile().getFamilyName(),
-                            recipient.getProfile().getAbout(),
-                            recipient.getProfile().getAboutEmoji(),
-                            recipient.getProfile().getAvatarUrlPath(),
-                            recipient.getProfile().getUnidentifiedAccessMode().name(),
-                            recipient.getProfile()
-                                    .getCapabilities()
-                                    .stream()
-                                    .map(Enum::name)
-                                    .collect(Collectors.toSet()));
-            return new Storage.Recipient(pair.getKey().getId(),
-                    recipient.getAddress().getNumber().orElse(null),
-                    recipient.getAddress().getUuid().map(UUID::toString).orElse(null),
-                    recipient.getProfileKey() == null
-                            ? null
-                            : base64.encodeToString(recipient.getProfileKey().serialize()),
-                    recipient.getProfileKeyCredential() == null
-                            ? null
-                            : base64.encodeToString(recipient.getProfileKeyCredential().serialize()),
-                    contact,
-                    profile);
-        }).collect(Collectors.toList()), lastId);
-
-        // Write to memory first to prevent corrupting the file in case of serialization errors
-        try (var inMemoryOutput = new ByteArrayOutputStream()) {
-            objectMapper.writeValue(inMemoryOutput, storage);
-
-            var input = new ByteArrayInputStream(inMemoryOutput.toByteArray());
-            try (var outputStream = new FileOutputStream(file)) {
-                input.transferTo(outputStream);
-            }
-        } catch (Exception e) {
-            logger.error("Error saving recipient store file: {}", e.getMessage());
         }
     }
 
-    private static class Storage {
+    private void removeRecipientAddress(Connection connection, RecipientId recipientId) throws SQLException {
+        final var sql = String.format("                UPDATE %s\n"
+                + "                SET number = NULL, uuid = NULL, pni = NULL\n" + "                WHERE _id = ?\n",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
 
-        public List<Recipient> recipients;
+    private void updateRecipientAddress(Connection connection, RecipientId recipientId, final RecipientAddress address)
+            throws SQLException {
+        final var sql = String.format("                UPDATE %s\n"
+                + "                SET number = ?, uuid = ?, pni = ?\n" + "                WHERE _id = ?\n",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, address.number().orElse(null));
+            statement.setBytes(2, address.serviceId().map(ServiceId::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.setBytes(3, address.pni().map(PNI::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.setLong(4, recipientId.id());
+            statement.executeUpdate();
+        }
+    }
 
-        public long lastId;
+    private void deleteRecipient(final Connection connection, final RecipientId recipientId) throws SQLException {
+        final var sql = String.format("                DELETE FROM %s\n" + "                WHERE _id = ?\n",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            statement.executeUpdate();
+        }
+    }
 
-        // For deserialization
-        private Storage() {
+    private void mergeRecipientsLocked(Connection connection, RecipientId recipientId,
+            RecipientId toBeMergedRecipientId) throws SQLException {
+        final var contact = getContact(connection, recipientId);
+        if (contact == null) {
+            final var toBeMergedContact = getContact(connection, toBeMergedRecipientId);
+            storeContact(connection, recipientId, toBeMergedContact);
         }
 
-        public Storage(final List<Recipient> recipients, final long lastId) {
-            this.recipients = recipients;
-            this.lastId = lastId;
+        final var profileKey = getProfileKey(connection, recipientId);
+        if (profileKey == null) {
+            final var toBeMergedProfileKey = getProfileKey(connection, toBeMergedRecipientId);
+            storeProfileKey(connection, recipientId, toBeMergedProfileKey, false);
         }
 
-        private static class Recipient {
+        final var profileKeyCredential = getExpiringProfileKeyCredential(connection, recipientId);
+        if (profileKeyCredential == null) {
+            final var toBeMergedProfileKeyCredential = getExpiringProfileKeyCredential(connection,
+                    toBeMergedRecipientId);
+            storeExpiringProfileKeyCredential(connection, recipientId, toBeMergedProfileKeyCredential);
+        }
 
-            public long id;
-            public String number;
-            public String uuid;
-            public String profileKey;
-            public String profileKeyCredential;
-            public Contact contact;
-            public Profile profile;
+        final var profile = getProfile(connection, recipientId);
+        if (profile == null) {
+            final var toBeMergedProfile = getProfile(connection, toBeMergedRecipientId);
+            storeProfile(connection, recipientId, toBeMergedProfile);
+        }
 
-            // For deserialization
-            private Recipient() {
-            }
+        recipientsMerged.put(toBeMergedRecipientId.id, recipientId.id);
+    }
 
-            public Recipient(
-                    final long id,
-                    final String number,
-                    final String uuid,
-                    final String profileKey,
-                    final String profileKeyCredential,
-                    final Contact contact,
-                    final Profile profile
-            ) {
-                this.id = id;
-                this.number = number;
-                this.uuid = uuid;
-                this.profileKey = profileKey;
-                this.profileKeyCredential = profileKeyCredential;
-                this.contact = contact;
-                this.profile = profile;
-            }
+    private Optional<RecipientWithAddress> findByNumber(final Connection connection, final String number)
+            throws SQLException {
+        final var sql = String.format("                SELECT r._id, r.number, r.uuid, r.pni\n"
+                + "                FROM %s r\n" + "                WHERE r.number = ?\n LIMIT 1", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, number);
+            return Utils.executeQueryForOptional(statement, this::getRecipientWithAddressFromResultSet);
+        }
+    }
 
-            private static class Contact {
+    private Optional<RecipientWithAddress> findByServiceId(final Connection connection, final ServiceId serviceId)
+            throws SQLException {
+        final var sql = String.format("                SELECT r._id, r.number, r.uuid, r.pni\n"
+                + "                FROM %s r\n" + "                WHERE r.uuid = ? OR r.pni = ?\nLIMIT 1",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, UuidUtil.toByteArray(serviceId.uuid()));
+            return Utils.executeQueryForOptional(statement, this::getRecipientWithAddressFromResultSet);
+        }
+    }
 
-                public String name;
-                public String color;
-                public int messageExpirationTime;
-                public boolean blocked;
-                public boolean archived;
+    private Set<RecipientWithAddress> findAllByAddress(final Connection connection, final RecipientAddress address)
+            throws SQLException {
+        final var sql = String.format("SELECT r._id, r.number, r.uuid, r.pni " + " FROM %s r "
+                + " WHERE r.uuid = ?1 OR r.pni = ?1 OR " + " r.uuid = ?2 OR r.pni = ?2 OR " + " r.number = ?3",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setBytes(1, address.serviceId().map(ServiceId::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.setBytes(2, address.pni().map(ServiceId::uuid).map(UuidUtil::toByteArray).orElse(null));
+            statement.setString(3, address.number().orElse(null));
+            return Utils.executeQueryForStream(statement, this::getRecipientWithAddressFromResultSet)
+                    .collect(Collectors.toSet());
+        }
+    }
 
-                // For deserialization
-                public Contact() {
-                }
+    private Contact getContact(final Connection connection, final RecipientId recipientId) throws SQLException {
+        final var sql = String.format(
+                "                SELECT r.given_name, r.family_name, r.expiration_time, r.profile_sharing, r.color, r.blocked, r.archived\n"
+                        + "                FROM %s r\n" + "                WHERE r._id = ? AND (%s)",
+                TABLE_RECIPIENT, SQL_IS_CONTACT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            return Utils.executeQueryForOptional(statement, this::getContactFromResultSet).orElse(null);
+        }
+    }
 
-                public Contact(
-                        final String name,
-                        final String color,
-                        final int messageExpirationTime,
-                        final boolean blocked,
-                        final boolean archived
-                ) {
-                    this.name = name;
-                    this.color = color;
-                    this.messageExpirationTime = messageExpirationTime;
-                    this.blocked = blocked;
-                    this.archived = archived;
-                }
-            }
+    private ProfileKey getProfileKey(final Connection connection, final RecipientId recipientId) throws SQLException {
+        final var sql = String.format("                SELECT r.profile_key\n" + "                FROM %s r\n"
+                + "                WHERE r._id = ?\n", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            return Utils.executeQueryForOptional(statement, this::getProfileKeyFromResultSet).orElse(null);
+        }
+    }
 
-            private static class Profile {
+    private ExpiringProfileKeyCredential getExpiringProfileKeyCredential(final Connection connection,
+            final RecipientId recipientId) throws SQLException {
+        final var sql = String.format("                SELECT r.profile_key_credential\n"
+                + "                FROM %s r\n" + "                WHERE r._id = ?", TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            return Utils.executeQueryForOptional(statement, this::getExpiringProfileKeyCredentialFromResultSet)
+                    .orElse(null);
+        }
+    }
 
-                public long lastUpdateTimestamp;
-                public String givenName;
-                public String familyName;
-                public String about;
-                public String aboutEmoji;
-                public String avatarUrlPath;
-                public String unidentifiedAccessMode;
-                public Set<String> capabilities;
+    private Profile getProfile(final Connection connection, final RecipientId recipientId) throws SQLException {
+        final var sql = String.format(
+                "                SELECT r.profile_last_update_timestamp, r.profile_given_name, r.profile_family_name, r.profile_about, r.profile_about_emoji, r.profile_avatar_url_path, r.profile_mobile_coin_address, r.profile_unidentified_access_mode, r.profile_capabilities\n"
+                        + "                FROM %s r\n"
+                        + "                WHERE r._id = ? AND r.profile_capabilities IS NOT NULL\n",
+                TABLE_RECIPIENT);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, recipientId.id);
+            return Utils.executeQueryForOptional(statement, this::getProfileFromResultSet).orElse(null);
+        }
+    }
 
-                // For deserialization
-                private Profile() {
-                }
+    private RecipientAddress getRecipientAddressFromResultSet(ResultSet resultSet) throws SQLException {
+        final var serviceId = Optional.ofNullable(resultSet.getBytes("uuid")).map(ServiceId::parseOrNull);
+        final var pni = Optional.ofNullable(resultSet.getBytes("pni")).map(PNI::parseOrNull);
+        final var number = Optional.ofNullable(resultSet.getString("number"));
+        return new RecipientAddress(serviceId, pni, number);
+    }
 
-                public Profile(
-                        final long lastUpdateTimestamp,
-                        final String givenName,
-                        final String familyName,
-                        final String about,
-                        final String aboutEmoji,
-                        final String avatarUrlPath,
-                        final String unidentifiedAccessMode,
-                        final Set<String> capabilities
-                ) {
-                    this.lastUpdateTimestamp = lastUpdateTimestamp;
-                    this.givenName = givenName;
-                    this.familyName = familyName;
-                    this.about = about;
-                    this.aboutEmoji = aboutEmoji;
-                    this.avatarUrlPath = avatarUrlPath;
-                    this.unidentifiedAccessMode = unidentifiedAccessMode;
-                    this.capabilities = capabilities;
-                }
-            }
+    private RecipientId getRecipientIdFromResultSet(ResultSet resultSet) throws SQLException {
+        return new RecipientId(resultSet.getLong("_id"), this);
+    }
+
+    private RecipientWithAddress getRecipientWithAddressFromResultSet(final ResultSet resultSet) throws SQLException {
+        return new RecipientWithAddress(getRecipientIdFromResultSet(resultSet),
+                getRecipientAddressFromResultSet(resultSet));
+    }
+
+    private Recipient getRecipientFromResultSet(final ResultSet resultSet) throws SQLException {
+        return new Recipient(getRecipientIdFromResultSet(resultSet), getRecipientAddressFromResultSet(resultSet),
+                getContactFromResultSet(resultSet), getProfileKeyFromResultSet(resultSet),
+                getExpiringProfileKeyCredentialFromResultSet(resultSet), getProfileFromResultSet(resultSet));
+    }
+
+    private Contact getContactFromResultSet(ResultSet resultSet) throws SQLException {
+        return new Contact(resultSet.getString("given_name"), resultSet.getString("family_name"),
+                resultSet.getString("color"), resultSet.getInt("expiration_time"), resultSet.getBoolean("blocked"),
+                resultSet.getBoolean("archived"), resultSet.getBoolean("profile_sharing"));
+    }
+
+    private Profile getProfileFromResultSet(ResultSet resultSet) throws SQLException {
+        final var profileCapabilities = resultSet.getString("profile_capabilities");
+        final var profileUnidentifiedAccessMode = resultSet.getString("profile_unidentified_access_mode");
+        return new Profile(resultSet.getLong("profile_last_update_timestamp"),
+                resultSet.getString("profile_given_name"), resultSet.getString("profile_family_name"),
+                resultSet.getString("profile_about"), resultSet.getString("profile_about_emoji"),
+                resultSet.getString("profile_avatar_url_path"), resultSet.getBytes("profile_mobile_coin_address"),
+                profileUnidentifiedAccessMode == null ? Profile.UnidentifiedAccessMode.UNKNOWN
+                        : Profile.UnidentifiedAccessMode.valueOfOrUnknown(profileUnidentifiedAccessMode),
+                profileCapabilities == null ? Set.of()
+                        : Arrays.stream(profileCapabilities.split(",")).map(Profile.Capability::valueOfOrNull)
+                                .filter(Objects::nonNull).collect(Collectors.toSet()));
+    }
+
+    private ProfileKey getProfileKeyFromResultSet(ResultSet resultSet) throws SQLException {
+        final var profileKey = resultSet.getBytes("profile_key");
+
+        if (profileKey == null) {
+            return null;
+        }
+        try {
+            return new ProfileKey(profileKey);
+        } catch (InvalidInputException ignored) {
+            return null;
+        }
+    }
+
+    private ExpiringProfileKeyCredential getExpiringProfileKeyCredentialFromResultSet(ResultSet resultSet)
+            throws SQLException {
+        final var profileKeyCredential = resultSet.getBytes("profile_key_credential");
+
+        if (profileKeyCredential == null) {
+            return null;
+        }
+        try {
+            return new ExpiringProfileKeyCredential(profileKeyCredential);
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 
     public interface RecipientMergeHandler {
 
-        void mergeRecipients(RecipientId recipientId, RecipientId toBeMergedRecipientId);
+        void mergeRecipients(final Connection connection, RecipientId recipientId, RecipientId toBeMergedRecipientId)
+                throws SQLException;
+    }
+
+    private class HelperStore implements MergeRecipientHelper.Store {
+
+        private final Connection connection;
+
+        public HelperStore(final Connection connection) {
+            this.connection = connection;
+        }
+
+        @Override
+        public Set<RecipientWithAddress> findAllByAddress(final RecipientAddress address) throws SQLException {
+            return RecipientStore.this.findAllByAddress(connection, address);
+        }
+
+        @Override
+        public RecipientId addNewRecipient(final RecipientAddress address) throws SQLException {
+            return RecipientStore.this.addNewRecipient(connection, address);
+        }
+
+        @Override
+        public void updateRecipientAddress(final RecipientId recipientId, final RecipientAddress address)
+                throws SQLException {
+            RecipientStore.this.updateRecipientAddress(connection, recipientId, address);
+        }
+
+        @Override
+        public void removeRecipientAddress(final RecipientId recipientId) throws SQLException {
+            RecipientStore.this.removeRecipientAddress(connection, recipientId);
+        }
     }
 }

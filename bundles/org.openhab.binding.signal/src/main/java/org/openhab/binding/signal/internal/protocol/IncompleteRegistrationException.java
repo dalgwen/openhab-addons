@@ -12,11 +12,13 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
+import java.util.Optional;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
- * Launch to notify incomplete registration
+ * To notify incomplete registration
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
@@ -26,13 +28,14 @@ public class IncompleteRegistrationException extends Exception {
     private static final long serialVersionUID = 7319532258732939073L;
 
     private RegistrationState registrationState;
+    @Nullable
     private String additionnalMessage;
 
     public IncompleteRegistrationException(RegistrationState registrationState) {
         this(registrationState, "");
     }
 
-    public IncompleteRegistrationException(RegistrationState registrationState, String additionnalMessage) {
+    public IncompleteRegistrationException(RegistrationState registrationState, @Nullable String additionnalMessage) {
         super();
         this.registrationState = registrationState;
         this.additionnalMessage = additionnalMessage;
@@ -44,6 +47,6 @@ public class IncompleteRegistrationException extends Exception {
 
     @Override
     public @Nullable String getMessage() {
-        return registrationState.name() + " " + additionnalMessage;
+        return registrationState.name() + Optional.ofNullable(" " + additionnalMessage).orElse("");
     }
 }

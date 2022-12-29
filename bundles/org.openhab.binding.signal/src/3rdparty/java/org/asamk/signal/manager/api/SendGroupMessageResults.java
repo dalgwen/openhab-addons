@@ -1,26 +1,26 @@
 package org.asamk.signal.manager.api;
 
-import org.whispersystems.signalservice.api.messages.SendMessageResult;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
 public class SendGroupMessageResults {
-
     private final long timestamp;
     private final List<SendMessageResult> results;
 
-    public SendGroupMessageResults(
-            final long timestamp, final List<SendMessageResult> results
-    ) {
+    public SendGroupMessageResults(@JsonProperty("timestamp") long timestamp, @JsonProperty("results") List<SendMessageResult> results) {
+        super();
         this.timestamp = timestamp;
         this.results = results;
     }
 
-    public long getTimestamp() {
+    public long timestamp() {
         return timestamp;
     }
 
-    public List<SendMessageResult> getResults() {
+    public List<SendMessageResult> results() {
         return results;
     }
+
 }

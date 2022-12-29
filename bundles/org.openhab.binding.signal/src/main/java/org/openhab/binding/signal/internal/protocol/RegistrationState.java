@@ -21,7 +21,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public enum RegistrationState {
-    NO_USER,
+    NO_VALID_USER,
     CAPTCHA_NEEDED,
     VERIFICATION_CODE_NEEDED,
     QR_CODE_NEEDED,

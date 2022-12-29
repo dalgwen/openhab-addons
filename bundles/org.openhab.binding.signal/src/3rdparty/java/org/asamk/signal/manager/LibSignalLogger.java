@@ -1,15 +1,15 @@
 package org.asamk.signal.manager;
 
+import org.signal.libsignal.protocol.logging.SignalProtocolLogger;
+import org.signal.libsignal.protocol.logging.SignalProtocolLoggerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.libsignal.logging.SignalProtocolLogger;
-import org.whispersystems.libsignal.logging.SignalProtocolLoggerProvider;
 
 public class LibSignalLogger implements SignalProtocolLogger {
 
     private final static Logger logger = LoggerFactory.getLogger("LibSignal");
 
-    public static void initLogger() {
+    static void initLogger() {
         SignalProtocolLoggerProvider.setProvider(new LibSignalLogger());
     }
 

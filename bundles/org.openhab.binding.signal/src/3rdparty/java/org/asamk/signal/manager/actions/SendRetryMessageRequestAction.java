@@ -1,38 +1,40 @@
 package org.asamk.signal.manager.actions;
 
+import java.util.Optional;
+
 import org.asamk.signal.manager.groups.GroupId;
-import org.asamk.signal.manager.jobs.Context;
+import org.asamk.signal.manager.helper.Context;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.signal.libsignal.metadata.ProtocolException;
-import org.whispersystems.libsignal.protocol.CiphertextMessage;
-import org.whispersystems.libsignal.protocol.DecryptionErrorMessage;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.message.CiphertextMessage;
+import org.signal.libsignal.protocol.message.DecryptionErrorMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 
 public class SendRetryMessageRequestAction implements HandleAction {
 
     private final RecipientId recipientId;
+    private final ServiceId serviceId;
     private final ProtocolException protocolException;
     private final SignalServiceEnvelope envelope;
 
-    public SendRetryMessageRequestAction(
-            final RecipientId recipientId,
-            final ProtocolException protocolException,
-            final SignalServiceEnvelope envelope
-    ) {
+    public SendRetryMessageRequestAction(final RecipientId recipientId, final ServiceId serviceId,
+            final ProtocolException protocolException, final SignalServiceEnvelope envelope) {
         this.recipientId = recipientId;
+        this.serviceId = serviceId;
         this.protocolException = protocolException;
         this.envelope = envelope;
     }
 
     @Override
     public void execute(Context context) throws Throwable {
-        context.getAccount().getSessionStore().archiveSessions(recipientId);
+        context.getAccount().getAciSessionStore().archiveSessions(serviceId);
 
         int senderDevice = protocolException.getSenderDevice();
-        Optional<GroupId> groupId = protocolException.getGroupId().isPresent() ? Optional.of(GroupId.unknownVersion(
-                protocolException.getGroupId().get())) : Optional.absent();
+        Optional<GroupId> groupId = protocolException.getGroupId().isPresent()
+                ? Optional.of(GroupId.unknownVersion(protocolException.getGroupId().get()))
+                : Optional.empty();
 
         byte[] originalContent;
         int envelopeType;
@@ -46,9 +48,7 @@ public class SendRetryMessageRequestAction implements HandleAction {
         }
 
         DecryptionErrorMessage decryptionErrorMessage = DecryptionErrorMessage.forOriginalMessage(originalContent,
-                envelopeType,
-                envelope.getTimestamp(),
-                senderDevice);
+                envelopeType, envelope.getTimestamp(), senderDevice);
 
         context.getSendHelper().sendRetryReceipt(decryptionErrorMessage, recipientId, groupId);
     }
@@ -61,7 +61,6 @@ public class SendRetryMessageRequestAction implements HandleAction {
                 return CiphertextMessage.SENDERKEY_TYPE;
             case SignalServiceProtos.Envelope.Type.PLAINTEXT_CONTENT_VALUE:
                 return CiphertextMessage.PLAINTEXT_CONTENT_TYPE;
-            case SignalServiceProtos.Envelope.Type.CIPHERTEXT_VALUE:
             default:
                 return CiphertextMessage.WHISPER_TYPE;
         }
@@ -69,13 +68,21 @@ public class SendRetryMessageRequestAction implements HandleAction {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         final SendRetryMessageRequestAction that = (SendRetryMessageRequestAction) o;
 
-        if (!recipientId.equals(that.recipientId)) return false;
-        if (!protocolException.equals(that.protocolException)) return false;
+        if (!recipientId.equals(that.recipientId)) {
+            return false;
+        }
+        if (!protocolException.equals(that.protocolException)) {
+            return false;
+        }
         return envelope.equals(that.envelope);
     }
 
