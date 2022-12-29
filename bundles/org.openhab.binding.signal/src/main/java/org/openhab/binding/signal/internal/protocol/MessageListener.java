@@ -12,9 +12,9 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
+import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  *
@@ -23,5 +23,8 @@ import org.whispersystems.signalservice.api.push.SignalServiceAddress;
  */
 @NonNullByDefault
 public interface MessageListener {
-    public void messageReceived(SignalServiceAddress sender, SignalServiceDataMessage messageData);
+
+    public void messageReceived(@Nullable RecipientAddress sender, String messageData);
+
+    public void deliveryStatusReceived(DeliveryReport deliveryStatus);
 }

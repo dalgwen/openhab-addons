@@ -2,6 +2,8 @@ package org.asamk.signal.manager;
 
 import java.io.File;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class PathConfig {
 
     private final File dataPath;
@@ -9,35 +11,33 @@ public class PathConfig {
     private final File avatarsPath;
     private final File stickerPacksPath;
 
-    public static PathConfig createDefault(final File settingsPath) {
-        return new PathConfig(new File(settingsPath, "data"),
-                new File(settingsPath, "attachments"),
-                new File(settingsPath, "avatars"),
-                new File(settingsPath, "stickers"));
-    }
-
-    private PathConfig(
-            final File dataPath, final File attachmentsPath, final File avatarsPath, final File stickerPacksPath
-    ) {
+    public PathConfig(@JsonProperty("dataPath") File dataPath, @JsonProperty("attachmentsPath") File attachmentsPath,
+            @JsonProperty("avatarsPath") File avatarsPath, @JsonProperty("stickerPacksPath") File stickerPacksPath) {
+        super();
         this.dataPath = dataPath;
         this.attachmentsPath = attachmentsPath;
         this.avatarsPath = avatarsPath;
         this.stickerPacksPath = stickerPacksPath;
     }
 
-    public File getDataPath() {
+    public static PathConfig createDefault(final File settingsPath) {
+        return new PathConfig(new File(settingsPath, "data"), new File(settingsPath, "attachments"),
+                new File(settingsPath, "avatars"), new File(settingsPath, "stickers"));
+    }
+
+    public File dataPath() {
         return dataPath;
     }
 
-    public File getAttachmentsPath() {
+    public File attachmentsPath() {
         return attachmentsPath;
     }
 
-    public File getAvatarsPath() {
+    public File avatarsPath() {
         return avatarsPath;
     }
 
-    public File getStickerPacksPath() {
+    public File stickerPacksPath() {
         return stickerPacksPath;
     }
 }

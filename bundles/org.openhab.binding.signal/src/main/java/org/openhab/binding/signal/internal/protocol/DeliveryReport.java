@@ -12,8 +12,10 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
+import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 
 /**
  *
@@ -24,15 +26,33 @@ import org.eclipse.jdt.annotation.Nullable;
 @NonNullByDefault
 public class DeliveryReport {
 
-    public DeliveryStatus deliveryStatus;
+    public final DeliveryStatus deliveryStatus;
 
     @Nullable
-    public String aci;
-
+    private final String aci;
     @Nullable
-    public String e164;
+    private final String e164;
 
-    public DeliveryReport(DeliveryStatus deliveryStatus, @Nullable String aci, @Nullable String e164) {
+    public DeliveryReport(DeliveryStatus deliveryStatus, RecipientAddress recipientAddress) {
+        super();
+        this.deliveryStatus = deliveryStatus;
+        this.aci = recipientAddress.uuid().map(uuid -> uuid.toString()).orElse(null);
+        this.e164 = recipientAddress.number().orElse(null);
+    }
+
+    public DeliveryReport(DeliveryStatus deliveryStatus, String id) {
+        super();
+        this.deliveryStatus = deliveryStatus;
+        if (UuidUtil.isUuid(id)) {
+            this.aci = id;
+            this.e164 = null;
+        } else {
+            this.e164 = id;
+            this.aci = null;
+        }
+    }
+
+    public DeliveryReport(DeliveryStatus deliveryStatus, String e164, String aci) {
         super();
         this.deliveryStatus = deliveryStatus;
         this.aci = aci;
@@ -48,16 +68,8 @@ public class DeliveryReport {
         return aci;
     }
 
-    public void setAci(String aci) {
-        this.aci = aci;
-    }
-
     @Nullable
     public String getE164() {
         return e164;
-    }
-
-    public void setE164(String e164) {
-        this.e164 = e164;
     }
 }
