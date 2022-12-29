@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { MediaSessionCtrl, PlaybackState, useMediaSessionStore } from "./media-session";
+import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
 import { getSpotifyCtrl, SpotifyPlatformCtrl } from "../../platforms";
 export const useSpotifyPlayerStore = defineStore("spotify", () => {
   let token = "";
@@ -18,6 +18,9 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   async function connect() {
     spotifyPlatformCtrl?.setPlaybackStateListener(playbackListener);
     return spotifyPlatformCtrl?.connect() ?? false
+  }
+  async function initSpotify() {
+    await spotifyPlatformCtrl?.initSpotify();
   }
   async function initPlayer(name: string) {
     await spotifyPlatformCtrl?.initPlayer(name);
@@ -40,15 +43,17 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   function updateToken(accessToken: string) {
     spotifyPlatformCtrl?.setToken(accessToken);
   }
-  async function playbackListener(playbackState: PlaybackState, _songImage: string, _songName: string) {
+  async function playbackListener(playbackState: PlaybackState, uri: string, _songImage: string, _songName: string) {
+    songName.value = _songName;
+    songImg.value = _songImage;
     mediaState.value = playbackState;
     if (playbackState == PlaybackState.PLAYING) {
       const player = await spotifyPlatformCtrl?.getPlayer();
       mediaController.value = player ?? null;
-      mediaSessionStore.updateProvider("spotify", (await player?.getMediaId()) ?? '');
+      mediaSessionStore.updateProvider("spotify", uri ?? '');
+    } else if(playbackState == PlaybackState.STOPPED && mediaController.value?.getId() == MediaProvider.SPOTIFY) {
+      mediaSessionStore.stopMedia();
     }
-    songName.value = _songName;
-    songImg.value = _songImage;
   }
   return {
     songName,
@@ -56,6 +61,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     activatePlayer,
     connect,
     disconnect,
+    initSpotify,
     initPlayer,
     isConnected,
     isEnabled,

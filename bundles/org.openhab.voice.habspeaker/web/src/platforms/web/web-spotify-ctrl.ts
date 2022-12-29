@@ -1,17 +1,17 @@
 import { MediaProvider, MediaSessionCtrl, PlaybackState } from "../../stores/media-players/media-session";
-import { SpotifyPlatformCtrl } from "../platform";
+import { SpotifyPlatformCtrl, SpotifyPlaybackListener } from "../platform";
 
 export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
     token?: string;
     playerId: string = "";
     private _mediaController?: MediaSessionCtrl;
     private player?: Spotify.Player;
-    private playbackListener?: (state: PlaybackState, songImage: string, songTile: string) => void;
+    private playbackListener?: SpotifyPlaybackListener;
     async isEnabled(): Promise<boolean> {
         return !!this.token?.length && typeof window.Spotify !== 'undefined';
     }
-    initSpotify(): Promise<void> {
-        return this.loadSpotifyApi();
+    async initSpotify(): Promise<void> {
+        await this.initPlayer('HAB Speaker')
     }
     async activateSpotify(): Promise<void> {
         await this.player?.activateElement();
@@ -22,7 +22,7 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
     async disconnect(): Promise<void> {
         this.player?.disconnect();
     }
-    async setPlaybackStateListener(listener: (state: PlaybackState, songImage: string, songTile: string) => void): Promise<void> {
+    async setPlaybackStateListener(listener: SpotifyPlaybackListener): Promise<void> {
         this.playbackListener = listener;
     }
     async setToken(token: string) {
@@ -103,6 +103,7 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
         playerRef.addListener('player_state_changed', (playbackState) => {
             this.playbackListener?.(
                 this.parseSpotifyPlayerState(playbackState),
+                playbackState.track_window.current_track.uri,
                 playbackState.track_window.current_track.album.images[0]?.url ?? '',
                 playbackState.track_window.current_track.name,
             );

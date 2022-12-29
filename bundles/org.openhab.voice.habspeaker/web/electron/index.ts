@@ -3,6 +3,8 @@ import { release } from 'node:os';
 import { join } from 'node:path';
 import { registerAPIHandlers } from './native-api';
 process.env.DIST = join(__dirname, './habspeaker');
+process.env.LIBRESPOT_FOLDER = join(__dirname, 'librespot');
+
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) app.disableHardwareAcceleration()
 
@@ -10,7 +12,7 @@ if (release().startsWith('6.1')) app.disableHardwareAcceleration()
 if (process.platform === 'win32') app.setAppUserModelId(app.getName())
 
 if (!app.requestSingleInstanceLock()) {
-  app.quit()
+  app.quit();
   process.exit(0)
 }
 
@@ -45,8 +47,11 @@ async function createWindow() {
     return { action: 'deny' }
   })
 }
+function registerHABSpeakerHandlers() {
+  return registerAPIHandlers(() => win);
+}
 // register api handlers and launch
-app.whenReady().then(registerAPIHandlers).then(createWindow);
+app.whenReady().then(registerHABSpeakerHandlers).then(createWindow);
 
 app.on('window-all-closed', () => {
   win = null
@@ -68,21 +73,4 @@ app.on('activate', () => {
   } else {
     createWindow()
   }
-})
-
-// New window example arg: new windows url
-// ipcMain.handle('open-win', (_, arg) => {
-//   const childWindow = new BrowserWindow({
-//     webPreferences: {
-//       preload,
-//       nodeIntegration: true,
-//       contextIsolation: false,
-//     },
-//   })
-
-//   if (process.env.VITE_DEV_SERVER_URL) {
-//     childWindow.loadURL(`${url}#${arg}`)
-//   } else {
-//     childWindow.loadFile(indexHtml, { hash: arg })
-//   }
-// })
+});

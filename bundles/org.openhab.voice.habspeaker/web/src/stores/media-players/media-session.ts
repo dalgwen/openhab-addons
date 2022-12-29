@@ -123,11 +123,9 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                 }
                 break;
             case 'spotify':
-                if (spotifyStore.isConnected()) {
-                    spotifyStore.playUri(media)
+                spotifyStore.playUri(media)
                     .then(() => startMediaUpdateInterval())
                     .catch((err) => console.error("Error playing spotify media: ", err));
-                }
                 break;
             default:
                 console.error('unsupported media provider ', provider);

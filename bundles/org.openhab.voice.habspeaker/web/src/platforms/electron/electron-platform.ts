@@ -17,8 +17,13 @@ export const electronPlatform = new ElectronPlatform();
 declare global {
     interface Window {
         electronAPI: {
-            getSpeakerId(): Promise<string>
-            getUrlOpenHAB(): Promise<string>
+            getSpeakerId(): Promise<string>;
+            getUrlOpenHAB(): Promise<string>;
+            isSpotifyAvailable(): Promise<boolean>;
+            startSpotify(label: string): Promise<string>;
+            stopSpotify(): Promise<void>;
+            getSpotifyId(): Promise<string>;
+            setSpotifyPlaybackListener(listener: (state: string) => void): Promise<void>;
         }
     }
 }

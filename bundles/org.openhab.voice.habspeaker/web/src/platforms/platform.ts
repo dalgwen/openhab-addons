@@ -15,5 +15,7 @@ export interface SpotifyPlatformCtrl {
     playOnThisDevice(mediaUri: string): Promise<void>;
     connect(): Promise<boolean>;
     disconnect(): Promise<void>;
-    setPlaybackStateListener(listener: (state: PlaybackState, songImage: string, songTile: string) => void): Promise<void>;
+    setPlaybackStateListener(listener: SpotifyPlaybackListener): Promise<void>;
 }
+
+export type SpotifyPlaybackListener = (state: PlaybackState, uri: string, songImage: string, songTile: string) => void;

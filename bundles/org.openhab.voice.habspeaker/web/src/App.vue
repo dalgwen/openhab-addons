@@ -8,7 +8,7 @@ import { storeToRefs } from "pinia";
 const { getUIConfig, authorize } = useAuthStore();
 const { miniMode } = storeToRefs(useAssistantStore());
 const spotifyStore = useSpotifyPlayerStore();
-getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
+getUIConfig().then(async ({ secure, spotifyEnabled }) => {
   if (secure) {
     console.debug("Authorization required!");
     await authorize();
@@ -16,7 +16,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled, label }) => {
     console.debug("Authorization no required!");
   }
   if (spotifyEnabled) {
-    spotifyStore.initPlayer(label)
+    spotifyStore.initSpotify()
       .then(() => console.debug("Spotify web sdk loaded"))
       .catch(err => console.error("Spotify error: ", err));
   }

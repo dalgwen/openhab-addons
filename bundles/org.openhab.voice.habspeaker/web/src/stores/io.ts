@@ -129,11 +129,11 @@ export const useIOStore = defineStore("io", () => {
           spotifyStore.initPlayer(speakerLabel.value)
             .then(() => spotifyStore.connect())
             .then((connected) => console.debug("Spotify is connected: " + connected))
-            .catch(() => console.error("Error connecting to spotify"));
+            .catch((err) => console.error("Error connecting to spotify: ", err));
         } else if (!value) {
           spotifyStore.disconnect()
             .then(() => console.debug("Spotify is disconnected"))
-            .catch(() => console.error("Error connecting to spotify"));
+            .catch(() => console.error("Error disconnecting from spotify"));
         }
       }
     });

@@ -1,5 +1,9 @@
 {
   "name": "hab-speaker",
+  "author": {
+    "name": "GiviMAD"
+  },
+  "description": "A Smart Assistant UI for openHAB",
   "version": "0.0.12",
   "scripts": {
     "dev": "vite",

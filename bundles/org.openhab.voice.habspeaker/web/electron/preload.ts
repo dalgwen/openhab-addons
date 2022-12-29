@@ -4,7 +4,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   getSpeakerId: () => ipcRenderer.invoke('setting:speaker-id'),
   getUrlOpenHAB: () => ipcRenderer.invoke('setting:oh-url'),
+  isSpotifyAvailable: () => ipcRenderer.invoke('spotify:available'),
+  startSpotify: (label: string) => ipcRenderer.invoke('spotify:start', label),
+  stopSpotify: () => ipcRenderer.invoke('spotify:stop'),
+  getSpotifyId: () => ipcRenderer.invoke('spotify:id'),
+  setSpotifyPlaybackListener: (listener: (state: string) => void) => ipcRenderer.on('spotify:status', (_, state: string) => listener(state)),
 });
+
 
 // Display loading
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {

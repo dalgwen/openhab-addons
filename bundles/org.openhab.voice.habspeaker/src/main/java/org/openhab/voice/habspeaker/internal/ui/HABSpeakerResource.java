@@ -196,7 +196,7 @@ public class HABSpeakerResource implements RESTResource {
             @ApiResponse(responseCode = "303", description = "See other redirect to spotify login"),
             @ApiResponse(responseCode = "500", description = "Server error") })
     public Response spotifyLogin(@Context UriInfo uriInfo) {
-        var scope = "streaming+user-read-email+user-modify-playback-state+user-read-private";
+        var scope = "streaming+user-read-email+user-modify-playback-state+user-read-private+user-read-playback-state";
         String redirect;
         String challenge;
         try {
