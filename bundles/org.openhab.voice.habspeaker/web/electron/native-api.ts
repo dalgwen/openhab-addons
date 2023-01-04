@@ -1,9 +1,9 @@
-import { app, BrowserWindow, ipcMain, systemPreferences } from 'electron'
+import { app, BrowserWindow, ipcMain, systemPreferences, dialog } from 'electron'
 import { join } from 'node:path';
 import { get } from 'node:http';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, constants } from "node:fs/promises";
-import { readFileSync } from 'node:fs';
+import { readFileSync, accessSync } from 'node:fs';
 export function getOhUrl() {
   return config.ohUrl;
 }
@@ -138,22 +138,35 @@ async function isLibrespotAvailable() {
   return false;
 }
 // handle settings
-const configPath = join(app.getPath('home'), '.HABSpeaker', 'settings.json');
+const SPEAKER_CONFIG_PATH = join(app.getPath('home'), '.HABSpeaker', 'settings.json');
 type ConfigFile = {
   ohUrl: string,
   speakerId: string;
   ohToken?: string;
 };
+export function isConfigLoaded() {
+  return !!config;
+}
 function loadConfigFromFile() {
   try {
-    const configFile = JSON.parse(readFileSync(configPath).toString()) as ConfigFile;
+    try {
+      accessSync(SPEAKER_CONFIG_PATH, constants.F_OK);
+    } catch (error) {
+      throw new Error("Local settings file not found, please ensure it is in place.")
+    }
+    let configFile: ConfigFile;
+    try {
+      configFile = JSON.parse(readFileSync(SPEAKER_CONFIG_PATH).toString()) as ConfigFile;
+    } catch (error) {
+      throw new Error("Unable to parse speaker settings as json.")
+    }
     if (!configFile.speakerId) {
       // TODO: validate alphanumeric with dashes
-      throw new Error('Incorrect speakerId');
+      throw new Error('Incorrect speakerId settings property');
     }
     if (!configFile.ohUrl) {
       // TODO: validate url
-      throw new Error('Incorrect openHAB url');
+      throw new Error('Incorrect ohUrl settings property');
     }
     if (!configFile.ohToken) {
       // TODO: validate token
@@ -169,5 +182,6 @@ try {
   config = loadConfigFromFile();
 } catch (error) {
   console.error("Unable to read speaker config: ", error);
+  dialog.showErrorBox("Configuration Error", error.message ?? "Unable to read speaker config");
   app.exit(1);
 }
