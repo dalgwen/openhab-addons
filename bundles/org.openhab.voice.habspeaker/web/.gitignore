@@ -16,6 +16,7 @@ coverage
 *.local
 electron-release
 librespot
+librespot-src
 /cypress/videos/
 /cypress/screenshots/
 

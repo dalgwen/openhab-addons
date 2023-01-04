@@ -27,6 +27,7 @@ export function registerAPIHandlers(winGetter: () => BrowserWindow | undefined) 
 }
 
 // handle librespot
+const LIBRESPOT_FOLDER = join(__dirname, 'librespot');
 let spotifyToken = "";
 const LIBRESPOT_DISCOVERY_PORT = 9298;
 let librespot: ChildProcessWithoutNullStreams | undefined;
@@ -118,7 +119,9 @@ function getLibrespotExecutable() {
   switch (process.platform) {
     case "linux":
     case "darwin":
-      return join(process.env.LIBRESPOT_FOLDER, 'librespot');
+      return join(LIBRESPOT_FOLDER, 'librespot');
+    case "win32":
+      return join(LIBRESPOT_FOLDER, 'librespot.exe');
     default:
       return;
   }

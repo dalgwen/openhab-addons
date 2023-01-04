@@ -2,7 +2,7 @@
  * @see https://www.electron.build/configuration/configuration
  */
 {
-  "appId": "dev.givimad.${name}",
+  "appId": "dev.givimad.habspeaker",
   "productName": "HABSpeaker",
   "asar": true,
   "directories": {
@@ -42,7 +42,7 @@
   },
   linux: {
     category: "Utility",
-    artifactName: "${productName}_${version}.${ext}",
+    artifactName: "${productName}_${version}_linux_${arch}.${ext}",
     target: ["AppImage"],
     "icon": "electron-resources/icons/png",
   },

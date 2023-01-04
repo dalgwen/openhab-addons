@@ -1,14 +1,14 @@
 # Prepare librespot vendor on hosted platform
 FROM --platform=$BUILDPLATFORM rust:buster as rust_vendor
 WORKDIR /code
-RUN git clone --branch v0.4.2 https://github.com/librespot-org/librespot.git && \
+RUN git -c advice.detachedHead=false clone --quiet --branch v0.4.2 https://github.com/librespot-org/librespot.git && \
     cd librespot && \
     mkdir -p /code/librespot/.cargo && \
     cargo vendor > /code/librespot/.cargo/config
 # Build librespot for targeted platform
 FROM rust:buster as librespot_binary
 WORKDIR /code
-RUN git clone --branch v0.4.2 https://github.com/librespot-org/librespot.git
+RUN git -c advice.detachedHead=false clone --quiet --branch v0.4.2 https://github.com/librespot-org/librespot.git
 COPY --from=rust_vendor /code/librespot/.cargo /code/librespot/.cargo
 COPY --from=rust_vendor /code/librespot/vendor /code/librespot/vendor
 WORKDIR /code/librespot

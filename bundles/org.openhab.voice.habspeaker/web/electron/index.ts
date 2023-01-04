@@ -2,8 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { registerAPIHandlers, requestPermissions, getOhUrl } from './native-api';
-process.env.DIST = join(__dirname, './habspeaker');
-process.env.LIBRESPOT_FOLDER = join(__dirname, 'librespot');
+const DIST = join(__dirname, './habspeaker');
 if (process.platform === 'win32') {
   // Disable GPU Acceleration for Windows 7
   if (release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -20,12 +19,12 @@ if (!app.requestSingleInstanceLock()) {
 let win: BrowserWindow | null = null
 const preload = join(__dirname, 'preload.js');
 const url = process.env.VITE_DEV_SERVER_URL;
-const indexHtml = join(process.env.DIST, 'index.html');
+const indexHtml = join(DIST, 'index.html');
 
 async function createWindow() {
   win = new BrowserWindow({
     title: 'HAB Speaker',
-    icon: join(process.env.DIST, 'favicon.svg'),
+    icon: join(DIST, 'favicon.svg'),
     webPreferences: {
       preload,
       nodeIntegration: false,

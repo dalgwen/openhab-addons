@@ -3,8 +3,8 @@
   "author": {
     "name": "GiviMAD"
   },
-  "description": "A Smart Assistant UI for openHAB",
-  "version": "0.0.12",
+  "description": "A Smart Speaker UI concept for openHAB",
+  "version": "0.0.13",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
