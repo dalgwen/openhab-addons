@@ -194,6 +194,50 @@ The voice search will look into the sources described in the '$OPENHAB_USERDATA/
 
 Note: spotify search just search by individual songs now, pending to improve.
 
+## Electron App
+
+The UI can be built as an electron application.
+
+The electron application avoid two limitations of the web version:
+
+* Do not requires https, it can be used over http.
+* Do not requires an initial user interaction to use audio.
+
+### Setup
+
+The app expects a settings json file in the path '$HOME/.HABSpeaker/settings.json' with a content like:
+
+```json
+{"speakerId": "myspeakerid", "ohUrl": "http://192.168.1.200:8080", "ohToken": "oh.TokenNme.RANDOM"}
+
+```
+
+The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org/docs/configuration/apitokens.html). This token is not required if the OpenHAB 'Api Security' has 'Implicit User Role' enabled and the HABSpeaker 'Secure' setting has been turned off. 
+
+### Spotify Support
+
+The Spotify Web Sdk don't work on electron, so support is enabled thanks to the open source rust client [Librespot](https://github.com/librespot-org/librespot) (Requires a paid Spotify subscription).
+
+<b>There is a current limitation, first time you need to start the playback from another client in the same network (it will appear with its label on the Connected Devices list of the Spotify app), so it gets logged into your account, from there the speaker will keep linked to your account, event if you reboot the application.</b>
+
+Librespot credentials are persisted on '$HOME/.Librespot'.
+
+### Supported Platforms
+
+The electron application should work on:
+
+* macOS (arm64, x64)
+* Linux (arm64, x64)
+* Window (x64)
+
+Note: Build is tested on all the environments but the application has only been tested on macOS and Windows, needs testing but everything seems to work.
+
+### App Build
+
+You can find some scripts to help you build the application on the 'web/tools' folder. For windows/macOS requires you to have installed nodejs and rust. For Linux you should have Docker with buildx (plugin to support cross-compilation) installed.
+
+There are still no public builds available for the electron app. I will add some and link them here.
+
 ## Audio Component Details:
 
 The audio sink registered supports the following audio format: WAV PCM-SIGNED 16000hz 16-bit mono (single channel).
