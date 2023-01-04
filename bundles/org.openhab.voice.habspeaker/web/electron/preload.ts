@@ -1,13 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
-
+let windowOnReadyCallback: (() => void) | undefined;
 // expose electron to app
 contextBridge.exposeInMainWorld('electronAPI', {
+  onReady: (cb: () => void) => windowOnReadyCallback = cb,
   getSpeakerId: () => ipcRenderer.invoke('setting:speaker-id'),
+  getTokenOpenHAB: () => ipcRenderer.invoke('setting:oh-token'),
   getUrlOpenHAB: () => ipcRenderer.invoke('setting:oh-url'),
   isSpotifyAvailable: () => ipcRenderer.invoke('spotify:available'),
   startSpotify: (label: string) => ipcRenderer.invoke('spotify:start', label),
   stopSpotify: () => ipcRenderer.invoke('spotify:stop'),
   getSpotifyId: () => ipcRenderer.invoke('spotify:id'),
+  setSpotifyToken: (spotifyToken: string) => ipcRenderer.invoke('spotify:token', spotifyToken),
   setSpotifyPlaybackListener: (listener: (state: string) => void) => ipcRenderer.on('spotify:status', (_, state: string) => listener(state)),
 });
 
@@ -104,10 +107,10 @@ function useLoading() {
 
 const { appendLoading, removeLoading } = useLoading()
 domReady().then(appendLoading)
-
-window.onmessage = (ev) => {
-  ev.data.payload === 'removeLoading' && removeLoading()
-}
-
-
-setTimeout(removeLoading, 4999)
+setTimeout(() => {
+  if(windowOnReadyCallback) {
+    windowOnReadyCallback();
+    windowOnReadyCallback = null;
+  }
+  removeLoading();
+}, 4999)

@@ -161,7 +161,8 @@ export default class IOWorker {
     let wsRef = this.wsRef;
     try {
       wsRef = this.wsRef = new WebSocket(
-        `${this.ohUrl}/habspeaker/ws`
+        `${this.ohUrl}/habspeaker/ws`,
+        [`oh_token-${this.token}`, 'habspeaker'],
       );
     } catch (error) {
       console.error(error);

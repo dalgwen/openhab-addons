@@ -4,6 +4,7 @@ import { useAuthStore } from "../stores/auth";
 import { useAssistantStore } from "../stores/assistant";
 import { useSettingsStore } from "../stores/settings";
 import { useIOStore } from "../stores/io";
+import { setupPlatform } from "../platforms";
 import router from "../router";
 import AssistantWidget from "../components/AssistantWidget.vue";
 import YoutubePlayer from "../components/media-players/YoutubePlayer.vue";
@@ -20,7 +21,7 @@ const { startAssistant, isAudioSupported } = store;
 const { online } = storeToRefs(ioStore);
 const { mediaId, mediaProvider } = storeToRefs(mediaSessionStore);
 const { userInteractionDone, miniMode } = storeToRefs(store);
-async function onPanelClick() {
+async function startSpeaker() {
   if (!userInteractionDone.value) {
     startAssistant(
       await getSpeakerId(),
@@ -36,6 +37,7 @@ async function onPanelClick() {
 if (!isAudioSupported()) {
   router.replace("/audio-error");
 }
+setupPlatform(startSpeaker);
 function getMediaComponent() {
   switch (mediaProvider.value) {
     case MediaProvider.YOUTUBE:
@@ -54,7 +56,7 @@ function getMediaComponent() {
 
 <template>
   <main>
-    <div @click="onPanelClick()" class="container"
+    <div @click="startSpeaker()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
       <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
       <component v-if="mediaProvider" :is="getMediaComponent()" :mediaId="mediaId"></component>

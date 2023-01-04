@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { useScreenSaverStore } from "./screen-saver";
 import { useAuthStore } from "./auth";
-import { useMediaSessionStore } from "./media-players/media-session";
+import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
@@ -300,8 +300,12 @@ export const useIOStore = defineStore("io", () => {
                   mediaSessionCtrl.pause();
                   break;
                 case 'stop':
-                  mediaSessionCtrl.stop();
-                  mediaSessionStore.stopMedia();
+                  mediaSessionCtrl.getPlaybackState().then((state) => {
+                    if (state === PlaybackState.PLAYING) {
+                      mediaSessionCtrl.stop();
+                    }
+                    mediaSessionStore.stopMedia();
+                  });
                   break;
                 case 'next':
                   mediaSessionCtrl.next();

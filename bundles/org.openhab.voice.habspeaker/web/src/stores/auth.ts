@@ -3,36 +3,24 @@ import axios, { AxiosError } from "axios";
 import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
-import { getUrlOpenHAB } from "../platforms";
+import { getPlatformName, getServerToken, getUrlOpenHAB } from "../platforms";
+import { useSpotifyPlayerStore } from "./media-players/spotify-player";
+import router from "../router";
 export const useAuthStore = defineStore("auth", () => {
   const ioStore = useIOStore();
+  const spotifyStore = useSpotifyPlayerStore();
   const { getSpeakerId } = useSettingsStore();
   const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getUrlOpenHAB });
+  let persistentToken: string | null = null;
   function getAccessToken() {
-    return ohAuthHelper.getAccessToken();
+    return persistentToken ?? ohAuthHelper.getAccessToken() ?? '';
   }
   async function getUIConfig(): Promise<UIConfig> {
-    try {
-      return (await axios.get<UIConfig>(`${await getUrlOpenHAB()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
-    } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 401) {
-        return { secure: true, spotifyEnabled: false, label: "" };
-      }
-      throw error;
-    }
-  }
-  async function getSpeakerCookie() {
     const headers = {
-      "content-type": "application/x-www-form-urlencoded",
       accept: "application/json",
     } as { [key: string]: string };
-    if (ohAuthHelper.hasAccessToken()) { headers["Authorization"] = "Bearer " + ohAuthHelper.getAccessToken(); }
-    const refreshToken = ohAuthHelper.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('Missing refresh token.');
-    }
-    await axios
-      .post(`${await getUrlOpenHAB()}/rest/habspeaker/cookie`, `${encodeURIComponent("refresh_token")}=${encodeURIComponent(refreshToken)}`, { headers });
+    if (getAccessToken().length) { headers["Authorization"] = "Bearer " + getAccessToken(); }
+    return (await axios.get<UIConfig>(`${await getUrlOpenHAB()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
   }
   function unauthorized() {
     console.debug("Unauthorized, redirecting to login");
@@ -48,10 +36,8 @@ export const useAuthStore = defineStore("auth", () => {
       await ohAuthHelper.refreshAccessToken((err, data) => {
         if (err) {
           return unauthorized();
-        }
-        if (data) {
+        } else if (data) {
           ioStore.setAuthToken(data.access_token);
-          getSpeakerCookie().catch(err => console.error(err));
         }
       }, !authorized);
     } catch (error) {
@@ -59,6 +45,39 @@ export const useAuthStore = defineStore("auth", () => {
       return unauthorized();
     }
   }
+  // check security and redirect to login
+  (async function () {
+    let requireCredentials = false;
+    let startSpotify = false;
+    persistentToken = await getServerToken();
+    try {
+      const { secure, spotifyEnabled } = await getUIConfig();
+      requireCredentials = !persistentToken && secure;
+      startSpotify = spotifyEnabled;
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        if (persistentToken != null) {
+          return await router.replace("/unauthorized");
+        }
+        requireCredentials = true;
+      } else {
+        throw error;
+      }
+    }
+    if (requireCredentials) {
+      console.debug("Authorization required!");
+      if((await getPlatformName()) == 'electron') {
+        return await router.replace("/unauthorized");
+      }
+      await authorize();
+      startSpotify = (await getUIConfig()).spotifyEnabled;
+    }
+    if (startSpotify) {
+      spotifyStore.initSpotify()
+        .then(() => console.log('Spotify initialized'))
+        .catch(err => console.error("Spotify error: ", err));
+    }
+  })();
   return { getUIConfig, getAccessToken, authorize };
 });
 

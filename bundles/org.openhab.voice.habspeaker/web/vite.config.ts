@@ -1,12 +1,11 @@
-import { fileURLToPath, URL } from "node:url";
-
 import { defineConfig, PluginOption } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
 import ConditionalCompile from "vite-plugin-conditional-compiler";
+const pkg = require('./package.json');
 const plugins: PluginOption[] = [ConditionalCompile(), vue()];
 const isDevelopment = process.env.NODE_ENV === "development" || !!process.env.VSCODE_DEBUG
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = !isDevelopment;
 let baseUrl: string | undefined;
 if (process.env.ELECTRON_BUILD) {
   console.log("Building HAB Speaker for electron");
@@ -97,9 +96,9 @@ function getElectronPlugin() {
           sourcemap: isDevelopment,
           minify: isProduction,
           outDir: 'dist-electron/',
-          // rollupOptions: {
-          //   external: Object.keys("dependencies" in pkg ? pkg.dependencies : {}),
-          // },
+          rollupOptions: {
+            external: { ...pkg.dependencies, ...pkg.optionalDependencies },
+          },
         },
       },
     },
@@ -115,9 +114,9 @@ function getElectronPlugin() {
           sourcemap: isDevelopment,
           minify: isProduction,
           outDir: 'dist-electron/',
-          // rollupOptions: {
-          //   external: Object.keys("dependencies" in pkg ? pkg.dependencies : {}),
-          // },
+          rollupOptions: {
+            external: { ...pkg.dependencies, ...pkg.optionalDependencies },
+          },
         },
       },
     }

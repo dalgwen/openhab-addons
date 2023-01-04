@@ -17,15 +17,13 @@ import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpe
 import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.auth.ManagedUser;
-import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
@@ -73,21 +71,27 @@ public class HABSpeakerWebsocketContext implements HttpContext {
             // security is disabled
             return defaultHttpContext.handleSecurity(request, response);
         }
+        // Allow access to the websocket sending a token in the alternative auth header
         var accessToken = request.getHeader(ALT_AUTH_HEADER);
-        if (accessToken != null) {
-            // Allow access to the websocket using user generated tokens
-            return servlet.isValidToken(accessToken);
+        // Allow access to the websocket sending a token among the valid protocols
+        var tokenProtocolPrefix = "oh_token-";
+        var speakerProtocol = "habspeaker";
+        var protocols = request.getHeader("Sec-WebSocket-Protocol");
+        if (protocols != null) {
+            var protocolList = Arrays.stream(protocols.split(",")).map(String::trim).collect(Collectors.toList());
+            for (var protocol : protocolList) {
+                if (speakerProtocol.equals(protocol) && response != null) {
+                    // as per spec one of the protocols should be returned as selected
+                    response.setHeader("Sec-WebSocket-Protocol", speakerProtocol);
+                } else if (protocol.startsWith(tokenProtocolPrefix) && accessToken == null) {
+                    accessToken = protocol.replace(tokenProtocolPrefix, "");
+                }
+            }
         }
-        Optional<User> user = Optional.empty();
-        var cookies = request.getCookies();
-        if (cookies != null && cookies.length > 0) {
-            var sessionCookie = Arrays.stream(cookies).filter(cookie -> HAB_SPEAKER_COOKIE.equals(cookie.getName()))
-                    .findAny();
-            user = sessionCookie.flatMap(cookie -> userRegistry.getAll().stream().filter(u -> ((ManagedUser) u)
-                    .getSessions().stream().anyMatch(s -> s.getSessionId().equals(cookie.getValue()))).findAny());
-            user.ifPresent((_user) -> logger.debug("Found active user session: {}", _user.getName()));
+        if (accessToken == null) {
+            return false;
         }
-        return user.isPresent();
+        return servlet.isValidToken(accessToken);
     }
 
     @Override

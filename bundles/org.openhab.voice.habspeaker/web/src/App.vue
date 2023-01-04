@@ -2,25 +2,15 @@
 import { RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import ScreenSaver from "./components/ScreenSaver.vue";
-import { useSpotifyPlayerStore } from "./stores/media-players/spotify-player";
 import { useAssistantStore } from "./stores/assistant";
 import { storeToRefs } from "pinia";
-const { getUIConfig, authorize } = useAuthStore();
+import { getPlatformName } from "./platforms";
+import { ref } from "vue";
+// auth store handles the token
+useAuthStore();
 const { miniMode } = storeToRefs(useAssistantStore());
-const spotifyStore = useSpotifyPlayerStore();
-getUIConfig().then(async ({ secure, spotifyEnabled }) => {
-  if (secure) {
-    console.debug("Authorization required!");
-    await authorize();
-  } else {
-    console.debug("Authorization no required!");
-  }
-  if (spotifyEnabled) {
-    spotifyStore.initSpotify()
-      .then(() => console.debug("Spotify web sdk loaded"))
-      .catch(err => console.error("Spotify error: ", err));
-  }
-});
+const showSettings = ref(true);
+getPlatformName().then(name => showSettings.value = (name === 'web'));
 </script>
 
 <template>
@@ -32,7 +22,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled }) => {
     </div>
     <nav>
       <RouterLink to="/">Speaker</RouterLink>
-      <RouterLink to="/Settings">Settings</RouterLink>
+      <RouterLink v-if="showSettings" to="/Settings">Settings</RouterLink>
     </nav>
   </header>
 
@@ -46,7 +36,7 @@ getUIConfig().then(async ({ secure, spotifyEnabled }) => {
 header {
   position: relative;
   line-height: 1.5;
-  max-height: 100vh;
+  height: 5vh;
 }
 
 .title {

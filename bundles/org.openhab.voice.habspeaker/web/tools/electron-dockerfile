@@ -1,0 +1,35 @@
+# Prepare librespot vendor on hosted platform
+FROM --platform=$BUILDPLATFORM rust:buster as rust_vendor
+WORKDIR /code
+RUN git clone --branch v0.4.2 https://github.com/librespot-org/librespot.git && \
+    cd librespot && \
+    mkdir -p /code/librespot/.cargo && \
+    cargo vendor > /code/librespot/.cargo/config
+# Build librespot for targeted platform
+FROM rust:buster as librespot_binary
+WORKDIR /code
+RUN git clone --branch v0.4.2 https://github.com/librespot-org/librespot.git
+COPY --from=rust_vendor /code/librespot/.cargo /code/librespot/.cargo
+COPY --from=rust_vendor /code/librespot/vendor /code/librespot/vendor
+WORKDIR /code/librespot
+RUN apt update && apt install -y build-essential libasound2-dev && \
+    rustup component add rustfmt && \
+    cargo build --release --offline && \
+    mkdir -p output && \
+    cp target/release/librespot* output/ && \
+    rm -rf target
+# Build habspeaker for targeted platform
+FROM node:18
+WORKDIR /code
+COPY package*.json /code/
+COPY electron-builder.json5 /code/
+RUN npm ci
+COPY electron-resources /code/electron-resources
+COPY electron /code/electron
+COPY public /code/public
+COPY index.html /code/
+COPY vite.config.ts /code/
+COPY tsconfig*.json /code/
+COPY src /code/src
+COPY --from=librespot_binary /code/librespot/output/librespot /code/librespot/
+RUN npm run build:electron

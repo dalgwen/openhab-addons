@@ -1,21 +1,33 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, systemPreferences } from 'electron'
 import { join } from 'node:path';
 import { get } from 'node:http';
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
-import { readFile, access, constants } from "node:fs/promises";
-
+import { access, constants } from "node:fs/promises";
+import { readFileSync } from 'node:fs';
+export function getOhUrl() {
+  return config.ohUrl;
+}
+export async function requestPermissions() {
+  if (systemPreferences.getMediaAccessStatus("microphone") !== 'granted'
+    && !await systemPreferences.askForMediaAccess("microphone")) {
+    console.error("HAB Speaker needs microphone access");
+    app.exit(1);
+  }
+}
 
 export function registerAPIHandlers(winGetter: () => BrowserWindow | undefined) {
-  ipcMain.handle('check-settings', () => checkConfig);
-  ipcMain.handle('setting:speaker-id', () => readConfig('speakerId'));
-  ipcMain.handle('setting:oh-url', () => readConfig('ohUrl'));
+  ipcMain.handle('setting:speaker-id', () => config.speakerId);
+  ipcMain.handle('setting:oh-url', () => config.ohUrl);
+  ipcMain.handle('setting:oh-token', () => config.ohToken);
   ipcMain.handle('spotify:available', () => isLibrespotAvailable());
-  ipcMain.handle('spotify:start', (ev, name: string) => startLibrespot(name, getLibrespotPlaybackListener(winGetter)));
+  ipcMain.handle('spotify:start', (_, name: string) => startLibrespot(name, getLibrespotPlaybackListener(winGetter)));
   ipcMain.handle('spotify:stop', () => stopLibrespot());
   ipcMain.handle('spotify:id', () => getSpotifyId());
+  ipcMain.handle('spotify:token', (_, accessToken) => spotifyToken = accessToken);
 }
 
 // handle librespot
+let spotifyToken = "";
 const LIBRESPOT_DISCOVERY_PORT = 9298;
 let librespot: ChildProcessWithoutNullStreams | undefined;
 app.on('quit', stopLibrespot);
@@ -66,6 +78,7 @@ async function stopLibrespot() {
       console.log("Librespot stopped!");
     }
     librespot = undefined;
+    _spotifyId = undefined;
   }
 }
 async function startLibrespot(label: string, onChange: (state: string) => void) {
@@ -103,6 +116,7 @@ async function startLibrespot(label: string, onChange: (state: string) => void) 
 }
 function getLibrespotExecutable() {
   switch (process.platform) {
+    case "linux":
     case "darwin":
       return join(process.env.LIBRESPOT_FOLDER, 'librespot');
     default:
@@ -125,12 +139,11 @@ const configPath = join(app.getPath('home'), '.HABSpeaker', 'settings.json');
 type ConfigFile = {
   ohUrl: string,
   speakerId: string;
-  accessToken?: string;
+  ohToken?: string;
 };
-let config: ConfigFile | undefined;
-async function loadConfigFromFile() {
+function loadConfigFromFile() {
   try {
-    const configFile = JSON.parse((await readFile(configPath)).toString()) as ConfigFile;
+    const configFile = JSON.parse(readFileSync(configPath).toString()) as ConfigFile;
     if (!configFile.speakerId) {
       // TODO: validate alphanumeric with dashes
       throw new Error('Incorrect speakerId');
@@ -139,23 +152,19 @@ async function loadConfigFromFile() {
       // TODO: validate url
       throw new Error('Incorrect openHAB url');
     }
-    if (!configFile.accessToken) {
+    if (!configFile.ohToken) {
       // TODO: validate token
     }
     return configFile;
   } catch (error) {
-    console.log(error);
     throw error;
   }
 }
-async function checkConfig() {
-  try {
-    return !!(await loadConfigFromFile())
-  } catch (error) {
-    console.error(error);
-    return false;
-  }
-}
-async function readConfig<T extends keyof ConfigFile>(key: T): Promise<ConfigFile[T]> {
-  return (await loadConfigFromFile())[key];
+// load speaker config
+let config: ConfigFile = null;
+try {
+  config = loadConfigFromFile();
+} catch (error) {
+  console.error("Unable to read speaker config: ", error);
+  app.exit(1);
 }

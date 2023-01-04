@@ -9,24 +9,22 @@ export class OHAuthHelper {
     getRedirectUri() {
         return window.location.origin + (this.options.path ?? '');
     }
-    authorize() {
-        import('pkce-challenge').then((PkceChallenge) => {
-            const pkceChallenge = PkceChallenge.default()
-            const authState = (this.options.setup ? 'setup-' : '') + generateUUID();
-            sessionStorage.setItem('openhab.ui:codeVerifier', pkceChallenge.code_verifier)
-            sessionStorage.setItem('openhab.ui:authState', authState)
-            var redirectUri = this.getRedirectUri();
-            (window.location as any) = '/auth?' + urlEncodeObject({
-                response_type: "code",
-                client_id: redirectUri,
-                redirect_uri: redirectUri,
-                scope: "admin",
-                code_challenge_method: "S256",
-                code_challenge: pkceChallenge.code_challenge,
-                state: authState,
-            });
-
-        })
+    async authorize() {
+        const PkceChallenge = await import('pkce-challenge');
+        const pkceChallenge = PkceChallenge.default()
+        const authState = (this.options.setup ? 'setup-' : '') + generateUUID();
+        sessionStorage.setItem('openhab.ui:codeVerifier', pkceChallenge.code_verifier)
+        sessionStorage.setItem('openhab.ui:authState', authState)
+        var redirectUri = this.getRedirectUri();
+        (window.location as any) = `${await this.getUrl()}/auth?` + urlEncodeObject({
+            response_type: "code",
+            client_id: redirectUri,
+            redirect_uri: redirectUri,
+            scope: "admin",
+            code_challenge_method: "S256",
+            code_challenge: pkceChallenge.code_challenge,
+            state: authState,
+        });
     }
     /**
      * 

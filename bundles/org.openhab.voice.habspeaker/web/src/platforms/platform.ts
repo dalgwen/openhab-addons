@@ -1,7 +1,12 @@
 import type { MediaSessionCtrl, PlaybackState } from "../stores/media-players/media-session";
 
+export type PlatformName = 'web' | 'electron';
+
 export interface Platform {
+    getName(): PlatformName;
+    setup(startMic: () => void): Promise<void>;
     getSpeakerId(): Promise<string | null>;
+    getServerToken(): Promise<string | null>;
     getUrlOpenHAB(): Promise<string>;
     getSpotifyCtrl(): Promise<SpotifyPlatformCtrl>
 }

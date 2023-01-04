@@ -6,7 +6,8 @@
   "productName": "HABSpeaker",
   "asar": true,
   "directories": {
-    "output": "release/${version}"
+    "buildResources": "electron-resources",
+    "output": "electron-release/${version}"
   },
   "asarUnpack": [
     "librespot/*"
@@ -27,12 +28,26 @@
     "package.json"
   ],
   "mac": {
-    "artifactName": "${productName}_${version}.${ext}",
+    "icon": "electron-resources/icons/mac/icon.icns",
+    "artifactName": "${productName}_${version}_macOS_${arch}.${ext}",
     "target": [
       "dmg"
-    ]
+    ],
+    "extendInfo": {
+        "NSMicrophoneUsageDescription": "HAB Speaker requires access to your microphone",
+        "NSCameraUsageDescription": "Please give HAB Speaker access to your camera",
+        "com.apple.security.device.audio-input": true,
+        "com.apple.security.device.camera": true
+      },
+  },
+  linux: {
+    category: "Utility",
+    artifactName: "${productName}_${version}.${ext}",
+    target: ["AppImage"],
+    "icon": "electron-resources/icons/png",
   },
   "win": {
+    "icon": "electron-resources/icons/win/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -41,7 +56,7 @@
         ]
       }
     ],
-    "artifactName": "${productName}_${version}.${ext}"
+    "artifactName": "${productName}_${version}_windows_${arch}.${ext}"
   },
   "nsis": {
     "oneClick": false,

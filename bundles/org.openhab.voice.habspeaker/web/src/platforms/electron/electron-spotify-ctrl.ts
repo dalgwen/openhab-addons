@@ -40,6 +40,7 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
     }
     async setToken(token: string): Promise<void> {
         this.token = token;
+        await window.electronAPI.setSpotifyToken(token);
     }
     async initPlayer(name: string): Promise<void> {
         this.label = name;
@@ -78,8 +79,22 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
             setVolume: async (value: number) => this.setSpotifyVolume(value),
         };
     }
+    async claimPlayback() {
+        const deviceId = await window.electronAPI.getSpotifyId();
+        if (!deviceId.length) {
+            console.warn("Missing spotify id");
+            return;
+        }
+        await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            body: JSON.stringify({ "device_ids": [deviceId] }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+        }).catch((err) => console.error("Can not play on spotify", err));
+    }
     async spotifyPlay(spotifyUri: string) {
-        console.log("CHECK playURI: " + spotifyUri);
         await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'PUT',
             body: JSON.stringify(spotifyUri.startsWith("spotify:track:") ? { uris: [spotifyUri] } : { context_uri: spotifyUri }),
@@ -144,7 +159,7 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
             },
         }).catch((err) => console.error("Can set volume on spotify", err));
     }
-    async getSpotifyPlaybackState(): Promise<SpotifyApiPlaybackState> {
+    async getSpotifyPlaybackState(): Promise<SpotifyApiPlaybackState | undefined> {
         if (this.playbackStateCache && Date.now() < this.playbackStateCacheTime) {
             return this.playbackStateCache;
         }
@@ -156,9 +171,11 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
             },
         })
             .then(async resp => {
-                let data = await resp.json();
-                this.playbackStateCacheTime = Date.now() + 3000;
-                return this.playbackStateCache = data;
+                if (resp.status >= 200 && resp.status < 400) {
+                    let data = await resp.json();
+                    this.playbackStateCacheTime = Date.now() + 3000;
+                    return this.playbackStateCache = data;
+                }
             })
             .catch((err) => console.error("Can't get spotify playback state", err))
 

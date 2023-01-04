@@ -14,8 +14,8 @@ dist-electron
 dist-ssr
 coverage
 *.local
-release
-
+electron-release
+librespot
 /cypress/videos/
 /cypress/screenshots/
 
