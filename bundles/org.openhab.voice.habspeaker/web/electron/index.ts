@@ -31,12 +31,13 @@ async function createWindow() {
       contextIsolation: true,
     },
   });
+  // remove menu options
+  win.removeMenu();
   if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
     win.loadURL(url)
     win.webContents.openDevTools();
   } else {
     win.loadFile(indexHtml);
-    win.webContents.openDevTools();
   }
   // handle open external links
   win.webContents.setWindowOpenHandler(({ url }) => {
