@@ -16,13 +16,23 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
                 if (state == 'play' || state == 'pause') {
                     this.playbackStateCacheTime = 0;
                     const playbackState = await this.getSpotifyPlaybackState();
-                    if (playbackState && playbackState.device?.id == (await window.electronAPI.getSpotifyId())) {
-                        this.playbackListener(
-                            playbackState.is_playing ? PlaybackState.PLAYING : PlaybackState.PAUSED,
-                            playbackState.item?.uri ?? '',
-                            playbackState.item?.album.images[0].url ?? '',
-                            playbackState.item?.name ?? '',
-                        );
+                    if (playbackState) {
+                        const imPlating = playbackState.device?.id == (await window.electronAPI.getSpotifyId());
+                        if (imPlating) {
+                            this.playbackListener(
+                                playbackState.is_playing ? PlaybackState.PLAYING : PlaybackState.PAUSED,
+                                playbackState.item?.uri ?? '',
+                                playbackState.item?.album.images[0].url ?? '',
+                                playbackState.item?.name ?? '',
+                            );
+                        } else {
+                            this.playbackListener(
+                                PlaybackState.STOPPED,
+                                "",
+                                "",
+                                "",
+                            );
+                        }
                     }
                 } else if (state == 'stop') {
                     this.playbackListener(

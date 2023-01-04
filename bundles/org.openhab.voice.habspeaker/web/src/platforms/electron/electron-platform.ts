@@ -1,6 +1,7 @@
 import { Platform, PlatformName } from "../platform";
 import { ElectronSpotifyCtrl } from "./electron-spotify-ctrl";
 class ElectronPlatform implements Platform {
+    spotifyCtrl = new ElectronSpotifyCtrl();
     getName(): PlatformName {
         return 'electron';
     }
@@ -11,7 +12,6 @@ class ElectronPlatform implements Platform {
     async setup(cb: () => void): Promise<void> {
         window.electronAPI.onReady(cb);
     }
-    spotifyCtrl = new ElectronSpotifyCtrl();
     async getSpotifyCtrl() {
         return this.spotifyCtrl;
     }
