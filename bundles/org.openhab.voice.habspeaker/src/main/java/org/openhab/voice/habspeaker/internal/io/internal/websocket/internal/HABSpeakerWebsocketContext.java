@@ -24,7 +24,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.auth.UserRegistry;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
 import org.osgi.service.http.HttpContext;
@@ -41,7 +40,6 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerWebsocketContext implements HttpContext {
     private static final String HAB_SPEAKER_COOKIE = "X-HABSPEAKER-SESSIONID";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebsocketContext.class);
-    private final UserRegistry userRegistry;
     private final HttpContext defaultHttpContext;
     private final HABSpeakerWebSocketProtocol servlet;
     private final HABSpeakerConfigProvider configProvider;
@@ -53,12 +51,11 @@ public class HABSpeakerWebsocketContext implements HttpContext {
      * @param defaultHttpContext the base {@link HttpContext} - use {@link HttpService#createDefaultHttpContext()} to
      *            create a default one
      */
-    public HABSpeakerWebsocketContext(HABSpeakerWebSocketProtocol servlet, UserRegistry userRegistry,
-            HABSpeakerConfigProvider configProvider, HttpContext defaultHttpContext) {
+    public HABSpeakerWebsocketContext(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
+            HttpContext defaultHttpContext) {
         this.servlet = servlet;
         this.configProvider = configProvider;
         this.defaultHttpContext = defaultHttpContext;
-        this.userRegistry = userRegistry;
     }
 
     @Override

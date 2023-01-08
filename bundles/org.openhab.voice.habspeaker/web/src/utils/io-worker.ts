@@ -159,11 +159,13 @@ export default class IOWorker {
       setTimeout(this.connectWebSocket.bind(this), 10000);
     };
     let wsRef = this.wsRef;
+    const wsProtocols = ['habspeaker'];
+    if (this.token.length) {
+      // send the token info as an alternative protocol
+      wsProtocols.push(`oh_token-${this.token}`);
+    }
     try {
-      wsRef = this.wsRef = new WebSocket(
-        `${this.ohUrl}/habspeaker/ws`,
-        [`oh_token-${this.token}`, 'habspeaker'],
-      );
+      wsRef = this.wsRef = new WebSocket(`${this.ohUrl}/habspeaker/ws`, wsProtocols);
     } catch (error) {
       console.error(error);
       return retry();
@@ -172,7 +174,6 @@ export default class IOWorker {
       const initMessage = JSON.stringify({
         cmd: WebSocketInCmd.INITIALIZE,
         id: this.id,
-        token: (this.token && this.token.length) ? this.token : null,
         sampleRate: this.sampleRate,
       });
       if ((import.meta as any).env.DEV) {

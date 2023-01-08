@@ -91,8 +91,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     @Override
     public void register() {
         try {
-            httpService.registerServlet(WS_PATH, this, null, new HABSpeakerWebsocketContext(this, userRegistry,
-                    configProvider, httpService.createDefaultHttpContext()));
+            httpService.registerServlet(WS_PATH, this, null,
+                    new HABSpeakerWebsocketContext(this, configProvider, httpService.createDefaultHttpContext()));
             logger.debug("Started HABSpeaker at " + WS_PATH);
         } catch (NamespaceException | ServletException e) {
             logger.error("Error during HABSpeakerWebsocketIO, service will not work: {}", e.getMessage());

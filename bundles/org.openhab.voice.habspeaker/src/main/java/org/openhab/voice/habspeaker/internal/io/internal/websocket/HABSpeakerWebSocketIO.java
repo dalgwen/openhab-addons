@@ -12,8 +12,6 @@
  */
 package org.openhab.voice.habspeaker.internal.io.internal.websocket;
 
-import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol.ALT_AUTH_HEADER;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -79,34 +77,22 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         switch (command) {
             case INITIALIZE:
                 var requiredSinkSampleRate = (int) data.get("sampleRate");
-                @Nullable
-                String token = (String) data.get("token");
-                var session = getSession();
-                if (token == null && session != null) {
-                    // Allow access to the websocket using user generated tokens
-                    token = Objects.requireNonNull(session).getUpgradeRequest().getHeader(ALT_AUTH_HEADER);
-                }
                 var scheduledDisconnection = this.scheduledDisconnection;
                 if (scheduledDisconnection != null) {
                     scheduledDisconnection.cancel(true);
                 }
-                if (isValidAccess(token)) {
-                    id = (String) data.getOrDefault("id", "");
-                    servlet.addHandler(this);
-                    try {
-                        var thingHandler = this.thingHandler;
-                        var speakerConfig = getSpeakerConfig(thingHandler);
-                        if (speakerConfig != null) {
-                            sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE, speakerConfig);
-                        }
-                        registerSpeakerComponents(id, requiredSinkSampleRate, thingHandler);
-                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
-                    } catch (IOException | IllegalStateException e) {
-                        logger.warn("Disconnecting client: {}", e.getMessage());
-                        disconnect();
+                id = (String) data.getOrDefault("id", "");
+                servlet.addHandler(this);
+                try {
+                    var thingHandler = this.thingHandler;
+                    var speakerConfig = getSpeakerConfig(thingHandler);
+                    if (speakerConfig != null) {
+                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE, speakerConfig);
                     }
-                } else {
-                    logger.warn("Unauthorized access, disconnecting client");
+                    registerSpeakerComponents(id, requiredSinkSampleRate, thingHandler);
+                    sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
+                } catch (IOException | IllegalStateException e) {
+                    logger.warn("Disconnecting client: {}", e.getMessage());
                     disconnect();
                 }
                 break;
