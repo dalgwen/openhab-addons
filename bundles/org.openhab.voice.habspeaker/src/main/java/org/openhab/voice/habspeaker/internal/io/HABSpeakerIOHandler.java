@@ -55,13 +55,8 @@ public interface HABSpeakerIOHandler {
     /**
      * Is called on remote media playback updates
      *
-     * @param provider
-     * @param mediaId
-     * @param volume
-     * @param currentSecond
-     * @param totalSeconds
-     * @param playbackState
+     * @param mediaState the speaker media state
+     * @param volume the speaker media volume
      */
-    void onMediaStateUpdate(String provider, String mediaId, int volume, long currentSecond, long totalSeconds,
-            HABSpeakerIO.PlaybackStates playbackState);
+    void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume);
 }

@@ -19,7 +19,7 @@ const { getSpeakerId } = useSettingsStore();
 const { getAccessToken } = useAuthStore();
 const { startAssistant, isAudioSupported } = store;
 const { online } = storeToRefs(ioStore);
-const { mediaId, mediaProvider } = storeToRefs(mediaSessionStore);
+const { mediaProvider } = storeToRefs(mediaSessionStore);
 const { userInteractionDone, miniMode } = storeToRefs(store);
 async function startSpeaker() {
   if (!userInteractionDone.value) {
@@ -59,7 +59,7 @@ function getMediaComponent() {
     <div @click="startSpeaker()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
       <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
-      <component v-if="mediaProvider" :is="getMediaComponent()" :mediaId="mediaId"></component>
+      <component v-if="mediaProvider" :is="getMediaComponent()" ></component>
     </div>
   </main>
 </template>

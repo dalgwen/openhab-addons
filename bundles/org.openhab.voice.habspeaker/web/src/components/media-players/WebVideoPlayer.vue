@@ -1,35 +1,26 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { watch, ref, Ref, onMounted } from 'vue';
+import { useMediaSessionStore } from '../../stores/media-players/media-session';
 import { useWebVideoPlayerStore } from '../../stores/media-players/web-video-player';
-
-const props = defineProps({
-    mediaId: String,
-});
-const videoElement: Ref<HTMLVideoElement | null> = ref(null);
-const store  = useWebVideoPlayerStore();
-onMounted(()=> {
-    if(videoElement.value) {
+const videoElement: Ref<HTMLVideoElement | undefined> = ref();
+const mediaStore = useMediaSessionStore();
+const { mediaTarget } = storeToRefs(mediaStore);
+const store = useWebVideoPlayerStore();
+onMounted(() => {
+    if (videoElement.value) {
         store.registerMediaController(videoElement.value)
     }
 });
-watch(() => props.mediaId, (value) => {
-    console.debug("Playing new video ", value);
+watch(mediaTarget, (value) => {
+    console.debug("Playing new video ", value?.mediaId);
     videoElement.value?.load();
 });
-function getVideoType(url: string): string {
-    const fileParts = url.split('/')[0]?.split('.');
-    // presume mp4
-    let type = "mp4";
-    if (fileParts.length > 1) {
-        type = fileParts[fileParts.length - 1];
-    }
-    return `video/${type}`;
-}
 </script>
 <template>
     <div class="media-container">
-        <video :ref="(el) => {videoElement = el as any}" controls autoplay preload="auto" playsinline>
-            <source v-if="props.mediaId" :src="props.mediaId" />
+        <video :ref="(el) => { videoElement = el as any }" controls autoplay preload="auto" playsinline>
+            <source v-if="mediaTarget" :src="mediaTarget.mediaId" />
         </video>
     </div>
 
@@ -41,6 +32,7 @@ function getVideoType(url: string): string {
     width: 100%;
     background-color: black;
 }
+
 .media-container video {
     width: 100%;
     height: 100%;

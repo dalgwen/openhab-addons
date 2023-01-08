@@ -29,6 +29,13 @@ export function getMediaSessionCtrl(provider: MediaProvider, playerRef: HTMLVide
   return {
     getId: () => provider,
     getMediaId: async () => playerRef.currentSrc,
+    getPlaylistId: async () => {
+      // There is not playlist support implemented for web audio/video player 
+      return undefined;
+    },
+    getPlaylistIndex: async () => {
+      return undefined;
+    },
     play: async () => playerRef.play(),
     pause: async () => playerRef.pause(),
     stop: async () => playerRef.pause(),

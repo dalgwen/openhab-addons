@@ -1,10 +1,13 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
-import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
+import { MediaProvider, MediaTarget, PlaybackState, useMediaSessionStore } from "./media-session";
 export const useYoutubePlayerStore = defineStore("youtube", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
   const player = ref<YT.Player | null>(null);
+  let playlistId: string | undefined;
+  let desiredPlaylistIndex: number | undefined;
+  let desiredSecond: number | undefined;
   function loadYoutubeApi() {
     return new Promise<void>((resolve, reject) => {
       try {
@@ -29,14 +32,17 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
       }
     });
   }
-  async function playVideo(mediaId: string) {
+  async function playVideo(media: MediaTarget) {
     await loadYoutubeApi();
     const Player = window.YT.Player;
     if (player.value) {
-      if (mediaId.startsWith('playlist:')) {
-        player.value.loadPlaylist({ listType: "playlist", list: mediaId.replace('playlist:', '') })
-      } else {
-        player.value.loadVideoById(mediaId);
+      if (media.playlistId) {
+        playlistId = media.playlistId;
+        // we are assuming the playlist index is correct which maybe is not right, can be improved by checking the mediaId matches after load.
+        player.value.loadPlaylist({ listType: "playlist", list: playlistId, index: media.playlistIndex, startSeconds: media.startSecond });
+      } else if (media.mediaId) {
+        playlistId = undefined;
+        player.value.loadVideoById({ videoId: media.mediaId, startSeconds: media.startSecond });
       }
       return;
     }
@@ -48,11 +54,27 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
       enablejsapi: 1,
     };
     let videoId: string | undefined;
-    if (mediaId.startsWith('playlist:')) {
+    if (media.playlistId) {
+      playlistId = media.playlistId;
       playerVars.listType = 'playlist';
-      playerVars.list = mediaId.replace('playlist:', '');
+      playerVars.list = playlistId;
+      if (media.playlistIndex != null && media.playlistIndex !== 0) {
+        // Youtube iframe do not expose a way to load a playlist index we need to fake this
+        desiredPlaylistIndex = media.playlistIndex;
+        desiredSecond = media.startSecond;
+      } else {
+        desiredPlaylistIndex = undefined;
+        desiredSecond = undefined;
+        if (media.startSecond != null) {
+          playerVars.start = media.startSecond;
+        }
+      }
     } else {
-      videoId = mediaId;
+      playlistId = undefined;
+      videoId = media.mediaId;
+      if (media.startSecond != null) {
+        playerVars.start = media.startSecond;
+      }
     }
     const playerOptions: YT.PlayerOptions = {
       height: '0', // iframe height/width is forced by the global styles
@@ -70,6 +92,9 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
   }
   const onPlayerReady: YT.PlayerEventHandler<YT.PlayerEvent> = function (event) {
     const player = event.target;
+    if (desiredPlaylistIndex && playlistId) {
+      player.loadPlaylist({ listType: "playlist", list: playlistId, index: desiredPlaylistIndex, startSeconds: desiredSecond });
+    }
     mediaController.value = {
       getId: () => MediaProvider.YOUTUBE,
       getMediaId: async () => {
@@ -88,6 +113,12 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
           }
         }
         return "";
+      },
+      async getPlaylistId() {
+        return playlistId;
+      },
+      async getPlaylistIndex() {
+        return playlistId ? player.getPlaylistIndex() : undefined;
       },
       play: async () => player.playVideo(),
       pause: async () => player.pauseVideo(),

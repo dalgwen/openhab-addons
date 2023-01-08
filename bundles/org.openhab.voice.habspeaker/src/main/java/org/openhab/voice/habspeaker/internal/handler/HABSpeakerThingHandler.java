@@ -58,10 +58,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     private @Nullable HABSpeakerIO speakerIO;
     private @Nullable Integer sinkVolume;
     private @Nullable Integer mediaVolume;
-    private String youtubeMediaId = "";
-    private String spotifyMediaId = "";
-    private String videoMediaUrl = "";
-    private String audioMediaUrl = "";
 
     public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry, HABSpeakerIOManager ioManager,
             HABSpeakerConfigProvider configProvider) {
@@ -303,7 +299,12 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         if (id.isBlank() || "NULL".equals(id)) {
             speakerIO.playerStop();
         } else {
-            speakerIO.playerStart(provider, id);
+            if (id.startsWith("playlist:")) {
+                var playlistId = id.replace("playlist:", "");
+                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(provider, null, playlistId, 0, 0));
+            } else {
+                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(provider, id, null, 0, 0));
+            }
         }
     }
 
@@ -322,30 +323,25 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     }
 
     @Override
-    public void onMediaStateUpdate(String provider, String mediaId, int volume, long currentSecond, long totalSeconds,
-            HABSpeakerIO.PlaybackStates playbackState) {
+    public void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume) {
         String youtubeMediaId = "";
         String spotifyMediaId = "";
         String videoMediaUrl = "";
         String audioMediaUrl = "";
-        switch (provider) {
+        switch (mediaState.provider) {
             case "youtube":
-                youtubeMediaId = mediaId;
+                youtubeMediaId = mediaState.mediaId;
                 break;
             case "spotify":
-                spotifyMediaId = mediaId;
+                spotifyMediaId = mediaState.mediaId;
                 break;
             case "web-video":
-                videoMediaUrl = mediaId;
+                videoMediaUrl = mediaState.mediaId;
                 break;
             case "web-music":
-                audioMediaUrl = mediaId;
+                audioMediaUrl = mediaState.mediaId;
                 break;
         }
-        this.youtubeMediaId = youtubeMediaId;
-        this.spotifyMediaId = spotifyMediaId;
-        this.videoMediaUrl = videoMediaUrl;
-        this.audioMediaUrl = audioMediaUrl;
         if (isLinked(YOUTUBE_ID_CHANNEL)) {
             updateState(YOUTUBE_ID_CHANNEL, youtubeMediaId.isEmpty() ? UnDefType.NULL : new StringType(youtubeMediaId));
         }
@@ -359,18 +355,19 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
             updateState(WEB_AUDIO_CHANNEL, audioMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(audioMediaUrl));
         }
         if (isLinked(MEDIA_CURRENT_SECOND_CHANNEL)) {
-            updateState(MEDIA_CURRENT_SECOND_CHANNEL, new DecimalType(currentSecond));
+            updateState(MEDIA_CURRENT_SECOND_CHANNEL, new DecimalType(mediaState.currentSecond));
         }
         if (isLinked(MEDIA_TOTAL_SECONDS_CHANNEL)) {
-            updateState(MEDIA_TOTAL_SECONDS_CHANNEL, new DecimalType(totalSeconds));
+            updateState(MEDIA_TOTAL_SECONDS_CHANNEL, new DecimalType(mediaState.totalSeconds));
         }
         if (isLinked(MEDIA_PROGRESS_CHANNEL)) {
-            updateState(MEDIA_PROGRESS_CHANNEL,
-                    new PercentType((int) ((((double) currentSecond) / ((double) totalSeconds)) * 100.0)));
+            updateState(MEDIA_PROGRESS_CHANNEL, new PercentType(
+                    (int) ((((double) mediaState.currentSecond) / ((double) mediaState.totalSeconds)) * 100.0)));
         }
         if (isLinked(MEDIA_CONTROL_CHANNEL)) {
             updateState(MEDIA_CONTROL_CHANNEL,
-                    playbackState == HABSpeakerIO.PlaybackStates.PLAYING ? PlayPauseType.PLAY : PlayPauseType.PAUSE);
+                    mediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING ? PlayPauseType.PLAY
+                            : PlayPauseType.PAUSE);
         }
         if (isLinked(MEDIA_VOLUME_CHANNEL)) {
             updateState(MEDIA_VOLUME_CHANNEL, new PercentType(volume));

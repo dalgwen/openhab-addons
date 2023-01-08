@@ -284,7 +284,12 @@ export const useIOStore = defineStore("io", () => {
             case WorkerOutCmd.MEDIA_COMMAND:
               const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
               if ('start' === mediaCommandData.type) {
-                mediaSessionStore.startMedia(mediaCommandData.provider, mediaCommandData.id);
+                mediaSessionStore.startMedia(mediaCommandData.provider, {
+                  mediaId: mediaCommandData.mediaId,
+                  playlistId: mediaCommandData.playlistId,
+                  playlistIndex: mediaCommandData.playlistIndex,
+                  startSecond: mediaCommandData.second,
+                });
                 return;
               }
               const mediaSessionCtrl = mediaController.value;

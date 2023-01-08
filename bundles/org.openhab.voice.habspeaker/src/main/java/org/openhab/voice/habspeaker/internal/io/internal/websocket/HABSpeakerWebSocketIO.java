@@ -62,8 +62,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private @Nullable ScheduledFuture<?> scheduledDisconnection;
     private int sinkVolume;
     private int mediaVolume;
-    private long currentSecond;
-    private long totalSeconds;
+    private @Nullable MediaState mediaState;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
             HttpClient httpClient, ScheduledExecutorService executor, HABSpeakerIOManager ioManager) {
@@ -109,35 +108,31 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                     logger.warn("Unable to parse sink volume");
                 }
             case MEDIA_STATE:
-                var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
-                var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
-                this.currentSecond = currentSecond;
-                this.totalSeconds = totalSeconds;
-                var playbackState = PlaybackStates
-                        .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
-                var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
-                var provider = data.getOrDefault("provider", "").toString();
-                var mediaId = data.getOrDefault("id", "").toString();
-                mediaVolume = volume;
-                if (thingHandler != null) {
-                    thingHandler.onMediaStateUpdate(provider, mediaId, volume, currentSecond, totalSeconds,
-                            playbackState);
+                try {
+                    var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
+                    var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
+                    var playbackState = PlaybackStates
+                            .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
+                    var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
+                    var provider = data.getOrDefault("provider", "").toString();
+                    var mediaId = data.getOrDefault("id", "").toString();
+                    @Nullable
+                    String playlistId = data.containsKey("playlistId") ? data.get("playlistId").toString() : null;
+                    var playlistIndex = Integer.parseInt(data.getOrDefault("playlistIndex", "0").toString());
+                    mediaVolume = volume;
+                    var mediaState = new MediaState(provider, mediaId, playlistId, playlistIndex, currentSecond,
+                            totalSeconds, playbackState);
+                    this.mediaState = mediaState;
+                    if (thingHandler != null) {
+                        thingHandler.onMediaStateUpdate(mediaState, volume);
+                    }
+                } catch (NumberFormatException nfe) {
+                    logger.warn("Unable to parse media state: {}", nfe.getMessage());
                 }
                 break;
             default:
                 logger.warn("Unhandled JSON command: {}", data);
         }
-    }
-
-    private boolean isValidAccess(@Nullable String token) {
-        if (!this.configProvider.getConfig().secure) {
-            return true;
-        }
-        if (token == null) {
-            logger.debug("Token is missed.");
-            return false;
-        }
-        return servlet.isValidToken(token);
     }
 
     public void sendAudio(byte[] id, byte[] b) {
@@ -212,11 +207,12 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
 
     @Override
     public void playerCommand(RewindFastforwardType command) {
-        if (totalSeconds < 1L) {
+        var mediaState = this.mediaState;
+        if (mediaState == null || mediaState.totalSeconds < 1L) {
             logger.warn("Unable to seek missed media info");
             return;
         }
-        int newProgress = (int) ((((double) currentSecond) / ((double) totalSeconds)) * 100.0)
+        int newProgress = (int) ((((double) mediaState.currentSecond) / ((double) mediaState.totalSeconds)) * 100.0)
                 + (RewindFastforwardType.REWIND.equals(command) ? -3 : 3);
         playerSeekToPercent(newProgress);
     }
@@ -231,16 +227,17 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
 
     @Override
     public void playerSeekToPercent(int percent) {
-        if (totalSeconds < 1L) {
+        var mediaState = this.mediaState;
+        if (mediaState == null || mediaState.totalSeconds < 1L) {
             logger.error("Unable to seek missed media info");
             return;
         }
         if (percent > 99) {
-            this.playerSeekToSecond(totalSeconds);
+            this.playerSeekToSecond(mediaState.totalSeconds);
         } else if (percent < 1) {
             this.playerSeekToSecond(0);
         } else {
-            var seekSecond = (long) ((((double) percent) / 100.0) * (double) totalSeconds);
+            var seekSecond = (long) ((((double) percent) / 100.0) * (double) mediaState.totalSeconds);
             this.playerSeekToSecond(seekSecond);
         }
     }
@@ -253,11 +250,18 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
-    public void playerStart(MediaProvider provider, String id) {
+    public void playerStart(StartMediaMessage startMediaMessage) {
         var data = new HashMap<String, Object>();
         data.put("type", "start");
-        data.put("provider", provider.toString());
-        data.put("id", id);
+        data.put("provider", startMediaMessage.provider.toString());
+        if (startMediaMessage.mediaId != null) {
+            data.put("mediaId", startMediaMessage.mediaId);
+        }
+        if (startMediaMessage.playlistId != null) {
+            data.put("playlistId", startMediaMessage.playlistId);
+        }
+        data.put("playlistIndex", startMediaMessage.playlistIndex);
+        data.put("startSecond", startMediaMessage.startSecond);
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 

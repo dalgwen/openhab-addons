@@ -1,25 +1,26 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { watch, ref, Ref, onMounted } from 'vue';
+import { useMediaSessionStore } from '../../stores/media-players/media-session';
 import { useWebAudioPlayerStore } from '../../stores/media-players/web-audio-player';
-
-const props = defineProps({
-    mediaId: String,
-});
-const audioElement: Ref<HTMLAudioElement | null> = ref(null);
-const store  = useWebAudioPlayerStore();
-onMounted(()=> {
-    if(audioElement.value) {
+const audioElement: Ref<HTMLAudioElement | undefined> = ref();
+const mediaStore = useMediaSessionStore();
+const { mediaTarget } = storeToRefs(mediaStore);
+const store = useWebAudioPlayerStore();
+onMounted(() => {
+    if (audioElement.value) {
         store.registerMediaController(audioElement.value)
     }
 });
-watch(() => props.mediaId, (value) => {
+watch(mediaTarget, (value) => {
     console.debug("Playing new audio ", value);
     audioElement.value?.load();
 });
 </script>
 <template>
     <div class="media-container">
-        <audio v-if="props.mediaId" :ref="(el) => {audioElement = el as any}" :src="props.mediaId" controls autoplay preload="auto"></audio>
+        <audio v-if="mediaTarget" :ref="(el) => { audioElement = el as any }" :src="mediaTarget.mediaId" controls
+            autoplay preload="auto"></audio>
     </div>
 </template>
 
@@ -29,6 +30,7 @@ watch(() => props.mediaId, (value) => {
     width: 100%;
     background-color: black;
 }
+
 .media-container audio {
     width: 100%;
     height: 100%;

@@ -67,10 +67,21 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
                 getId: () => MediaProvider.SPOTIFY,
                 getMediaId: async () => {
                     const state = await playerRef.getCurrentState();
+                    return state?.context?.metadata?.current_item?.uri ?? "";
+                },
+                getPlaylistId: async () => {
+                    const state = await playerRef.getCurrentState();
                     if (state?.context.uri) {
                         return state?.context.uri;
                     }
-                    return "";
+                    return undefined;
+                },
+                getPlaylistIndex: async () => {
+                    const state = await playerRef.getCurrentState();
+                    if (state) {
+                        return state?.position ?? 0;
+                    }
+                    return undefined;
                 },
                 play: () => playerRef.resume(),
                 pause: () => playerRef.pause(),
@@ -110,6 +121,21 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
         });
         playerRef.on('ready', readyCallback);
         this.player = playerRef;
+    }
+    async claimPlayback() {
+        const deviceId = await window.electronAPI.getSpotifyId();
+        if (!deviceId.length) {
+            console.warn("Missing spotify id");
+            return;
+        }
+        await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            body: JSON.stringify({ "device_ids": [this.playerId] }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+        });
     }
     async playOnThisDevice(spotifyUri: string) {
         fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.playerId}`, {

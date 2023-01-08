@@ -49,9 +49,13 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     mediaState.value = playbackState;
     if (playbackState == PlaybackState.PLAYING) {
       const player = await spotifyPlatformCtrl?.getPlayer();
-      mediaController.value = player ?? null;
-      mediaSessionStore.updateProvider("spotify", uri ?? '');
-    } else if(playbackState == PlaybackState.STOPPED && mediaController.value?.getId() == MediaProvider.SPOTIFY) {
+      if (player) {
+        mediaController.value = player;
+      } else {
+        console.warn("Unable to load Spotify controller");
+      }
+      mediaSessionStore.updateProvider("spotify");
+    } else if (playbackState == PlaybackState.STOPPED && mediaController.value?.getId() == MediaProvider.SPOTIFY) {
       mediaSessionStore.stopMedia();
     }
   }

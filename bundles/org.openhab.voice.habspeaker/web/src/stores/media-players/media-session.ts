@@ -5,10 +5,10 @@ import { useSpotifyPlayerStore } from "./spotify-player";
 export const useMediaSessionStore = defineStore("mediaSession", () => {
     const ioStore = useIOStore();
     const spotifyStore = useSpotifyPlayerStore();
-    const mediaController: Ref<MediaSessionCtrl | null> = ref(null);
+    const mediaController: Ref<MediaSessionCtrl | undefined> = ref();
     const mediaState: Ref<PlaybackState> = ref(PlaybackState.STOPPED);
     const mediaProvider = ref("");
-    const mediaId = ref("");
+    const mediaTarget: Ref<MediaTarget | undefined> = ref();
     let mediaVolume = 100;
     let mediaVolumeBackup = -1;
     let muteMediaCounter = 0;
@@ -75,6 +75,8 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                 state: await player.getPlaybackState(),
                 provider: player.getId(),
                 id: await player.getMediaId(),
+                playlistId: await player.getPlaylistId(),
+                playlistIndex: await player.getPlaylistIndex(),
             });
         }
     }
@@ -99,33 +101,42 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         }
         updateMediaState();
     });
-    function updateProvider(provider: string, media: string) {
+    function updateProvider(provider: string) {
         mediaProvider.value = provider;
-        mediaId.value = media;
     }
-    function startMedia(provider: string, media: string) {
+    function startMedia(provider: string, media: MediaTarget) {
         stopMediaUpdateInterval();
-        console.debug(`starting media ${provider}: ${media}`)
+        console.debug(`starting ${provider} media:`, media);
         switch (provider) {
             case MediaProvider.WEB_AUDIO:
             case MediaProvider.WEB_VIDEO:
             case MediaProvider.YOUTUBE:
-                if (mediaId.value == media && mediaProvider.value == provider && mediaController.value) {
+                if (!!mediaController.value && !!mediaTarget.value && Object.entries(mediaProvider.value).every(e => media[e[0] as keyof MediaTarget] === e[1])) {
                     // if media is the same we should force a reload
                     const mediaCtrl = mediaController.value;
-                    mediaCtrl.seek(0)
+                    mediaCtrl.seek(media.startSecond ?? 0)
                         .then(() => mediaCtrl.play())
-                        .then(() => startMediaUpdateInterval())
+                        .then(() => updateMediaState())
                         .catch((err) => console.error("Error reloading media: ", err));
-                    // TODO: restart the media state interval is needed?
                 } else {
-                    updateProvider(provider, media);
+                    // media providers impl should use this data on init and watch its changes.
+                    mediaTarget.value = media;
+                    updateProvider(provider);
                 }
                 break;
             case 'spotify':
-                spotifyStore.playUri(media)
-                    .then(() => startMediaUpdateInterval())
-                    .catch((err) => console.error("Error playing spotify media: ", err));
+                // spotify does not use this, so clean it
+                mediaTarget.value = undefined;
+                if (mediaProvider.value !== MediaProvider.SPOTIFY) {
+                    // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
+                    mediaProvider.value = "";
+                }
+                const spotifyUri = media.playlistId ?? media.mediaId;
+                if (spotifyUri) {
+                    spotifyStore.playUri(spotifyUri)
+                        .then(() => startMediaUpdateInterval())
+                        .catch((err) => console.error("Error playing spotify media: ", err));
+                }
                 break;
             default:
                 console.error('unsupported media provider ', provider);
@@ -134,16 +145,16 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
     }
     function stopMedia() {
         stopMediaUpdateInterval();
-        mediaController.value = null;
+        mediaController.value = undefined;
         mediaProvider.value = "";
-        mediaId.value = "";
+        mediaTarget.value = undefined;
         updateMediaState();
     }
     return {
         mediaController,
         mediaState,
         mediaProvider,
-        mediaId,
+        mediaTarget,
         getMediaVolume,
         setMediaVolume,
         muteMediaVolume,
@@ -152,9 +163,17 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         updateProvider,
     };
 });
+export interface MediaTarget {
+    mediaId?: string,
+    playlistId?: string,
+    playlistIndex?: number,
+    startSecond?: number
+}
 export interface MediaSessionCtrl {
     getId(): string;
     getMediaId(): Promise<string>;
+    getPlaylistId(): Promise<string | undefined>;
+    getPlaylistIndex(): Promise<number | undefined>;
     getAwakeScreen(): boolean;
     getVolume(): Promise<number>;
     setVolume(value: number): Promise<void>;

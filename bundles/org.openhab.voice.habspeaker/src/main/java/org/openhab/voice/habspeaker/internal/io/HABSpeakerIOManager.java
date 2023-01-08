@@ -50,7 +50,6 @@ public class HABSpeakerIOManager
     private final List<HABSpeakerWebSocketProtocol> ioProtocols;
     private final Set<HABSpeakerIO> speakerConnections = Collections.synchronizedSet(new HashSet<>());
     private final HABSpeakerConfigProvider configProvider;
-    private final HttpClientFactory httpClientFactory;
     private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
 
     @Activate
@@ -59,7 +58,6 @@ public class HABSpeakerIOManager
             final @Reference HttpClientFactory httpClientFactory, final @Reference UserRegistry userRegistry,
             final @Reference HABSpeakerConfigProvider configProvider) {
         this.configProvider = configProvider;
-        this.httpClientFactory = httpClientFactory;
         this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext,
                 httpClientFactory.getCommonHttpClient(), httpService, audioManager, voiceManager, userRegistry));
         configProvider.addListener(this);

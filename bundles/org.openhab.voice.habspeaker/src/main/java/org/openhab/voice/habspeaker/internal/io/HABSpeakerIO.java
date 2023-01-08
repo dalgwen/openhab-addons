@@ -153,7 +153,7 @@ public interface HABSpeakerIO {
     /**
      * Starts media playback from provider
      */
-    void playerStart(MediaProvider provider, String id);
+    void playerStart(StartMediaMessage msg);
 
     /**
      * Forces a speaker disconnection.
@@ -224,6 +224,56 @@ public interface HABSpeakerIO {
         @Override
         public String toString() {
             return this.name;
+        }
+    }
+
+    /**
+     * Describes the speaker media state
+     */
+    class MediaState {
+        public final String provider;
+        public final String mediaId;
+        @Nullable
+        public final String playlistId;
+        public final int playlistIndex;
+        public final long currentSecond;
+        public final long totalSeconds;
+        public final PlaybackStates playbackState;
+
+        public MediaState(String provider, String mediaId, @Nullable String playlistId, int playlistIndex,
+                long currentSecond, long totalSeconds, PlaybackStates playbackState) {
+            this.provider = provider;
+            this.mediaId = mediaId;
+            this.playlistId = playlistId;
+            this.playlistIndex = playlistIndex;
+            this.currentSecond = currentSecond;
+            this.totalSeconds = totalSeconds;
+            this.playbackState = playbackState;
+        }
+    }
+
+    /**
+     * Contains the media information to start playing
+     */
+    class StartMediaMessage {
+        public final MediaProvider provider;
+        @Nullable
+        public final String mediaId;
+        @Nullable
+        public final String playlistId;
+        public final int playlistIndex;
+        public final long startSecond;
+
+        public StartMediaMessage(MediaProvider provider, @Nullable String mediaId, @Nullable String playlistId,
+                int playlistIndex, long startSecond) throws IllegalStateException {
+            this.provider = provider;
+            this.mediaId = mediaId;
+            this.playlistId = playlistId;
+            this.playlistIndex = playlistIndex;
+            this.startSecond = startSecond;
+            if (mediaId == null && playlistId == null) {
+                throw new IllegalStateException("Missing media info");
+            }
         }
     }
 }

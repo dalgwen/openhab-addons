@@ -1,17 +1,19 @@
-<script setup>
+<script lang="ts" setup>
+import { storeToRefs } from 'pinia';
 import { watch, onUnmounted } from 'vue';
+import { useMediaSessionStore } from '../../stores/media-players/media-session';
 import { useYoutubePlayerStore } from '../../stores/media-players/youtube-player';
-
-const props = defineProps({
-    mediaId: String,
-});
+const mediaStore = useMediaSessionStore();
+const { mediaTarget } = storeToRefs(mediaStore);
 const youtubePlayerStore = useYoutubePlayerStore();
-if (props.mediaId && props.mediaId.length) {
-    youtubePlayerStore.playVideo(props.mediaId);
+if (mediaTarget.value) {
+    youtubePlayerStore.playVideo(mediaTarget.value);
 }
-watch(() => props.mediaId, (value) => {
-    console.debug("Playing youtube new video ", value);
-    youtubePlayerStore.playVideo(value);
+watch(mediaTarget, (value) => {
+    if (value) {
+        console.debug("Playing youtube new video ", value);
+        youtubePlayerStore.playVideo(value);
+    }
 });
 onUnmounted(youtubePlayerStore.destroyPlayer);
 </script>
@@ -22,8 +24,8 @@ onUnmounted(youtubePlayerStore.destroyPlayer);
 </template>
 
 <style lang="scss" scoped>
-    .yt-container {
-        width: 100%;
-        height: 100%;
-    }
+.yt-container {
+    width: 100%;
+    height: 100%;
+}
 </style>

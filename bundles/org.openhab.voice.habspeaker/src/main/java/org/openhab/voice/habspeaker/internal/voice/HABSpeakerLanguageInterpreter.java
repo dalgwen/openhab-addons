@@ -138,13 +138,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             }
             String ytSearch = compareTemplateWithParameter(config.watchOnYouTubePhrase, lowerText);
             if (!ytSearch.isBlank()) {
-                // assume a valid YouTube video id or a list id prefixed by 'playlist:'
-                var localResult = searchMediaFile(YOUTUBE_MEDIA_PATH, ytSearch);
-                if (!localResult.isBlank()) {
-                    playOnYouTube(localResult);
-                } else {
-                    watchOnYouTube(ytSearch);
-                }
+                watchOnYouTube(ytSearch);
                 return config.commandSentMessage;
             }
             // media playback control phrases
@@ -234,6 +228,14 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     }
 
     // Search media
+
+    /**
+     * Try to search on a json media.
+     * 
+     * @param mediaPath path of the media file
+     * @param name key on the media file
+     * @return value for the provided name on the media file or empty
+     */
     private String searchMediaFile(Path mediaPath, String name) {
         if (mediaPath.toFile().exists()) {
             try (var is = HashMap.class.getResourceAsStream(mediaPath.toAbsolutePath().toString())) {
@@ -252,21 +254,79 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     // Third party integrations
 
-    public void playOnYouTube(String ytId) {
-        speakerIO.playerStart(HABSpeakerIO.MediaProvider.YOUTUBE, ytId);
+    /**
+     * Try to resolve search from local media json file for YouTube or fallback to YouTube Search API,
+     * and play it on the speaker
+     * 
+     * @param search the text to search
+     */
+    public void watchOnYouTube(String search) {
+        // assume a valid YouTube video id or a list id prefixed by 'playlist:'
+        var localResult = searchMediaFile(YOUTUBE_MEDIA_PATH, search);
+        if (!localResult.isBlank()) {
+            if (localResult.startsWith("playlist:")) {
+                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.YOUTUBE, null,
+                        localResult.replace("playlist:", ""), 0, 0));
+            } else {
+                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.YOUTUBE,
+                        localResult, null, 0, 0));
+            }
+        } else {
+            searchIdAndWatchOnYouTube(search);
+        }
     }
 
-    public void watchOnYouTube(String name) {
-        if (name.isBlank()) {
+    /**
+     * Try to resolve search from YouTube Search API,
+     * and play it on the speaker
+     * 
+     * @param search the text to search
+     */
+    public void searchIdAndWatchOnYouTube(String search) {
+        if (search.isBlank()) {
             logger.warn("Search is blank");
             return;
         }
         try {
-            var youTubeId = searchYouTubeId(name);
-            if (youTubeId.isBlank()) {
-                throw new IllegalStateException("YouTube id can not be black");
+            logger.warn("searching in youtube: {}", search);
+            var apiKey = configProvider.getConfig().youtubeAPIKey;
+            if (apiKey.isBlank()) {
+                throw new IllegalStateException("Missing Youtube api key");
             }
-            playOnYouTube(youTubeId);
+            var response = httpClient.newRequest("https://youtube.googleapis.com/youtube/v3/search") //
+                    .header(HttpHeader.ACCEPT, "application/json") //
+                    .param("q", search) //
+                    .param("maxResults", "1") //
+                    .param("key", apiKey).send();
+            var responseStatus = response.getStatus();
+            var responseContent = response.getContentAsString();
+            logger.debug("YouTube search response {}: {}", responseStatus, responseContent);
+            if (responseStatus > 299 || responseStatus < 200) {
+                throw new IllegalStateException(
+                        String.format("Youtube api returned an error %d: %s", responseStatus, responseContent));
+            }
+            var jsonResponse = new ObjectMapper().readValue(responseContent, YouTubeSearchResponse.class);
+            if (jsonResponse.items.isEmpty()) {
+                throw new IllegalStateException("Youtube return no results");
+            }
+            var searchItem = jsonResponse.items.get(0);
+            switch (searchItem.id.kind) {
+                case "youtube#channel":
+                    var playlistId = getYoutubeChannelUploadsPlaylist(searchItem.id.channelId);
+                    speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.YOUTUBE, null,
+                            playlistId, 0, 0));
+                    return;
+                case "youtube#playlist":
+                    speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.YOUTUBE, null,
+                            searchItem.id.playlistId, 0, 0));
+                    return;
+                case "youtube#video":
+                    speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.YOUTUBE,
+                            searchItem.id.videoId, null, 0, 0));
+                    return;
+                default:
+                    throw new IllegalStateException("YouTube returns an unsupported item type");
+            }
         } catch (ExecutionException | InterruptedException | TimeoutException | JsonProcessingException e) {
             logger.warn("watch on YouTube has failed:", e);
         }
@@ -306,42 +366,6 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             throw new IllegalStateException("Spotify return no results");
         }
         return jsonResponse.tracks.items.get(0).uri;
-    }
-
-    public String searchYouTubeId(String search) throws IllegalStateException, ExecutionException, InterruptedException,
-            TimeoutException, JsonProcessingException {
-        logger.warn("searching in youtube: {}", search);
-        var apiKey = configProvider.getConfig().youtubeAPIKey;
-        if (apiKey.isBlank()) {
-            throw new IllegalStateException("Missing Youtube api key");
-        }
-        var response = httpClient.newRequest("https://youtube.googleapis.com/youtube/v3/search") //
-                .header(HttpHeader.ACCEPT, "application/json") //
-                .param("q", search) //
-                .param("maxResults", "1") //
-                .param("key", apiKey).send();
-        var responseStatus = response.getStatus();
-        var responseContent = response.getContentAsString();
-        logger.debug("YouTube search response {}: {}", responseStatus, responseContent);
-        if (responseStatus > 299 || responseStatus < 200) {
-            throw new IllegalStateException(
-                    String.format("Youtube api returned an error %d: %s", responseStatus, responseContent));
-        }
-        var jsonResponse = new ObjectMapper().readValue(responseContent, YouTubeSearchResponse.class);
-        if (jsonResponse.items.isEmpty()) {
-            throw new IllegalStateException("Youtube return no results");
-        }
-        var searchItem = jsonResponse.items.get(0);
-        switch (searchItem.id.kind) {
-            case "youtube#channel":
-                return "playlist:" + getYoutubeChannelUploadsPlaylist(searchItem.id.channelId);
-            case "youtube#playlist":
-                return "playlist:" + searchItem.id.playlistId;
-            case "youtube#video":
-                return searchItem.id.videoId;
-            default:
-                throw new IllegalStateException("YouTube returns an unsupported item type");
-        }
     }
 
     private String getYoutubeChannelUploadsPlaylist(String channelId)
@@ -391,15 +415,18 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     }
 
     private void listenOnSpotify(String spotifyUri) {
-        speakerIO.playerStart(HABSpeakerIO.MediaProvider.SPOTIFY, spotifyUri);
+        speakerIO.playerStart(
+                new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.SPOTIFY, spotifyUri, null, 0, 0));
     }
 
     private void listenOnWebPlayer(String url) {
-        speakerIO.playerStart(HABSpeakerIO.MediaProvider.WEB_AUDIO, url);
+        speakerIO
+                .playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.WEB_AUDIO, url, null, 0, 0));
     }
 
     private void watchOnWebPlayer(String url) {
-        speakerIO.playerStart(HABSpeakerIO.MediaProvider.WEB_VIDEO, url);
+        speakerIO
+                .playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.WEB_VIDEO, url, null, 0, 0));
     }
 
     private enum SpotifySearchType {

@@ -9,12 +9,13 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
     // Cache the playback response to avoid calls when possible
     private playbackStateCache?: SpotifyApiPlaybackState;
     private playbackStateCacheTime = 0;
+    private playbackStateCacheExpiration = 0;
     async initSpotify(): Promise<void> {
         // nothing to do
         window.electronAPI.setSpotifyPlaybackListener(async (state: string) => {
             if (this.playbackListener) {
                 if (state == 'play' || state == 'pause') {
-                    this.playbackStateCacheTime = 0;
+                    this.playbackStateCacheExpiration = 0;
                     const playbackState = await this.getSpotifyPlaybackState();
                     if (playbackState) {
                         const imPlating = playbackState.device?.id == (await window.electronAPI.getSpotifyId());
@@ -75,6 +76,8 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
         return {
             getId: () => MediaProvider.SPOTIFY,
             getMediaId: async () => (await this.getSpotifyPlaybackState())?.item.uri ?? '',
+            getPlaylistId: async () => (await this.getSpotifyPlaybackState())?.context?.uri,
+            getPlaylistIndex: async () => (await this.getSpotifyPlaybackState())?.position,
             play: async () => this.spotifyResume(),
             pause: async () => this.spotifyPause(),
             stop: async () => this.spotifyPause(),
@@ -95,112 +98,124 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
             console.warn("Missing spotify id");
             return;
         }
-        await fetch('https://api.spotify.com/v1/me/player', {
+        await this.withRetry(() => fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             body: JSON.stringify({ "device_ids": [deviceId] }),
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
     async spotifyPlay(spotifyUri: string) {
-        await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${await window.electronAPI.getSpotifyId()}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/play?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'PUT',
             body: JSON.stringify(spotifyUri.startsWith("spotify:track:") ? { uris: [spotifyUri] } : { context_uri: spotifyUri }),
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
     async spotifyResume() {
-        await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${await window.electronAPI.getSpotifyId()}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/play?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
     async spotifyPause() {
-        await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${await window.electronAPI.getSpotifyId()}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
     async spotifyNext() {
-        await fetch(`https://api.spotify.com/v1/me/player/next?device_id=${await window.electronAPI.getSpotifyId()}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/next?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
     async spotifyPrevious() {
-        await fetch(`https://api.spotify.com/v1/me/player/previous?device_id=${await window.electronAPI.getSpotifyId()}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/previous?device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can not play on spotify", err));
+        }));
     }
 
     async setSpotifyVolume(volume: number) {
-        await fetch(`https://api.spotify.com/v1/me/player/volume?device_id=${await window.electronAPI.getSpotifyId()}&volume_percent=${Math.floor(volume)}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/volume?device_id=${await window.electronAPI.getSpotifyId()}&volume_percent=${Math.floor(volume)}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can set volume on spotify", err));
+        }));
     }
     async seekSpotifyPlayback(second: number) {
-        await fetch(`https://api.spotify.com/v1/me/player/seek?device_id=${await window.electronAPI.getSpotifyId()}&position_ms=${Math.floor(second * 1000)}`, {
+        await this.withRetry(async () => fetch(`https://api.spotify.com/v1/me/player/seek?device_id=${await window.electronAPI.getSpotifyId()}&position_ms=${Math.floor(second * 1000)}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can set volume on spotify", err));
+        }));
     }
     async getSpotifyPlaybackState(): Promise<SpotifyApiPlaybackState | undefined> {
-        if (this.playbackStateCache && Date.now() < this.playbackStateCacheTime) {
-            return this.playbackStateCache;
+        if (this.playbackStateCache && Date.now() < this.playbackStateCacheExpiration) {
+            // This avoid doing to much calls to the spotify api, this cache is invalidated on song changes.  
+            return { ...this.playbackStateCache, progress_ms: this.playbackStateCache.progress_ms + (Date.now() - this.playbackStateCacheTime) };
         }
-        return await fetch(`https://api.spotify.com/v1/me/player`, {
+        return await this.withRetry(async () => await fetch(`https://api.spotify.com/v1/me/player`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        })
+        }))
             .then(async resp => {
                 if (resp.status >= 200 && resp.status < 400) {
-                    let data = await resp.json();
-                    this.playbackStateCacheTime = Date.now() + 3000;
-                    return this.playbackStateCache = data;
+                    this.playbackStateCacheTime = Date.now();
+                    this.playbackStateCacheExpiration = Date.now() + 30000;
+                    return this.playbackStateCache = await resp.json();
                 }
-            })
-            .catch((err) => console.error("Can't get spotify playback state", err))
-
+                throw new Error(`Can not get spotify player state with response ${resp.status}: ${resp.statusText}`);
+            });
     }
     async seek(second: number) {
-        await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${second * 1000}&device_id=${await window.electronAPI.getSpotifyId()}`, {
+        return await this.withRetry(async () => await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${second * 1000}&device_id=${await window.electronAPI.getSpotifyId()}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).catch((err) => console.error("Can't seek on spotify", err));
+        }));
     }
-
-
+    // retry on 50x errors
+    private async withRetry(fetchOp: () => Promise<Response>) {
+        let count = 0;
+        let resp = await fetchOp();
+        while (count < 2) {
+            if (resp.status < 500) {
+                return resp;
+            }
+            await new Promise((r) => setTimeout(r, 300));
+            resp = await fetchOp();
+            count++;
+        }
+        return resp;
+    }
 
 }
 
@@ -209,6 +224,7 @@ type SpotifyApiPlaybackState = {
     device: { id: string, volume_percent: number },
     context: { uri: string },
     progress_ms: number,
+    position: number;
     item: { name: string, duration_ms: number, uri: string, album: { images: [{ url: string }] } },
     is_playing: boolean
 }

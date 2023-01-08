@@ -1,27 +1,26 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { onUnmounted } from 'vue';
+import { onUnmounted, watch } from 'vue';
 import { PlaybackState, useMediaSessionStore } from '../../stores/media-players/media-session';
 import { useSpotifyPlayerStore } from '../../stores/media-players/spotify-player';
 const mediaSessionStore = useMediaSessionStore();
 const { mediaState } = storeToRefs(mediaSessionStore);
 const spotifyPlayerStore = useSpotifyPlayerStore();
 const { songImg, songName } = storeToRefs(spotifyPlayerStore);
+let isPlaying = false;
+watch(mediaState, value => isPlaying = (value == PlaybackState.PLAYING));
 onUnmounted(() => spotifyPlayerStore.getMediaCtrl()?.then(pl => pl?.stop()));
 async function play() {
     (await spotifyPlayerStore.getMediaCtrl())?.play();
 }
 async function pause() {
-    (await spotifyPlayerStore.getMediaCtrl())?.pause()
+    (await spotifyPlayerStore.getMediaCtrl())?.pause();
 }
 async function next() {
-    (await spotifyPlayerStore.getMediaCtrl())?.next()
+    (await spotifyPlayerStore.getMediaCtrl())?.next();
 }
 async function previous() {
-    (await spotifyPlayerStore.getMediaCtrl())?.previous()
-}
-function isPlaying(state: PlaybackState) {
-    return state == PlaybackState.PLAYING;
+    (await spotifyPlayerStore.getMediaCtrl())?.previous();
 }
 </script>
 <template>
@@ -39,7 +38,7 @@ function isPlaying(state: PlaybackState) {
                         <i class='fas fa-random'></i>
                         <div class="controls-center">
                             <fa-icon class="item" icon="fa-solid fa-fast-backward" @click="previous" />
-                            <fa-icon v-if="isPlaying(mediaState)" icon="fa-solid fa-pause" @click="pause" class="item" />
+                            <fa-icon v-if="isPlaying" icon="fa-solid fa-pause" @click="pause" class="item" />
                             <fa-icon v-else class="item" icon="fa-solid fa-play" @click="play" />
                             <fa-icon class="item" icon="fa-solid fa-fast-forward" @click="next" />
                         </div>
