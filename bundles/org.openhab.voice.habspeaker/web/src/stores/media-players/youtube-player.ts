@@ -8,23 +8,25 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
   let playlistId: string | undefined;
   let desiredPlaylistIndex: number | undefined;
   let desiredSecond: number | undefined;
+  let apiLoaded = false;
   function loadYoutubeApi() {
     return new Promise<void>((resolve, reject) => {
       try {
-        const iFrameApiLoaded = (window as any)['yt_embedsEnableIframeSrcWithIntent'];
-        if (!iFrameApiLoaded) {
+        if (!apiLoaded) {
           var tag = document.createElement('script');
           tag.src = "https://www.youtube.com/iframe_api";
           var firstScriptTag = document.getElementsByTagName('script')[0];
           if (!firstScriptTag || !firstScriptTag.parentNode)
             throw new Error('Unable to load youtube api');
           (window as any).onYouTubeIframeAPIReady = function () {
-            console.debug("youtube api loaded!");
+            console.debug("youtube iframe api loaded!");
             delete (window as any).onYouTubeIframeAPIReady;
+            apiLoaded = true;
             resolve();
           };
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         } else {
+          console.debug("youtube iframe api already loaded!")
           resolve();
         }
       } catch (error) {
@@ -36,6 +38,7 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
     await loadYoutubeApi();
     const Player = window.YT.Player;
     if (player.value) {
+      console.debug('loading video in same youtube player');
       if (media.playlistId) {
         playlistId = media.playlistId;
         // we are assuming the playlist index is correct which maybe is not right, can be improved by checking the mediaId matches after load.
@@ -46,6 +49,7 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
       }
       return;
     }
+    console.debug('loading video in new youtube player');
     const playerVars: YT.PlayerVars = {
       modestbranding: 1,
       playsinline: 1,

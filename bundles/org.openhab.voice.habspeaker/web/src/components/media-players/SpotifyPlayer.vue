@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { onUnmounted, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { PlaybackState, useMediaSessionStore } from '../../stores/media-players/media-session';
 import { useSpotifyPlayerStore } from '../../stores/media-players/spotify-player';
 const mediaSessionStore = useMediaSessionStore();
 const { mediaState } = storeToRefs(mediaSessionStore);
 const spotifyPlayerStore = useSpotifyPlayerStore();
 const { songImg, songName } = storeToRefs(spotifyPlayerStore);
-let isPlaying = false;
-watch(mediaState, value => isPlaying = (value == PlaybackState.PLAYING));
+const isPlaying = ref(mediaState.value == PlaybackState.PLAYING);
+watch(mediaState, value => isPlaying.value = (value == PlaybackState.PLAYING));
 onUnmounted(() => spotifyPlayerStore.getMediaCtrl()?.then(pl => pl?.stop()));
 async function play() {
     (await spotifyPlayerStore.getMediaCtrl())?.play();

@@ -143,6 +143,24 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                 return;
         }
     }
+    function claimMedia(provider: string) {
+        stopMediaUpdateInterval();
+        console.debug(`claiming ${provider} media`);
+        switch (provider) {
+            case 'spotify':
+                if (mediaProvider.value !== MediaProvider.SPOTIFY) {
+                    // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
+                    mediaProvider.value = "";
+                }
+                spotifyStore.claimPlayback()
+                    .then(() => startMediaUpdateInterval())
+                    .catch((err) => console.error("Error playing spotify media: ", err));
+                break;
+            default:
+                console.error('Media claim is not supported by provider ' + provider);
+                return;
+        }
+    }
     function stopMedia() {
         stopMediaUpdateInterval();
         mediaController.value = undefined;
@@ -159,6 +177,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         setMediaVolume,
         muteMediaVolume,
         startMedia,
+        claimMedia,
         stopMedia,
         updateProvider,
     };

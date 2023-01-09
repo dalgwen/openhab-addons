@@ -38,20 +38,6 @@ if (!isAudioSupported()) {
   router.replace("/audio-error");
 }
 setupPlatform(startSpeaker);
-function getMediaComponent() {
-  switch (mediaProvider.value) {
-    case MediaProvider.YOUTUBE:
-      return YoutubePlayer;
-    case MediaProvider.SPOTIFY:
-      return SpotifyPlayer;
-    case MediaProvider.WEB_VIDEO:
-      return WebVideoPlayer;
-    case MediaProvider.WEB_AUDIO:
-      return WebAudioPlayer;
-    default:
-      return null;
-  }
-}
 </script>
 
 <template>
@@ -59,7 +45,10 @@ function getMediaComponent() {
     <div @click="startSpeaker()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
       <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
-      <component v-if="mediaProvider" :is="getMediaComponent()" ></component>
+      <YoutubePlayer v-if="mediaProvider == MediaProvider.YOUTUBE"></YoutubePlayer>
+      <SpotifyPlayer v-else-if="mediaProvider == MediaProvider.SPOTIFY"></SpotifyPlayer>
+      <WebAudioPlayer v-else-if="mediaProvider == MediaProvider.WEB_AUDIO"></WebAudioPlayer>
+      <WebVideoPlayer v-else-if="mediaProvider == MediaProvider.WEB_VIDEO"></WebVideoPlayer>
     </div>
   </main>
 </template>

@@ -28,6 +28,9 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   async function playUri(mediaUri: string) {
     await spotifyPlatformCtrl?.playOnThisDevice(mediaUri);
   }
+  async function claimPlayback() {
+    await spotifyPlatformCtrl?.claimPlayback();
+  }
   function isConnected() {
     return connected;
   }
@@ -43,7 +46,13 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   function updateToken(accessToken: string) {
     spotifyPlatformCtrl?.setToken(accessToken);
   }
-  async function playbackListener(playbackState: PlaybackState, uri: string, _songImage: string, _songName: string) {
+  async function playbackListener(playbackState: PlaybackState, _songImage: string, _songName: string) {
+    if(playbackState == PlaybackState.STOPPED) {
+      if(mediaController.value && mediaController.value.getId() == MediaProvider.SPOTIFY) {
+        mediaController.value = undefined;
+      }
+      return;
+    }
     songName.value = _songName;
     songImg.value = _songImage;
     mediaState.value = playbackState;
@@ -55,8 +64,6 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
         console.warn("Unable to load Spotify controller");
       }
       mediaSessionStore.updateProvider("spotify");
-    } else if (playbackState == PlaybackState.STOPPED && mediaController.value?.getId() == MediaProvider.SPOTIFY) {
-      mediaSessionStore.stopMedia();
     }
   }
   return {
@@ -71,6 +78,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     isEnabled,
     getMediaCtrl,
     playUri,
+    claimPlayback,
     updateToken,
   };
 });

@@ -123,6 +123,9 @@ export const useIOStore = defineStore("io", () => {
   function setOnline(value: boolean) {
     awakeScreenSaver();
     online.value = value;
+    if (!value) {
+      mediaSessionStore.stopMedia();
+    }
     spotifyStore.isEnabled().then(spotifyEnabled => {
       if (spotifyEnabled) {
         if (value) {
@@ -137,9 +140,6 @@ export const useIOStore = defineStore("io", () => {
         }
       }
     });
-    if (!value) {
-      mediaSessionStore.stopMedia();
-    }
   }
   function updateSpotifyToken(token: string) {
     spotifyStore.updateToken(token);
@@ -290,6 +290,10 @@ export const useIOStore = defineStore("io", () => {
                   playlistIndex: mediaCommandData.playlistIndex,
                   startSecond: mediaCommandData.second,
                 });
+                return;
+              }
+              if ('claim' === mediaCommandData.type) {
+                mediaSessionStore.claimMedia(mediaCommandData.provider);
                 return;
               }
               const mediaSessionCtrl = mediaController.value;

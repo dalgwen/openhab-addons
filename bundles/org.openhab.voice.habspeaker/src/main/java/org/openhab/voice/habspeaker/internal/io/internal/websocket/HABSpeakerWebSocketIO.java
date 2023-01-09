@@ -120,14 +120,14 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                     String playlistId = data.containsKey("playlistId") ? data.get("playlistId").toString() : null;
                     var playlistIndex = Integer.parseInt(data.getOrDefault("playlistIndex", "0").toString());
                     mediaVolume = volume;
-                    var mediaState = new MediaState(provider, mediaId, playlistId, playlistIndex, currentSecond,
-                            totalSeconds, playbackState);
+                    var mediaState = new MediaState(MediaProvider.fromString(provider), mediaId, playlistId,
+                            playlistIndex, currentSecond, totalSeconds, playbackState);
                     this.mediaState = mediaState;
                     if (thingHandler != null) {
                         thingHandler.onMediaStateUpdate(mediaState, volume);
                     }
-                } catch (NumberFormatException nfe) {
-                    logger.warn("Unable to parse media state: {}", nfe.getMessage());
+                } catch (NumberFormatException | IllegalStateException e) {
+                    logger.warn("Unable to parse media state: {}", e.getMessage());
                 }
                 break;
             default:
@@ -261,7 +261,15 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
             data.put("playlistId", startMediaMessage.playlistId);
         }
         data.put("playlistIndex", startMediaMessage.playlistIndex);
-        data.put("startSecond", startMediaMessage.startSecond);
+        data.put("second", startMediaMessage.startSecond);
+        sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
+    }
+
+    @Override
+    public void playerClaim(MediaProvider provider) {
+        var data = new HashMap<String, Object>();
+        data.put("type", "claim");
+        data.put("provider", provider.toString());
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }
 
@@ -365,6 +373,11 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     @Override
     public int getMediaVolume() {
         return mediaVolume;
+    }
+
+    @Override
+    public @Nullable MediaState getMediaState() {
+        return mediaState;
     }
 
     @Override

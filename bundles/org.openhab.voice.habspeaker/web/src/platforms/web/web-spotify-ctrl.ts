@@ -114,38 +114,36 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
         playerRef.addListener('player_state_changed', (playbackState) => {
             this.playbackListener?.(
                 this.parseSpotifyPlayerState(playbackState),
-                playbackState.track_window.current_track.uri,
-                playbackState.track_window.current_track.album.images[0]?.url ?? '',
-                playbackState.track_window.current_track.name,
+                playbackState?.track_window?.current_track?.album?.images?.[0]?.url ?? '',
+                playbackState?.track_window?.current_track?.name,
             );
         });
         playerRef.on('ready', readyCallback);
         this.player = playerRef;
     }
     async claimPlayback() {
-        const deviceId = await window.electronAPI.getSpotifyId();
-        if (!deviceId.length) {
+        if (!this.playerId.length) {
             console.warn("Missing spotify id");
             return;
         }
-        await fetch('https://api.spotify.com/v1/me/player', {
+        await this.withRetry(() => fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             body: JSON.stringify({ "device_ids": [this.playerId] }),
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        });
+        }));
     }
     async playOnThisDevice(spotifyUri: string) {
-        fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.playerId}`, {
+        this.withRetry(() => fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.playerId}`, {
             method: 'PUT',
             body: JSON.stringify(spotifyUri.startsWith("spotify:track:") ? { uris: [spotifyUri] } : { context_uri: spotifyUri }),
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-        }).then(() => console.debug("Spotify starting"))
+        })).then(() => console.debug("Spotify starting"))
             .catch((err) => console.error("Can not play on spotify", err));
     }
     async activatePlayer() {
@@ -179,7 +177,7 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
     }
     private parseSpotifyPlayerState(playerState: Spotify.PlaybackState | null) {
         if (!playerState) {
-            return PlaybackState.STOPPED
+            return PlaybackState.STOPPED;
         }
         if (playerState.loading) {
             return PlaybackState.BUFFERING;
@@ -188,5 +186,19 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
             return PlaybackState.PLAYING;
         }
         return PlaybackState.PAUSED;
+    }
+    // retry on 50x errors
+    private async withRetry(fetchOp: () => Promise<Response>) {
+        let count = 0;
+        let resp = await fetchOp();
+        while (count < 2) {
+            if (resp.status < 500) {
+                return resp;
+            }
+            await new Promise((r) => setTimeout(r, 300));
+            resp = await fetchOp();
+            count++;
+        }
+        return resp;
     }
 }

@@ -18,12 +18,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -87,16 +89,11 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             if (speakerIO.getDropIn() == null) {
                 String speakerName = compareTemplateWithParameter(config.startDropInPhrase, lowerText);
                 if (!speakerName.isBlank()) {
-                    var optionalSpeakerIO = ioManager.getSpeakerConnections().stream().filter(io -> {
-                        var handler = io.getThingHandler();
-                        if (handler == null) {
-                            return false;
-                        }
-                        return speakerName.equalsIgnoreCase(handler.getLabel()) || //
-                        speakerName.equalsIgnoreCase(handler.getLocationLabel());
-                    }).findAny();
-                    if (optionalSpeakerIO.isPresent()) {
-                        speakerIO.dropIn(optionalSpeakerIO.get());
+                    var optionalTargetSpeaker = ioManager.getSpeakerConnections().stream() //
+                            .filter(filterTargetSpeaker(speakerName)) //
+                            .findAny();
+                    if (optionalTargetSpeaker.isPresent()) {
+                        speakerIO.dropIn(optionalTargetSpeaker.get());
                         return config.commandSentMessage;
                     }
                 }
@@ -140,6 +137,18 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             if (!ytSearch.isBlank()) {
                 watchOnYouTube(ytSearch);
                 return config.commandSentMessage;
+            }
+            // media transfer phrases
+            String continueMediaOn = compareTemplateWithParameter(config.continueMediaOnPhrase, lowerText);
+            if (!continueMediaOn.isBlank()) {
+                if (continueMediaOn(continueMediaOn)) {
+                    return config.commandSentMessage;
+                }
+            }
+            if (compareTemplate(config.claimMediaPhrase, lowerText)) {
+                if (claimPlayback()) {
+                    return config.commandSentMessage;
+                }
             }
             // media playback control phrases
             if (compareTemplate(config.resumeMediaPhrase, lowerText)) {
@@ -193,6 +202,110 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
             logger.warn("Speaker Interpretation error: ", e);
         }
         throw new InterpretationException("Unknown voice command");
+    }
+
+    private boolean claimPlayback() {
+        var sourceSpeaker = ioManager.getSpeakerConnections().stream().filter(filterSpeakerNotStopped())
+                .sorted(sortPlayingFirst()).findAny().orElse(null);
+        var sourceMediaState = sourceSpeaker != null ? sourceSpeaker.getMediaState() : null;
+        if (sourceSpeaker != null && sourceMediaState != null) {
+            var provider = sourceMediaState.provider;
+            if (provider != null) {
+                // another speaker is playing something
+                if (sourceMediaState.provider != HABSpeakerIO.MediaProvider.SPOTIFY) {
+                    // Stop media on the source speaker
+                    sourceSpeaker.playerStop();
+                    // Start media on the current speaker
+                    speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(provider, sourceMediaState.mediaId,
+                            sourceMediaState.playlistId, sourceMediaState.playlistIndex,
+                            sourceMediaState.currentSecond));
+                } else {
+                    // For providers that support media claim by itself
+                    // Claim media on current speaker
+                    speakerIO.playerClaim(provider);
+                }
+                return true;
+            }
+        } else if (isPlayingOnSpotify()) {
+            // another spotify connected device is playing, claim its playback
+            speakerIO.playerClaim(HABSpeakerIO.MediaProvider.SPOTIFY);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean continueMediaOn(String continueMediaOn) {
+        var optionalTargetSpeaker = ioManager.getSpeakerConnections().stream()
+                .filter(filterTargetSpeaker(continueMediaOn)).findAny();
+        if (optionalTargetSpeaker.isPresent()) {
+            var targetSpeaker = optionalTargetSpeaker.get();
+            // Prioritize current speaker media state
+            var mediaSourceSpeaker = speakerIO;
+            var mediaState = speakerIO.getMediaState();
+            if (mediaState == null) {
+                // Search for another speaker currently playing media
+                mediaSourceSpeaker = ioManager.getSpeakerConnections().stream() //
+                        .filter(filterSpeakerNotStopped()) //
+                        .sorted(sortPlayingFirst()) //
+                        .findAny().orElse(null);
+                if (mediaSourceSpeaker != null) {
+                    mediaState = mediaSourceSpeaker.getMediaState();
+                }
+            }
+            if (mediaState != null) {
+                var provider = mediaState.provider;
+                if (provider != null) {
+                    if (provider != HABSpeakerIO.MediaProvider.SPOTIFY) {
+                        // Stop media on the source speaker
+                        mediaSourceSpeaker.playerStop();
+                        // Start media on the target speaker
+                        targetSpeaker.playerStart(new HABSpeakerIO.StartMediaMessage(provider, mediaState.mediaId,
+                                mediaState.playlistId, mediaState.playlistIndex, mediaState.currentSecond));
+                    } else {
+                        // For providers that support media claim by itself
+                        targetSpeaker.playerClaim(provider);
+                    }
+                    return true;
+                }
+            } else if (isPlayingOnSpotify()) {
+                // another spotify connected device is playing, claim playback on target speaker
+                targetSpeaker.playerClaim(HABSpeakerIO.MediaProvider.SPOTIFY);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Predicate<HABSpeakerIO> filterSpeakerNotStopped() {
+        return io -> {
+            var mediaState = io.getMediaState();
+            return mediaState != null && (mediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING
+                    || mediaState.playbackState == HABSpeakerIO.PlaybackStates.PAUSED);
+        };
+    }
+
+    private Comparator<HABSpeakerIO> sortPlayingFirst() {
+        return (a, b) -> {
+            var aMediaState = a.getMediaState();
+            var bMediaState = b.getMediaState();
+            if (aMediaState != null && bMediaState != null
+                    && aMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING
+                    && bMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING) {
+                return 0;
+            }
+            return aMediaState != null && aMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING ? 1 : -1;
+        };
+    }
+
+    private Predicate<HABSpeakerIO> filterTargetSpeaker(String speakerName) {
+        return io -> {
+            var handler = io.getThingHandler();
+            if (handler == null) {
+                return false;
+            }
+            return speakerName.equalsIgnoreCase(handler.getLabel()) || //
+            speakerName.equalsIgnoreCase(handler.getLocationLabel());
+        };
     }
 
     private String compareTemplateWithParameter(String template, String lowerText) {
@@ -398,9 +511,31 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         return uploadsPlayList;
     }
 
+    private boolean isPlayingOnSpotify() {
+        var spotifyToken = configProvider.getSpotifyToken();
+        if (spotifyToken.isBlank()) {
+            return false;
+        }
+        try {
+            var response = httpClient.newRequest("https://api.spotify.com/v1/me/player/currently-playing") //
+                    .header(HttpHeader.AUTHORIZATION, "Bearer " + spotifyToken) //
+                    .header(HttpHeader.ACCEPT, "application/json") //
+                    .header(HttpHeader.CONTENT_TYPE, "application/json").send();
+            var responseStatus = response.getStatus();
+            return responseStatus != 204 && responseStatus <= 399;
+        } catch (InterruptedException | TimeoutException | ExecutionException e) {
+            logger.warn("Error while calling spotify API: {}", e.getMessage());
+        }
+        return false;
+    }
+
     private void listenOnSpotify(SpotifySearchType type, String name) {
         if (name.isBlank()) {
             logger.warn("Search is blank");
+            return;
+        }
+        if (configProvider.getSpotifyToken().isBlank()) {
+            logger.warn("Missing spotify token");
             return;
         }
         try {
@@ -458,7 +593,8 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class SpotifySearchResponse {
-        public @Nullable SpotifyTracks tracks;
+        @Nullable
+        public SpotifyTracks tracks;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

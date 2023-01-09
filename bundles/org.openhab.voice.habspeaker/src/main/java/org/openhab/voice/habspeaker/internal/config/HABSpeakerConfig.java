@@ -58,6 +58,14 @@ public class HABSpeakerConfig {
      */
     public String watchOnYouTubePhrase = "";
     /**
+     * Phrase to continue media on another speaker
+     */
+    public String continueMediaOnPhrase = "";
+    /**
+     * Phrase to continue media into the current speaker
+     */
+    public String claimMediaPhrase = "";
+    /**
      * Phrase to resume media
      */
     public String resumeMediaPhrase = "";

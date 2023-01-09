@@ -22,7 +22,6 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
                         if (imPlating) {
                             this.playbackListener(
                                 playbackState.is_playing ? PlaybackState.PLAYING : PlaybackState.PAUSED,
-                                playbackState.item?.uri ?? '',
                                 playbackState.item?.album.images[0].url ?? '',
                                 playbackState.item?.name ?? '',
                             );
@@ -31,14 +30,12 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
                                 PlaybackState.STOPPED,
                                 "",
                                 "",
-                                "",
                             );
                         }
                     }
                 } else if (state == 'stop') {
                     this.playbackListener(
                         PlaybackState.STOPPED,
-                        "",
                         "",
                         "",
                     );

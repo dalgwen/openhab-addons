@@ -63,6 +63,14 @@ public interface HABSpeakerIO {
     int getMediaVolume();
 
     /**
+     * Gets the speaker media state
+     *
+     * @return the speaker media state
+     */
+    @Nullable
+    MediaState getMediaState();
+
+    /**
      * Get thing handler
      *
      * @return the associated thing handler
@@ -156,6 +164,11 @@ public interface HABSpeakerIO {
     void playerStart(StartMediaMessage msg);
 
     /**
+     * Claim provider playback, for providers that allow claim playback
+     */
+    void playerClaim(MediaProvider provider);
+
+    /**
      * Forces a speaker disconnection.
      */
     void disconnect();
@@ -201,6 +214,23 @@ public interface HABSpeakerIO {
             this.name = name;
         }
 
+        public static @Nullable MediaProvider fromString(String name) {
+            switch (name) {
+                case "":
+                    return null;
+                case "youtube":
+                    return YOUTUBE;
+                case "spotify":
+                    return SPOTIFY;
+                case "web-video":
+                    return WEB_VIDEO;
+                case "web-audio":
+                    return WEB_AUDIO;
+                default:
+                    throw new IllegalStateException("Unexpected value: " + name);
+            }
+        }
+
         @Override
         public String toString() {
             return this.name;
@@ -231,7 +261,9 @@ public interface HABSpeakerIO {
      * Describes the speaker media state
      */
     class MediaState {
-        public final String provider;
+        @Nullable
+        public final MediaProvider provider;
+        @Nullable
         public final String mediaId;
         @Nullable
         public final String playlistId;
@@ -240,8 +272,8 @@ public interface HABSpeakerIO {
         public final long totalSeconds;
         public final PlaybackStates playbackState;
 
-        public MediaState(String provider, String mediaId, @Nullable String playlistId, int playlistIndex,
-                long currentSecond, long totalSeconds, PlaybackStates playbackState) {
+        public MediaState(@Nullable MediaProvider provider, String mediaId, @Nullable String playlistId,
+                int playlistIndex, long currentSecond, long totalSeconds, PlaybackStates playbackState) {
             this.provider = provider;
             this.mediaId = mediaId;
             this.playlistId = playlistId;

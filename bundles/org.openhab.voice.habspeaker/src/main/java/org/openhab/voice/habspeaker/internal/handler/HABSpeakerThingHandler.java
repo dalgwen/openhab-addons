@@ -328,19 +328,21 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         String spotifyMediaId = "";
         String videoMediaUrl = "";
         String audioMediaUrl = "";
-        switch (mediaState.provider) {
-            case "youtube":
-                youtubeMediaId = mediaState.mediaId;
-                break;
-            case "spotify":
-                spotifyMediaId = mediaState.mediaId;
-                break;
-            case "web-video":
-                videoMediaUrl = mediaState.mediaId;
-                break;
-            case "web-music":
-                audioMediaUrl = mediaState.mediaId;
-                break;
+        if (mediaState.provider != null && mediaState.mediaId != null) {
+            switch (mediaState.provider) {
+                case YOUTUBE:
+                    youtubeMediaId = mediaState.mediaId;
+                    break;
+                case SPOTIFY:
+                    spotifyMediaId = mediaState.mediaId;
+                    break;
+                case WEB_VIDEO:
+                    videoMediaUrl = mediaState.mediaId;
+                    break;
+                case WEB_AUDIO:
+                    audioMediaUrl = mediaState.mediaId;
+                    break;
+            }
         }
         if (isLinked(YOUTUBE_ID_CHANNEL)) {
             updateState(YOUTUBE_ID_CHANNEL, youtubeMediaId.isEmpty() ? UnDefType.NULL : new StringType(youtubeMediaId));

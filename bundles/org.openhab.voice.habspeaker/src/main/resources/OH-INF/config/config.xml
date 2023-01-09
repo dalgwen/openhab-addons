@@ -86,6 +86,14 @@
 			<label>Watch on YouTube Phrase</label>
 			<description>Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').</description>
 		</parameter>
+		<parameter name="continueMediaOnPhrase" type="text" groupName="voice">
+			<label>Continue Media On Phrase</label>
+			<description>Phrase to continue media on another speaker (Example: 'continue on $*').</description>
+		</parameter>
+		<parameter name="claimMediaPhrase" type="text" groupName="voice">
+			<label>Claim Media Phrase</label>
+			<description>Phrase to continue media into the current speaker (Example: 'continue here').</description>
+		</parameter>
 		<parameter name="spotifyClientId" type="text" groupName="media-providers">
 			<label>Spotify Client Id</label>
 			<description>Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify

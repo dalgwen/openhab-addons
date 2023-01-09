@@ -11,8 +11,16 @@ export enum StreamType {
 export type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string, playlistId?: string, playlistIndex?: number };
 type SetVolumeCmd = { value: number };
 type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, spotConfig?: { keyword?: string, threshold?: number, averagedThreshold?: number, eagerMode?: boolean } };
-type MediaCommandCmd = { type: 'play' } | { type: 'pause' } | { type: 'stop' } | { type: 'next' } | { type: 'previous' } | { type: 'seek', second: number } | { type: 'volume', level: number } | { type: 'start', provider: string, mediaId?: string, playlistId?: string, playlistIndex?: number, second?: number };
 type SpotifyTokenCmd = { token: string };
+type MediaCommandCmd = { type: 'play' } |
+{ type: 'pause' } |
+{ type: 'stop' } |
+{ type: 'next' } |
+{ type: 'previous' } |
+{ type: 'seek', second: number } |
+{ type: 'volume', level: number } |
+{ type: 'claim', provider: string } |
+{ type: 'start', provider: string, mediaId?: string, playlistId?: string, playlistIndex?: number, second?: number };
 // Commands from worker to server (no command for sending audio as is sent as binary).
 export enum WebSocketInCmd {
   INITIALIZE = "INITIALIZE",
