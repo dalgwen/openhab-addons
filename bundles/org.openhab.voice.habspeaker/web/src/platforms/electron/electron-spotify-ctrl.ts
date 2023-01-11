@@ -72,7 +72,7 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
     async getPlayer(): Promise<MediaSessionCtrl | undefined> {
         return {
             getId: () => MediaProvider.SPOTIFY,
-            getMediaId: async () => (await this.getSpotifyPlaybackState())?.item.uri ?? '',
+            getMediaId: async () => (await this.getSpotifyPlaybackState())?.item?.uri ?? '',
             getPlaylistId: async () => (await this.getSpotifyPlaybackState())?.context?.uri,
             getPlaylistIndex: async () => (await this.getSpotifyPlaybackState())?.position,
             play: async () => this.spotifyResume(),
@@ -91,7 +91,7 @@ export class ElectronSpotifyCtrl implements SpotifyPlatformCtrl {
     }
     async claimPlayback() {
         const deviceId = await window.electronAPI.getSpotifyId();
-        if (!deviceId.length) {
+        if (!deviceId?.length) {
             console.warn("Missing spotify id");
             return;
         }

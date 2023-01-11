@@ -65,47 +65,18 @@ export class WebSpotifyCtrl implements SpotifyPlatformCtrl {
             playerRef.removeListener("ready", readyCallback);
             this._mediaController = {
                 getId: () => MediaProvider.SPOTIFY,
-                getMediaId: async () => {
-                    const state = await playerRef.getCurrentState();
-                    return state?.context?.metadata?.current_item?.uri ?? "";
-                },
-                getPlaylistId: async () => {
-                    const state = await playerRef.getCurrentState();
-                    if (state?.context.uri) {
-                        return state?.context.uri;
-                    }
-                    return undefined;
-                },
-                getPlaylistIndex: async () => {
-                    const state = await playerRef.getCurrentState();
-                    if (state) {
-                        return state?.position ?? 0;
-                    }
-                    return undefined;
-                },
+                getMediaId: async () => (await playerRef.getCurrentState())?.context?.metadata?.current_item?.uri ?? "",
+                getPlaylistId: async () => (await playerRef.getCurrentState())?.context?.uri ?? undefined,
+                getPlaylistIndex: async () => (await playerRef.getCurrentState())?.position ?? 0,
                 play: () => playerRef.resume(),
                 pause: () => playerRef.pause(),
                 stop: () => playerRef.pause(),
                 next: () => playerRef.nextTrack(),
                 previous: () => playerRef.previousTrack(),
                 seek: (second) => playerRef.seek(second * 1000),
-                getCurrentSecond: async () => {
-                    const position = (await playerRef.getCurrentState())?.position;
-                    if (position != null) {
-                        return position / 1000;
-                    }
-                    return 0;
-                },
-                getTotalSeconds: async () => {
-                    const duration = (await playerRef.getCurrentState())?.duration;
-                    if (duration != null) {
-                        return duration / 1000;
-                    }
-                    return 0;
-                },
-                getPlaybackState: async () => {
-                    return this.parseSpotifyPlayerState(await playerRef.getCurrentState());
-                },
+                getCurrentSecond: async () => ((await playerRef.getCurrentState())?.position ?? 0) / 1000,
+                getTotalSeconds: async () => ((await playerRef.getCurrentState())?.duration ?? 0) / 1000,
+                getPlaybackState: async () =>  this.parseSpotifyPlayerState(await playerRef.getCurrentState()),
                 getAwakeScreen: () => false,
                 getVolume: async () => (await playerRef.getVolume()) * 100,
                 setVolume: (value: number) => playerRef.setVolume(value / 100)

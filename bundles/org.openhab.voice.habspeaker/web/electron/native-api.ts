@@ -33,14 +33,18 @@ const LIBRESPOT_DISCOVERY_PORT = 9298;
 let librespot: ChildProcessWithoutNullStreams | undefined;
 app.on('quit', stopLibrespot);
 let _spotifyId: string | undefined;
-let notifySpotifyTimeout: any = null;
+let notifySpotifyTimeout: any = undefined;
 
 function getLibrespotPlaybackListener(winGetter: () => BrowserWindow | undefined) {
   return (state: string) => {
-    if (notifySpotifyTimeout) clearTimeout(notifySpotifyTimeout);
+    console.log("[Librespot] event: " + state);
+    if (notifySpotifyTimeout) {
+      clearTimeout(notifySpotifyTimeout);
+      notifySpotifyTimeout = undefined;
+    }
     notifySpotifyTimeout = setTimeout(() => {
       winGetter()?.webContents.send('spotify:status', state);
-    }, 1000);
+    }, 500);
   };
 }
 async function getSpotifyId() {
@@ -86,27 +90,29 @@ async function startLibrespot(label: string, onChange: (state: string) => void) 
   await stopLibrespot();
   librespot = spawn(getLibrespotExecutable().replace('app.asar', 'app.asar.unpacked'), [
     "-n", label,
-    // "-b", "320",
+    "-b", "320",
     "-C", join(app.getPath('home'), '.Librespot'),
     "-z", LIBRESPOT_DISCOVERY_PORT.toString(),
     "-v"
   ]);
-  librespot.stdout.on("data", data => {
-    console.log(`librespot: ${data}`);
-  });
-  librespot.stderr.on("data", (data: string) => {
-    //   console.log(`librespot: ${data}`);
-    if (data.includes("Sending status to server: [kPlayStatusPlay]")) {
-      console.log("main: spotify resumed");
-      onChange('play');
-    } else if (data.includes("Sending status to server: [kPlayStatusPause]")) {
-      console.log("main: spotify paused");
-      onChange('pause');
-    } else if (data.includes("Sending status to server: [kPlayStatusStop]")) {
-      console.log("main: spotify stopped");
-      onChange('stop');
+  function processLibrespotOutput(data: string) {
+    const lines = (data != null ? data.toString() : '').split('\n');
+    for (const line of lines) {
+      if (line.includes("Sending status to server:")) {
+        if (line.includes("[kPlayStatusPlay]")) {
+          onChange('play');
+        } else if (line.includes("[kPlayStatusPause]")) {
+          onChange('pause');
+        } else if (line.includes("[kPlayStatusStop]")) {
+          onChange('stop');
+        }
+      } else if (line.includes("command=Stop")) {
+        onChange('stop');
+      }
     }
-  });
+  }
+  librespot.stdout.on("data", processLibrespotOutput);
+  librespot.stderr.on("data", processLibrespotOutput);
   librespot.on('error', (error) => {
     console.log(`librespot error: ${error.message}`);
   });

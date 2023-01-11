@@ -49,7 +49,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   async function playbackListener(playbackState: PlaybackState, _songImage: string, _songName: string) {
     if(playbackState == PlaybackState.STOPPED) {
       if(mediaController.value && mediaController.value.getId() == MediaProvider.SPOTIFY) {
-        mediaController.value = undefined;
+        mediaSessionStore.stopMedia();
       }
       return;
     }
