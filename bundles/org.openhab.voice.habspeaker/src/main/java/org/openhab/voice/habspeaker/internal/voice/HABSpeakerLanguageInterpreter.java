@@ -38,6 +38,7 @@ import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.core.voice.text.InterpretationException;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
@@ -82,126 +83,158 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     @Override
     public String interpret(Locale locale, String text) throws InterpretationException {
+        var config = configProvider.getConfig();
+        String lowerText = text.toLowerCase();
+        boolean interpreted = false;
+        logger.debug("Trying to interpret text: {}", text);
         try {
-            var config = configProvider.getConfig();
-            var lowerText = text.toLowerCase();
-            // drop-in phrases
-            if (speakerIO.getDropIn() == null) {
-                String speakerName = compareTemplateWithParameter(config.startDropInPhrase, lowerText);
-                if (!speakerName.isBlank()) {
-                    var optionalTargetSpeaker = ioManager.getSpeakerConnections().stream() //
-                            .filter(filterTargetSpeaker(speakerName)) //
-                            .findAny();
-                    if (optionalTargetSpeaker.isPresent()) {
-                        speakerIO.dropIn(optionalTargetSpeaker.get());
-                        return config.commandSentMessage;
-                    }
-                }
-            } else {
-                if (compareTemplate(config.stopDropInPhrase, lowerText)) {
-                    speakerIO.dropIn(null);
-                    return config.commandSentMessage;
-                }
-            }
-            // media search phrases
-            String webAudioSearch = compareTemplateWithParameter(config.listenOnWebPhrase, lowerText);
-            if (!webAudioSearch.isBlank()) {
-                // assume a valid url
-                var localResult = searchMediaFile(WEB_AUDIO_MEDIA_PATH, webAudioSearch);
-                if (!localResult.isBlank()) {
-                    listenOnWebPlayer(localResult);
-                    return config.commandSentMessage;
-                }
-            }
-            String webVideoSearch = compareTemplateWithParameter(config.watchOnWebPhrase, lowerText);
-            if (!webVideoSearch.isBlank()) {
-                // assume a valid url
-                var localResult = searchMediaFile(WEB_VIDEO_MEDIA_PATH, webVideoSearch);
-                if (!localResult.isBlank()) {
-                    watchOnWebPlayer(localResult);
-                    return config.commandSentMessage;
-                }
-            }
-            String spotifySearch = compareTemplateWithParameter(config.listenOnSpotifyPhrase, lowerText);
-            if (!spotifySearch.isBlank()) {
-                // assume a valid spotify URI
-                var localResult = searchMediaFile(SPOTIFY_MEDIA_PATH, spotifySearch);
-                if (!localResult.isBlank()) {
-                    listenOnSpotify(localResult);
-                } else {
-                    listenTrackOnSpotify(spotifySearch);
-                }
-                return config.commandSentMessage;
-            }
-            String ytSearch = compareTemplateWithParameter(config.watchOnYouTubePhrase, lowerText);
-            if (!ytSearch.isBlank()) {
-                watchOnYouTube(ytSearch);
-                return config.commandSentMessage;
-            }
-            // media transfer phrases
-            String continueMediaOn = compareTemplateWithParameter(config.continueMediaOnPhrase, lowerText);
-            if (!continueMediaOn.isBlank()) {
-                if (continueMediaOn(continueMediaOn)) {
-                    return config.commandSentMessage;
-                }
-            }
-            if (compareTemplate(config.claimMediaPhrase, lowerText)) {
-                if (claimPlayback()) {
-                    return config.commandSentMessage;
-                }
-            }
-            // media playback control phrases
-            if (compareTemplate(config.resumeMediaPhrase, lowerText)) {
-                speakerIO.playerCommand(PlayPauseType.PLAY);
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.pauseMediaPhrase, lowerText)) {
-                speakerIO.playerCommand(PlayPauseType.PAUSE);
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.stopMediaPhrase, lowerText)) {
-                speakerIO.playerStop();
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
-                speakerIO.playerCommand(RewindFastforwardType.FASTFORWARD);
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
-                speakerIO.playerCommand(RewindFastforwardType.REWIND);
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.nextMediaPhrase, lowerText)) {
-                speakerIO.playerCommand(NextPreviousType.NEXT);
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.previousMediaPhrase, lowerText)) {
-                speakerIO.playerCommand(NextPreviousType.PREVIOUS);
-                return config.commandSentMessage;
-            }
-            // media playback volume phrases
-            if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
-                var level = speakerIO.getMediaVolume();
-                if (level > config.mediaVolumeStep - 1) {
-                    speakerIO.setMediaVolume(level - config.mediaVolumeStep);
-                } else {
-                    speakerIO.setMediaVolume(0);
-                }
-                return config.commandSentMessage;
-            }
-            if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
-                var level = speakerIO.getMediaVolume();
-                if (level < 100 - config.mediaVolumeStep) {
-                    speakerIO.setMediaVolume(level + config.mediaVolumeStep);
-                } else {
-                    speakerIO.setMediaVolume(100);
-                }
-                return config.commandSentMessage;
-            }
+            interpreted = interpretDropInCommands(config, lowerText) || //
+                    interpretMediaSearch(config, lowerText) || //
+                    interpretMediaTransfer(config, lowerText) || //
+                    interpretMediaControl(config, lowerText) || //
+                    interpretMediaVolume(config, lowerText);
         } catch (Exception e) {
             logger.warn("Speaker Interpretation error: ", e);
         }
-        throw new InterpretationException("Unknown voice command");
+        logger.debug("Text interpreted: {}", interpreted);
+        if (!interpreted) {
+            throw new InterpretationException("Unknown voice command");
+        }
+        return config.commandSentMessage;
+    }
+
+    private boolean interpretMediaVolume(HABSpeakerConfig config, String lowerText) {
+        if (compareTemplate(config.decreaseMediaVolumePhrase, lowerText)) {
+            var level = speakerIO.getMediaVolume();
+            if (level > config.mediaVolumeStep - 1) {
+                speakerIO.setMediaVolume(level - config.mediaVolumeStep);
+            } else {
+                speakerIO.setMediaVolume(0);
+            }
+            return true;
+        }
+        if (compareTemplate(config.increaseMediaVolumePhrase, lowerText)) {
+            var level = speakerIO.getMediaVolume();
+            if (level < 100 - config.mediaVolumeStep) {
+                speakerIO.setMediaVolume(level + config.mediaVolumeStep);
+            } else {
+                speakerIO.setMediaVolume(100);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean interpretMediaControl(HABSpeakerConfig config, String lowerText) {
+        @Nullable
+        HABSpeakerIO commandTarget = speakerIO;
+        var mediaState = speakerIO.getMediaState();
+        if (mediaState == null || mediaState.playbackState == HABSpeakerIO.PlaybackStates.STOPPED) {
+            // try target another connected speaker how is playing media
+            logger.debug("Speaker not playing media, looking for another");
+            commandTarget = ioManager.getSpeakerConnections().stream().filter(filterSpeakerNotStopped())
+                    .sorted(sortPlayingFirst()).findAny().orElse(null);
+        }
+        if (commandTarget == null) {
+            logger.debug("No devices playing media");
+            return false;
+        }
+        if (compareTemplate(config.resumeMediaPhrase, lowerText)) {
+            commandTarget.playerCommand(PlayPauseType.PLAY);
+            return true;
+        }
+        if (compareTemplate(config.pauseMediaPhrase, lowerText)) {
+            commandTarget.playerCommand(PlayPauseType.PAUSE);
+            return true;
+        }
+        if (compareTemplate(config.stopMediaPhrase, lowerText)) {
+            commandTarget.playerStop();
+            return true;
+        }
+        if (compareTemplate(config.fastForwardMediaProgressPhrase, lowerText)) {
+            commandTarget.playerCommand(RewindFastforwardType.FASTFORWARD);
+            return true;
+        }
+        if (compareTemplate(config.rewindMediaProgressPhrase, lowerText)) {
+            commandTarget.playerCommand(RewindFastforwardType.REWIND);
+            return true;
+        }
+        if (compareTemplate(config.nextMediaPhrase, lowerText)) {
+            commandTarget.playerCommand(NextPreviousType.NEXT);
+            return true;
+        }
+        if (compareTemplate(config.previousMediaPhrase, lowerText)) {
+            commandTarget.playerCommand(NextPreviousType.PREVIOUS);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean interpretMediaTransfer(HABSpeakerConfig config, String lowerText) {
+        String continueMediaOn = compareTemplateWithParameter(config.continueMediaOnPhrase, lowerText);
+        if (!continueMediaOn.isBlank() && continueMediaOn(continueMediaOn)) {
+            return true;
+        }
+        return compareTemplate(config.claimMediaPhrase, lowerText) && claimPlayback();
+    }
+
+    private boolean interpretMediaSearch(HABSpeakerConfig config, String lowerText) {
+        String webAudioSearch = compareTemplateWithParameter(config.listenOnWebPhrase, lowerText);
+        if (!webAudioSearch.isBlank()) {
+            // assume a valid url
+            var localResult = searchMediaFile(WEB_AUDIO_MEDIA_PATH, webAudioSearch);
+            if (!localResult.isBlank()) {
+                listenOnWebPlayer(localResult);
+                return true;
+            }
+        }
+        String webVideoSearch = compareTemplateWithParameter(config.watchOnWebPhrase, lowerText);
+        if (!webVideoSearch.isBlank()) {
+            // assume a valid url
+            var localResult = searchMediaFile(WEB_VIDEO_MEDIA_PATH, webVideoSearch);
+            if (!localResult.isBlank()) {
+                watchOnWebPlayer(localResult);
+                return true;
+            }
+        }
+        String spotifySearch = compareTemplateWithParameter(config.listenOnSpotifyPhrase, lowerText);
+        if (!spotifySearch.isBlank()) {
+            // assume a valid spotify URI
+            var localResult = searchMediaFile(SPOTIFY_MEDIA_PATH, spotifySearch);
+            if (!localResult.isBlank()) {
+                listenOnSpotify(localResult);
+            } else {
+                listenTrackOnSpotify(spotifySearch);
+            }
+            return true;
+        }
+        String ytSearch = compareTemplateWithParameter(config.watchOnYouTubePhrase, lowerText);
+        if (!ytSearch.isBlank()) {
+            watchOnYouTube(ytSearch);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean interpretDropInCommands(HABSpeakerConfig config, String lowerText) {
+        if (speakerIO.getDropIn() == null) {
+            String speakerName = compareTemplateWithParameter(config.startDropInPhrase, lowerText);
+            if (!speakerName.isBlank()) {
+                var optionalTargetSpeaker = ioManager.getSpeakerConnections().stream() //
+                        .filter(filterTargetSpeaker(speakerName)) //
+                        .findAny();
+                if (optionalTargetSpeaker.isPresent()) {
+                    speakerIO.dropIn(optionalTargetSpeaker.get());
+                    return true;
+                }
+            }
+        } else {
+            if (compareTemplate(config.stopDropInPhrase, lowerText)) {
+                speakerIO.dropIn(null);
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean claimPlayback() {
