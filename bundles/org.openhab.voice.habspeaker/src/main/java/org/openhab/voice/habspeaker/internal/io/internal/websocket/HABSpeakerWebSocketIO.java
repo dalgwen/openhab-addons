@@ -81,8 +81,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                     scheduledDisconnection.cancel(true);
                 }
                 id = (String) data.getOrDefault("id", "");
-                servlet.addHandler(this);
                 try {
+                    servlet.addHandler(this);
                     var thingHandler = this.thingHandler;
                     var speakerConfig = getSpeakerConfig(thingHandler);
                     if (speakerConfig != null) {

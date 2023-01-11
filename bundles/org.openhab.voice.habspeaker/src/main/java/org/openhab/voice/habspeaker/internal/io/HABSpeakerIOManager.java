@@ -98,7 +98,7 @@ public class HABSpeakerIOManager
         logger.debug("connecting speakers {}", speakerConnections.size());
         synchronized (speakerConnections) {
             if (getSpeakerConnection(speaker.getId()) != null) {
-                throw new IllegalStateException("speaker already registered");
+                throw new IllegalStateException("Another speaker with the same id is already connected");
             }
             speakerConnections.add(speaker);
             var protocolListener = this.protocolListener;

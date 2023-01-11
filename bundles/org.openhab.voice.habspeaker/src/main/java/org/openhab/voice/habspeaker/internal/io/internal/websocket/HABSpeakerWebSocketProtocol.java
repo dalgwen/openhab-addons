@@ -93,7 +93,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         try {
             httpService.registerServlet(WS_PATH, this, null,
                     new HABSpeakerWebsocketContext(this, configProvider, httpService.createDefaultHttpContext()));
-            logger.debug("Started HABSpeaker at " + WS_PATH);
+            logger.debug("HABSpeaker accepts ws connections at " + WS_PATH);
         } catch (NamespaceException | ServletException e) {
             logger.error("Error during HABSpeakerWebsocketIO, service will not work: {}", e.getMessage());
         }
@@ -110,16 +110,26 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         logger.debug("Pinging {} clients...", wsHandlers.size());
         var handlers = new ArrayList<>(wsHandlers);
         for (var handler : handlers) {
-            try {
-                if (handler != null) {
-                    var remote = handler.getRemote();
-                    if (remote != null) {
+            if (handler != null) {
+                boolean pinned = false;
+                var remote = handler.getRemote();
+                if (remote != null) {
+                    try {
                         remote.sendPing(ByteBuffer.wrap("oh".getBytes(StandardCharsets.UTF_8)));
+                        pinned = true;
+                    } catch (IOException ignored) {
                     }
                 }
-            } catch (IOException e) {
-                logger.debug("Ping failed: {}", e.getMessage());
+                if (!pinned) {
+                    logger.warn("ping failed, disconnecting speaker {}", handler.getId());
+                    var session = handler.getSession();
+                    removeHandler(handler);
+                    if (session != null) {
+                        session.close();
+                    }
+                }
             }
+
         }
     }
 
@@ -177,7 +187,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     }
 
     public void removeHandler(HABSpeakerWebSocketIO habSpeakerWebSocketIO) {
-        wsHandlers.remove(habSpeakerWebSocketIO);
-        ioManager.onDisconnected(habSpeakerWebSocketIO);
+        if (wsHandlers.remove(habSpeakerWebSocketIO)) {
+            ioManager.onDisconnected(habSpeakerWebSocketIO);
+        }
     }
 }
