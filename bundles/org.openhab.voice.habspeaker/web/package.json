@@ -4,7 +4,7 @@
     "name": "GiviMAD"
   },
   "description": "A smart speaker UI concept for openHAB",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
