@@ -232,11 +232,13 @@ The electron application should work on:
 
 Note: Build is tested on all the environments but the application has only been tested on macOS and Windows, needs testing but everything seems to work.
 
-### App Build
+### App Installer Build
 
-You can find some scripts to help you build the application on the 'web/tools' folder. For windows/macOS requires you to have installed nodejs and rust. For Linux you should have Docker with buildx (plugin to support cross-compilation) installed.
+You can find some scripts to help you build the application on the 'web/tools' folder. In requires you to have installed the appropiate dependencies (nodejs and rust | docker with buildx).
 
-There are still no public builds available for the electron app. I will add some and link them here.
+### App Installer Downloads
+
+App installers can be found [here](https://github.com/habspeaker/habspeaker-builds/releases).
 
 ## Audio Component Details:
 
