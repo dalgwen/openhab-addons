@@ -3,10 +3,8 @@ import { defineStore, storeToRefs } from "pinia";
 import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
 import { getSpotifyCtrl, SpotifyPlatformCtrl } from "../../platforms";
 export const useSpotifyPlayerStore = defineStore("spotify", () => {
-  let token = "";
-  let playerId = "";
   const mediaSessionStore = useMediaSessionStore();
-  const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
+  const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
   var songName = ref<string>("");
   var songImg = ref<string>("");
   let connected = false;
@@ -47,8 +45,8 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     spotifyPlatformCtrl?.setToken(accessToken);
   }
   async function playbackListener(playbackState: PlaybackState, _songImage: string, _songName: string) {
-    if(playbackState == PlaybackState.STOPPED) {
-      if(mediaController.value && mediaController.value.getId() == MediaProvider.SPOTIFY) {
+    if (playbackState == PlaybackState.STOPPED) {
+      if (mediaController.value && mediaController.value.getId() == MediaProvider.SPOTIFY) {
         mediaSessionStore.stopMedia();
       }
       return;
@@ -57,13 +55,19 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
     songImg.value = _songImage;
     mediaState.value = playbackState;
     if (playbackState == PlaybackState.PLAYING) {
-      const player = await spotifyPlatformCtrl?.getPlayer();
-      if (player) {
-        mediaController.value = player;
-      } else {
-        console.warn("Unable to load Spotify controller");
+      const mediaProviderId = mediaController.value?.getId();
+      if (!mediaProviderId || mediaProviderId === MediaProvider.SPOTIFY) {
+        const player = await spotifyPlatformCtrl?.getPlayer();
+        if (player) {
+          mediaController.value = player;
+          // ensure correct media volume
+          player.setVolume(await mediaSessionStore.getMediaVolume())
+            .catch(err => console.error("Unable to set spotify volume: ", err));
+        } else {
+          console.warn("Unable to load Spotify controller");
+        }
+        mediaSessionStore.updateProvider("spotify");
       }
-      mediaSessionStore.updateProvider("spotify");
     }
   }
   return {
