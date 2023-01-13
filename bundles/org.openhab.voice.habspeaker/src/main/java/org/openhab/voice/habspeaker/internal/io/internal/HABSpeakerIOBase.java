@@ -180,7 +180,9 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         TTSService tts = null;
         Voice voice = null;
         KSService ks = null;
-        List<HumanLanguageInterpreter> hlis = List.of(speakerLanguageInterpreter);
+        var defaultHLI = voiceManager.getHLI();
+        List<HumanLanguageInterpreter> hlis = defaultHLI == null ? List.of(speakerLanguageInterpreter)
+                : List.of(speakerLanguageInterpreter, defaultHLI);
         if (thingHandler != null) {
             var speakerConfig = thingHandler.getSpeakerConfig();
             if (!speakerConfig.stt.isBlank()) {
@@ -194,7 +196,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                         .findAny().orElse(null);
             }
             HumanLanguageInterpreter hli = !speakerConfig.hli.isBlank() ? voiceManager.getHLI(speakerConfig.hli)
-                    : voiceManager.getHLI();
+                    : defaultHLI;
             if (hli != null) {
                 hlis = List.of(speakerLanguageInterpreter, hli);
             }
