@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class HABSpeakerWebsocketContext implements HttpContext {
-    private static final String HAB_SPEAKER_COOKIE = "X-HABSPEAKER-SESSIONID";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebsocketContext.class);
     private final HttpContext defaultHttpContext;
     private final HABSpeakerWebSocketProtocol servlet;
@@ -66,6 +65,7 @@ public class HABSpeakerWebsocketContext implements HttpContext {
         }
         if (!configProvider.getConfig().secure) {
             // security is disabled
+            logger.debug("No auth checks, service security is disabled");
             return defaultHttpContext.handleSecurity(request, response);
         }
         // Allow access to the websocket sending a token in the alternative auth header
@@ -85,10 +85,12 @@ public class HABSpeakerWebsocketContext implements HttpContext {
                 }
             }
         }
-        if (accessToken == null) {
+        if (accessToken == null || !servlet.isValidToken(accessToken)) {
+            logger.debug("Speaker authorized missing jwt token");
             return false;
         }
-        return servlet.isValidToken(accessToken);
+        logger.debug("Speaker authorized by jwt token");
+        return true;
     }
 
     @Override
