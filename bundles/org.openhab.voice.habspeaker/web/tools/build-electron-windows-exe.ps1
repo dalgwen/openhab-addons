@@ -2,11 +2,13 @@ $scriptpath = $MyInvocation.MyCommand.Path
 $dir = Split-Path $scriptpath
 cd $dir\..\
 $HABSPEAKER_VERSION = (Get-Content package.json) -join "`n" | ConvertFrom-Json | Select -ExpandProperty "version"
-$LIBRESPOT_VERSION = "v0.4.2"
+$LIBRESPOT_VERSION = "FORK"
 Write-Host "Builing HABSpeaker $HABSPEAKER_VERSION electron exe for windown x86_64"
 if (-not(Test-Path -Path librespot-src\Cargo.toml -PathType Leaf)) {
     Write-Host "Clonning Librespot $LIBRESPOT_VERSION"
-    git -c advice.detachedHead=false clone --quiet --branch $LIBRESPOT_VERSION https://github.com/librespot-org/librespot.git librespot-src
+    # git -c advice.detachedHead=false clone --quiet --branch $LIBRESPOT_VERSION https://github.com/librespot-org/librespot.git librespot-src
+    # temporally use fork version to allow access token authentication
+    git -c advice.detachedHead=false clone --quiet --branch master https://github.com/GiviMAD/librespot.git librespot-src
 }
  else {
      Write-Host "Skipping Librespot clone"

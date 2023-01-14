@@ -218,8 +218,6 @@ The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org
 
 The Spotify Web Sdk don't work on electron, so support is enabled thanks to the open source rust client [Librespot](https://github.com/librespot-org/librespot) (Requires a paid Spotify subscription).
 
-<b>There is a current limitation, first time you need to start the playback from another client in the same network (it will appear with its label on the Connected Devices list of the Spotify app), so it gets logged into your account, from there the speaker will keep linked to your account, event if you reboot the application.</b>
-
 Librespot credentials are persisted on '$HOME/.Librespot'.
 
 ### Supported Platforms

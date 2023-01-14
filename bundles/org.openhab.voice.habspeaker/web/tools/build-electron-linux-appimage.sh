@@ -3,7 +3,7 @@ set -e
 cd "${0%/*}"
 cd ../
 HABSPEAKER_VERSION=$(cat package.json | jq -r '.version')
-LIBRESPOT_VERSION="v0.4.2"
+LIBRESPOT_VERSION="FORK"
 TARGET_PLATFORM="${1:-amd64}"
 TARGET_PLATFORMS=("amd64", "arm64")
 if [[ ! "${TARGET_PLATFORMS[*]}" =~ "${TARGET_PLATFORM}" ]]; then
@@ -33,7 +33,9 @@ echostep "Builing Librespot binaries"
 if [[ ! -f $LIBRESPOT_BINARY || ! -f $LIBRESPOT_LIBRARY ]];then
     if [ ! -f librespot-src/Cargo.toml ];then
         echostep "Cloning Librespot $LIBRESPOT_VERSION source..."
-        git -c advice.detachedHead=false clone --quiet --branch $LIBRESPOT_VERSION https://github.com/librespot-org/librespot.git librespot-src
+        # git -c advice.detachedHead=false clone --quiet --branch $LIBRESPOT_VERSION https://github.com/librespot-org/librespot.git librespot-src
+        # temporally use fork version to allow access token authentication
+        git -c advice.detachedHead=false clone --quiet --branch master https://github.com/GiviMAD/librespot.git librespot-src
     else
         echostep "Librespot source already exists, assuming desired version"
     fi
