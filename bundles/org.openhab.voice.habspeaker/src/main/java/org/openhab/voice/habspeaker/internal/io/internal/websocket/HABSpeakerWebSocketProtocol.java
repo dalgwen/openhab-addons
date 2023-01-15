@@ -31,14 +31,10 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import org.openhab.core.audio.AudioManager;
-import org.openhab.core.auth.Authentication;
-import org.openhab.core.auth.AuthenticationException;
-import org.openhab.core.auth.User;
-import org.openhab.core.auth.UserApiTokenCredentials;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.VoiceManager;
-import org.openhab.voice.habspeaker.internal.auth.HABSpeakerJwtHelper;
+import org.openhab.voice.habspeaker.internal.auth.HABSpeakerSystemSecurityHelper;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocol;
@@ -57,8 +53,6 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HABSpeakerIOProtocol {
     public static final String WS_PATH = "/" + SERVICE_ID + "/ws";
-    private static final String API_TOKEN_PREFIX = "oh.";
-    public static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketProtocol.class);
     private final HttpService httpService;
     private final List<HABSpeakerWebSocketIO> wsHandlers = new ArrayList<>();
@@ -67,7 +61,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     protected final VoiceManager voiceManager;
     protected final AudioManager audioManager;
     private final UserRegistry userRegistry;
-    private final HABSpeakerJwtHelper jwtHelper;
+    private final HABSpeakerSystemSecurityHelper apiSecurityHelper;
     private final ScheduledFuture<?> pingTask;
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
@@ -75,7 +69,7 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
 
     public HABSpeakerWebSocketProtocol(HABSpeakerIOManager ioManager, HABSpeakerConfigProvider configProvider,
             BundleContext bundleContext, HttpClient httpClient, HttpService httpService, AudioManager audioManager,
-            VoiceManager voiceManager, UserRegistry userRegistry) {
+            VoiceManager voiceManager, UserRegistry userRegistry, HABSpeakerSystemSecurityHelper apiSecurityHelper) {
         this.ioManager = ioManager;
         this.configProvider = configProvider;
         this.bundleContext = bundleContext;
@@ -84,15 +78,15 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         this.voiceManager = voiceManager;
         this.userRegistry = userRegistry;
         this.httpClient = httpClient;
-        this.jwtHelper = new HABSpeakerJwtHelper();
+        this.apiSecurityHelper = apiSecurityHelper;
         this.pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
     }
 
     @Override
     public void register() {
         try {
-            httpService.registerServlet(WS_PATH, this, null,
-                    new HABSpeakerWebsocketContext(this, configProvider, httpService.createDefaultHttpContext()));
+            httpService.registerServlet(WS_PATH, this, null, new HABSpeakerWebsocketContext(apiSecurityHelper,
+                    userRegistry, httpService.createDefaultHttpContext()));
             logger.debug("HABSpeaker accepts ws connections at " + WS_PATH);
         } catch (NamespaceException | ServletException e) {
             logger.error("Error during HABSpeakerWebsocketIO, service will not work: {}", e.getMessage());
@@ -146,29 +140,6 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
                     logger.debug("Disconnect failed: {}", e.getMessage());
                 }
             }
-        }
-    }
-
-    public boolean isValidToken(String token) {
-        try {
-            if (token.startsWith(API_TOKEN_PREFIX)) {
-                // Allow access to the websocket using user generated tokens
-                logger.debug("Validating access through oh token");
-                UserApiTokenCredentials credentials = new UserApiTokenCredentials(token);
-                Authentication auth = userRegistry.authenticate(credentials);
-                User user = userRegistry.get(auth.getUsername());
-                if (user == null) {
-                    throw new AuthenticationException("User not found in registry");
-                }
-                return true;
-            } else {
-                logger.debug("Validating jwt token");
-                jwtHelper.verifyAndParseJwtAccessToken(token);
-                return true;
-            }
-        } catch (AuthenticationException e) {
-            logger.debug("AuthenticationException: {}", e.getMessage());
-            return false;
         }
     }
 

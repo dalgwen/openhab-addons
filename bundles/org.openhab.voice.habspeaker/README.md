@@ -29,12 +29,6 @@ Once installed the web client will be listed on right panel of the main ui (home
 
 You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker** there are different sections:
 
-### Service Settings
-
-Service related configurations:
-
-* **Secure** - Require user credentials to use the speaker (the ui will redirect you to the login page when needed).
-
 ### Voice Control
 
 Define the phrases you can use to interact with the speaker. For the phrases you can add multiple options separated by ';'. Leave a phrase empty to disable it
@@ -212,7 +206,7 @@ The app expects a settings json file in the path '$HOME/.HABSpeaker/settings.jso
 
 ```
 
-The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org/docs/configuration/apitokens.html). This token is not required if the OpenHAB 'Api Security' has 'Implicit User Role' enabled and the HABSpeaker 'Secure' setting has been turned off. 
+The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org/docs/configuration/apitokens.html). This token is not required if an implicit user role is granted, configurable in the OpenHAB 'Api Security'. 
 
 ### Spotify Support
 

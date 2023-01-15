@@ -12,8 +12,6 @@
  */
 package org.openhab.voice.habspeaker.internal.io.internal.websocket.internal;
 
-import static org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol.ALT_AUTH_HEADER;
-
 import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
@@ -24,10 +22,13 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
+import org.openhab.core.auth.Authentication;
+import org.openhab.core.auth.AuthenticationException;
+import org.openhab.core.auth.User;
+import org.openhab.core.auth.UserApiTokenCredentials;
+import org.openhab.core.auth.UserRegistry;
+import org.openhab.voice.habspeaker.internal.auth.HABSpeakerSystemSecurityHelper;
 import org.osgi.service.http.HttpContext;
-import org.osgi.service.http.HttpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,22 +39,17 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class HABSpeakerWebsocketContext implements HttpContext {
+    private static final String API_TOKEN_PREFIX = "oh.";
+    public static final String ALT_AUTH_HEADER = "X-OPENHAB-TOKEN";
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebsocketContext.class);
     private final HttpContext defaultHttpContext;
-    private final HABSpeakerWebSocketProtocol servlet;
-    private final HABSpeakerConfigProvider configProvider;
+    private final HABSpeakerSystemSecurityHelper apiSecurityHelper;
+    private final UserRegistry userRegistry;
 
-    /**
-     * Constructs an {@link HABSpeakerWebsocketContext} with will another {@link HttpContext} as a base.
-     *
-     * @param configProvider
-     * @param defaultHttpContext the base {@link HttpContext} - use {@link HttpService#createDefaultHttpContext()} to
-     *            create a default one
-     */
-    public HABSpeakerWebsocketContext(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
+    public HABSpeakerWebsocketContext(HABSpeakerSystemSecurityHelper apiSecurityHelper, UserRegistry userRegistry,
             HttpContext defaultHttpContext) {
-        this.servlet = servlet;
-        this.configProvider = configProvider;
+        this.userRegistry = userRegistry;
+        this.apiSecurityHelper = apiSecurityHelper;
         this.defaultHttpContext = defaultHttpContext;
     }
 
@@ -63,9 +59,10 @@ public class HABSpeakerWebsocketContext implements HttpContext {
         if (request == null) {
             return false;
         }
-        if (!configProvider.getConfig().secure) {
+        // this checks if implicit user role has been granted based on the system api security configuration
+        if (apiSecurityHelper.isImplicitUserRole(request)) {
             // security is disabled
-            logger.debug("No auth checks, service security is disabled");
+            logger.debug("No auth checks, implicit member role");
             return defaultHttpContext.handleSecurity(request, response);
         }
         // Allow access to the websocket sending a token in the alternative auth header
@@ -85,12 +82,35 @@ public class HABSpeakerWebsocketContext implements HttpContext {
                 }
             }
         }
-        if (accessToken == null || !servlet.isValidToken(accessToken)) {
+        if (accessToken == null || !isValidToken(accessToken)) {
             logger.debug("Speaker authorized missing jwt token");
             return false;
         }
         logger.debug("Speaker authorized by jwt token");
         return true;
+    }
+
+    private boolean isValidToken(String token) {
+        try {
+            if (token.startsWith(API_TOKEN_PREFIX)) {
+                // Allow access to the websocket using user generated tokens
+                logger.debug("Validating access through oh token");
+                UserApiTokenCredentials credentials = new UserApiTokenCredentials(token);
+                Authentication auth = userRegistry.authenticate(credentials);
+                User user = userRegistry.get(auth.getUsername());
+                if (user == null) {
+                    throw new AuthenticationException("User not found in registry");
+                }
+                return true;
+            } else {
+                logger.debug("Validating jwt token");
+                apiSecurityHelper.verifyAndParseJwtAccessToken(token);
+                return true;
+            }
+        } catch (AuthenticationException e) {
+            logger.debug("AuthenticationException: {}", e.getMessage());
+            return false;
+        }
     }
 
     @Override

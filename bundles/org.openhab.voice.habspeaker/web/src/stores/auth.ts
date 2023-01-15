@@ -51,8 +51,8 @@ export const useAuthStore = defineStore("auth", () => {
     let startSpotify = false;
     persistentToken = await getServerToken();
     try {
-      const { secure, spotifyEnabled } = await getUIConfig();
-      requireCredentials = !persistentToken && secure;
+      const { spotifyEnabled } = await getUIConfig();
+      requireCredentials = false;
       startSpotify = spotifyEnabled;
     } catch (error) {
       if (error instanceof AxiosError && error.response?.status === 401) {
@@ -70,7 +70,8 @@ export const useAuthStore = defineStore("auth", () => {
         return await router.replace("/unauthorized");
       }
       await authorize();
-      startSpotify = (await getUIConfig()).spotifyEnabled;
+      const { spotifyEnabled } = await getUIConfig();
+      startSpotify = spotifyEnabled;
     }
     if (startSpotify) {
       spotifyStore.initSpotify()
@@ -82,7 +83,6 @@ export const useAuthStore = defineStore("auth", () => {
 });
 
 type UIConfig = {
-  secure: boolean;
   spotifyEnabled: boolean;
   label: string;
 };

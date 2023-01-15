@@ -123,7 +123,6 @@ public class HABSpeakerResource implements RESTResource {
         }
         var config = configProvider.getConfig();
         Map<String, Object> configResp = new HashMap<>();
-        configResp.put("secure", config.secure);
         configResp.put("spotifyEnabled",
                 !config.spotifyClientId.isBlank() && !configProvider.getSpotifyToken().isBlank());
         configResp.put("label", (label != null && !label.isBlank()) ? label : "HAB Speaker");

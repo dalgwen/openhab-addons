@@ -21,11 +21,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  */
 @NonNullByDefault
 public class HABSpeakerConfig {
-    // Service config
-    /**
-     * Require security to use the speaker.
-     */
-    public boolean secure;
     // Voice control config
     /**
      * Phrase to say on the speaker on command success
