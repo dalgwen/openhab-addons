@@ -125,8 +125,7 @@ All the connected speakers can be automatically discovered using the main ui.
 To run keyword spotting on the browser using rustpotter:
 
 * Select 'Ruspotter Web' as ks in the thing configuration 'Voice' section.
-* Configure the speaker keyword on the thing configuration 'Rustpotter Web' section.
-* The rustpotter model should be available under '$OPENHAB_USERDATA/habspeaker/ks/rustpotter' or '$OPENHAB_USERDATA/rustpotter'.
+* The rustpotter model for the configured magic word should be available under '$OPENHAB_USERDATA/habspeaker/ks/rustpotter' or '$OPENHAB_USERDATA/rustpotter'.
 
 For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
 

@@ -48,6 +48,10 @@ public class HABSpeakerThingConfig {
      */
     public String ks = "";
     /**
+     * Custom keyword for this speaker
+     */
+    public String keyword = "";
+    /**
      * Custom listeningItem for this speaker
      */
     public String listeningItem = "";
@@ -65,10 +69,6 @@ public class HABSpeakerThingConfig {
      */
     public boolean sinkStereo = false;
     // Rustpotter web config
-    /**
-     * Rustpotter web keyword
-     */
-    public String rustpotterKeyword = "";
     /**
      * Rustpotter web threshold
      */

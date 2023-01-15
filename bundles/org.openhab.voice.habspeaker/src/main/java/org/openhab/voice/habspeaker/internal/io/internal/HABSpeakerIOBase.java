@@ -113,8 +113,17 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         var spotMode = SpotMode.NONE;
         if (!config.ks.isBlank()) {
             if (config.ks.equals(HABSpeakerConfigProvider.RUSTPOTTER_WEB_KS_ID)) {
-                var modelName = config.rustpotterKeyword.toLowerCase();
-                if (config.rustpotterKeyword.isBlank()) {
+                var modelName = configProvider.getSystemKeyword();
+                if (!config.keyword.isBlank()) {
+                    var customModelName = config.keyword.toLowerCase();
+                    if (validateKeyword(customModelName)) {
+                        modelName = customModelName;
+                    } else {
+                        logger.warn("Missing rustpotter model for custom keyword '{}'", config.keyword);
+                    }
+                }
+                logger.debug("Using rustpotter web with keyword '{}'", modelName);
+                if (modelName.isBlank()) {
                     logger.warn("Missing rustpotter keyword, keyword spotting disabled");
                 } else if (validateKeyword(modelName)) {
                     spotMode = SpotMode.RUSTPOTTER_WEB;
@@ -180,6 +189,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         TTSService tts = null;
         Voice voice = null;
         KSService ks = null;
+        String keyword = configProvider.getSystemKeyword();
         var defaultHLI = voiceManager.getHLI();
         List<HumanLanguageInterpreter> hlis = defaultHLI == null ? List.of(speakerLanguageInterpreter)
                 : List.of(speakerLanguageInterpreter, defaultHLI);
@@ -200,13 +210,16 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
             if (hli != null) {
                 hlis = List.of(speakerLanguageInterpreter, hli);
             }
+            if (!speakerConfig.keyword.isBlank()) {
+                keyword = speakerConfig.keyword;
+            }
             if (!speakerConfig.ks.isBlank()) {
                 ks = voiceManager.getKS(speakerConfig.ks);
             }
         }
         var hsKS = new HABSpeakerKS(this, ks);
         this.ks = hsKS;
-        voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, null, listeningItem);
+        voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, keyword, listeningItem);
     }
 
     protected synchronized void unregisterSpeakerComponents(String id) {

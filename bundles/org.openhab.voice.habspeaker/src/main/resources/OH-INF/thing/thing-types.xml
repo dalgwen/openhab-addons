@@ -72,6 +72,10 @@
 				<label>Keyword Spotter</label>
 				<description>Enables keyword spotting using the specified service.</description>
 			</parameter>
+			<parameter name="keyword" type="text" groupName="voice">
+				<label>Magic Word</label>
+				<description>The magic word to spot before initiating a dialog, leave empty to use the default.</description>
+			</parameter>
 			<parameter name="listeningItem" type="text" groupName="voice">
 				<context>item</context>
 				<filter>
@@ -97,11 +101,6 @@
 				<default>30</default>
 			</parameter>
 			<!-- Rustpotter Web config -->
-			<parameter name="rustpotterKeyword" type="text" groupName="rustpotter_web">
-				<label>Keyword</label>
-				<description>Spot keyword</description>
-				<default>speaker</default>
-			</parameter>
 			<parameter name="rustpotterAvgThreshold" type="decimal" min="0" max="1" groupName="rustpotter_web">
 				<label>Averaged threshold</label>
 				<description>Spot average threshold (0 for disabled)</description>

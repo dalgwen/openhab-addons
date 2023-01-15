@@ -79,7 +79,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
         + SERVICE_ID)
 @NonNullByDefault
 public class HABSpeakerConfigProvider implements ConfigOptionProvider {
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     protected static final String SPEAKER_CONFIG_URI = "thing-type:habspeaker:speaker";
     public static final String RUSTPOTTER_WEB_KS_ID = "habspeaker::rustpotter_web::ks";
     public static final String HABSPEAKER_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "habspeaker").toString();
@@ -103,18 +102,11 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
         ensureDir("credentials", CREDENTIALS_FOLDER, logger);
     }
 
-    private static void ensureDir(String name, String path, Logger logger) {
-        File credentials = new File(path);
-        if (!credentials.exists()) {
-            if (credentials.mkdir()) {
-                logger.info("habspeaker {} dir created {}", name, path);
-            }
-        }
-    }
-
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     private final VoiceManager voiceManager;
     private final LocaleProvider localeProvider;
     private final HttpClient httpClient;
+    private final HABSpeakerVoiceConfigHelper voiceConfigHelper;
     private String spotifyToken = "";
     private String spotifyRefreshToken = "";
     private @Nullable ScheduledFuture<?> spotifyRenewTask = null;
@@ -124,9 +116,11 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
 
     @Activate
     public HABSpeakerConfigProvider(@Reference VoiceManager voiceManager, @Reference LocaleProvider localeProvider,
-            final @Reference HttpClientFactory httpClientFactory) {
+            final @Reference HttpClientFactory httpClientFactory,
+            @Reference HABSpeakerVoiceConfigHelper voiceConfigHelper) {
         this.voiceManager = voiceManager;
         this.localeProvider = localeProvider;
+        this.voiceConfigHelper = voiceConfigHelper;
         this.httpClient = httpClientFactory.getCommonHttpClient();
         this.spotifyRefreshToken = loadSpotifyRefreshToken();
     }
@@ -150,6 +144,14 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
 
     public String getSpotifyToken() {
         return spotifyToken;
+    }
+
+    /**
+     *
+     * @return the keyword configured in "System Settings/Voice"
+     */
+    public String getSystemKeyword() {
+        return voiceConfigHelper.getKeyword();
     }
 
     @Activate
@@ -307,5 +309,14 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
         void onSpotifyTokenUpdate(String accessToken);
 
         void onGlobalConfigUpdate(HABSpeakerConfig config);
+    }
+
+    private static void ensureDir(String name, String path, Logger logger) {
+        File credentials = new File(path);
+        if (!credentials.exists()) {
+            if (credentials.mkdir()) {
+                logger.info("habspeaker {} dir created {}", name, path);
+            }
+        }
     }
 }
