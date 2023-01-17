@@ -6,8 +6,16 @@ import { PlaybackState, useMediaSessionStore } from "./media-players/media-sessi
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
+import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import { getUrlOpenHAB } from "../platforms";
+const browserSupportAudioWorklets = typeof registerProcessor === 'function';
+let WebAudioSinkImpl = WebAudioSink;
+if (!browserSupportAudioWorklets) {
+  // keep using the processor api on older browsers
+  console.warn("Falling back to old audio sink implementation");
+  WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+}
 export const useIOStore = defineStore("io", () => {
   let audioContext: AudioContext | null = null;
   let audioSource: WebAudioSource | null = null;
@@ -183,6 +191,9 @@ export const useIOStore = defineStore("io", () => {
     let remoteSpotMode = false;
     startVoiceAudioContext();
     audioSource = new WebAudioSource(getVoiceAudioContext());
+    if (browserSupportAudioWorklets) {
+      await WebAudioSink.registerProcessor(getVoiceAudioContext());
+    }
     await audioSource.resume();
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(audioSource.resume.bind(audioSource), 10000);
@@ -406,7 +417,7 @@ export const useIOStore = defineStore("io", () => {
    */
   function createAudioSink(id: string, volume: number, channels: number, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
     const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSink(id, audioContext, channels, (value) => {
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, (value) => {
       if (value) {
         cancelStopSpeaker();
       } else {
