@@ -37,7 +37,9 @@ async function startSpeaker() {
 if (!isAudioSupported()) {
   router.replace("/audio-error");
 }
-setupPlatform(startSpeaker);
+setupPlatform(startSpeaker)
+  .then(() => console.log("main: platform setup done"))
+  .catch(err => console.error("main: error on platform setup.", err));
 </script>
 
 <template>

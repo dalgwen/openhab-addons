@@ -6,10 +6,11 @@
   "description": "A smart speaker UI concept for openHAB",
   "version": "0.0.17",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:dev": "vite build --mode development --sourcemap true --minify disable",
-    "build:electron": "ELECTRON_BUILD=true vite build --mode electron && electron-builder",
+    "dev": "vite --mode pwa",
+    "build": "vite build --mode pwa",
+    "build:dev": "vite build --mode pwa --sourcemap true --minify disable",
+    "build:electron": "vite build --mode electron && electron-builder",
+    "build:capacitor": "vite build --mode capacitor && npm i -D capacitor-audio-permission && cap sync && npm rm --save-dev capacitor-audio-permission && npm i -O capacitor-audio-permission",
     "preview": "vite preview --port 4173",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
@@ -41,6 +42,13 @@
     "vue-tsc": "^1.0.9"
   },
   "optionalDependencies": {
+    "@capacitor/android": "^4.6.1",
+    "@capacitor/app": "^4.1.1",
+    "@capacitor/cli": "^4.6.1",
+    "@capacitor/core": "^4.6.1",
+    "@capacitor/dialog": "^4.1.0",
+    "@capacitor/ios": "^4.6.1",
+    "capacitor-audio-permission": "^0.0.6",
     "electron": "^22.0.0",
     "electron-builder": "^23.6.0",
     "vite-plugin-electron": "^0.11.1"

@@ -1,6 +1,6 @@
 import type { MediaSessionCtrl, PlaybackState } from "../stores/media-players/media-session";
 
-export type PlatformName = 'web' | 'electron';
+export type PlatformName = 'web' | 'electron' | 'capacitor';
 
 export interface Platform {
     getName(): PlatformName;

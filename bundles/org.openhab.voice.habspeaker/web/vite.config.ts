@@ -3,37 +3,48 @@ import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
 import ConditionalCompile from "vite-plugin-conditional-compiler";
 const pkg = require('./package.json');
-const plugins: PluginOption[] = [ConditionalCompile(), vue()];
 const isDevelopment = process.env.NODE_ENV === "development" || !!process.env.VSCODE_DEBUG
 const isProduction = !isDevelopment;
-let baseUrl: string | undefined;
-if (process.env.ELECTRON_BUILD) {
-  console.log("Building HAB Speaker for electron");
-  const { rmSync } = require('node:fs');
-  rmSync('dist-electron', { recursive: true, force: true });
-  plugins.push(getElectronPlugin());
-} else {
-  console.log("Building HAB Speaker PWA");
-  baseUrl = "/habspeaker/";
-  plugins.push(getPWAPlugin());
-}
 // https://vitejs.dev/config/
-export default defineConfig({
-  base: baseUrl,
-  plugins,
-  envDir: 'env',
-  server: {
-    proxy: {
-      "/habspeaker/ws": {
-        target: "ws://127.0.0.1:8080",
-        ws: true,
-      },
-      "/rest": {
-        target: "http://127.0.0.1:8080",
+export default defineConfig(({ mode }) => {
+  const plugins: PluginOption[] = [ConditionalCompile(), vue()];
+  let baseUrl: string | undefined;
+  switch (mode) {
+    case "electron":
+      console.log("Building HAB Speaker for Electron");
+      const { rmSync } = require('node:fs');
+      rmSync('dist-electron', { recursive: true, force: true });
+      plugins.push(getElectronPlugin());
+      break;
+    case "capacitor":
+      console.log("Building HAB Speaker for Capacitor");
+      break;
+    case "pwa":
+      console.log("Building HAB Speaker PWA");
+      baseUrl = "/habspeaker/";
+      plugins.push(getPWAPlugin());
+      break;
+    default:
+      console.log("Unsupported mode");
+      process.exit(1);
+  }
+  return {
+    base: baseUrl,
+    plugins,
+    envDir: 'env',
+    server: {
+      proxy: {
+        "/habspeaker/ws": {
+          target: "ws://127.0.0.1:8080",
+          ws: true,
+        },
+        "/rest": {
+          target: "http://127.0.0.1:8080",
+        },
       },
     },
-  },
-  clearScreen: false,
+    clearScreen: false,
+  };
 });
 
 // Platform Plugins

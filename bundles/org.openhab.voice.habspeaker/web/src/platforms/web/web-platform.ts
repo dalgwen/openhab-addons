@@ -1,7 +1,7 @@
 import { Platform, PlatformName } from "../platform";
 import { WebSpotifyCtrl } from "./web-spotify-ctrl";
 
-class WebPlatform implements Platform {
+export class WebPlatform implements Platform {
     spotifyCtrl = new WebSpotifyCtrl();
     getName(): PlatformName {
         return 'web';

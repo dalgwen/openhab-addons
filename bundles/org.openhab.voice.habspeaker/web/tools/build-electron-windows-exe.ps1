@@ -31,6 +31,4 @@ cp $LIBRESPOT_BINARY librespot\
 cp $LIBRESPOT_LIBRARY librespot\
 Write-Host "Build HABSpeaker electron exe"
 npm ci
-$env:ELECTRON_BUILD="true"
-Start-Process "$(npm bin)\vite.cmd" -wait -NoNewWindow -ArgumentList "build","--mode","electron"
-Start-Process "$(npm bin)\electron-builder.cmd" -wait -NoNewWindow
+npm run build:electron
