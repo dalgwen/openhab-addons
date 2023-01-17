@@ -28,8 +28,15 @@ export class SinkCache extends AudioWorkletProcessor {
     constructor() {
         super();
         this.port.onmessage = (ev) => {
-            if (ev.data instanceof Float32Array) {
-                this.audioCache.writeAudioData(ev.data);
+            const type = ev.data.type;
+            const port = ev.data.port;
+            if(type === 'audio_input_port' && port instanceof MessagePort) {
+                // this port is directly connected to the io webworker
+                port.onmessage = (ev) => {
+                    if (ev.data instanceof Float32Array) {
+                        this.audioCache.writeAudioData(ev.data);
+                    }
+                }
             }
         };
     }
@@ -72,4 +79,4 @@ export class SinkCache extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor("sink-cache", SinkCache);
+registerProcessor("habspeaker-sink-worklet", SinkCache);

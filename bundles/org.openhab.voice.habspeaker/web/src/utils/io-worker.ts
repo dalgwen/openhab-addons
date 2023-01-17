@@ -14,6 +14,8 @@ export default class IOWorker {
   sampleRate = 0;
   inputResampler?: Resampler;
   sinkResamplers = new Map<string, Resampler>();
+  sinkMessageCache = new Map<string, Float32Array[]>();
+  sinkMessagePorts = new Map<string, MessagePort>();
   ohUrl: string = '';
   constructor(private postMessage: (data: any) => void) {
   }
@@ -63,10 +65,26 @@ export default class IOWorker {
           break;
         case WorkerInCmd.LISTEN_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
-          const port = listenData.port;
-          port.onmessage = (ev) => {
+          const listenPort = listenData.port;
+          listenPort.onmessage = (ev) => {
             this.onListen(ev.data);
           };
+          break;
+        case WorkerInCmd.SPEAK_PORT:
+          const speakPortData = ev.data as WorkerInCmdType<typeof command>;
+          if (speakPortData.port) {
+            this.sinkMessagePorts.set(speakPortData.id, speakPortData.port);
+            const buffersCache = this.sinkMessageCache.get(speakPortData.id);
+            if (buffersCache != null) {
+              buffersCache.forEach(b => speakPortData.port.postMessage(b, [b.buffer]));
+              this.sinkMessageCache.delete(speakPortData.id);
+            }
+          } else {
+            // clean up related sink data
+            this.sinkMessagePorts.delete(speakPortData.id);
+            this.sinkMessageCache.delete(speakPortData.id);
+            this.sinkResamplers.delete(speakPortData.id); 
+          }
           break;
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
@@ -220,19 +238,31 @@ export default class IOWorker {
               let resampler = this.sinkResamplers.get(streamId);
               if (!resampler) {
                 resampler = new Resampler(streamSampleRate, this.sampleRate, streamChannels, dataBuffer.byteLength);
-                if (this.sinkResamplers.size > 4) {
-                  this.sinkResamplers.delete(Array.from(this.sinkResamplers.keys())[this.sinkResamplers.size - 1]);
-                }
                 this.sinkResamplers.set(streamId, resampler);
               }
               const resampledBuffer = resampler.resample(audioFromInt16Buffer(dataBuffer));
-              // resample input
-              this.postMessage({
-                cmd: WorkerOutCmd.SPEAK,
-                id: streamId,
-                buffer: resampledBuffer,
-                channels: streamChannels,
-              });
+              const sinkPort = this.sinkMessagePorts.get(streamId);
+              if (sinkPort) {
+                // send data over the sink message port
+                sinkPort.postMessage(resampledBuffer, [resampledBuffer.buffer]);
+              } else {
+                // cache this buffer and request the creation of the sink message port
+                let sinkBufferCache = this.sinkMessageCache.get(streamId);
+                let requestPort = false;
+                if (!sinkBufferCache) {
+                  requestPort = true;
+                  sinkBufferCache = [];
+                  this.sinkMessageCache.set(streamId, sinkBufferCache);
+                }
+                sinkBufferCache.push(resampledBuffer);
+                if (requestPort) {
+                  this.postMessage({
+                    cmd: WorkerOutCmd.SPEAK_PORT,
+                    id: streamId,
+                    channels: streamChannels,
+                  });
+                }
+              }
             });
             if ((import.meta as any).env.DEV) {
               console.debug("websocket => worker: Binary data");

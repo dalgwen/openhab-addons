@@ -28,12 +28,17 @@ export class WebAudioSink {
     sinkProcessorNode: ScriptProcessorNode;
     audioCache: AudioCache;
     private playing: boolean = false;
-    constructor(private id: string, private audioContext: AudioContext, private channels: number, private listener: (playing: boolean) => void) {
+    constructor(private id: string, private audioContext: AudioContext, private channels: number, audioMessagePort: MessagePort, private listener: (playing: boolean) => void) {
         this.audioElement = document.createElement('audio');
         this.gainNode = audioContext.createGain();
         this.sinkProcessorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 0, channels);
         this.sinkProcessorNode.onaudioprocess = this.processAudio.bind(this);
         this.sinkProcessorNode.connect(this.gainNode);
+        audioMessagePort.onmessage = ev => {
+            if (ev.data instanceof Float32Array) {
+                this.audioCache.writeAudioData(ev.data);
+            }
+        };
         this.audioCache = new AudioCache();
         var destination = audioContext.createMediaStreamDestination();
         this.gainNode.connect(destination);
@@ -50,9 +55,6 @@ export class WebAudioSink {
         this.gainNode.disconnect();
         this.sinkProcessorNode.disconnect();
         this.audioElement.remove();
-    }
-    playAudio(buffer: Float32Array) {
-        this.audioCache.writeAudioData(buffer);
     }
     isPlaying() {
         return this.playing;

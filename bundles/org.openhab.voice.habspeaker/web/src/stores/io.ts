@@ -274,14 +274,14 @@ export const useIOStore = defineStore("io", () => {
               setOnline(false);
               stopAllMicProcessors();
               break;
-            case WorkerOutCmd.SPEAK: {
+            case WorkerOutCmd.SPEAK_PORT: {
               const speakData = ev.data as WorkerOutCmdType<typeof command>;
-              let sinkContext = activeSinks.get(speakData.id);
-              if (!sinkContext) {
-                sinkContext = createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, onSinkSpeaking);
-                activeSinks.set(sinkContext.getId(), sinkContext);
-              }
-              sinkContext.playAudio(speakData.buffer);
+              // create a message channel to communicate the worker with the sink
+              const audioMessageChannel = new MessageChannel();
+              const sink = createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, audioMessageChannel.port1, onSinkSpeaking);
+              const speakPortCmd = { cmd: WorkerInCmd.SPEAK_PORT, id: sink.getId(), port: audioMessageChannel.port2 };
+              // transfer port to worker
+              worker?.postMessage(speakPortCmd, [speakPortCmd.port]);
               break;
             }
             case WorkerOutCmd.START_LISTENING:
@@ -424,7 +424,7 @@ export const useIOStore = defineStore("io", () => {
   /**
    *
    */
-  function createAudioSink(id: string, volume: number, channels: number, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
+  function createAudioSink(id: string, volume: number, channels: number, audioPort: MessagePort, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
     let WebAudioSinkImpl = WebAudioSink;
     if (!isWorkletSupported()) {
       // keep using the processor api on older browsers
@@ -432,7 +432,7 @@ export const useIOStore = defineStore("io", () => {
       WebAudioSinkImpl = WebAudioSinkDeprecated as any;
     }
     const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSinkImpl(id, audioContext, channels, (value) => {
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, audioPort, (value) => {
       if (value) {
         cancelStopSpeaker();
       } else {
@@ -449,6 +449,8 @@ export const useIOStore = defineStore("io", () => {
       console.debug(`main: stopping sink ${id}`);
       sink.close();
       activeSinks.delete(id);
+      // tear down sink on worker
+      worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id });
       speakerOffTimeout = null;
     }
     function debouncedStopSpeaker() {
@@ -464,6 +466,7 @@ export const useIOStore = defineStore("io", () => {
       }
       onSinkSpeaking(true);
     }
+    activeSinks.set(sink.getId(), sink);
     return sink;
   }
   return {

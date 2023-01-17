@@ -5,15 +5,18 @@ export class WebAudioSink {
     private gainNode: GainNode;
     sinkProcessorNode: AudioWorkletNode;
     private playing: boolean = false;
-    constructor(private id: string, private audioContext: AudioContext, channels: number, private listener: (playing: boolean) => void) {
+    constructor(private id: string, private audioContext: AudioContext, channels: number, audioMessagePort: MessagePort, private listener: (playing: boolean) => void) {
         this.audioElement = document.createElement('audio');
         this.gainNode = audioContext.createGain();
-        this.sinkProcessorNode = new AudioWorkletNode(audioContext, 'sink-cache', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [channels], channelCountMode: 'explicit' });
+        this.sinkProcessorNode = new AudioWorkletNode(audioContext, 'habspeaker-sink-worklet', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [channels], channelCountMode: 'explicit' });
+        // transfer message port to processor node so audio doesn't use the main thread
+        const setPortCommand = { type: 'audio_input_port', port: audioMessagePort };
+        this.sinkProcessorNode.port.postMessage(setPortCommand, [setPortCommand.port]);
         this.sinkProcessorNode.port.onmessage = (ev) => {
-            const evData = ev.data;
-            switch (evData.type) {
+            switch (ev.data.type) {
                 case "listening":
-                    this.listener(evData.value);
+                    this.playing = ev.data.value;
+                    this.listener(ev.data.value);
                     break;
             }
         }
@@ -36,9 +39,6 @@ export class WebAudioSink {
         this.gainNode.disconnect();
         this.sinkProcessorNode.disconnect();
         this.audioElement.remove();
-    }
-    playAudio(buffer: Float32Array) {
-        this.sinkProcessorNode.port.postMessage(buffer, [buffer.buffer]);
     }
     isPlaying() {
         return this.playing;

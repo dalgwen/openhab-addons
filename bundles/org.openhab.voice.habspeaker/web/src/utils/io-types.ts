@@ -53,6 +53,7 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
 export enum WorkerInCmd {
   INITIALIZE = "INITIALIZE",
   LISTEN_PORT = "LISTEN_PORT",
+  SPEAK_PORT = "SPEAK_PORT",
   ON_SPOT = "ON_SPOT",
   RESET_CONNECTION = "RESET_CONNECTION",
   TOKEN_RENEW = "TOKEN_RENEW",
@@ -61,6 +62,7 @@ export enum WorkerInCmd {
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
   T extends WorkerInCmd.LISTEN_PORT ? { port: MessagePort } :
+  T extends WorkerInCmd.SPEAK_PORT ? { id: string, port: MessagePort } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerInCmd.RESET_CONNECTION ? { id: string } :
@@ -71,14 +73,14 @@ export enum WorkerOutCmd {
   CONFIGURE = "CONFIGURE",
   INITIALIZED = "INITIALIZED",
   OFFLINE = "OFFLINE",
-  SPEAK = "SPEAK",
+  SPEAK_PORT = "SPEAK_PORT",
   START_LISTENING = "START_LISTENING",
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
   SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 };
-export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK ? { id: string, buffer: Float32Array, channels: number } :
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK_PORT ? { id: string, channels: number } :
   T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
