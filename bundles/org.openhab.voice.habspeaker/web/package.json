@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.2.0",
+    "@types/audioworklet": "0.0.36",
     "@types/spotify-web-playback-sdk": "^0.1.15",
     "@types/youtube": "^0.0.47",
     "@vitejs/plugin-vue": "^4.0.0",

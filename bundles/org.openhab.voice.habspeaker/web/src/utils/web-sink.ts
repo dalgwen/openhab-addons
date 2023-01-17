@@ -24,7 +24,7 @@ export class WebAudioSink {
         this.audioElement.autoplay = true;
     }
     static async registerProcessor(audioContext: AudioContext) {
-        audioContext.audioWorklet.addModule(sinkCacheUrl);
+        await audioContext.audioWorklet.addModule(sinkCacheUrl);
     }
     getId() {
         return this.id;

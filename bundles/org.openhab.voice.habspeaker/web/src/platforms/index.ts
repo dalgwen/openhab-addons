@@ -2,12 +2,15 @@
 import type { Platform } from "./platform";
 export * from "./platform";
 const getPlatform: () => Promise<Platform> = async () => {
+    
     // #v-ifdef MODE=electron
     return (await import('./electron/electron-platform')).electronPlatform;
     // #v-endif
+
     // #v-ifdef MODE=capacitor
     return (await import('./capacitor/capacitor-platform')).capacitorPlatform;
     // #v-endif
+
     return (await import('./web/web-platform')).webPlatform;
 };
 export async function getPlatformName() {

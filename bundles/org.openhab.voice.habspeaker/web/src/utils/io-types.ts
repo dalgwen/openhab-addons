@@ -52,7 +52,7 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
 // Commands from main thread to worker.
 export enum WorkerInCmd {
   INITIALIZE = "INITIALIZE",
-  LISTEN = "LISTEN",
+  LISTEN_PORT = "LISTEN_PORT",
   ON_SPOT = "ON_SPOT",
   RESET_CONNECTION = "RESET_CONNECTION",
   TOKEN_RENEW = "TOKEN_RENEW",
@@ -60,7 +60,7 @@ export enum WorkerInCmd {
   MEDIA_STATE = "MEDIA_STATE",
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
-  T extends WorkerInCmd.LISTEN ? { buffers: Float32Array[] } :
+  T extends WorkerInCmd.LISTEN_PORT ? { port: MessagePort } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerInCmd.RESET_CONNECTION ? { id: string } :

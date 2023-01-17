@@ -9,13 +9,8 @@ import { WebAudioSink } from "../utils/web-sink";
 import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import { getUrlOpenHAB } from "../platforms";
-const browserSupportAudioWorklets = typeof registerProcessor === 'function';
-let WebAudioSinkImpl = WebAudioSink;
-if (!browserSupportAudioWorklets) {
-  // keep using the processor api on older browsers
-  console.warn("Falling back to old audio sink implementation");
-  WebAudioSinkImpl = WebAudioSinkDeprecated as any;
-}
+import audioPortWorklet from "../utils/audio-port-worklet.ts?url";
+
 export const useIOStore = defineStore("io", () => {
   let audioContext: AudioContext | null = null;
   let audioSource: WebAudioSource | null = null;
@@ -50,6 +45,9 @@ export const useIOStore = defineStore("io", () => {
       console.debug("Audio resample is needed: " + (audioContext.sampleRate !== voiceSampleRate));
     }
   }
+  function isWorkletSupported() {
+    return !!getVoiceAudioContext().audioWorklet
+  }
   function getVoiceAudioContext(): AudioContext {
     if (!audioContext) {
       throw new Error('AudioContext not initialized');
@@ -63,16 +61,26 @@ export const useIOStore = defineStore("io", () => {
     if (webSocketProcessorNode) {
       return webSocketProcessorNode;
     }
+    const audioMessagePort = new MessageChannel();
+    const command = { cmd: WorkerInCmd.LISTEN_PORT, port: audioMessagePort.port1 };
+    worker?.postMessage(command, [command.port]);
     const audioContext = getVoiceAudioContext();
-    const _webSocketProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
-    _webSocketProcessorNode.onaudioprocess = ({ inputBuffer }: AudioProcessingEvent) => {
-      const buffers: Float32Array[] = [];
-      for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
-        buffers[i] = inputBuffer.getChannelData(i);
+    if (isWorkletSupported()) {
+      const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'audio-port', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
+      const command = { type: 'audio_output_port', port: audioMessagePort.port2 };
+      _webSocketWorkletNode.port.postMessage(command, [command.port]);
+      return _webSocketWorkletNode as AudioNode;
+    } else {
+      const _webSocketProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
+      _webSocketProcessorNode.onaudioprocess = ({ inputBuffer }: AudioProcessingEvent) => {
+        const buffers: Float32Array[] = [];
+        for (let i = 0; i < inputBuffer.numberOfChannels; i++) {
+          buffers[i] = inputBuffer.getChannelData(i);
+        }
+        audioMessagePort.port2.postMessage(buffers, [buffers[0].buffer]);
       }
-      worker?.postMessage({ cmd: WorkerInCmd.LISTEN, buffers });
+      return webSocketProcessorNode = _webSocketProcessorNode;
     }
-    return webSocketProcessorNode = _webSocketProcessorNode;
   }
   /**
    * Returns a processor node that spots for the keyword
@@ -190,10 +198,11 @@ export const useIOStore = defineStore("io", () => {
     let sinkConfig = { ...defaultSinkConfig };
     let remoteSpotMode = false;
     startVoiceAudioContext();
-    audioSource = new WebAudioSource(getVoiceAudioContext());
-    if (browserSupportAudioWorklets) {
+    if (isWorkletSupported()) {
       await WebAudioSink.registerProcessor(getVoiceAudioContext());
+      await getVoiceAudioContext().audioWorklet.addModule(audioPortWorklet);
     }
+    audioSource = new WebAudioSource(getVoiceAudioContext());
     await audioSource.resume();
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(audioSource.resume.bind(audioSource), 10000);
@@ -416,6 +425,12 @@ export const useIOStore = defineStore("io", () => {
    *
    */
   function createAudioSink(id: string, volume: number, channels: number, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
+    let WebAudioSinkImpl = WebAudioSink;
+    if (!isWorkletSupported()) {
+      // keep using the processor api on older browsers
+      console.warn("No worklet support, falling back to old audio sink implementation");
+      WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+    }
     const audioContext = getVoiceAudioContext();
     const sink = new WebAudioSinkImpl(id, audioContext, channels, (value) => {
       if (value) {

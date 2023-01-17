@@ -61,9 +61,12 @@ export default class IOWorker {
             .replace('http:', 'ws:');
           this.connectWebSocket();
           break;
-        case WorkerInCmd.LISTEN:
+        case WorkerInCmd.LISTEN_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
-          this.onListen(listenData.buffers);
+          const port = listenData.port;
+          port.onmessage = (ev) => {
+            this.onListen(ev.data);
+          };
           break;
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
