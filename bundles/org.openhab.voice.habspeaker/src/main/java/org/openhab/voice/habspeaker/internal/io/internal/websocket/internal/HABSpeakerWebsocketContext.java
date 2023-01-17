@@ -59,17 +59,11 @@ public class HABSpeakerWebsocketContext implements HttpContext {
         if (request == null) {
             return false;
         }
-        // this checks if implicit user role has been granted based on the system api security configuration
-        if (apiSecurityHelper.isImplicitUserRole(request)) {
-            // security is disabled
-            logger.debug("No auth checks, implicit member role");
-            return defaultHttpContext.handleSecurity(request, response);
-        }
+        var speakerProtocol = "habspeaker";
         // Allow access to the websocket sending a token in the alternative auth header
         var accessToken = request.getHeader(ALT_AUTH_HEADER);
         // Allow access to the websocket sending a token among the valid protocols
         var tokenProtocolPrefix = "oh_token-";
-        var speakerProtocol = "habspeaker";
         var protocols = request.getHeader("Sec-WebSocket-Protocol");
         if (protocols != null) {
             var protocolList = Arrays.stream(protocols.split(",")).map(String::trim).collect(Collectors.toList());
@@ -81,6 +75,12 @@ public class HABSpeakerWebsocketContext implements HttpContext {
                     accessToken = protocol.replace(tokenProtocolPrefix, "");
                 }
             }
+        }
+        // this checks if implicit user role has been granted based on the system api security configuration
+        if (apiSecurityHelper.isImplicitUserRole(request)) {
+            // security is disabled
+            logger.debug("No auth checks, implicit member role");
+            return defaultHttpContext.handleSecurity(request, response);
         }
         if (accessToken == null || !isValidToken(accessToken)) {
             logger.debug("Speaker authorized missing jwt token");
