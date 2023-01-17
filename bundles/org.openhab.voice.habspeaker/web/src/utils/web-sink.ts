@@ -1,4 +1,4 @@
-import sinkCacheUrl from "./web-sink-worklet.ts?url";
+import sinkCacheUrl from "./web-sink-worklet.ts?sharedworker&url";
 
 export class WebAudioSink {
     private audioElement: HTMLAudioElement;
@@ -26,9 +26,6 @@ export class WebAudioSink {
         this.audioElement.srcObject = destination.stream;
         this.audioElement.autoplay = true;
     }
-    static async registerProcessor(audioContext: AudioContext) {
-        await audioContext.audioWorklet.addModule(sinkCacheUrl);
-    }
     getId() {
         return this.id;
     }
@@ -42,5 +39,8 @@ export class WebAudioSink {
     }
     isPlaying() {
         return this.playing;
+    }
+    static async registerProcessor(audioContext: AudioContext) {
+        await audioContext.audioWorklet.addModule(sinkCacheUrl);
     }
 }

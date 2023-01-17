@@ -9,7 +9,7 @@ import { WebAudioSink } from "../utils/web-sink";
 import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import { getUrlOpenHAB } from "../platforms";
-import audioPortWorklet from "../utils/audio-port-worklet.ts?url";
+import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
 
 export const useIOStore = defineStore("io", () => {
   let audioContext: AudioContext | null = null;
@@ -66,7 +66,7 @@ export const useIOStore = defineStore("io", () => {
     worker?.postMessage(command, [command.port]);
     const audioContext = getVoiceAudioContext();
     if (isWorkletSupported()) {
-      const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'audio-port', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
+      const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'habspeaker-source-worklet', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
       const command = { type: 'audio_output_port', port: audioMessagePort.port2 };
       _webSocketWorkletNode.port.postMessage(command, [command.port]);
       return _webSocketWorkletNode as AudioNode;
@@ -198,12 +198,12 @@ export const useIOStore = defineStore("io", () => {
     let sinkConfig = { ...defaultSinkConfig };
     let remoteSpotMode = false;
     startVoiceAudioContext();
+    audioSource = new WebAudioSource(getVoiceAudioContext());
+    await audioSource.resume();
     if (isWorkletSupported()) {
       await WebAudioSink.registerProcessor(getVoiceAudioContext());
       await getVoiceAudioContext().audioWorklet.addModule(audioPortWorklet);
     }
-    audioSource = new WebAudioSource(getVoiceAudioContext());
-    await audioSource.resume();
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(audioSource.resume.bind(audioSource), 10000);
     document.addEventListener("visibilitychange", () => {

@@ -1,4 +1,4 @@
-export class AudioPortWorklet extends AudioWorkletProcessor {
+export class HABSpeakerSourceWorklet extends AudioWorkletProcessor {
     playing: boolean = false;
     audioMessagePort?: MessagePort;
     constructor() {
@@ -20,4 +20,4 @@ export class AudioPortWorklet extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor("audio-port", AudioPortWorklet);
+registerProcessor("habspeaker-source-worklet", HABSpeakerSourceWorklet);
