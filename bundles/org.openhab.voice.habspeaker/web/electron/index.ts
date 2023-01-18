@@ -21,7 +21,6 @@ const preload = join(__dirname, 'preload.js');
 const indexHtml = join(DIST, 'index.html');
 
 async function createWindow() {
-  debugger
   win = new BrowserWindow({
     title: 'HAB Speaker',
     icon: join(DIST, 'favicon.svg'),

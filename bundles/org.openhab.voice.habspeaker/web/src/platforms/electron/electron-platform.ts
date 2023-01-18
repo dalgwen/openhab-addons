@@ -1,9 +1,12 @@
-import { Platform, PlatformName } from "../platform";
+import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
 import { ElectronSpotifyCtrl } from "./electron-spotify-ctrl";
 class ElectronPlatform implements Platform {
     spotifyCtrl = new ElectronSpotifyCtrl();
     getName(): PlatformName {
         return 'electron';
+    }
+    async shouldRedirectToLogin(): Promise<boolean> {
+        return false;
     }
     async getServerToken(): Promise<string | null> {
         const ohToken = await window.electronAPI.getTokenOpenHAB();
@@ -14,6 +17,9 @@ class ElectronPlatform implements Platform {
     }
     async getSpotifyCtrl() {
         return this.spotifyCtrl;
+    }
+    async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
+        await window.electronAPI.setLocalSettings(localSettings);
     }
     getSpeakerId(): Promise<string> {
         return window.electronAPI.getSpeakerId();
@@ -36,6 +42,7 @@ declare global {
             stopSpotify(): Promise<void>;
             getSpotifyId(): Promise<string>;
             setSpotifyToken(spotifyToken: string): Promise<void>;
+            setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
             setSpotifyPlaybackListener(listener: (state: string) => void): Promise<void>;
         }
     }

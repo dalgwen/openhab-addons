@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { MediaProvider, PlaybackState, useMediaSessionStore } from "./media-session";
-import { getSpotifyCtrl, SpotifyPlatformCtrl } from "../../platforms";
+import { platform, SpotifyPlatformCtrl } from "../../platforms";
 export const useSpotifyPlayerStore = defineStore("spotify", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
@@ -9,7 +9,7 @@ export const useSpotifyPlayerStore = defineStore("spotify", () => {
   var songImg = ref<string>("");
   let connected = false;
   let spotifyPlatformCtrl: SpotifyPlatformCtrl | undefined;
-  getSpotifyCtrl().then((ctrl) => spotifyPlatformCtrl = ctrl);
+  platform.getSpotifyCtrl().then((ctrl) => spotifyPlatformCtrl = ctrl);
   function getMediaCtrl() {
     return spotifyPlatformCtrl?.getPlayer();
   }

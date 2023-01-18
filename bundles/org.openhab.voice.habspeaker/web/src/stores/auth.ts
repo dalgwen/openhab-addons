@@ -3,14 +3,14 @@ import axios, { AxiosError } from "axios";
 import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
-import { getPlatformName, getServerToken, getUrlOpenHAB } from "../platforms";
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import router from "../router";
+import { platform } from "../platforms";
 export const useAuthStore = defineStore("auth", () => {
   const ioStore = useIOStore();
   const spotifyStore = useSpotifyPlayerStore();
-  const { getSpeakerId } = useSettingsStore();
-  const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getUrlOpenHAB });
+  const { getSpeakerId, getOHUrl, getOHToken } = useSettingsStore();
+  const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getOHUrl });
   let persistentToken: string | null = null;
   function getAccessToken() {
     return persistentToken ?? ohAuthHelper.getAccessToken() ?? '';
@@ -20,7 +20,7 @@ export const useAuthStore = defineStore("auth", () => {
       accept: "application/json",
     } as { [key: string]: string };
     if (getAccessToken().length) { headers["Authorization"] = "Bearer " + getAccessToken(); }
-    return (await axios.get<UIConfig>(`${await getUrlOpenHAB()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
+    return (await axios.get<UIConfig>(`${await getOHUrl()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
   }
   function unauthorized() {
     console.debug("Unauthorized, redirecting to login");
@@ -49,7 +49,7 @@ export const useAuthStore = defineStore("auth", () => {
   (async function () {
     let requireCredentials = false;
     let startSpotify = false;
-    persistentToken = await getServerToken();
+    persistentToken = await getOHToken();
     try {
       const { spotifyEnabled } = await getUIConfig();
       requireCredentials = false;
@@ -66,7 +66,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
     if (requireCredentials) {
       console.debug("Authorization required!");
-      if((await getPlatformName()) == 'electron') {
+      if (!await platform.shouldRedirectToLogin()) {
         return await router.replace("/unauthorized");
       }
       await authorize();
@@ -75,7 +75,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
     if (startSpotify) {
       spotifyStore.initSpotify()
-        .then(() => console.log('Spotify initialized'))
+        .then(() => console.debug('Spotify initialized'))
         .catch(err => console.error("Spotify error: ", err));
     }
   })();

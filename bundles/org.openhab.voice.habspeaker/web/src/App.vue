@@ -4,14 +4,17 @@ import { useAuthStore } from "./stores/auth";
 import ScreenSaver from "./components/ScreenSaver.vue";
 import { useAssistantStore } from "./stores/assistant";
 import { storeToRefs } from "pinia";
-import { getPlatformName } from "./platforms";
+import { platform } from "./platforms";
 import { ref } from "vue";
+import router from "./router";
 // auth store handles the token
 useAuthStore();
 const { miniMode } = storeToRefs(useAssistantStore());
-const showSettings = ref(true);
-console.log(import.meta.env);
-getPlatformName().then(name => showSettings.value = (name === 'web'));
+platform.getSpeakerId().then(speakerId=> {
+  if(!speakerId) {
+    router.replace('settings');
+  }
+});
 </script>
 
 <template>
@@ -21,10 +24,6 @@ getPlatformName().then(name => showSettings.value = (name === 'web'));
       <span>HAB </span>
       <span class="grey">Speaker</span>
     </div>
-    <nav>
-      <RouterLink to="/">Speaker</RouterLink>
-      <RouterLink v-if="showSettings" to="/Settings">Settings</RouterLink>
-    </nav>
   </header>
 
   <RouterView />

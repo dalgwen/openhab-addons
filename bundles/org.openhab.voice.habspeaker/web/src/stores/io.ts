@@ -8,8 +8,8 @@ import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
-import { getUrlOpenHAB } from "../platforms";
 import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
+import { useSettingsStore } from "./settings";
 
 export const useIOStore = defineStore("io", () => {
   let audioContext: AudioContext | null = null;
@@ -23,6 +23,7 @@ export const useIOStore = defineStore("io", () => {
   let stopLocalKsProcessorNode: (() => void) | null = null;
   let speakerLabel = ref("HAB Speaker");
   const authStore = useAuthStore();
+  const { getOHUrl } = useSettingsStore();
   const spotifyStore = useSpotifyPlayerStore();
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController } = storeToRefs(mediaSessionStore);
@@ -118,7 +119,7 @@ export const useIOStore = defineStore("io", () => {
     if (accessToken.length) {
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
-    await rp.addWakewordByPath(`${await getUrlOpenHAB()}/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
+    await rp.addWakewordByPath(`${await getOHUrl()}/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
     try {
       node.disconnect();
     } catch (ignored) {
@@ -362,7 +363,7 @@ export const useIOStore = defineStore("io", () => {
           console.error(err);
           reject(err);
         };
-        getUrlOpenHAB().then((ohUrl) => {
+        getOHUrl().then((ohUrl) => {
           worker?.postMessage({
             cmd: WorkerInCmd.INITIALIZE,
             id,

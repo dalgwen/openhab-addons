@@ -48,6 +48,7 @@
     "@capacitor/core": "^4.6.1",
     "@capacitor/dialog": "^4.1.0",
     "@capacitor/ios": "^4.6.1",
+    "@capacitor/preferences": "^4.0.2",
     "capacitor-audio-permission": "^0.0.6",
     "electron": "^22.0.0",
     "electron-builder": "^23.6.0",

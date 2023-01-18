@@ -8,6 +8,8 @@ export interface Platform {
     getSpeakerId(): Promise<string | null>;
     getServerToken(): Promise<string | null>;
     getUrlOpenHAB(): Promise<string>;
+    shouldRedirectToLogin(): Promise<boolean>;
+    setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
     getSpotifyCtrl(): Promise<SpotifyPlatformCtrl>
 }
 export interface SpotifyPlatformCtrl {
@@ -23,5 +25,9 @@ export interface SpotifyPlatformCtrl {
     disconnect(): Promise<void>;
     setPlaybackStateListener(listener: SpotifyPlaybackListener): Promise<void>;
 }
-
+export type SpeakerLocalSettings = {
+    speakerId: string,
+    ohToken: string,
+    ohUrl: string,
+}
 export type SpotifyPlaybackListener = (state: PlaybackState, songImage: string, songTile: string) => void;

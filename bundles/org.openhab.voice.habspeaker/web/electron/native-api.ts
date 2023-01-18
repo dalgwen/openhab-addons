@@ -4,13 +4,13 @@ import { get as getHttp } from 'node:http';
 import { get as getHttps } from 'node:https';
 import { stringify } from "node:querystring";
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access, constants, readFile, unlink } from "node:fs/promises";
+import { access, constants, readFile, unlink, writeFile, mkdir } from "node:fs/promises";
 import { readFileSync, accessSync } from 'node:fs';
 import { createHash, randomFillSync } from "node:crypto";
 import { createServer, AddressInfo } from "node:net";
 
-export function getOhUrl() {
-  return config.ohUrl;
+export async function getOhUrl() {
+  return (await getLocalConfig())?.ohUrl ?? '';
 }
 export async function requestPermissions() {
   if (systemPreferences.getMediaAccessStatus("microphone") !== 'granted'
@@ -21,9 +21,10 @@ export async function requestPermissions() {
 }
 
 export function registerAPIHandlers(winGetter: () => BrowserWindow | undefined) {
-  ipcMain.handle('setting:speaker-id', () => config.speakerId);
-  ipcMain.handle('setting:oh-url', () => config.ohUrl);
-  ipcMain.handle('setting:oh-token', () => config.ohToken);
+  ipcMain.handle('setting:commit', async (_, localSettings) => await saveConfigFile(localSettings));
+  ipcMain.handle('setting:speaker-id', async () => (await getLocalConfig())?.speakerId);
+  ipcMain.handle('setting:oh-url', async () => (await getLocalConfig())?.ohUrl);
+  ipcMain.handle('setting:oh-token', async () => (await getLocalConfig())?.ohToken);
   ipcMain.handle('spotify:available', () => isLibrespotAvailable());
   ipcMain.handle('spotify:start', (_, name: string) => startLibrespot(name, getLibrespotPlaybackListener(winGetter)));
   ipcMain.handle('spotify:stop', () => stopLibrespot());
@@ -46,7 +47,7 @@ function getLibrespotPlaybackListener(winGetter: () => BrowserWindow | undefined
   return (state: string) => {
     if (lastNotifiedState === state) return;
     lastNotifiedState = state;
-    console.log("[Librespot] event: " + state);
+    console.info("[Librespot] event: " + state);
     winGetter()?.webContents.send('spotify:status', state);
   };
 }
@@ -364,7 +365,8 @@ async function sleep(ms: number) {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 // handle settings
-const SPEAKER_CONFIG_PATH = join(app.getPath('home'), '.HABSpeaker', 'settings.json');
+const SPEAKER_CONFIG_FOLDER = join(app.getPath('home'), '.HABSpeaker');
+const SPEAKER_CONFIG_PATH = join(SPEAKER_CONFIG_FOLDER, 'settings.json');
 type ConfigFile = {
   ohUrl: string,
   speakerId: string;
@@ -373,16 +375,23 @@ type ConfigFile = {
 export function isConfigLoaded() {
   return !!config;
 }
-function loadConfigFromFile() {
+async function saveConfigFile(localSettings: any) {
+  if (!await fileExists(SPEAKER_CONFIG_FOLDER)) {
+    await mkdir(SPEAKER_CONFIG_FOLDER);
+  }
+  const settingsJSON = JSON.stringify(localSettings, null, 2);
+  await writeFile(SPEAKER_CONFIG_PATH, settingsJSON, { flag: 'w' });
+}
+async function loadConfigFromFile() {
   try {
     try {
-      accessSync(SPEAKER_CONFIG_PATH, constants.F_OK);
+      await access(SPEAKER_CONFIG_PATH, constants.F_OK);
     } catch (error) {
       throw new Error("Local settings file not found, please ensure it is in place.")
     }
     let configFile: ConfigFile;
     try {
-      configFile = JSON.parse(readFileSync(SPEAKER_CONFIG_PATH).toString()) as ConfigFile;
+      configFile = JSON.parse((await readFile(SPEAKER_CONFIG_PATH)).toString()) as ConfigFile;
     } catch (error) {
       throw new Error("Unable to parse speaker settings as json.")
     }
@@ -394,9 +403,6 @@ function loadConfigFromFile() {
       // TODO: validate url
       throw new Error('Incorrect ohUrl settings property');
     }
-    if (!configFile.ohToken) {
-      // TODO: validate token
-    }
     return configFile;
   } catch (error) {
     throw error;
@@ -404,10 +410,17 @@ function loadConfigFromFile() {
 }
 // load speaker config
 let config: ConfigFile = null;
-try {
-  config = loadConfigFromFile();
-} catch (error) {
-  console.error("Unable to read speaker config: ", error);
-  dialog.showErrorBox("Configuration Error", error.message ?? "Unable to read speaker config");
-  app.exit(1);
+async function getLocalConfig() {
+  if (!config)
+    await tryLoadConfig();
+  return config;
 }
+tryLoadConfig();
+async function tryLoadConfig() {
+  try {
+    config = await loadConfigFromFile();
+  } catch (error) {
+    console.error("Unable to read speaker config: ", error);
+  }
+}
+

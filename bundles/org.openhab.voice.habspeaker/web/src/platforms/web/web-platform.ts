@@ -1,10 +1,18 @@
-import { Platform, PlatformName } from "../platform";
+import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
 import { WebSpotifyCtrl } from "./web-spotify-ctrl";
 
+const storagePrefix = "habspeaker.ui:";
+const idLocalStorageKey = `${storagePrefix}id`;
 export class WebPlatform implements Platform {
     spotifyCtrl = new WebSpotifyCtrl();
     getName(): PlatformName {
         return 'web';
+    }
+    async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
+        localStorage.setItem(idLocalStorageKey, localSettings.speakerId);
+    }
+    async shouldRedirectToLogin(): Promise<boolean> {
+        return true;
     }
     async getServerToken(): Promise<string | null> {
         // nothing to do
@@ -14,8 +22,6 @@ export class WebPlatform implements Platform {
         // nothing to do
     }
     async getSpeakerId(): Promise<string | null> {
-        const storagePrefix = "habspeaker.ui:";
-        const idLocalStorageKey = `${storagePrefix}id`;
         return localStorage.getItem(idLocalStorageKey);
     }
     async getUrlOpenHAB(): Promise<string> {

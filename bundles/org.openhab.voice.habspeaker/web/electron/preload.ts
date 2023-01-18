@@ -3,6 +3,7 @@ let windowOnReadyCallback: (() => void) | undefined;
 // expose electron to app
 contextBridge.exposeInMainWorld('electronAPI', {
   onReady: (cb: () => void) => windowOnReadyCallback = cb,
+  setLocalSettings: (localSettings: any) => ipcRenderer.invoke('setting:commit', localSettings),
   getSpeakerId: () => ipcRenderer.invoke('setting:speaker-id'),
   getTokenOpenHAB: () => ipcRenderer.invoke('setting:oh-token'),
   getUrlOpenHAB: () => ipcRenderer.invoke('setting:oh-url'),

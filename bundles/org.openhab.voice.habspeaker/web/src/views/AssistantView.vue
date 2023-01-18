@@ -4,7 +4,6 @@ import { useAuthStore } from "../stores/auth";
 import { useAssistantStore } from "../stores/assistant";
 import { useSettingsStore } from "../stores/settings";
 import { useIOStore } from "../stores/io";
-import { setupPlatform } from "../platforms";
 import router from "../router";
 import AssistantWidget from "../components/AssistantWidget.vue";
 import YoutubePlayer from "../components/media-players/YoutubePlayer.vue";
@@ -12,6 +11,8 @@ import SpotifyPlayer from "../components/media-players/SpotifyPlayer.vue";
 import WebAudioPlayer from "../components/media-players/WebAudioPlayer.vue";
 import WebVideoPlayer from "../components/media-players/WebVideoPlayer.vue";
 import { MediaProvider, useMediaSessionStore } from "../stores/media-players/media-session";
+import { platform } from "../platforms";
+
 const store = useAssistantStore();
 const ioStore = useIOStore();
 const mediaSessionStore = useMediaSessionStore();
@@ -23,8 +24,13 @@ const { mediaProvider } = storeToRefs(mediaSessionStore);
 const { userInteractionDone, miniMode } = storeToRefs(store);
 async function startSpeaker() {
   if (!userInteractionDone.value) {
+    const id = await getSpeakerId();
+    if (!id) {
+      console.error("Unable to load speaker id");
+      return;
+    }
     startAssistant(
-      await getSpeakerId(),
+      id,
       getAccessToken()
     ).catch((error) => {
       console.error(error);
@@ -37,8 +43,8 @@ async function startSpeaker() {
 if (!isAudioSupported()) {
   router.replace("/audio-error");
 }
-setupPlatform(startSpeaker)
-  .then(() => console.log("main: platform setup done"))
+platform.setup(startSpeaker)
+  .then(() => console.debug("main: platform setup done"))
   .catch(err => console.error("main: error on platform setup.", err));
 </script>
 
