@@ -25,6 +25,22 @@ It is another step to have a full, open source, integrated voice assistant for y
 
 Once installed the web client will be listed on right panel of the main ui (home screen), or you can go to it by navigating to '<your openHAB url>/habspeaker'.
 
+## Local Settings:
+
+HAB Speaker needs some local settings in order to work: 
+
+* **SpeakerId** - This is the id that identifies your speaker against the server, will be part of the thing id.
+* **OH Url** - Your openHAB server url. (only displays on desktop/mobile)
+* **OH Token** - An api token that grant access to your server. (only displays on desktop/mobile)
+
+You can configure this settings in the initial form you will be displayed if those are not setup.
+
+When running as a web page these settings are stored on your browser local storage.
+
+When running as a desktop app these settings are stored on '$HOME/.HABSpeaker/settings.json'.
+
+When running as a mobile app these settings are stored on its shared preferences. (not ready).
+
 ## General Settings
 
 You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker** there are different sections:
@@ -60,14 +76,6 @@ Configure required credentials for the supported media providers:
 
 * **Spotify Client Id** - Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify integration).
 * **Youtube API Key** -API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for the YouTube search functionality).
-
-## Local Settings:
-
-You can access a basic form by clicking the 'Settings' button at the top right of the speaker ui where you can configure the following:
-
-* **Id** - This is the id that identifies your speaker against the server.
-
-These settings are stored on your browser local storage. 
 
 ## Thing Configurations
 
@@ -198,7 +206,9 @@ The electron application avoid two limitations of the web version:
 
 ### Setup
 
-The app expects a settings json file in the path '$HOME/.HABSpeaker/settings.json' with a content like:
+You can configure this settings on the first application launch, using a built-it form, so no need to do it manually on the file system.
+
+The app settings json file in the path '$HOME/.HABSpeaker/settings.json' will look like:
 
 ```json
 {"speakerId": "myspeakerid", "ohUrl": "http://192.168.1.200:8080", "ohToken": "oh.TokenNme.RANDOM"}
