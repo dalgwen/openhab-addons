@@ -55,7 +55,7 @@ setupPlatform(startSpeaker)
   </main>
 </template>
 
-<style lang="scss" scoped>
+<style lang="css" scoped>
 .container {
   position: relative;
   display: flex;

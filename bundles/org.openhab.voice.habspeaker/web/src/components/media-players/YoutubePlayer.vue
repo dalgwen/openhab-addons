@@ -29,7 +29,7 @@ onUnmounted(youtubePlayerStore.destroyPlayer);
     </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="css" scoped>
 .yt-container {
     width: 100%;
     height: 100%;

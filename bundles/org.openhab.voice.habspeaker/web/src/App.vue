@@ -10,6 +10,7 @@ import { ref } from "vue";
 useAuthStore();
 const { miniMode } = storeToRefs(useAssistantStore());
 const showSettings = ref(true);
+console.log(import.meta.env);
 getPlatformName().then(name => showSettings.value = (name === 'web'));
 </script>
 

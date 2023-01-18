@@ -35,9 +35,7 @@ const { userInteractionDone, miniMode } = storeToRefs(store);
   </button>
 </template>
 
-<style lang="scss" scoped>
-$size: 100px;
-
+<style lang="css" scoped>
 .clickable {
   cursor: pointer;
 }
@@ -46,8 +44,8 @@ $size: 100px;
   border: none;
   padding: 0;
   border-radius: 100%;
-  width: $size;
-  height: $size;
+  width: 100px;
+  height: 100px;
   font-size: 3em;
   color: var(--color-microphone);
   padding: 0;
@@ -56,7 +54,7 @@ $size: 100px;
   position: relative;
   z-index: 1;
   display: inline-block;
-  line-height: $size;
+  line-height: 100px;
   text-align: center;
   white-space: nowrap;
   vertical-align: middle;
@@ -152,8 +150,6 @@ $size: 100px;
   background: var(--color-assistant);
 }
 
-// speaker
-
 @keyframes bodyanimation {
   0% {
     height: 17%;
@@ -211,7 +207,6 @@ $size: 100px;
   animation-delay: 0s;
 }
 
-// loading ring
 .lds-ring {
   display: inline-block;
   position: absolute;

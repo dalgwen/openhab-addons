@@ -50,7 +50,7 @@ async function previous() {
     </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="css" scoped>
 .sp-container {
     color: white;
     background: linear-gradient(120DEG, #1DB954, #191414);

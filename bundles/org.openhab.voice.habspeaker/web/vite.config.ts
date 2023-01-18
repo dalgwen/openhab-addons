@@ -1,28 +1,33 @@
 import { defineConfig, PluginOption } from "vite";
 import vue from "@vitejs/plugin-vue";
-import { VitePWA } from "vite-plugin-pwa";
 import ConditionalCompile from "vite-plugin-conditional-compiler";
 const pkg = require('./package.json');
-const isDevelopment = process.env.NODE_ENV === "development" || !!process.env.VSCODE_DEBUG
-const isProduction = !isDevelopment;
+let isDevelopment = false;
+let isProduction = false;
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ command, mode }) => {
+  isDevelopment = command == "serve" || process.env.NODE_ENV === "development"
+  isProduction = !isDevelopment;
   const plugins: PluginOption[] = [ConditionalCompile(), vue()];
   let baseUrl: string | undefined;
+  const envMode = isProduction ? 'production' : 'development';
+  if (command == "serve") {
+    (process.env as any).VITE_DEV_SERVER_URL = "http://localhost:5173";
+  }
   switch (mode) {
     case "electron":
-      console.log("Building HAB Speaker for Electron");
+      console.log(`Building ${envMode} HAB Speaker UI Electron bundle`);
       const { rmSync } = require('node:fs');
       rmSync('dist-electron', { recursive: true, force: true });
-      plugins.push(getElectronPlugin());
+      plugins.push(await getElectronPlugin());
       break;
     case "capacitor":
-      console.log("Building HAB Speaker for Capacitor");
+      console.log(`Building ${envMode} HAB Speaker UI Capacitor bundle`);
       break;
     case "pwa":
-      console.log("Building HAB Speaker PWA");
+      console.log(`Building ${envMode} HAB Speaker UI PWA bundle`);
       baseUrl = "/habspeaker/";
-      plugins.push(getPWAPlugin());
+      plugins.push(await getPWAPlugin());
       break;
     default:
       console.log("Unsupported mode");
@@ -32,7 +37,12 @@ export default defineConfig(({ mode }) => {
     base: baseUrl,
     plugins,
     envDir: 'env',
+    build: {
+      sourcemap: isDevelopment,
+      minify: isProduction,
+    },
     server: {
+      port: 5173,
       proxy: {
         "/habspeaker/ws": {
           target: "ws://127.0.0.1:8080",
@@ -48,7 +58,8 @@ export default defineConfig(({ mode }) => {
 });
 
 // Platform Plugins
-function getPWAPlugin() {
+async function getPWAPlugin() {
+  const { VitePWA } = (await import("vite-plugin-pwa"));
   return VitePWA({
     registerType: 'autoUpdate',
     manifest: {
@@ -89,18 +100,14 @@ function getPWAPlugin() {
   });
 }
 
-function getElectronPlugin() {
-  const electron = require('vite-plugin-electron').default;
+async function getElectronPlugin() {
+  const electron = (await import('vite-plugin-electron')).default;
   return electron([
     {
       // Main-Process entry file of the Electron App.
       entry: 'electron/index.ts',
       onstart(options) {
-        if (process.env.VSCODE_DEBUG) {
-          console.log(/* For `.vscode/.debug.script.mjs` */'[startup] Electron App')
-        } else {
-          options.startup()
-        }
+        options.startup(['dist-electron/index.js', '--no-sandbox']);
       },
       vite: {
         build: {
@@ -111,6 +118,7 @@ function getElectronPlugin() {
             external: { ...pkg.dependencies, ...pkg.optionalDependencies },
           },
         },
+        clearScreen: false,
       },
     },
     {
@@ -129,7 +137,8 @@ function getElectronPlugin() {
             external: { ...pkg.dependencies, ...pkg.optionalDependencies },
           },
         },
+        clearScreen: false,
       },
-    }
+    },
   ]);
 }

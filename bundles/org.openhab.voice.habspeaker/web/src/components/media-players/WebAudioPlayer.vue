@@ -24,7 +24,7 @@ watch(mediaTarget, (value) => {
     </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="css" scoped>
 .media-container {
     height: 100%;
     width: 100%;

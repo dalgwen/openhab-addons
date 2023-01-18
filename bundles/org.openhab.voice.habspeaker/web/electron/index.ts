@@ -18,10 +18,10 @@ if (!app.requestSingleInstanceLock()) {
 
 let win: BrowserWindow | null = null
 const preload = join(__dirname, 'preload.js');
-const url = process.env.VITE_DEV_SERVER_URL;
 const indexHtml = join(DIST, 'index.html');
 
 async function createWindow() {
+  debugger
   win = new BrowserWindow({
     title: 'HAB Speaker',
     icon: join(DIST, 'favicon.svg'),
@@ -33,8 +33,8 @@ async function createWindow() {
   });
   // remove menu options
   win.removeMenu();
-  if (process.env.VITE_DEV_SERVER_URL) { // electron-vite-vue#298
-    win.loadURL(url)
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL)
     win.webContents.openDevTools();
   } else {
     win.loadFile(indexHtml);

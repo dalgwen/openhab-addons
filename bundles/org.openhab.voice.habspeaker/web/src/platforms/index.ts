@@ -26,6 +26,13 @@ export async function getSpotifyCtrl() {
 }
 
 export async function getUrlOpenHAB() {
+    let devServerUrl:string = import.meta.env.VITE_DEV_SERVER_URL;
+    if(devServerUrl) {
+        if(devServerUrl.endsWith('/')) {
+            devServerUrl = devServerUrl.slice(0, -1);
+        }
+        return devServerUrl;
+    }
     return (await getPlatform()).getUrlOpenHAB();
 }
 

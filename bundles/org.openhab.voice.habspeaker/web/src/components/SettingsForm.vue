@@ -34,7 +34,7 @@ function save() {
   </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="css" scoped>
 .container {
   display: flex;
   flex-direction: column;
