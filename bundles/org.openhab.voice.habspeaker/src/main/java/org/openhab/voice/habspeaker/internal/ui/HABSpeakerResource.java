@@ -126,7 +126,7 @@ public class HABSpeakerResource implements RESTResource {
         configResp.put("spotifyEnabled",
                 !config.spotifyClientId.isBlank() && !configProvider.getSpotifyToken().isBlank());
         configResp.put("label", (label != null && !label.isBlank()) ? label : "HAB Speaker");
-        return Response.ok(configResp).build();
+        return addAllowCorsHeaders(Response.ok(configResp)).build();
     }
 
     @GET
@@ -147,7 +147,7 @@ public class HABSpeakerResource implements RESTResource {
                         .build();
             }
         }
-        return Response.ok(modelFile, MediaType.APPLICATION_OCTET_STREAM).build();
+        return addAllowCorsHeaders(Response.ok(modelFile, MediaType.APPLICATION_OCTET_STREAM)).build();
     }
 
     @GET
@@ -235,18 +235,25 @@ public class HABSpeakerResource implements RESTResource {
         return Response.ok("LOGIN DONE").build();
     }
 
-    String generateCodeVerifier() throws UnsupportedEncodingException {
+    private String generateCodeVerifier() throws UnsupportedEncodingException {
         SecureRandom secureRandom = new SecureRandom();
         byte[] codeVerifier = new byte[32];
         secureRandom.nextBytes(codeVerifier);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(codeVerifier);
     }
 
-    String generateCodeChallenge(String codeVerifier) throws UnsupportedEncodingException, NoSuchAlgorithmException {
+    private String generateCodeChallenge(String codeVerifier)
+            throws UnsupportedEncodingException, NoSuchAlgorithmException {
         byte[] bytes = codeVerifier.getBytes("US-ASCII");
         MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
         messageDigest.update(bytes, 0, bytes.length);
         byte[] digest = messageDigest.digest();
         return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+    }
+
+    private Response.ResponseBuilder addAllowCorsHeaders(Response.ResponseBuilder builder) {
+        return builder.header("Access-Control-Allow-Origin", "*").header("Access-Control-Allow-Credentials", "true")
+                .header("Access-Control-Allow-Headers", "origin, content-type, accept, authorization")
+                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD");
     }
 }
