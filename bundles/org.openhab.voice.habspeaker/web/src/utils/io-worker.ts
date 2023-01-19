@@ -1,4 +1,5 @@
 import { StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
+import { MessageACKManager } from "./message-ack-manager";
 import { Resampler } from "./resampler";
 /**
  * Handles the websocket connection and the required audio format conversions. 
@@ -17,6 +18,9 @@ export default class IOWorker {
   sinkMessageCache = new Map<string, Float32Array[]>();
   sinkMessagePorts = new Map<string, MessagePort>();
   ohUrl: string = '';
+  listenPort?: MessagePort;
+  messageACKs = new MessageACKManager("worker");
+  configurationACK?: number;
   constructor(private postMessage: (data: any) => void) {
   }
   /**
@@ -63,12 +67,18 @@ export default class IOWorker {
             .replace('http:', 'ws:');
           this.connectWebSocket();
           break;
+        case WorkerInCmd.ACK_MESSAGE:
+          const ackData = ev.data as WorkerInCmdType<typeof command>;
+          this.messageACKs.confirmACK(ackData.code);
+          break;
         case WorkerInCmd.LISTEN_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
-          const listenPort = listenData.port;
-          listenPort.onmessage = (ev) => {
+          this.listenPort = listenData.port;
+          this.listenPort.onmessage = (ev) => {
             this.onListen(ev.data);
           };
+          this.listenPort.start();
+          this.postToMainThread(WorkerOutCmd.ACK_MESSAGE, { code: listenData.ack });
           break;
         case WorkerInCmd.SPEAK_PORT:
           const speakPortData = ev.data as WorkerInCmdType<typeof command>;
@@ -83,7 +93,7 @@ export default class IOWorker {
             // clean up related sink data
             this.sinkMessagePorts.delete(speakPortData.id);
             this.sinkMessageCache.delete(speakPortData.id);
-            this.sinkResamplers.delete(speakPortData.id); 
+            this.sinkResamplers.delete(speakPortData.id);
           }
           break;
         case WorkerInCmd.ON_SPOT:
@@ -140,7 +150,14 @@ export default class IOWorker {
       const command = data.cmd as WebSocketOutCmd;
       switch (command) {
         case WebSocketOutCmd.INITIALIZED:
-          this.postToMainThread(WorkerOutCmd.INITIALIZED);
+          if (this.configurationACK != null) {
+            this.messageACKs.awaitACK(this.configurationACK)
+              .then(() => this.postToMainThread(WorkerOutCmd.INITIALIZED))
+              .catch(() => console.error("worker: speaker initialization aborted"));
+            this.configurationACK = undefined;
+          } else {
+            this.postToMainThread(WorkerOutCmd.INITIALIZED);
+          }
           break;
         case WebSocketOutCmd.START_LISTENING:
           this.postToMainThread(WorkerOutCmd.START_LISTENING);
@@ -150,7 +167,8 @@ export default class IOWorker {
           break;
         case WebSocketOutCmd.CONFIGURE:
           const configureData = data as WebSocketOutCmdType<typeof command>;
-          this.postToMainThread(WorkerOutCmd.CONFIGURE, configureData);
+          this.configurationACK = this.messageACKs.createACK();
+          this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
           break;
         case WebSocketOutCmd.SINK_VOLUME:
           const sinkVolumeData = data as WebSocketOutCmdType<typeof command>;
@@ -277,6 +295,10 @@ export default class IOWorker {
     });
     wsRef.addEventListener("close", () => {
       console.warn("websocket => worker: connection closed");
+      if (this.configurationACK != null) {
+        this.messageACKs.abortACK(this.configurationACK);
+        this.configurationACK = undefined;
+      }
       this.wsRef = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();

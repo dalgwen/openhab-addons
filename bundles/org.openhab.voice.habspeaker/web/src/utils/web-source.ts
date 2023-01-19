@@ -52,6 +52,7 @@ export class WebAudioSource {
             .filter(p => !audioProcessors.includes(p))
             .forEach((audioNode) => this.disconnectNode(audioNode));
         this.nodeProcessors = audioProcessors;
+        console.debug(`main: ${this.nodeProcessors.length} active audio source processors`);
     }
     stop() {
         if (this.nodeProcessors) {
@@ -60,6 +61,7 @@ export class WebAudioSource {
             }
             this.nodeProcessors = undefined;
         }
+        console.debug('main: no active audio source processors');
     }
     private connectNode(audioNode: AudioNode) {
         this.micGainNode.connect(audioNode);

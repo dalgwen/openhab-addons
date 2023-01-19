@@ -10,15 +10,17 @@ import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprec
 import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
 import { useSettingsStore } from "./settings";
+import { MessageACKManager } from "../utils/message-ack-manager";
 
 export const useIOStore = defineStore("io", () => {
+  const messageACKs = new MessageACKManager("main");
+  let listenPortACK: number | undefined;
   let audioContext: AudioContext | null = null;
   let audioSource: WebAudioSource | null = null;
   let worker: Worker | null = null;
   let micStreaming = false;
   let currentSpeaking = false;
   const activeSinks = new Map<string, WebAudioSink>();
-  let webSocketProcessorNode: AudioNode;
   let localKsProcessorNode: AudioNode | null = null;
   let stopLocalKsProcessorNode: (() => void) | null = null;
   let speakerLabel = ref("HAB Speaker");
@@ -58,20 +60,23 @@ export const useIOStore = defineStore("io", () => {
   /**
    * Returns a processor node that sends data through the websocket 
   */
-  function getWSProcessorNode() {
-    if (webSocketProcessorNode) {
-      return webSocketProcessorNode;
-    }
-    const audioMessagePort = new MessageChannel();
-    const command = { cmd: WorkerInCmd.LISTEN_PORT, port: audioMessagePort.port1 };
-    worker?.postMessage(command, [command.port]);
+  async function getWSProcessorNode() {
     const audioContext = getVoiceAudioContext();
     if (isWorkletSupported()) {
       const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'habspeaker-source-worklet', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
-      const command = { type: 'audio_output_port', port: audioMessagePort.port2 };
-      _webSocketWorkletNode.port.postMessage(command, [command.port]);
+      listenPortACK = messageACKs.createACK();
+      const command = { cmd: WorkerInCmd.LISTEN_PORT, port: _webSocketWorkletNode.port, ack: listenPortACK };
+      worker?.postMessage(command, [command.port]);
+      await messageACKs.awaitACK(listenPortACK);
+      listenPortACK = undefined;
       return _webSocketWorkletNode as AudioNode;
     } else {
+      const audioMessagePort = new MessageChannel();
+      listenPortACK = messageACKs.createACK();
+      const command = { cmd: WorkerInCmd.LISTEN_PORT, port: audioMessagePort.port1, ack: listenPortACK };
+      worker?.postMessage(command, [command.port]);
+      await messageACKs.awaitACK(listenPortACK);
+      listenPortACK = undefined;
       const _webSocketProcessorNode = audioContext.createScriptProcessor(4096, 1, 1);
       _webSocketProcessorNode.onaudioprocess = ({ inputBuffer }: AudioProcessingEvent) => {
         const buffers: Float32Array[] = [];
@@ -80,7 +85,7 @@ export const useIOStore = defineStore("io", () => {
         }
         audioMessagePort.port2.postMessage(buffers, [buffers[0].buffer]);
       }
-      return webSocketProcessorNode = _webSocketProcessorNode;
+      return _webSocketProcessorNode;
     }
   }
   /**
@@ -141,6 +146,10 @@ export const useIOStore = defineStore("io", () => {
     awakeScreenSaver();
     online.value = value;
     if (!value) {
+      if (listenPortACK) {
+        messageACKs.abortACK(listenPortACK);
+        listenPortACK = undefined;
+      }
       mediaSessionStore.stopMedia();
     }
     spotifyStore.isEnabled().then(spotifyEnabled => {
@@ -226,40 +235,48 @@ export const useIOStore = defineStore("io", () => {
           switch (command) {
             case WorkerOutCmd.CONFIGURE:
               // TODO: disallow configure after initialized
-              const { sinkVolume, spotMode, screenSaverTime, spotifyToken, label, spotConfig, } = ev.data as WorkerOutCmdType<typeof command>;
-              if (label) {
-                speakerLabel.value = label;
-              }
-              if (sinkVolume != null) {
-                sinkConfig.volume = sinkVolume;
-              }
-              remoteSpotMode = false;
-              switch (spotMode) {
-                case "server":
-                  remoteSpotMode = true;
-                  break;
-                case "rustpotter_web":
-                  if (spotConfig?.keyword) {
-                    initLocalKsProcessor(spotConfig?.keyword, { ...spotConfig })
-                      .then((audioProcessor) => {
-                        localKsProcessorNode = audioProcessor;
+              (async () => {
+                const { sinkVolume, spotMode, screenSaverTime, spotifyToken, label, spotConfig, ack } = ev.data as WorkerOutCmdType<typeof command>;
+                if (label) {
+                  speakerLabel.value = label;
+                }
+                if (sinkVolume != null) {
+                  sinkConfig.volume = sinkVolume;
+                }
+                remoteSpotMode = false;
+                switch (spotMode) {
+                  case "server":
+                    remoteSpotMode = true;
+                    break;
+                  case "rustpotter_web":
+                    if (spotConfig?.keyword) {
+                      try {
+                        const ksAudioProcessor = await initLocalKsProcessor(spotConfig?.keyword, { ...spotConfig });
+                        localKsProcessorNode = ksAudioProcessor;
                         audioSource?.start(localKsProcessorNode).catch((err) => console.error(err));
-                      })
-                      .catch(err => console.error(err));
-                  } else {
-                    console.warn("Missed spotConfig configuration");
-                  }
-                  break;
-                case "none":
-                default:
-                  break;
-              }
-              if (screenSaverTime != null && !isNaN(screenSaverTime)) {
-                setScreenSaverTime(screenSaverTime);
-              }
-              if (spotifyToken) {
-                updateSpotifyToken(spotifyToken);
-              }
+                      } catch (error) {
+                        console.error("unable to start local ks processor", error);
+                      }
+                    } else {
+                      console.warn("Missed spotConfig configuration");
+                    }
+                    break;
+                  case "none":
+                  default:
+                    break;
+                }
+                if (screenSaverTime != null && !isNaN(screenSaverTime)) {
+                  setScreenSaverTime(screenSaverTime);
+                }
+                if (spotifyToken) {
+                  updateSpotifyToken(spotifyToken);
+                }
+                postToWorker(WorkerInCmd.ACK_MESSAGE, { code: ack });
+              })();
+              break;
+            case WorkerOutCmd.ACK_MESSAGE:
+              const ackData = ev.data as WorkerOutCmdType<typeof command>;
+              messageACKs.confirmACK(ackData.code);
               break;
             case WorkerOutCmd.INITIALIZED:
               setOnline(true);
@@ -286,12 +303,20 @@ export const useIOStore = defineStore("io", () => {
               break;
             }
             case WorkerOutCmd.START_LISTENING:
+              if (!online.value) {
+                console.debug("main: ignoring start listening message before init");
+                return;
+              }
               setListening(true);
               if (!remoteSpotMode) {
                 startMicStreaming();
               }
               break;
             case WorkerOutCmd.STOP_LISTENING:
+              if (!online.value) {
+                console.debug("main: ignoring stop listening message before init");
+                return;
+              }
               setListening(false);
               if (!remoteSpotMode) {
                 stopMicStreaming();
@@ -377,30 +402,35 @@ export const useIOStore = defineStore("io", () => {
         reject(error);
       }
     });
-    function startMicStreaming() {
+    async function startMicStreaming() {
       if (!micStreaming) {
+        micStreaming = true;
         console.debug("starting microphone audio streaming");
-        const processors: AudioNode[] = [getWSProcessorNode()];
+        const processors: AudioNode[] = [await getWSProcessorNode()];
+        if (!micStreaming) {
+          console.warn("main: start microphone audio aborted");
+          return;
+        }
         if (localKsProcessorNode) {
           processors.unshift(localKsProcessorNode)
         }
         audioSource?.start(...processors).catch((err) => console.error(err));
-        micStreaming = true;
+      } else {
+        console.warn("main: trying to start microphone streaming but it's already started!");
       }
     }
     function stopMicStreaming() {
       if (micStreaming) {
         console.debug("stopping microphone audio streaming");
-        const processors: AudioNode[] = [];
-        if (localKsProcessorNode) {
-          processors.unshift(localKsProcessorNode);
-        }
+        micStreaming = false;
+        const processors: AudioNode[] = localKsProcessorNode ? [localKsProcessorNode] : [];
         if (processors.length > 0) {
           audioSource?.start(...processors).catch((err) => console.error(err));
         } else {
           audioSource?.stop();
         }
-        micStreaming = false;
+      } else {
+        console.warn("main: trying to stop microphone streaming but it's already stopped!");
       }
     }
     function stopAllMicProcessors() {
