@@ -1,9 +1,9 @@
 import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
 import { WebPlatform } from "../web/web-platform";
-import { App } from '@capacitor/app';
 import { Dialog } from '@capacitor/dialog';
-import { AudioPermissions } from "capacitor-audio-permission";
+import { VoiceRecorder } from "capacitor-voice-recorder";
 import { Preferences } from '@capacitor/preferences';
+import router from "../../router";
 
 class CapacitorPlatform extends WebPlatform implements Platform {
     getName(): PlatformName {
@@ -27,17 +27,17 @@ class CapacitorPlatform extends WebPlatform implements Platform {
         await Preferences.set({ key: "ohUrl", value: localSettings.ohUrl });
     }
     async setup(startMic: () => void): Promise<void> {
-        let audioPermissionStatus = (await AudioPermissions.checkPermissions()).audio;
+        let audioPermissionStatus = (await VoiceRecorder.hasAudioRecordingPermission()).value;
         console.debug(`Audio permissions state: ${audioPermissionStatus}`);
-        if (audioPermissionStatus == 'granted') {
+        if (audioPermissionStatus) {
             return;
         }
-        audioPermissionStatus = (await AudioPermissions.requestPermissions()).audio;
-        if (audioPermissionStatus == 'granted') {
+        audioPermissionStatus = (await VoiceRecorder.requestAudioRecordingPermission()).value;
+        if (audioPermissionStatus) {
             return;
         }
         await Dialog.alert({ message: "HAB Speaker requires audio permissions to work" });
-        await App.exitApp();
+        router.replace("/audio-error");
     }
 }
 

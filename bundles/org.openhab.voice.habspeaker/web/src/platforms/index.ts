@@ -28,11 +28,10 @@ class PlatformAdapter {
     }
 
     async getUrlOpenHAB() {
-        let devServerUrl: string = import.meta.env.VITE_DEV_SERVER_URL ?? (await getPlatform()).getUrlOpenHAB();
-        if (devServerUrl && devServerUrl.endsWith('/')) {
-            devServerUrl = devServerUrl.slice(0, -1);
+        if (import.meta.env.VITE_DEV_SERVER_URL) {
+            return import.meta.env.VITE_DEV_SERVER_URL;
         }
-        return devServerUrl;
+        return (await getPlatform()).getUrlOpenHAB();
     }
     async shouldRedirectToLogin() {
         return (await getPlatform()).shouldRedirectToLogin();
