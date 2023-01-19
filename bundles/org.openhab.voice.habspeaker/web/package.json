@@ -11,7 +11,10 @@
     "build": "vite build --mode pwa",
     "build:dev": "NODE_ENV=development vite build --mode pwa",
     "build:electron": "vite build --mode electron && electron-builder",
-    "build:capacitor": "vite build --mode capacitor && npm i -D capacitor-voice-recorder @capacitor/preferences @capacitor/dialog && cap sync",
+    "build:capacitor": "vite build --mode capacitor && cap sync",
+    "install-capacitor-plugins": "npm i capacitor-voice-recorder @capacitor/preferences @capacitor/dialog",
+    "fix-capacitor-plugins": "npm run install-capacitor-plugins -- --save-dev",
+    "rm-fix-capacitor-plugins": "npm rm capacitor-voice-recorder @capacitor/preferences @capacitor/dialog && npm run install-capacitor-plugins -- --save-optional && npm i",
     "preview": "vite preview --port 4173",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },

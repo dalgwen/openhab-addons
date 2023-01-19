@@ -6,6 +6,10 @@
 	<string>HAB Speaker requires access to your microphone</string>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
