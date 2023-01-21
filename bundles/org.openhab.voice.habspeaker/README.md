@@ -83,17 +83,23 @@ Configure required credentials for the supported media providers:
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config          |  Type   | Group | Description                                                                |
-|-----------------|---------|-------|----------------------------------------------------------------------------|
-| sinkVolume      | String  | audio | Default sink volume.                                                       |
-| sinkStereo      | Boolean | audio | Use dual channel audio.                                                    |
-| stt             | String  | voice | The text-to-speech service to use, leave empty to use the default.         |
-| tts             | String  | voice | The speech-to-text service to use, leave empty to use the default.         |
-| voice           | String  | voice | The voice to use if no voice is specified, leave empty to use the default. |
-| hli             | String  | voice | The human language interpreter to use, leave empty to use the default.     |
-| ks              | String  | voice | Enables keyword spotting using the specified service.                      |
-| listeningItem   | String  | voice | If provided, the item will be switched on during the voice recognition.    |
-| screenSaverTime | String  | ui    | Seconds to activate screen saver (0 for disabled).                         |
+| Config                 | Type    | Group          | Description                                                                |
+|------------------------|---------|----------------|----------------------------------------------------------------------------|
+| sinkVolume             | String  | audio          | Default sink volume.                                                       |
+| sinkStereo             | Boolean | audio          | Use dual channel audio.                                                    |
+| screenSaverTime        | String  | device         | Seconds to activate screen saver (0 for disabled).                         |
+| dimScreen              | Boolean | device         | Prevent device of going to sleep/block (not available on web).             |
+| keepAwake              | Boolean | device         | Lower the screen brightness while the screen saver is enabled.             |
+| enableSpotify          | Boolean | device         | Enable spotify integration on this speaker.                                |
+| stt                    | String  | voice          | The text-to-speech service to use, leave empty to use the default.         |
+| tts                    | String  | voice          | The speech-to-text service to use, leave empty to use the default.         |
+| voice                  | String  | voice          | The voice to use if no voice is specified, leave empty to use the default. |
+| hli                    | String  | voice          | The human language interpreter to use, leave empty to use the default.     |
+| ks                     | String  | voice          | Enables keyword spotting using the specified service.                      |
+| listeningItem          | String  | voice          | If provided, the item will be switched on during the voice recognition.    |
+| rustpotterAvgThreshold | Decimal | rustpotter_web | Spot average threshold (0 for disabled) (only for rustpotter web ks).      |
+| rustpotterThreshold    | Decimal | rustpotter_web | Spot detection threshold (only for rustpotter web ks).                     |
+| rustpotterEagerMode    | Boolean | rustpotter_web | Spot in eager mode (only for rustpotter web ks).                           |
 
 ## Thing Channels
 
@@ -132,7 +138,7 @@ All the connected speakers can be automatically discovered using the main ui.
 
 To run keyword spotting on the browser using rustpotter:
 
-* Select 'Ruspotter Web' as ks in the thing configuration 'Voice' section.
+* Select 'Rustpotter Web' as 'Keyword Spotter' in the thing configuration 'Voice' section (when configuring in file, set ks thing config to 'habspeaker::rustpotter_web::ks').
 * The rustpotter model for the configured magic word should be available under '$OPENHAB_USERDATA/habspeaker/ks/rustpotter' or '$OPENHAB_USERDATA/rustpotter'.
 
 For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
