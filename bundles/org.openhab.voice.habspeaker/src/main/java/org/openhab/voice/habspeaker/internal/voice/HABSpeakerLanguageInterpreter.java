@@ -383,9 +383,10 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
      * @return value for the provided name on the media file or empty
      */
     private String searchMediaFile(Path mediaPath, String name) {
-        if (mediaPath.toFile().exists()) {
-            try (var is = HashMap.class.getResourceAsStream(mediaPath.toAbsolutePath().toString())) {
-                var mediaMap = new ObjectMapper().readValue(is, new TypeReference<HashMap<String, String>>() {
+        var mediaFile = mediaPath.toFile();
+        if (mediaFile.exists()) {
+            try {
+                var mediaMap = new ObjectMapper().readValue(mediaFile, new TypeReference<HashMap<String, String>>() {
                 });
                 var value = mediaMap.get(name);
                 if (value != null && !value.isBlank()) {
