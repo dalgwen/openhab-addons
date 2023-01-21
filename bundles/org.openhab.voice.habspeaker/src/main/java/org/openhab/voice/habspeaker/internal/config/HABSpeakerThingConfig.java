@@ -26,6 +26,18 @@ public class HABSpeakerThingConfig {
      * Seconds to activate screen saver (0 for disabled)
      */
     public int screenSaverTime = 30;
+    /**
+     * Lower the screen brightness while the screen saver is enabled.
+     */
+    public boolean dimScreen = false;
+    /**
+     * Prevent device from going to sleep/block while running the application.
+     */
+    public boolean keepAwake = false;
+    /**
+     * Enable spotify integration on this speaker.
+     */
+    public boolean enableSpotify = true;
     // Voice config
     /**
      * Custom tts service for this speaker

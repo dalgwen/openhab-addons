@@ -53,6 +53,7 @@ import org.openhab.core.io.rest.RESTResource;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -118,13 +119,15 @@ public class HABSpeakerResource implements RESTResource {
     public Response config(@PathParam("speaker_id") String id) {
         var thing = thingRegistry.get(new ThingUID("habspeaker", "speaker", id));
         String label = null;
+        boolean spotifyEnabled = false;
         if (thing != null) {
             label = thing.getLabel();
+            spotifyEnabled = thing.getConfiguration().as(HABSpeakerThingConfig.class).enableSpotify;
         }
         var config = configProvider.getConfig();
         Map<String, Object> configResp = new HashMap<>();
         configResp.put("spotifyEnabled",
-                !config.spotifyClientId.isBlank() && !configProvider.getSpotifyToken().isBlank());
+                spotifyEnabled && !config.spotifyClientId.isBlank() && !configProvider.getSpotifyToken().isBlank());
         configResp.put("label", (label != null && !label.isBlank()) ? label : "HAB Speaker");
         return addAllowCorsHeaders(Response.ok(configResp)).build();
     }
@@ -151,7 +154,6 @@ public class HABSpeakerResource implements RESTResource {
     }
 
     @GET
-    @RolesAllowed({ Role.USER, Role.ADMIN })
     @Path("/spotify/login")
     @Produces(MediaType.TEXT_HTML)
     @Operation(summary = "Redirects to spotify login.", responses = {
@@ -191,7 +193,6 @@ public class HABSpeakerResource implements RESTResource {
     }
 
     @GET
-    @RolesAllowed({ Role.USER, Role.ADMIN })
     @Path("/spotify/login/callback")
     @Produces(MediaType.TEXT_HTML)
     @Operation(summary = "Redirects to spotify login.", responses = {

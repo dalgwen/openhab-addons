@@ -40,8 +40,8 @@ async function createWindow() {
   }
   // handle open external links
   win.webContents.setWindowOpenHandler(({ url }) => {
-    const ohUrl = getOhUrl();
-    if (ohUrl.length && url.startsWith(ohUrl + '/auth')) return { action: 'allow' };
+    // const ohUrl = await getOhUrl();
+    // if (ohUrl.length && url.startsWith(ohUrl + '/auth')) return { action: 'allow' };
     if (url.startsWith('https:')) shell.openExternal(url)
     return { action: 'deny' }
   })

@@ -4,10 +4,38 @@ import { Dialog } from '@capacitor/dialog';
 import { VoiceRecorder } from "capacitor-voice-recorder";
 import { Preferences } from '@capacitor/preferences';
 import router from "../../router";
-
+import { KeepAwake } from '@capacitor-community/keep-awake';
+import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 class CapacitorPlatform extends WebPlatform implements Platform {
+    screenDimmed = false;
+    screenBrightnessBU = 1;
     getName(): PlatformName {
         return 'capacitor';
+    }
+    async keepDeviceAwake(value: boolean): Promise<void> {
+        try {
+            if (!await KeepAwake.isSupported()) {
+                console.warn("Keep await device is not supported");
+                return;
+            }
+            if (value) {
+                await KeepAwake.keepAwake();
+            } else {
+                await KeepAwake.allowSleep();
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }
+    async dimDeviceScreen(value: boolean): Promise<void> {
+        if (value && !this.screenDimmed) {
+            this.screenDimmed = true;
+            this.screenBrightnessBU = (await ScreenBrightness.getBrightness()).brightness;
+            await ScreenBrightness.setBrightness({ brightness: 0 });
+        } else if (!value && this.screenDimmed) {
+            this.screenDimmed = false;
+            await ScreenBrightness.setBrightness({ brightness: this.screenBrightnessBU });
+        }
     }
     async getSpeakerId(): Promise<string | null> {
         return (await Preferences.get({ key: "speakerId" }))?.value;

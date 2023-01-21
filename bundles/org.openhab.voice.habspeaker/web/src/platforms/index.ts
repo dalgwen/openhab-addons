@@ -18,6 +18,12 @@ class PlatformAdapter {
     async getName() {
         return (await getPlatform()).getName();
     }
+    async keepDeviceAwake(value: boolean) {
+        (await getPlatform()).keepDeviceAwake(value);
+    }
+    async dimDeviceScreen(value: boolean) {
+        (await getPlatform()).dimDeviceScreen(value);
+    }
     async setup(onReady: () => void) {
         const platform = await getPlatform();
         console.info(`main: running ${platform.getName()} setup`);

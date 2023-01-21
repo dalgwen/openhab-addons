@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTokenOpenHAB: () => ipcRenderer.invoke('setting:oh-token'),
   getUrlOpenHAB: () => ipcRenderer.invoke('setting:oh-url'),
   isSpotifyAvailable: () => ipcRenderer.invoke('spotify:available'),
+  blockSystemSleep: (value: boolean) => ipcRenderer.invoke('sleep:block', value),
   startSpotify: (label: string) => ipcRenderer.invoke('spotify:start', label),
   stopSpotify: () => ipcRenderer.invoke('spotify:stop'),
   getSpotifyId: () => ipcRenderer.invoke('spotify:id'),

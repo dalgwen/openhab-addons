@@ -5,6 +5,12 @@ class ElectronPlatform implements Platform {
     getName(): PlatformName {
         return 'electron';
     }
+    async dimDeviceScreen(value: boolean) {
+        console.warn("TODO: implement");
+    }
+    async keepDeviceAwake(value: boolean) {
+        await window.electronAPI.blockSystemSleep(value);
+    }
     async shouldRedirectToLogin(): Promise<boolean> {
         return false;
     }
@@ -33,14 +39,15 @@ export const electronPlatform = new ElectronPlatform();
 declare global {
     interface Window {
         electronAPI: {
-            onReady(cb: () => void): void;
+            blockSystemSleep(value: boolean): Promise<void>;
             getSpeakerId(): Promise<string>;
-            getUrlOpenHAB(): Promise<string>;
+            getSpotifyId(): Promise<string>;
             getTokenOpenHAB(): Promise<string | undefined>;
+            getUrlOpenHAB(): Promise<string>;
             isSpotifyAvailable(): Promise<boolean>;
+            onReady(cb: () => void): void;
             startSpotify(label: string): Promise<string>;
             stopSpotify(): Promise<void>;
-            getSpotifyId(): Promise<string>;
             setSpotifyToken(spotifyToken: string): Promise<void>;
             setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
             setSpotifyPlaybackListener(listener: (state: string) => void): Promise<void>;

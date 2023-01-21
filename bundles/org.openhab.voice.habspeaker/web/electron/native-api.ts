@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, systemPreferences, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, systemPreferences, powerSaveBlocker } from 'electron'
 import { join } from 'node:path';
 import { get as getHttp } from 'node:http';
 import { get as getHttps } from 'node:https';
@@ -30,6 +30,21 @@ export function registerAPIHandlers(winGetter: () => BrowserWindow | undefined) 
   ipcMain.handle('spotify:stop', () => stopLibrespot());
   ipcMain.handle('spotify:id', () => getSpotifyId());
   ipcMain.handle('spotify:token', (_, accessToken) => spotifyToken = accessToken);
+  ipcMain.handle('sleep:block', async (_, value) => await sleepBlocker(value));
+}
+
+// handle screen lock
+let lockRef: number | undefined;
+async function sleepBlocker(value: boolean) {
+  if (value && lockRef == null) {
+    lockRef = powerSaveBlocker.start('prevent-app-suspension');
+    console.log("device sleep locked: " + powerSaveBlocker.isStarted(lockRef));
+  } else if (!value && lockRef != null) {
+    const lock = lockRef;
+    lockRef = null;
+    powerSaveBlocker.stop(lock);
+  }
+
 }
 
 // handle librespot

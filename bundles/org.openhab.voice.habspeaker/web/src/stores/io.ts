@@ -11,6 +11,7 @@ import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../u
 import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
 import { useSettingsStore } from "./settings";
 import { MessageACKManager } from "../utils/message-ack-manager";
+import { platform } from "../platforms";
 
 export const useIOStore = defineStore("io", () => {
   const messageACKs = new MessageACKManager("main");
@@ -29,7 +30,7 @@ export const useIOStore = defineStore("io", () => {
   const spotifyStore = useSpotifyPlayerStore();
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController } = storeToRefs(mediaSessionStore);
-  const { awakeScreenSaver, setScreenSaverTime } = useScreenSaverStore();
+  const { awakeScreenSaver, setScreenSaverTime, enableScreenDim } = useScreenSaverStore();
   // state
   const listening = ref(false);
   const speaking = ref(false);
@@ -236,7 +237,7 @@ export const useIOStore = defineStore("io", () => {
             case WorkerOutCmd.CONFIGURE:
               // TODO: disallow configure after initialized
               (async () => {
-                const { sinkVolume, spotMode, screenSaverTime, spotifyToken, label, spotConfig, ack } = ev.data as WorkerOutCmdType<typeof command>;
+                const { sinkVolume, spotMode, screenSaverTime, spotifyToken, label, dimScreen, keepAwake, spotConfig, ack } = ev.data as WorkerOutCmdType<typeof command>;
                 if (label) {
                   speakerLabel.value = label;
                 }
@@ -253,9 +254,9 @@ export const useIOStore = defineStore("io", () => {
                       try {
                         const ksAudioProcessor = await initLocalKsProcessor(spotConfig?.keyword, { ...spotConfig });
                         localKsProcessorNode = ksAudioProcessor;
-                        audioSource?.start(localKsProcessorNode).catch((err) => console.error(err));
+                        await audioSource?.start(localKsProcessorNode);
                       } catch (error) {
-                        console.error("unable to start local ks processor", error);
+                        console.error("Unable to start local ks processor", error);
                       }
                     } else {
                       console.warn("Missed spotConfig configuration");
@@ -268,6 +269,8 @@ export const useIOStore = defineStore("io", () => {
                 if (screenSaverTime != null && !isNaN(screenSaverTime)) {
                   setScreenSaverTime(screenSaverTime);
                 }
+                enableScreenDim(!!dimScreen);
+                await platform.keepDeviceAwake(!!keepAwake);
                 if (spotifyToken) {
                   updateSpotifyToken(spotifyToken);
                 }

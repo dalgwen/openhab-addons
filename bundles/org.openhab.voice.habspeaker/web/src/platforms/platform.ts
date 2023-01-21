@@ -4,13 +4,15 @@ export type PlatformName = 'web' | 'electron' | 'capacitor';
 
 export interface Platform {
     getName(): PlatformName;
-    setup(startMic: () => void): Promise<void>;
-    getSpeakerId(): Promise<string | null>;
     getServerToken(): Promise<string | null>;
-    getUrlOpenHAB(): Promise<string>;
-    shouldRedirectToLogin(): Promise<boolean>;
-    setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
+    getSpeakerId(): Promise<string | null>;
     getSpotifyCtrl(): Promise<SpotifyPlatformCtrl>
+    getUrlOpenHAB(): Promise<string>;
+    dimDeviceScreen(value: boolean): Promise<void>;
+    keepDeviceAwake(value: boolean): Promise<void>;
+    setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
+    setup(startMic: () => void): Promise<void>;
+    shouldRedirectToLogin(): Promise<boolean>;
 }
 export interface SpotifyPlatformCtrl {
     initSpotify(): Promise<void>;

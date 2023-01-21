@@ -28,13 +28,13 @@
 				<label>Audio</label>
 				<description>Sink and source options.</description>
 			</parameter-group>
+			<parameter-group name="device">
+				<label>Device</label>
+				<description>Misc device options.</description>
+			</parameter-group>
 			<parameter-group name="voice">
 				<label>Voice</label>
 				<description>Voice configuration options for this speaker.</description>
-			</parameter-group>
-			<parameter-group name="ui">
-				<label>UI</label>
-				<description>Client UI options.</description>
 			</parameter-group>
 			<parameter-group name="rustpotter_web">
 				<label>Rustpotter Web</label>
@@ -50,6 +50,27 @@
 				<label>Sink Stereo</label>
 				<description>Use dual channel audio</description>
 				<default>false</default>
+			</parameter>
+			<!-- Device config -->
+			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
+				<label>Screen Saver Time</label>
+				<description>Seconds to activate screen saver (0 for disabled)</description>
+				<default>30</default>
+			</parameter>
+			<parameter name="dimScreen" type="boolean">
+				<label>Dim Device Screen</label>
+				<description>Lower the screen brightness while the screen saver is enabled.</description>
+				<default>false</default>
+			</parameter>
+			<parameter name="keepAwake" type="boolean">
+				<label>Keep device awake</label>
+				<description>Prevent device from going to sleep/block while running the application.</description>
+				<default>false</default>
+			</parameter>
+			<parameter name="enableSpotify" type="boolean">
+				<label>Spotify Speaker</label>
+				<description>Enable spotify integration on this speaker.</description>
+				<default>true</default>
 			</parameter>
 			<!-- Voice config -->
 			<parameter name="tts" type="text" groupName="voice">
@@ -93,12 +114,6 @@
 					<criteria name="tag">Location</criteria>
 				</filter>
 				<context>item</context>
-			</parameter>
-			<!-- UI config -->
-			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
-				<label>Screen Saver Time</label>
-				<description>Seconds to activate screen saver (0 for disabled)</description>
-				<default>30</default>
 			</parameter>
 			<!-- Rustpotter Web config -->
 			<parameter name="rustpotterAvgThreshold" type="decimal" min="0" max="1" groupName="rustpotter_web">

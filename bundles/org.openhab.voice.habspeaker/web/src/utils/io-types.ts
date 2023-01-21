@@ -10,7 +10,7 @@ export enum StreamType {
 // Some reused message types
 export type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string, playlistId?: string, playlistIndex?: number };
 type SetVolumeCmd = { value: number };
-type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, spotConfig?: { keyword?: string, threshold?: number, averagedThreshold?: number, eagerMode?: boolean } };
+type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: { keyword?: string, threshold?: number, averagedThreshold?: number, eagerMode?: boolean } };
 type SpotifyTokenCmd = { token: string };
 type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |

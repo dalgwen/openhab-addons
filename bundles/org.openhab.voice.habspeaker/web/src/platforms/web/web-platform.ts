@@ -4,9 +4,32 @@ import { WebSpotifyCtrl } from "./web-spotify-ctrl";
 const storagePrefix = "habspeaker.ui:";
 const idLocalStorageKey = `${storagePrefix}id`;
 export class WebPlatform implements Platform {
+    wakeLock?: WakeLockSentinel;
     spotifyCtrl = new WebSpotifyCtrl();
     getName(): PlatformName {
         return 'web';
+    }
+    async keepDeviceAwake(value: boolean): Promise<void> {
+        if (value && this.wakeLock == null) {
+            if (typeof window.navigator === 'undefined' || typeof window.navigator.wakeLock === 'undefined') {
+                console.warn("Device wake lock is not supported by this browser.")
+                return;
+            }
+            try {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err: any) {
+                console.error(`Unable to keep device awake: ${err.name}, ${err.message}`);
+            }
+        } else if (!value && this.wakeLock != null) {
+            const wakeLock = this.wakeLock;
+            this.wakeLock = undefined;
+            await wakeLock.release();
+        }
+    }
+    async dimDeviceScreen(value: boolean): Promise<void> {
+        if (value) {
+            console.warn("Device brightness control is not supported on this platform.");
+        }
     }
     async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
         localStorage.setItem(idLocalStorageKey, localSettings.speakerId);
