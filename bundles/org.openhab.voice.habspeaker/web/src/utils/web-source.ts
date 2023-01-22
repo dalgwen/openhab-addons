@@ -1,7 +1,12 @@
+/**
+ * Utility class to encapsulate the creation of a media stream audio source node,
+ * its volume and its connected audio node processors.
+ */
 export class WebAudioSource {
+    private micGainNode: GainNode;
+    private suspended: boolean = true;
     private stream?: MediaStream;
     private sourceNode?: MediaStreamAudioSourceNode;
-    private micGainNode: GainNode;
     private nodeProcessors?: AudioNode[];
     constructor(private audioContext: AudioContext) {
         // Add a gain node to the microphone to reduce noise
@@ -27,17 +32,33 @@ export class WebAudioSource {
             this.sourceNode.connect(this.micGainNode);
         }
     }
+    isSuspended() {
+        return this.suspended;
+    }
+    async suspend() {
+        console.debug("main: suspending audio source");
+        this.suspended = true;
+        this.sourceNode?.disconnect();
+        this.sourceNode = undefined;
+        console.debug("main: deleting audio media stream");
+        this.stream?.getAudioTracks().forEach(t => t.stop());
+        this.stream = undefined;
+    }
     async resume() {
+        if (this.suspended) {
+            this.suspended = false;
+            console.debug("main: resuming audio source");
+        }
         if (this.audioContext.state !== 'running') {
-            console.debug("main: resuming microphone audio context");
+            console.debug("main: resuming voice audio context");
             await this.audioContext.resume();
         }
         if (this.audioContext.state !== 'running') {
-            console.debug("main: microphone audio context not running");
+            console.debug("main: voice audio context not running");
         } else if (!this.stream || !this.stream.active) {
-            console.debug("main: recreating microphone stream");
+            console.debug("main: recreating audio media stream");
             this.stream = undefined;
-            if (this.sourceNode) this.sourceNode.disconnect();
+            this.sourceNode?.disconnect();
             this.sourceNode = undefined;
             await this.init();
         }

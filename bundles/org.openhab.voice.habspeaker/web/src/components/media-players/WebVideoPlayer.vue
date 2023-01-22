@@ -23,7 +23,6 @@ watch(mediaTarget, (value) => {
             <source v-if="mediaTarget" :src="mediaTarget.mediaId" />
         </video>
     </div>
-
 </template>
 
 <style lang="css" scoped>

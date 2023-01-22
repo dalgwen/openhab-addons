@@ -21,16 +21,21 @@ class AudioCache {
         this.buffer = new Float32Array(0);
     }
 }
-
+/**
+ * Utility class to encapsulate the creation of a media stream destination consumed by an audio element
+ * and connected to a deprecated script processor which will forward the audio buffers received though the provided port
+ * into the audio system.
+ */
 export class WebAudioSink {
     private audioElement: HTMLAudioElement;
     private gainNode: GainNode;
     sinkProcessorNode: ScriptProcessorNode;
     audioCache: AudioCache;
     private playing: boolean = false;
-    constructor(private id: string, private audioContext: AudioContext, private channels: number, audioMessagePort: MessagePort, private listener: (playing: boolean) => void) {
-        this.audioElement = document.createElement('audio');
+    destination: MediaStreamAudioDestinationNode;
+    constructor(private id: string, private audioContext: AudioContext, private channels: number, audioMessagePort: MessagePort, volume: number, private listener: (playing: boolean) => void) {
         this.gainNode = audioContext.createGain();
+        this.gainNode.gain.value = (volume / 100);
         this.sinkProcessorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 0, channels);
         this.sinkProcessorNode.onaudioprocess = this.processAudio.bind(this);
         this.sinkProcessorNode.connect(this.gainNode);
@@ -40,9 +45,10 @@ export class WebAudioSink {
             }
         };
         this.audioCache = new AudioCache();
-        var destination = audioContext.createMediaStreamDestination();
-        this.gainNode.connect(destination);
-        this.audioElement.srcObject = destination.stream;
+        this.destination = audioContext.createMediaStreamDestination();
+        this.gainNode.connect(this.destination);
+        this.audioElement = document.createElement('audio');
+        this.audioElement.srcObject = this.destination.stream;
         this.audioElement.autoplay = true;
     }
     getId() {
@@ -54,6 +60,8 @@ export class WebAudioSink {
     close() {
         this.gainNode.disconnect();
         this.sinkProcessorNode.disconnect();
+        this.destination.disconnect();
+        this.destination.stream.getTracks().forEach(t => t.stop());
         this.audioElement.remove();
     }
     isPlaying() {

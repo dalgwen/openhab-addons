@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
+import { ReentrantLock } from "reentrant-lock";
 import { useScreenSaverStore } from "./screen-saver";
 import { useAuthStore } from "./auth";
 import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
@@ -15,6 +16,7 @@ import { platform } from "../platforms";
 
 export const useIOStore = defineStore("io", () => {
   const messageACKs = new MessageACKManager("main");
+  const mediaCommandLock = new ReentrantLock();
   let listenPortACK: number | undefined;
   let audioContext: AudioContext | null = null;
   let audioSource: WebAudioSource | null = null;
@@ -35,14 +37,36 @@ export const useIOStore = defineStore("io", () => {
   const listening = ref(false);
   const speaking = ref(false);
   const online = ref(false);
+  // detect browser
+  let _isIOSBrowser: boolean | undefined = undefined;
+  function isIOSBrowser() {
+    if (_isIOSBrowser != null) {
+      return _isIOSBrowser;
+    }
+    return _isIOSBrowser = [
+      'iPad Simulator',
+      'iPhone Simulator',
+      'iPod Simulator',
+      'iPad',
+      'iPhone',
+      'iPod'
+    ].includes(navigator.platform)
+      // iPad on iOS 13 detection
+      || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+  }
+  function isChromeBasedBrowser() {
+    return !!(window as any).chrome;
+  }
   // voice setup
   function startVoiceAudioContext() {
     if (!audioContext) {
-      // initialize to 16000 to avoid resampling, some browsers can ignore this
+      // this is the sample rate required by the server,
+      // by setting audio context to use it some resampling
+      // on the io webworker will be avoided.
       const voiceSampleRate = 16000;
-      var isChromium = !!(window as any).chrome;
       let options: AudioContextOptions = {};
-      if (isChromium) {
+      if (isChromeBasedBrowser()) {
+        // built-in resample seems to work great in chrome, not in safari, firefox remains untested.
         options.sampleRate = voiceSampleRate;
       }
       audioContext = new AudioContext(options);
@@ -50,7 +74,8 @@ export const useIOStore = defineStore("io", () => {
     }
   }
   function isWorkletSupported() {
-    return !!getVoiceAudioContext().audioWorklet
+    const audioContext = getVoiceAudioContext();
+    return !!audioContext.audioWorklet;
   }
   function getVoiceAudioContext(): AudioContext {
     if (!audioContext) {
@@ -185,7 +210,7 @@ export const useIOStore = defineStore("io", () => {
   }
   // io exposed actions
   function sendSpot() {
-    if (online.value) {
+    if (online.value && audioSource && !audioSource.isSuspended()) {
       postToWorker(WorkerInCmd.ON_SPOT);
     }
   }
@@ -216,10 +241,14 @@ export const useIOStore = defineStore("io", () => {
       await getVoiceAudioContext().audioWorklet.addModule(audioPortWorklet);
     }
     // microphone stream checker, to keep the stream alive on undetected disconnections  
-    setInterval(audioSource.resume.bind(audioSource), 10000);
+    setInterval(() => {
+      if (audioSource && !audioSource.isSuspended()) {
+        audioSource.resume();
+      }
+    }, 10000);
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        audioSource?.resume();
+      if (!document.hidden && audioSource && !audioSource.isSuspended()) {
+        audioSource.resume();
       }
     });
     return new Promise((resolve, reject) => {
@@ -332,54 +361,7 @@ export const useIOStore = defineStore("io", () => {
               break;
             case WorkerOutCmd.MEDIA_COMMAND:
               const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
-              if ('start' === mediaCommandData.type) {
-                mediaSessionStore.startMedia(mediaCommandData.provider, {
-                  mediaId: mediaCommandData.mediaId,
-                  playlistId: mediaCommandData.playlistId,
-                  playlistIndex: mediaCommandData.playlistIndex,
-                  startSecond: mediaCommandData.second,
-                });
-                return;
-              }
-              if ('claim' === mediaCommandData.type) {
-                mediaSessionStore.claimMedia(mediaCommandData.provider);
-                return;
-              }
-              const mediaSessionCtrl = mediaController.value;
-              if (!mediaSessionCtrl) {
-                console.warn("Media is not started");
-                return;
-              }
-              switch (mediaCommandData.type) {
-                case 'play':
-                  mediaSessionCtrl.play();
-                  break;
-                case 'pause':
-                  mediaSessionCtrl.pause();
-                  break;
-                case 'stop':
-                  mediaSessionCtrl.getPlaybackState().then((state) => {
-                    if (state === PlaybackState.PLAYING) {
-                      mediaSessionCtrl.stop();
-                    }
-                    mediaSessionStore.stopMedia();
-                  });
-                  break;
-                case 'next':
-                  mediaSessionCtrl.next();
-                  break;
-                case 'previous':
-                  mediaSessionCtrl.previous();
-                  break;
-                case 'seek':
-                  mediaSessionCtrl.seek(mediaCommandData.second);
-                  break;
-                case 'volume':
-                  mediaSessionStore.setMediaVolume(mediaCommandData.level);
-                  break;
-                default:
-                  console.error("Unsupported media command: ", mediaCommandData);
-              }
+              runMediaCommand(mediaCommandData).catch(err => console.error(err));
               break;
             case WorkerOutCmd.SPOTIFY_TOKEN:
               const spotifyTokenData = ev.data as WorkerOutCmdType<typeof command>;
@@ -454,7 +436,82 @@ export const useIOStore = defineStore("io", () => {
       }
     }
   }
-
+  /**
+   * 
+   */
+  async function runMediaCommand(mediaCommandData: WorkerOutCmdType<WorkerOutCmd.MEDIA_COMMAND>) {
+    const unlock = await mediaCommandLock.acquire();
+    try {
+      if (!online.value) {
+        console.warn("main: device not online, aborting media command " + mediaCommandData.type);
+        return;
+      }
+      console.debug("main: running media command" + mediaCommandData.type);
+      if (isIOSBrowser()) {
+        await audioSource?.suspend();
+      }
+      if ('start' === mediaCommandData.type) {
+        mediaSessionStore.startMedia(mediaCommandData.provider, {
+          mediaId: mediaCommandData.mediaId,
+          playlistId: mediaCommandData.playlistId,
+          playlistIndex: mediaCommandData.playlistIndex,
+          startSecond: mediaCommandData.second,
+        });
+        return;
+      }
+      if ('claim' === mediaCommandData.type) {
+        mediaSessionStore.claimMedia(mediaCommandData.provider);
+        return;
+      }
+      const mediaSessionCtrl = mediaController.value;
+      if (!mediaSessionCtrl) {
+        console.warn("Media is not started");
+        return;
+      }
+      switch (mediaCommandData.type) {
+        case 'play':
+          mediaSessionCtrl.play();
+          break;
+        case 'pause':
+          mediaSessionCtrl.pause();
+          break;
+        case 'stop':
+          mediaSessionCtrl.getPlaybackState().then((state) => {
+            if (state === PlaybackState.PLAYING) {
+              mediaSessionCtrl.stop();
+            }
+            mediaSessionStore.stopMedia();
+          });
+          break;
+        case 'next':
+          mediaSessionCtrl.next();
+          break;
+        case 'previous':
+          mediaSessionCtrl.previous();
+          break;
+        case 'seek':
+          mediaSessionCtrl.seek(mediaCommandData.second);
+          break;
+        case 'volume':
+          mediaSessionStore.setMediaVolume(mediaCommandData.level);
+          break;
+        default:
+          console.error("Unsupported media command: ", mediaCommandData);
+      }
+    } catch (error) {
+      console.error("Error while running media command: ", error);
+    } finally {
+      if (isIOSBrowser()) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 4000));
+          await audioSource?.resume();
+        } catch (error) {
+          console.error("Unable to resume audio source: ", error);
+        }
+      }
+      unlock();
+    }
+  }
   /**
    *
    */
@@ -466,19 +523,19 @@ export const useIOStore = defineStore("io", () => {
       WebAudioSinkImpl = WebAudioSinkDeprecated as any;
     }
     const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSinkImpl(id, audioContext, channels, audioPort, (value) => {
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, audioPort, volume, (value) => {
       if (value) {
         cancelStopSpeaker();
       } else {
         debouncedStopSpeaker();
       }
     });
-    console.debug("main: stream volume: " + volume);
-    sink.setVolume(volume);
     // Sink teardown timeout id
     let speakerOffTimeout: any = null;
     console.debug(`main: starting sink ${id}`);
-    audioContext.resume();
+    if (audioContext.state != 'running') {
+      audioContext.resume();
+    }
     function stopSpeaker() {
       console.debug(`main: stopping sink ${id}`);
       sink.close();
@@ -489,7 +546,7 @@ export const useIOStore = defineStore("io", () => {
     }
     function debouncedStopSpeaker() {
       if (!speakerOffTimeout) {
-        speakerOffTimeout = setTimeout(() => stopSpeaker(), 1000);
+        speakerOffTimeout = setTimeout(() => stopSpeaker(), 500);
       }
       onSinkSpeaking(false);
     }

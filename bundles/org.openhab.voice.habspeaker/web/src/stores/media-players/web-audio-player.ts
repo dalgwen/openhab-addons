@@ -6,8 +6,9 @@ export const useWebAudioPlayerStore = defineStore("web-audio", () => {
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
   var player = ref<HTMLAudioElement | null>(null);
   function registerMediaController(playerRef: HTMLAudioElement) {
+    const controller = mediaController.value = getMediaSessionCtrl(MediaProvider.WEB_AUDIO, playerRef, (state) => mediaState.value = state);
+    mediaSessionStore.getMediaVolume().then(level => controller.setVolume(level));
     player.value = playerRef;
-    mediaController.value = getMediaSessionCtrl(MediaProvider.WEB_AUDIO, playerRef, (state) => mediaState.value = state);
   }
   return {
     registerMediaController,

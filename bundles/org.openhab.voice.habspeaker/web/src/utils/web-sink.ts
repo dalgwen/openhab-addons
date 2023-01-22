@@ -1,13 +1,18 @@
 import sinkCacheUrl from "./web-sink-worklet.ts?sharedworker&url";
-
+/**
+ * Utility class to encapsulate the creation of a media stream destination consumed by an audio element
+ * and connected to an audio worklet which will forward the audio buffers received though the provided port
+ * into the audio system.
+ */
 export class WebAudioSink {
     private audioElement: HTMLAudioElement;
     private gainNode: GainNode;
     sinkProcessorNode: AudioWorkletNode;
     private playing: boolean = false;
-    constructor(private id: string, private audioContext: AudioContext, channels: number, audioMessagePort: MessagePort, private listener: (playing: boolean) => void) {
-        this.audioElement = document.createElement('audio');
+    private destination: MediaStreamAudioDestinationNode;
+    constructor(private id: string, private audioContext: AudioContext, channels: number, audioMessagePort: MessagePort, volume: number, private listener: (playing: boolean) => void) {
         this.gainNode = audioContext.createGain();
+        this.gainNode.gain.value = (volume / 100);
         this.sinkProcessorNode = new AudioWorkletNode(audioContext, 'habspeaker-sink-worklet', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [channels], channelCountMode: 'explicit' });
         // transfer message port to processor node so audio doesn't use the main thread
         const setPortCommand = { type: 'audio_input_port', port: audioMessagePort };
@@ -21,9 +26,10 @@ export class WebAudioSink {
             }
         }
         this.sinkProcessorNode.connect(this.gainNode);
-        var destination = audioContext.createMediaStreamDestination();
-        this.gainNode.connect(destination);
-        this.audioElement.srcObject = destination.stream;
+        this.destination = audioContext.createMediaStreamDestination();
+        this.gainNode.connect(this.destination);
+        this.audioElement = document.createElement('audio');
+        this.audioElement.srcObject = this.destination.stream;
         this.audioElement.autoplay = true;
     }
     getId() {
@@ -33,8 +39,10 @@ export class WebAudioSink {
         this.gainNode.gain.setValueAtTime((value / 100), this.audioContext.currentTime);
     }
     close() {
-        this.gainNode.disconnect();
         this.sinkProcessorNode.disconnect();
+        this.gainNode.disconnect();
+        this.destination.disconnect();
+        this.destination.stream.getTracks().forEach(t => t.stop());
         this.audioElement.remove();
     }
     isPlaying() {
