@@ -8,10 +8,12 @@
   "scripts": {
     "dev": "vite --mode pwa",
     "dev:electron": "vite --mode electron",
+    "dev:capacitor": "NODE_ENV=development npm run build:capacitor && cap run --no-sync",
     "build": "vite build --mode pwa",
     "build:dev": "NODE_ENV=development vite build --mode pwa",
     "build:electron": "vite build --mode electron && electron-builder",
-    "build:capacitor": "vite build --mode capacitor && cap sync",
+    "sync:capacitor": "npm run fix-capacitor-plugins && cap sync && npm run rm-fix-capacitor-plugins",
+    "build:capacitor": "vite build --mode capacitor && cap copy",
     "install-capacitor-plugins": "npm i capacitor-voice-recorder @capacitor/preferences @capacitor/dialog @capacitor-community/screen-brightness @capacitor-community/keep-awake",
     "rm-capacitor-plugins": "npm rm capacitor-voice-recorder @capacitor/preferences @capacitor/dialog @capacitor-community/screen-brightness @capacitor-community/keep-awake",
     "fix-capacitor-plugins": "npm run install-capacitor-plugins -- --save-dev",
