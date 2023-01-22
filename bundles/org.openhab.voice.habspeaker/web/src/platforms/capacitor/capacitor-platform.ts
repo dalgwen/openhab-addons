@@ -56,16 +56,19 @@ class CapacitorPlatform extends WebPlatform implements Platform {
     }
     async setup(startMic: () => void): Promise<void> {
         let audioPermissionStatus = (await VoiceRecorder.hasAudioRecordingPermission()).value;
+        if (!audioPermissionStatus) {
+            audioPermissionStatus = (await VoiceRecorder.requestAudioRecordingPermission()).value;
+        }
         console.debug(`Audio permissions state: ${audioPermissionStatus}`);
         if (audioPermissionStatus) {
-            return;
+            if (await capacitorPlatform.getSpeakerId() != null) {
+                // auto start speaker if it is configured
+                startMic();
+            }
+        } else {
+            await Dialog.alert({ message: "HAB Speaker requires audio permissions to work" });
+            router.replace("/audio-error");
         }
-        audioPermissionStatus = (await VoiceRecorder.requestAudioRecordingPermission()).value;
-        if (audioPermissionStatus) {
-            return;
-        }
-        await Dialog.alert({ message: "HAB Speaker requires audio permissions to work" });
-        router.replace("/audio-error");
     }
 }
 
