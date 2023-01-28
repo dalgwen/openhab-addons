@@ -1,4 +1,4 @@
-package org.openhab.habspeaker;
+package org.givimad.habspeaker;
 
 import com.getcapacitor.BridgeActivity;
 
