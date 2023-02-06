@@ -36,11 +36,18 @@ public class AutoDeleteFileAudioStream extends FileAudioStream {
     private final AudioFormat audioFormat;
     private final List<ClonedFileInputStream> clonedAudioStreams = new ArrayList<>(1);
     private boolean isOpen = true;
+    private boolean readAtLeastOnce = false;
 
     public AutoDeleteFileAudioStream(File file, AudioFormat format) throws AudioException {
         super(file, format);
         this.file = file;
         this.audioFormat = format;
+    }
+
+    @Override
+    public int read() throws IOException {
+        readAtLeastOnce = true;
+        return super.read();
     }
 
     @Override
@@ -52,7 +59,7 @@ public class AutoDeleteFileAudioStream extends FileAudioStream {
 
     protected void deleteIfPossible() {
         boolean aClonedStreamIsOpen = clonedAudioStreams.stream().anyMatch(as -> as.isOpen);
-        if (!isOpen && !aClonedStreamIsOpen) {
+        if (!isOpen && !aClonedStreamIsOpen && readAtLeastOnce) {
             file.delete();
         }
     }
@@ -72,6 +79,12 @@ public class AutoDeleteFileAudioStream extends FileAudioStream {
                 throws AudioException {
             super(file, audioFormat);
             this.parent = parent;
+        }
+
+        @Override
+        public int read() throws IOException {
+            parent.readAtLeastOnce = true;
+            return super.read();
         }
 
         @Override
