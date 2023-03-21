@@ -37,10 +37,6 @@
 			<default>true</default>
 			<advanced>true</advanced>
 		</parameter>
-		<parameter name="diceComparisonThreshold" type="decimal" min="0" max="100" groupName="nlp">
-			<label>Dice Comparison Threshold</label>
-			<description>Minimum score for dice type actions to not be discarded.</description>
-		</parameter>
 		<parameter name="commandSentMessage" type="text" groupName="messages">
 			<label>Command Sent Message</label>
 			<description>Message for successful command.</description>

@@ -28,12 +28,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class ActionTemplatePlaceholder {
     @JsonProperty(value = "label", required = true)
     public String label = "";
-    @JsonProperty("valuesFile")
-    public @Nullable String valuesFile = null;
     @JsonProperty("values")
     public String @Nullable [] values = null;
-    @JsonProperty("mappedValuesFile")
-    public @Nullable String mappedValuesFile = null;
     @JsonProperty("mappedValues")
     public @Nullable Map<String, String> mappedValues = null;
 

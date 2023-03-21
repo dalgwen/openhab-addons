@@ -22,14 +22,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public class ActionTemplateInterpreterConfiguration {
     /**
-     * Convert the input text to lower case before processing
-     */
-    public boolean lowerText = false;
-    /**
-     * Enable case sensitivity for pos and ner static values.
-     */
-    public boolean caseSensitive = false;
-    /**
      * Message for successful command
      */
     public String commandSentMessage = "Done";
@@ -41,10 +33,6 @@ public class ActionTemplateInterpreterConfiguration {
      * Message for error during processing
      */
     public String failureMessage = "There was an error";
-    /**
-     * Minimum score for dice type actions to not be discarded.
-     */
-    public double diceComparisonThreshold = 70.0;
     /**
      * Prefer simple tokenizer over white space tokenizer
      */

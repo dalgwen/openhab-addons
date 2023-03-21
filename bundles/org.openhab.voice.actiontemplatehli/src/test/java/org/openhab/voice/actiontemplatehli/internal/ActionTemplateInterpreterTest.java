@@ -15,15 +15,18 @@ package org.openhab.voice.actiontemplatehli.internal;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.openhab.voice.actiontemplatehli.internal.ActionTemplateInterpreterConstants.SERVICE_ID;
+import static org.openhab.voice.actiontemplatehli.internal.ActionTemplateInterpreterConstants.SERVICE_PID;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -31,6 +34,7 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.items.GroupItem;
+import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.items.Metadata;
 import org.openhab.core.items.MetadataKey;
@@ -42,13 +46,14 @@ import org.openhab.core.library.items.SwitchItem;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.StringType;
+import org.openhab.core.storage.Storage;
+import org.openhab.core.storage.StorageService;
 import org.openhab.core.types.StateDescriptionFragmentBuilder;
 import org.openhab.core.types.StateOption;
 import org.openhab.core.voice.text.InterpretationException;
 import org.openhab.voice.actiontemplatehli.internal.configuration.ActionTemplateConfiguration;
 import org.openhab.voice.actiontemplatehli.internal.configuration.ActionTemplateGroupTargets;
 import org.openhab.voice.actiontemplatehli.internal.configuration.ActionTemplatePlaceholder;
-import org.openhab.voice.actiontemplatehli.internal.utils.ActionTemplateDiceComparator;
 import org.openhab.voice.actiontemplatehli.internal.utils.ActionTemplateTokenComparator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +66,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @NonNullByDefault
 public class ActionTemplateInterpreterTest {
     private @Mock @NonNullByDefault({}) ItemRegistry itemRegistryMock;
+    private @Mock @NonNullByDefault({}) StorageService storageServiceMock;
     private @Mock @NonNullByDefault({}) MetadataRegistry metadataRegistryMock;
     private @Mock @NonNullByDefault({}) EventPublisher eventPublisherMock;
     private @NonNullByDefault({}) ActionTemplateInterpreter interpreter;
@@ -69,12 +75,17 @@ public class ActionTemplateInterpreterTest {
     public void setUp() throws IOException {
         MockitoAnnotations.openMocks(this);
         ObjectMapper mapper = new ObjectMapper();
+        Mockito.when(storageServiceMock.getStorage(SERVICE_PID + ".ActionTemplatePlaceholder",
+                this.getClass().getClassLoader())).thenReturn(new MockStorage());
         // Prepare Switch
         var switchItem = new SwitchItem("testSwitch");
         switchItem.setState(OnOffType.OFF);
         switchItem.setLabel("bedroom light");
         switchItem.addTag("Light");
         Mockito.when(itemRegistryMock.get(switchItem.getName())).thenReturn(switchItem);
+        var switchItemSemanticMetadataKey = new MetadataKey("semantics", switchItem.getName());
+        Mockito.when(metadataRegistryMock.get(switchItemSemanticMetadataKey))
+                .thenReturn(new Metadata(switchItemSemanticMetadataKey, "Lightbulb", null));
         // Prepare Switch Write action
         var switchNPLWriteAction = new ActionTemplateConfiguration();
         switchNPLWriteAction.template = "$onOff $itemLabel";
@@ -106,41 +117,42 @@ public class ActionTemplateInterpreterTest {
         // Prepare Group Write action
         var groupNPLWriteAction = new ActionTemplateConfiguration();
         groupNPLWriteAction.template = "turn on $itemLabel lights";
-        groupNPLWriteAction.requiredItemTags = new String[] { "Location" };
+        groupNPLWriteAction.requiredTags = new String[] { "Location" };
         groupNPLWriteAction.value = "ON";
-        groupNPLWriteAction.memberTargets = new ActionTemplateGroupTargets();
-        groupNPLWriteAction.memberTargets.itemType = "Switch";
-        groupNPLWriteAction.memberTargets.requiredItemTags = new String[] { "Light" };
+        groupNPLWriteAction.groupTargets = new ActionTemplateGroupTargets();
+        groupNPLWriteAction.groupTargets.affectedTypes = new String[] { "Switch" };
+        groupNPLWriteAction.groupTargets.requiredTags = new String[] { "Light" };
         // Prepare Group Read action
         var groupNPLReadAction = new ActionTemplateConfiguration();
         groupNPLReadAction.read = true;
-        groupNPLReadAction.requiredItemTags = new String[] { "Location" };
+        groupNPLReadAction.requiredTags = new String[] { "Location" };
         groupNPLReadAction.template = "how is the light in the $itemLabel";
         groupNPLReadAction.value = "$itemLabel in $groupLabel is $state";
         var statePlaceholder = new ActionTemplatePlaceholder();
         statePlaceholder.label = "state";
         statePlaceholder.mappedValues = Map.of("on", "ON", "off", "OFF");
         groupNPLReadAction.placeholders = List.of(statePlaceholder);
-        groupNPLReadAction.memberTargets = new ActionTemplateGroupTargets();
-        groupNPLReadAction.memberTargets.itemName = switchItem.getName();
-        groupNPLReadAction.memberTargets.requiredItemTags = new String[] { "Light" };
+        groupNPLReadAction.groupTargets = new ActionTemplateGroupTargets();
+        groupNPLReadAction.groupTargets.affectedTypes = new String[] { "Switch" };
+        groupNPLReadAction.groupTargets.affectedSemantics = new String[] { "Lightbulb" };
+        groupNPLReadAction.groupTargets.requiredTags = new String[] { "Light" };
         // Prepare group write action using item option
         var groupNPLOptionWriteAction = new ActionTemplateConfiguration();
         groupNPLOptionWriteAction.template = "set? $itemLabel channel to $itemOption";
-        groupNPLOptionWriteAction.requiredItemTags = new String[] { "Location" };
+        groupNPLOptionWriteAction.requiredTags = new String[] { "Location" };
         groupNPLOptionWriteAction.value = "$itemOption";
-        groupNPLOptionWriteAction.memberTargets = new ActionTemplateGroupTargets();
-        groupNPLOptionWriteAction.memberTargets.itemType = "Number";
-        groupNPLOptionWriteAction.memberTargets.requiredItemTags = new String[] { "tv_channel" };
+        groupNPLOptionWriteAction.groupTargets = new ActionTemplateGroupTargets();
+        groupNPLOptionWriteAction.groupTargets.affectedTypes = new String[] { "Number" };
+        groupNPLOptionWriteAction.groupTargets.requiredTags = new String[] { "tv_channel" };
         // Prepare group read action using item option
         var groupNPLOptionReadAction = new ActionTemplateConfiguration();
         groupNPLOptionReadAction.read = true;
-        groupNPLOptionReadAction.requiredItemTags = new String[] { "Location" };
+        groupNPLOptionReadAction.requiredTags = new String[] { "Location" };
         groupNPLOptionReadAction.template = "what channel is on the $itemLabel tv";
         groupNPLOptionReadAction.value = "$groupLabel tv is on $itemOption";
-        groupNPLOptionReadAction.memberTargets = new ActionTemplateGroupTargets();
-        groupNPLOptionReadAction.memberTargets.itemType = "Number";
-        groupNPLOptionReadAction.memberTargets.requiredItemTags = new String[] { "tv_channel" };
+        groupNPLOptionReadAction.groupTargets = new ActionTemplateGroupTargets();
+        groupNPLOptionReadAction.groupTargets.affectedTypes = new String[] { "Number" };
+        groupNPLOptionReadAction.groupTargets.requiredTags = new String[] { "tv_channel" };
         // Add switch member to group
         groupItem.addMember(switchItem);
         // Add number member to group
@@ -166,29 +178,19 @@ public class ActionTemplateInterpreterTest {
         Mockito.when(metadataRegistryMock.get(new MetadataKey(SERVICE_ID, stringItem.getName())))
                 .thenReturn(new Metadata(new MetadataKey(SERVICE_ID, stringItem.getName()), "",
                         mapper.readValue(mapper.writeValueAsString(stringNPLWriteAction), Map.class)));
-        // Prepare string write action type dice
-        var stringDiceWriteAction = new ActionTemplateConfiguration();
-        stringDiceWriteAction.template = "please? send alert|warning $* to $contact";
-        stringDiceWriteAction.value = "$contact:$*";
-        stringDiceWriteAction.silent = true;
-        stringDiceWriteAction.placeholders = List.of(contactPlaceholder);
-        stringDiceWriteAction.type = "dice";
-        // Mock metadata for 'testString2'
-        Mockito.when(metadataRegistryMock.get(new MetadataKey(SERVICE_ID, stringItem2.getName())))
-                .thenReturn(new Metadata(new MetadataKey(SERVICE_ID, stringItem2.getName()), "",
-                        mapper.readValue(mapper.writeValueAsString(stringDiceWriteAction), Map.class)));
         // Mock items
         Mockito.when(itemRegistryMock.getAll())
                 .thenReturn(List.of(switchItem, stringItem, stringItem2, groupItem, numberItem));
 
-        interpreter = new ActionTemplateInterpreter(itemRegistryMock, metadataRegistryMock, eventPublisherMock) {
+        interpreter = new ActionTemplateInterpreter(itemRegistryMock, metadataRegistryMock, eventPublisherMock,
+                storageServiceMock) {
             @Override
-            protected ActionTemplateConfiguration[] getTypeActionConfigs(String itemType) {
+            protected ActionTemplateConfiguration[] getCompatibleActionTemplates(Item item) {
                 // mock type actions for testing
-                if ("Switch".equals(itemType)) {
+                if ("Switch".equals(item.getType())) {
                     return new ActionTemplateConfiguration[] { switchNPLWriteAction, switchNPLReadAction };
                 }
-                if ("Group".equals(itemType)) {
+                if ("Group".equals(item.getType())) {
                     return new ActionTemplateConfiguration[] { groupNPLWriteAction, groupNPLReadAction,
                             groupNPLOptionReadAction, groupNPLOptionWriteAction };
                 }
@@ -269,19 +271,6 @@ public class ActionTemplateInterpreterTest {
     }
 
     /**
-     * Test write action using the dynamic label and dice comparison
-     */
-    @Test
-    public void diceMessageTest() throws InterpretationException {
-        // Note one word is incorrect
-        var response = interpreter.interpret(Locale.ENGLISH, "send pallet please turn off the bedroom light to mark");
-        // silent mode is enabled so no response
-        assertThat(response, is(""));
-        Mockito.verify(eventPublisherMock).post(ItemEventFactory.createCommandEvent("testString2",
-                new StringType("+34000000000:please turn off the bedroom light")));
-    }
-
-    /**
      * Test unitary to lemmas usage while using token comparison
      */
     @Test
@@ -299,28 +288,6 @@ public class ActionTemplateInterpreterTest {
     public void tagTokenComparisonUnitTest() {
         var comparator = new ActionTemplateTokenComparator(new String[] { "that", "sounds", "good" }, new String[] {},
                 new String[] { "DT", "VBZ", "JJ" });
-        var result = comparator.compare(new String[] { "<tag>DT", "sounds", "good" });
-        assertThat(result.score, is(100.0));
-    }
-
-    /**
-     * Test unitary to lemmas usage while using dice comparison
-     */
-    @Test
-    public void lemmaDiceComparisonUnitTest() {
-        var comparator = new ActionTemplateDiceComparator(new String[] { "she", "is", "really", "cool" },
-                new String[] { "she", "be", "really", "cool" }, new String[] { "" }, 50.0);
-        var result = comparator.compare(new String[] { "she", "<lemma>be", "really", "cool" });
-        assertThat(result.score, is(100.0));
-    }
-
-    /**
-     * Test unitary to tags usage while dice comparison
-     */
-    @Test
-    public void tagDiceComparisonUnitTest() {
-        var comparator = new ActionTemplateDiceComparator(new String[] { "that", "sounds", "good" }, new String[] {},
-                new String[] { "DT", "VBZ", "JJ" }, 50.0);
         var result = comparator.compare(new String[] { "<tag>DT", "sounds", "good" });
         assertThat(result.score, is(100.0));
     }
@@ -369,44 +336,6 @@ public class ActionTemplateInterpreterTest {
                 template), is(99.67));
     }
 
-    /**
-     * Test unitary to dice comparison
-     */
-    @Test
-    public void diceComparisonUnitTest() {
-        var template = new String[] { "play|watch", "something", "on|at", "the?", "television" };
-        assertThat(scoreByDiceComparison(new String[] { "play", "something" }, template), is(0.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "else" }, template), is(0.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "on", "television" }, template),
-                is(100.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "on", "the", "television" }, template),
-                is(100.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "at", "television" }, template),
-                is(100.0));
-        // bad transcription
-        assertThat(scoreByDiceComparison(new String[] { "pay", "something", "at", "television" }, template), is(94.34));
-    }
-
-    /**
-     * Test unitary to dynamic placeholder while dice comparison
-     */
-    @Test
-    public void dynamicDiceComparisonUnitTest() {
-        var template = new String[] { "play|watch", "$*", "on|at", "the?", "television" };
-        assertThat(scoreByDiceComparison(new String[] { "play", "something" }, template), is(0.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "else" }, template), is(0.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "on", "television" }, template), is(99.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "else", "more", "on", "television" },
-                template), is(99.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "on", "the", "television" }, template),
-                is(99.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "at", "television" }, template), is(99.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "else", "on", "television" }, template),
-                is(99.0));
-        assertThat(scoreByDiceComparison(new String[] { "play", "something", "else", "at", "television" }, template),
-                is(99.0));
-    }
-
     private double scoreByTokenComparison(String[] phrase, String[] template) {
         BigDecimal bd = BigDecimal.valueOf(
                 new ActionTemplateTokenComparator(phrase, new String[] {}, new String[] {}).compare(template).score);
@@ -414,11 +343,35 @@ public class ActionTemplateInterpreterTest {
         return bd.doubleValue();
     }
 
-    private double scoreByDiceComparison(String[] phrase, String[] template) {
-        BigDecimal bd = BigDecimal
-                .valueOf(new ActionTemplateDiceComparator(phrase, new String[] {}, new String[] {}, 50.0)
-                        .compare(template).score);
-        bd = bd.setScale(2, RoundingMode.HALF_UP);
-        return bd.doubleValue();
+    private class MockStorage implements Storage<Object> {
+        @Override
+        public @Nullable Object put(String s, @Nullable Object o) {
+            return null;
+        }
+
+        @Override
+        public @Nullable ActionTemplatePlaceholder remove(String s) {
+            return null;
+        }
+
+        @Override
+        public boolean containsKey(String s) {
+            return false;
+        }
+
+        @Override
+        public @Nullable ActionTemplatePlaceholder get(String s) {
+            return null;
+        }
+
+        @Override
+        public Collection<String> getKeys() {
+            return List.of();
+        }
+
+        @Override
+        public Collection<@Nullable Object> getValues() {
+            return List.of();
+        }
     }
 }

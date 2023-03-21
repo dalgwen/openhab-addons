@@ -11,13 +11,16 @@ This human language interpreter aims to have no language dependency as it does n
 
 Be encourage to read the examples at the end to get a general idea of what can be done.
 
+## Web UI
+
+The addon includes a small UI that allows you configure and test your action templates.
 
 ## Action Template Target:
 
 This interpreter allows two ways to target items:
 
-* You can link an action to a specific item by adding the custom metadata namespace 'actiontemplatehli' to it.
-* You can link an action to all items of a type by providing the file '<OPENHAB_USERDATA>/actiontemplatehli/type_actions/<ITEM_TYPE_NAME>.json' (here you can restrict each action by item tags).
+* You can link an action to a specific item by adding the custom metadata namespace 'actiontemplatehli' to it using the main UI.
+* You can link an action to a subset of items by using included UI. Those actions should contain the $itemLabel placeholder which will be matched against all the compatible items labels.
 
 Two important notes:
 
@@ -30,10 +33,7 @@ The scoring mechanism scores each action configuration to look for the best scor
 If a token fails the comparison, the action scores 0.
 If all actions scored 0, none is executed.
 
-The action configuration field 'type' defines the scoring mechanism. Those are the available:
-
-* "tokens": score by token equality. Will score 100% or 0% depending on whether all tokens match the template.
-* "dice": score using dice's coefficient. It calculates a percentage based on the template and token text similarity, score is ignored if it's under the configured 'diceComparisonThreshold' value.
+The plugin scores by token equality; If one token fails the comparison the template will be scored 0.
 
 The action template string is a list of tokens separated by white space.
 You can use the ';' separator to provide alternative templates, the '|' to provide alternative tokens and the '?' suffix to make a token optional.
@@ -52,38 +52,41 @@ This is defined by the boolean field read which is 'false' by default.
 When read is false:
 
 * template: action template. (Required)
-* value: value to be sent. It can be used to capture the transformed placeholder values. (Required unless the target item type is String, in which case silent mode is assumed to be true and the whole text is passed to the item).
-* type: action template type, either "tokens" or "dice".
+* value: value to be sent. It can be used to capture the transformed placeholder values. (Required)
+* affectedTypes: item types affected by this action (at least one is required to work).
+* affectedSemantics: item semantics affected by this action.
 * requiredTags: allow to restrict the items targeted by its tags by ignoring items not having all these tags.
 * placeholders: defined placeholders that can be used on the template and replaced on the value.
 * silent: boolean used to avoid confirmation message.
-* targetMembers: when targeting a Group item, can be used to send the command to its member items instead.
+* groupTargets: when targeting a Group item, can be used to send the command to its member items instead. (Requires at least one affected type to take effect)
 
 When read is true:
 
 * template: action template. (Required)
-* value: read template, can use the placeholders symbols $itemLabel and $state.
-* emptyValue: An alternative template. Is used when the state value is empty or NULL after the transforming it. The $itemLabel is available.
-* type: action template type, either "tokens" or "dice".
+* value: a template for the interpreter response, can use the placeholders symbols $groupLabel, $itemLabel and $state. (Required)
+* emptyValue: An alternative response template. Is used when the state value is empty or NULL after the transforming it. The $groupLabel and $itemLabel placeholders are available.
+* affectedTypes: item types affected by this action (at least one is required to work).
+* affectedSemantics: item semantics affected by this action.
 * requiredTags: allow to restrict the items targeted by its tags by ignoring items not having all these tags.
 * placeholders: only the placeholder with label state will be used, will apply its configured mappedValues on the state backwards.
-* targetMembers: when targeting a Group item, can be used to access the state of one of its members. In case of multiple matches, a warning is shown and the first one is used.
+* groupTargets: when targeting a Group item, can be used to send the command to its member items instead.  (Requires at least one affected type to take effect)
 
 ## Placeholders
 
 This configuration allow you to define symbols to use on your templates.
 You can define the sets of tokens to be matched and its required transformations.
+
+A placeholder can be defined inside an action or as a shared one.
+
 Those are its fields:
 
  * label: label for the placeholder, is prefixed with '$' and spaces are replaced by '_' to create the symbol you can use on the template (Required).
  * values: list of strings containing parts of the text to look for and capture this text as placeholder value.
- * valuesFile: name (without extension) for a json file under the values folder (<OPENHAB_USERDATA>/actiontemplatehli/values) containing and array of strings to use as values.
  * mappedValues: object with keys and values of type strings, keys are used to match parts of the text and capture its value as placeholder value.
- * mappedValuesFile: name (without extension) for a json file under the mapped_values folder (<OPENHAB_USERDATA>/actiontemplatehli/mapped_values) containing and object with keys and values of type string to use as mapped values.
 
-So the total list of terms to look for as valid placeholder value are the combination of the values, valuesFiles, mappedValues keys and mappedValuesFileKeys fields, and at least one is required.
+So the total list of terms to look for as valid placeholder value are the combination of the values, mappedValues keys.
 
-Note that mappedValues are applied backwards to read actions so the mappedValues object should always contain the human readable text as keys and the state that represented it as value. This way you can reuse mappedValues files between read and write actions. 
+Note that mappedValues are applied backwards to read actions so the mappedValues object should always contain the human readable text as keys and the state that represented it as value. This way you can reuse a placeholder between read and write actions. 
 
 As a summary, using the placeholders you can configure how parts of the speech are converted into valid item values and backward.
 The examples at the end of the document can help you to see it clearer.
@@ -134,17 +137,17 @@ The action with template "play $musicAuthor on living room" will be executed.
 The sentence "play beethoven on living room" will score 80% when compared with the template containing the dynamic placeholder and 0 when compared with the one without it, as 'beethoven' is not a valid value for the '$musicAuthor' placeholder.
 The action with template "play $* on living room" will be executed.
 
-### Target members:
+### Group Targets:
 
 When the target of an action is a group item, you can target its members instead.
 
 You can use the following fields:
 
-* itemName: name of the item member to target. If present the other fields are ignored.
-* itemType: type of the item members to target.
-* requiredTags: allow to restrict the members targeted by tags when matching by type.
+* affectedTypes: item types affected by this action (at least one is required or all the group targets configurations is ignored).
+* affectedSemantics: item semantics affected by this action.
+* requiredTags: allow to restrict the items targeted by its tags by ignoring items not having all these tags.
 * recursive: when matching by itemType, look for group members in a recursive way, default true.
-* mergeState: on a read action when matching by itemType, merge the item states by performing an AND operation, only allowed for 'Switch' and 'Contact' item types, default false.
+* mergeState: on a read action when matching by itemType, merge the item states by performing an AND operation, only allowed for 'Switch' and 'Contact' item types and for a single affectedType, default false.
 
 ## Text Preprocessing
 
@@ -200,99 +203,15 @@ Those are just required to use the matching by lemma or tag functionality.
 
 | Config                  |  Group   |  Type   |   Default          | Description                                                                                                   |
 |-------------------------|----------|---------|--------------------|---------------------------------------------------------------------------------------------------------------|
-| lowerText               | nlp      | boolean | false              | Convert the input text to lowercase before processing.                                                        |
-| caseSensitive           | nlp      | boolean | false              | Enable case sensitivity, do not apply to the 'itemLabel' placeholder.                                         |
 | useSimpleTokenizer      | nlp      | boolean | false              | Prefer simple tokenizer over white space tokenizer.                                                           |
 | detokenizeOptimization  | nlp      | boolean | true               | Enables build-in detokenization based on original text, otherwise string join by space is used.               |
-| diceComparisonThreshold | nlp      | number  |                    | Minimum score for dice type actions to not be discarded (percentage).                                         |
 | commandSentMessage      | messages | text    | Done               | Message for successful command.                                                                               |
 | unhandledMessage        | messages | text    | I can not do that  | Message for unsuccessful action.                                                                              |
 | failureMessage          | messages | text    | There was an error | Message for error during processing.                                                                          |
 
-## Examples:
+## Single Item Actions:
 
-### String type action configs example:
-
-This example contains the files to add actions for opening an android application and checking what application is opened.
-These actions will target all String items with the tag 'launch_android_app'.
-
-These are the files needed:
-
-#### File '<OPENHAB_USERDATA>/actiontemplatehli/type_actions/String.json'
-
-```json
-[
-    {
-        "template": "launch|open $app on $itemLabel",
-        "value": "$app",
-        "type": "tokens",
-        "requiredTags": ["launch_android_app"],
-        "placeholders": [
-            {
-                "label": "app",
-                "mappedValuesFile": "android_apps"
-            }
-        ]
-    },
-    {
-        "template": "what app|application is open on $itemLabel;what app|application is on $itemLabel",
-        "read": true,
-        "value": "the open app is $state",
-        "emptyValue": "no app open on $itemLabel",
-        "type": "tokens",
-        "requiredTags": ["launch_android_app"],
-        "placeholders": [
-            {
-                "label": "state",
-                "mappedValuesFile": "android_apps"
-            }
-        ]
-    }
-]
-```
-
-#### File '<OPENHAB_USERDATA>/actiontemplatehli/pos/android_apps.json'
-
-```json
-{
-  "youtube": "com.google.android.youtube",
-  "netflix": "com.netflix.ninja",
-  "jellyfin": "org.jellyfin.androidtv",
-  "amazon video": "com.amazon.amazonvideo.livingroom"
-}
-```
-
-### Switch type action configs example:
-
-This example contains the files to add actions for turning a switch on or off.
-These actions will target all Switch items.
-
-#### File '<OPENHAB_USERDATA>/actiontemplatehli/type_actions/Switch.json'
-
-```json
-[
-  {
-    "template": "$onOff $itemLabel",
-    "value": "$onOff",
-    "type": "tokens",
-    "placeholders": [
-      {
-        "label": "onOff",
-        "mappedValues": {
-          "turn on": "ON",
-          "turn off": "OFF"
-        }
-      }
-    ]
-  },
-  {
-    "template": "how <lemma>be the $itemLabel",
-    "read": true,
-    "type": "tokens",
-    "value": "$itemLabel is $state"
-  }
-]
-```
+To link an action to an specific item you should do it using the main interface and editing its metadata. These are some examples:
 
 ### Switch item action configs example:
 
@@ -308,7 +227,6 @@ config:
         "turn on": ON
         "turn off": OFF
   template: $onOff $itemLabel
-  type: tokens
   value: $onOff
 ```
 
@@ -328,6 +246,5 @@ config:
         - Raquel
   silent: true
   template: send message $* to $contact
-  type: tokens
   value: $contact:$*
 ```
