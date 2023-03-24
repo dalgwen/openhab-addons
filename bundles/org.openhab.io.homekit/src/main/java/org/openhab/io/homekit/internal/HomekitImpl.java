@@ -85,7 +85,7 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
     private final List<HomekitServer> homekitServers = new ArrayList<>();
     private final List<HomekitRoot> bridges = new ArrayList<>();
     private MDNSClient mdnsClient;
-    private int currentStartLevel = 0;
+    private boolean started = false;
 
     private final List<HomekitChangeListener> changeListeners = new ArrayList<>();
 
@@ -164,12 +164,17 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
                     || oldSettings.instances != settings.instances) {
                 // the HomeKit server settings changed. we do a complete re-init
                 stopHomekitServer();
-                if (currentStartLevel >= StartLevelService.STARTLEVEL_STATES) {
+                if (started) {
                     startHomekitServer();
                 }
             } else {
                 for (HomekitChangeListener changeListener : changeListeners) {
                     changeListener.updateSettings(settings);
+                }
+                if (settings.blockUserDeletion != oldSettings.blockUserDeletion) {
+                    for (HomekitAuthInfoImpl authInfo : authInfos) {
+                        authInfo.setBlockUserDeletion(settings.blockUserDeletion);
+                    }
                 }
             }
         } catch (IOException | InvalidAlgorithmParameterException e) {
@@ -180,6 +185,7 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
     @Override
     public synchronized void onReadyMarkerAdded(ReadyMarker readyMarker) {
         try {
+            started = true;
             startHomekitServer();
         } catch (IOException | InvalidAlgorithmParameterException e) {
             logger.warn("could not initialize HomeKit bridge: {}", e.getMessage());
@@ -188,6 +194,7 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
 
     @Override
     public synchronized void onReadyMarkerRemoved(ReadyMarker readyMarker) {
+        started = false;
         stopHomekitServer();
     }
 
@@ -203,10 +210,6 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
         changeListener.setBridge(bridge);
         bridges.add(bridge);
         bridge.setConfigurationIndex(changeListener.getConfigurationRevision());
-        bridge.refreshAuthInfo();
-
-        final int lastAccessoryCount = changeListener.getLastAccessoryCount();
-        int currentAccessoryCount = changeListener.getAccessories().size();
         bridge.start();
         return bridge;
     }
@@ -325,7 +328,7 @@ public class HomekitImpl implements Homekit, NetworkAddressChangeListener, Ready
     @Override
     public synchronized void onChanged(final List<CidrAddress> added, final List<CidrAddress> removed) {
         logger.trace("HomeKit bridge reacting on network interface changes.");
-        if (currentStartLevel < StartLevelService.STARTLEVEL_STATES) {
+        if (!started) {
             return;
         }
         removed.forEach(i -> {
