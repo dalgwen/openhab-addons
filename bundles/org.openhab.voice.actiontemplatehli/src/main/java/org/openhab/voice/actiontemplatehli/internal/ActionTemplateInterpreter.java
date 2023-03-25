@@ -87,9 +87,6 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import opennlp.tools.dictionary.Dictionary;
 import opennlp.tools.lemmatizer.DictionaryLemmatizer;
 import opennlp.tools.lemmatizer.Lemmatizer;
@@ -265,7 +262,7 @@ public class ActionTemplateInterpreter implements HumanLanguageInterpreter {
         if (itemActionResult != null) {
             return itemActionResult;
         }
-        return typeActionResult.score > itemActionResult.score ? typeActionResult : itemActionResult;
+        return checkTypeActionsConfigs(text, tokens, tags, lemmas);
     }
 
     private @Nullable NLPInterpretationResult checkItemActions(String text, String[] tokens, String[] tags,
