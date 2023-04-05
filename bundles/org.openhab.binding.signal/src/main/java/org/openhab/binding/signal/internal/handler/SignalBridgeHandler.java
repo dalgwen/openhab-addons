@@ -12,8 +12,9 @@
  */
 package org.openhab.binding.signal.internal.handler;
 
+import static org.openhab.binding.signal.internal.SignalBindingConstants.PHOTO_EXTENSIONS;
+
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -29,11 +30,15 @@ import java.util.stream.Collectors;
 import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalBridgeConfiguration;
 import org.openhab.binding.signal.internal.SignalConversationDiscoveryService;
 import org.openhab.binding.signal.internal.actions.SignalActions;
+import org.openhab.binding.signal.internal.protocol.AttachmentCreationException;
+import org.openhab.binding.signal.internal.protocol.AttachmentUtils;
 import org.openhab.binding.signal.internal.protocol.DeliveryReport;
+import org.openhab.binding.signal.internal.protocol.DeliveryStatus;
 import org.openhab.binding.signal.internal.protocol.IncompleteRegistrationException;
 import org.openhab.binding.signal.internal.protocol.MessageListener;
 import org.openhab.binding.signal.internal.protocol.ProvisionType;
@@ -64,7 +69,9 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
 
     private final ThingTypeUID thingTypeUID;
 
-    public static final List<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Arrays.asList(
+    private HttpClient httpClient;
+
+    public static final List<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = List.of(
             SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE,
             SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE);
 
@@ -93,9 +100,10 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
         scheduler.execute(this::stopService);
     }
 
-    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID) {
+    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID, HttpClient httpClient) {
         super(bridge);
         this.thingTypeUID = thingTypeUID;
+        this.httpClient = httpClient;
     }
 
     @Override
@@ -228,12 +236,58 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
         logger.debug("Sending message to {}", recipient);
         SignalService signalServiceFinal = signalService;
         if (signalServiceFinal != null) {
-            DeliveryReport deliveryReport = signalServiceFinal.send(recipient, text);
+            DeliveryReport deliveryReport = signalServiceFinal.send(recipient, text, null);
             deliveryStatusReceived(deliveryReport);
             return deliveryReport;
         } else {
             throw new IllegalStateException("Cannot send message if service not ready");
         }
+    }
+
+    /**
+     * Send image
+     *
+     * @param recipient The recipient for the message
+     * @param image The image to sent. Use a scheme at the beginning (either file:, http:, base64
+     */
+    public DeliveryReport sendImage(String recipient, String image) {
+
+        logger.debug("Sending photo message to {}", recipient);
+        SignalService signalServiceFinal = signalService;
+
+        if (signalServiceFinal == null) {
+            throw new IllegalStateException("Cannot send message if service not ready");
+        }
+
+        String lowerCasePhotoUrl = image.toLowerCase();
+
+        String attachment;
+
+        try {
+            if (lowerCasePhotoUrl.startsWith("http")) {
+                logger.debug("Http based URL for photo provided.");
+                attachment = AttachmentUtils.createAttachmentFromHttp(httpClient, image);
+            } else if (image.startsWith("data:")) { // direct support of data URI scheme
+                attachment = image;
+            } else if (PHOTO_EXTENSIONS.stream().anyMatch(lowerCasePhotoUrl::endsWith)
+                    || lowerCasePhotoUrl.startsWith("file:")) {
+                String imageSafe = image;
+                if (lowerCasePhotoUrl.startsWith("file:")) {
+                    imageSafe = image.substring(5);
+                }
+                logger.debug("Read file from local file system: {}", imageSafe);
+                attachment = imageSafe;
+            } else {
+                throw new AttachmentCreationException("Scheme not supported for attachment "
+                        + image.substring(0, image.length() < 100 ? image.length() : 100));
+            }
+        } catch (AttachmentCreationException e) {
+            logger.debug("Cannot attach image: {}", e.getMessage());
+            signalServiceFinal.send(recipient, "Cannot attach image: " + e.getMessage(), null);
+            return new DeliveryReport(DeliveryStatus.FAILED, recipient);
+        }
+
+        return signalServiceFinal.send(recipient, "", attachment);
     }
 
     /**

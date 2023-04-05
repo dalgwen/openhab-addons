@@ -60,6 +60,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.protocol.StateListener.ConnectionState;
 import org.openhab.core.OpenHAB;
+import org.signal.libsignal.metadata.ProtocolDuplicateMessageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
@@ -263,7 +264,7 @@ public class SignalService {
         }
     }
 
-    public DeliveryReport send(String address, String message) {
+    public DeliveryReport send(String address, String message, @Nullable String attachment) {
         Manager managerFinal = manager;
         if (managerFinal == null) {
             logger.warn("Cannot send message to {}, cause : no manager running/initialized", address);
@@ -283,10 +284,12 @@ public class SignalService {
         }
         SendMessageResults sendResults;
         try {
-            sendResults = managerFinal.sendMessage(
-                    new Message(message, Collections.emptyList(), Collections.emptyList(), Optional.empty(),
-                            Optional.empty(), Collections.emptyList(), Optional.empty()),
-                    Collections.singleton(recipient));
+            List<String> attachments = attachment == null ? List.of() : List.of(attachment);
+            sendResults = managerFinal
+                    .sendMessage(
+                            new Message(message, attachments, Collections.emptyList(), Optional.empty(),
+                                    Optional.empty(), Collections.emptyList(), Optional.empty()),
+                            Collections.singleton(recipient));
         } catch (IOException | AttachmentInvalidException | NotAGroupMemberException | GroupNotFoundException
                 | GroupSendingNotAllowedException | UnregisteredRecipientException | InvalidStickerException e) {
             logger.warn("Cannot send message to {}, cause {}", address, e.getMessage());
@@ -298,7 +301,9 @@ public class SignalService {
                 SendMessageResult result = resultsForRecipient.get(0);
                 if (!result.isSuccess()) {
                     logger.warn("Cannot send message to {}, cause {}", address, result.isIdentityFailure() ? "identity"
-                            : result.isNetworkFailure() ? "network" : result.isRateLimitFailure() ? "rate" : "unknown");
+                            : result.isNetworkFailure() ? "network"
+                                    : result.isRateLimitFailure() ? "rate"
+                                            : result.isUnregisteredFailure() ? "recipient unregistered" : "unknown");
                     return new DeliveryReport(DeliveryStatus.FAILED, address);
                 }
             }
@@ -400,6 +405,18 @@ public class SignalService {
                     // final var groupContext = message.groupContext().get();
                     // printGroupInfo(writer.indentedWriter(), groupContext.getId());
                     // }
+                } else if (envelope.getSync().isPresent() && envelope.getSync().get().sent().isPresent()
+                        && envelope.getSync().get().sent().get().destination().isPresent() && envelope.getSync().get()
+                                .sent().get().destination().get().getLegacyIdentifier().equals(phoneNumber)) {
+                    // message from the account to the account, handles this like a standard message
+                    MessageEnvelope.Data message = envelope.getSync().get().sent().get().message().get();
+                    if (message.getBody().isPresent()) {
+                        messageListener.messageReceived(envelope.getSync().get().sent().get().destination().get(),
+                                message.getBody().get());
+                    } else {
+                        logger.debug("empty message from {}",
+                                source != null ? source.getLegacyIdentifier() : "unknown");
+                    }
                 }
                 if (envelope.getReceipt().isPresent() && source != null) {
                     MessageEnvelope.Receipt receiptMessage = envelope.getReceipt().get();
@@ -423,20 +440,13 @@ public class SignalService {
                 }
             }
             if (exception != null) {
-                logger.warn("Signal get an exception while receiving message", exception);
+                if (exception instanceof ProtocolDuplicateMessageException) { // suppressing some messages
+                    logger.debug("Duplicate message: {}. Ignoring it", exception.getMessage());
+                } else {
+                    logger.warn("Signal get an exception while receiving message: {}", exception.getMessage());
+                }
             }
         }
-
-        // private void printGroupInfo(final PlainTextWriter writer, final GroupId groupId) {
-        // writer.println("Id: {}", groupId.toBase64());
-        //
-        // var group = m.getGroup(groupId);
-        // if (group != null) {
-        // writer.println("Name: {}", group.title());
-        // } else {
-        // writer.println("Name: <Unknown group>");
-        // }
-        // }
     }
 
     public void deleteAccount() throws IOException {
