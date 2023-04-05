@@ -65,4 +65,25 @@ public class SignalActions implements ThingActions {
             throw new IllegalArgumentException("Instance is not an SignalActions class.");
         }
     }
+
+    @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
+    public void sendSignalImage(
+            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
+            @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image) {
+
+        if (recipient != null && !recipient.isEmpty() && image != null) {
+            handler.sendImage(recipient, image);
+        } else {
+            logger.error("Signal cannot send a photo with no recipient or text");
+        }
+    }
+
+    public static void sendSignalImage(@Nullable ThingActions actions, @Nullable String recipient,
+            @Nullable String image) {
+        if (actions instanceof SignalActions) {
+            ((SignalActions) actions).sendSignalImage(recipient, image);
+        } else {
+            throw new IllegalArgumentException("Instance is not an SignalActions class.");
+        }
+    }
 }

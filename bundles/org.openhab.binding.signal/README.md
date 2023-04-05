@@ -110,7 +110,7 @@ The *signalconversation* supports the following channels :
 
 ## Rule action
 
-This binding includes a rule action to send messages.
+This binding includes two rule actions to send messages.
 
 ```
 (Rule DSL)
@@ -128,6 +128,16 @@ Once this action instance is retrieved, you can invoke the 'sendSignal' method o
 
 ```
 signalAction.sendSignal("+33123456789", "Hello world!")
+```
+
+You can also send image with this action, using file path, web resource, item of type Image, or direct dataUri :
+
+```
+signalAction.sendSignalImage("+33123456789", "/path/to/image.png")
+signalAction.sendSignalImage("+33123456789", "https://www.openhab.org/openhab-logo-top.png")
+signalAction.sendSignalImage("+33123456789", MyImageItem.state.toFullString)
+signalAction.sendSignalImage("+33123456789", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwQAADsEBuJFr7QAAABl0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC4yMfEgaZUAAAAfSURBVDhPY/j+v49sNKqZRDSqmUQ0qplENPI0/+8DAOnW7m6FxOUUAAAAAElFTkSuQmCC")
+
 ```
 
 When using the linked bridge thing, you can use the special recipient "self" to send note to yourself. When sending note to yourself, there is no notification on your other devices.
