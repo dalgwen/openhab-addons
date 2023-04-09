@@ -4,7 +4,7 @@
     "name": "GiviMAD"
   },
   "description": "A smart speaker UI concept for openHAB",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "scripts": {
     "dev": "vite --mode pwa",
     "dev:electron": "vite --mode electron",
@@ -29,7 +29,7 @@
     "pinia": "^2.0.27",
     "pkce-challenge": "^3.0.0",
     "reentrant-lock": "^2.0.1",
-    "rustpotter-worklet": "1.0.4",
+    "rustpotter-worklet": "2.0.0",
     "vue": "^3.2.41",
     "vue-router": "^4.1.6"
   },

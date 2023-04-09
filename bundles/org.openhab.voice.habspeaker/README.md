@@ -136,6 +136,8 @@ All the connected speakers can be automatically discovered using the main ui.
 
 ### Rustpotter
 
+Note: Uses rustpotter v2.x.x not compatible with 1.x.x model files.
+
 To run keyword spotting on the browser using rustpotter:
 
 * Select 'Rustpotter Web' as 'Keyword Spotter' in the thing configuration 'Voice' section (when configuring in file, set ks thing config to 'habspeaker::rustpotter_web::ks').

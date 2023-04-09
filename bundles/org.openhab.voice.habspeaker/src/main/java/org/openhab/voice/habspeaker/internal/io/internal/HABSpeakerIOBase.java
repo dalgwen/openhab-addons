@@ -133,7 +133,19 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                     spotConfig.put("keyword", modelName);
                     spotConfig.put("averagedThreshold", config.rustpotterAvgThreshold);
                     spotConfig.put("threshold", config.rustpotterThreshold);
-                    spotConfig.put("eagerMode", config.rustpotterEagerMode);
+                    spotConfig.put("minScores", config.rustpotterMinScores);
+                    spotConfig.put("scoreMode", config.rustpotterScoreMode);
+                    spotConfig.put("minGain", config.rustpotterMinGain);
+                    spotConfig.put("maxGain", config.rustpotterMaxGain);
+                    spotConfig.put("bandPassEnabled", config.rustpotterBandPass);
+                    spotConfig.put("bandPassLowCutoff", config.rustpotterLowCutoff);
+                    spotConfig.put("bandPassHighCutoff", config.rustpotterHighCutoff);
+                    spotConfig.put("comparatorBandSize", config.rustpotterComparatorBandSize);
+                    spotConfig.put("comparatorRef", config.rustpotterComparatorRef);
+                    spotConfig.put("gainNormalizerEnabled", config.rustpotterGainNormalizer);
+                    if (config.rustpotterGainRef != null) {
+                        spotConfig.put("gainRef", config.rustpotterGainRef);
+                    }
                     initializedConfig.put("spotConfig", spotConfig);
                 } else {
                     logger.warn("Missing rustpotter model for '{}', keyword spotting disabled", modelName);

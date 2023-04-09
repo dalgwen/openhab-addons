@@ -8,7 +8,7 @@ import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { WebAudioSource } from "../utils/web-source";
 import { WebAudioSink } from "../utils/web-sink";
 import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
-import { MediaStateCmd, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
+import { MediaStateCmd, RustpotterOptions, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
 import { useSettingsStore } from "./settings";
 import { MessageACKManager } from "../utils/message-ack-manager";
@@ -117,20 +117,31 @@ export const useIOStore = defineStore("io", () => {
   /**
    * Returns a processor node that spots for the keyword
    */
-  async function initLocalKsProcessor(keyword: string, options: { averagedThreshold?: number, threshold?: number, eagerMode?: boolean, }) {
+  async function initLocalRustpotterProcessor(keyword: string, options: RustpotterOptions) {
     console.debug("main: starting local keyword spotting using rustpotter");
-    const { RustpotterService } = await import("rustpotter-worklet");
+    const { RustpotterService, ScoreMode } = await import("rustpotter-worklet");
     const wasmModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter_wasm_bg.wasm', import.meta.url);
-    const workletModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotterWorklet.js', import.meta.url);
+    const workletModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter-worklet.js', import.meta.url);
+    const scoreMode = (ScoreMode[options.scoreMode as any] as any) ?? ScoreMode.max;
     const rp = new RustpotterService({
       workletPath: workletModuleUrl.href,
       wasmPath: wasmModuleUrl.href,
-      averagedThreshold: options.averagedThreshold ?? 0.2,
-      threshold: options.threshold ?? 0.5,
-      eagerMode: options.eagerMode ?? true,
+      averagedThreshold: options.averagedThreshold,
+      threshold: options.threshold,
+      minScores: options.minScores,
+      scoreMode: scoreMode,
+      minGain: options.minGain,
+      maxGain: options.maxGain,
+      bandPassEnabled: options.bandPassEnabled,
+      bandPassLowCutoff: options.bandPassLowCutoff,
+      bandPassHighCutoff: options.bandPassHighCutoff,
+      comparatorBandSize: options.comparatorBandSize,
+      comparatorRef: options.comparatorRef,
+      gainNormalizerEnabled: options.gainNormalizerEnabled,
+      gainRef: options.gainRef,
     });
-    rp.onspot = (name, score) => {
-      console.debug(`main: spotted '${name}' with score: ${score}`);
+    rp.onspot = (detection) => {
+      console.debug(`main: spotted '${detection.name}' with score: ${detection.score}`);
       sendSpot();
     };
     if (stopLocalKsProcessorNode) {
@@ -281,7 +292,7 @@ export const useIOStore = defineStore("io", () => {
                   case "rustpotter_web":
                     if (spotConfig?.keyword) {
                       try {
-                        const ksAudioProcessor = await initLocalKsProcessor(spotConfig?.keyword, { ...spotConfig });
+                        const ksAudioProcessor = await initLocalRustpotterProcessor(spotConfig?.keyword, { ...spotConfig });
                         localKsProcessorNode = ksAudioProcessor;
                         await audioSource?.start(localKsProcessorNode);
                       } catch (error) {

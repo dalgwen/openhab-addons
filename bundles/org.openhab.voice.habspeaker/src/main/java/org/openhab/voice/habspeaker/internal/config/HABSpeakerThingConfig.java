@@ -13,6 +13,7 @@
 package org.openhab.voice.habspeaker.internal.config;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * The {@link HABSpeakerThingConfig} class defines the speaker configuration
@@ -89,8 +90,52 @@ public class HABSpeakerThingConfig {
      * Rustpotter web averaged threshold
      */
     public float rustpotterAvgThreshold = 0.2f;
+
     /**
-     * Rustpotter web threshold
+     * Rustpotter web min scores.
      */
-    public boolean rustpotterEagerMode = true;
+    public int rustpotterMinScores = 5;
+
+    /**
+     * Rustpotter web score mode.
+     */
+    public String rustpotterScoreMode = "max";
+
+    /**
+     * Rustpotter web comparator reference.
+     */
+    public float rustpotterComparatorRef;
+    /**
+     * Rustpotter web comparator band size.
+     */
+    public int rustpotterComparatorBandSize;
+    /**
+     * Rustpotter web gain-normalizer enabled.
+     */
+    public boolean rustpotterGainNormalizer;
+    /**
+     * Rustpotter web gain-normalizer min gain.
+     */
+    public float rustpotterMinGain = 0.5f;
+    /**
+     * Rustpotter web gain-normalizer max gain.
+     */
+    public float rustpotterMaxGain = 1f;
+    /**
+     * Rustpotter web gain-normalizer ref.
+     */
+    @Nullable
+    public Float rustpotterGainRef = null;
+    /**
+     * Rustpotter web use band-pass filter
+     */
+    public boolean rustpotterBandPass = false;
+    /**
+     * Rustpotter web band pass low cutoff
+     */
+    public float rustpotterLowCutoff = 80f;
+    /**
+     * Rustpotter web band pass high cutoff
+     */
+    public float rustpotterHighCutoff = 400f;
 }

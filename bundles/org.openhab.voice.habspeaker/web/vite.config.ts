@@ -11,6 +11,7 @@ export default defineConfig(async ({ command, mode }) => {
   const plugins: PluginOption[] = [ConditionalCompile(), vue()];
   let baseUrl: string | undefined;
   const envMode = isProduction ? 'production' : 'development';
+  const OH_PROXY_URL = process.env.OH_PROXY ?? "http://127.0.0.1:8080";
   if (command == "serve") {
     (process.env as any).VITE_DEV_SERVER_URL = "http://localhost:5173";
   }
@@ -45,11 +46,11 @@ export default defineConfig(async ({ command, mode }) => {
       port: 5173,
       proxy: {
         "/habspeaker/ws": {
-          target: "ws://127.0.0.1:8080",
+          target: OH_PROXY_URL.replace("http:", "ws:").replace("https:", "wss:"),
           ws: true,
         },
         "/rest": {
-          target: "http://127.0.0.1:8080",
+          target: OH_PROXY_URL,
         },
       },
     },

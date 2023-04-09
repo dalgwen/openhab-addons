@@ -10,7 +10,23 @@ export enum StreamType {
 // Some reused message types
 export type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string, playlistId?: string, playlistIndex?: number };
 type SetVolumeCmd = { value: number };
-type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: { keyword?: string, threshold?: number, averagedThreshold?: number, eagerMode?: boolean } };
+export type RustpotterOptions = {
+  keyword?: string,
+  threshold?: number,
+  averagedThreshold: number
+  comparatorRef: number
+  comparatorBandSize: number
+  minScores: number
+  scoreMode: string
+  gainNormalizerEnabled: boolean
+  minGain: number
+  maxGain: number
+  gainRef?: number
+  bandPassEnabled: boolean
+  bandPassLowCutoff: number
+  bandPassHighCutoff: number
+};
+type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
 type SpotifyTokenCmd = { token: string };
 type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
