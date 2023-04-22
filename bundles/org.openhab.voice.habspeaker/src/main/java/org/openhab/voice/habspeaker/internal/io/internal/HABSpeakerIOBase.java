@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
+import org.openhab.core.OpenHAB;
 import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.audio.AudioSink;
@@ -233,7 +234,13 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         }
         var hsKS = new HABSpeakerKS(this, ks);
         this.ks = hsKS;
-        voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, keyword, listeningItem);
+        if (OpenHAB.getVersion().startsWith("3.")) {
+            voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, keyword, listeningItem);
+        } else {
+            voiceManager.startDialog(voiceManager.getDialogContextBuilder().withSource(source).withSink(sink)
+                    .withKS(hsKS).withSTT(stt).withTTS(tts).withVoice(voice).withHLIs(hlis).withKeyword(keyword)
+                    .withListeningItem(listeningItem).build());
+        }
     }
 
     protected synchronized void unregisterSpeakerComponents(String id) {
