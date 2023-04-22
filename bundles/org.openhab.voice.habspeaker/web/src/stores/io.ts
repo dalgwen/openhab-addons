@@ -38,22 +38,6 @@ export const useIOStore = defineStore("io", () => {
   const speaking = ref(false);
   const online = ref(false);
   // detect browser
-  let _isIOSBrowser: boolean | undefined = undefined;
-  function isIOSBrowser() {
-    if (_isIOSBrowser != null) {
-      return _isIOSBrowser;
-    }
-    return _isIOSBrowser = [
-      'iPad Simulator',
-      'iPhone Simulator',
-      'iPod Simulator',
-      'iPad',
-      'iPhone',
-      'iPod'
-    ].includes(navigator.platform)
-      // iPad on iOS 13 detection
-      || (navigator.userAgent.includes("Mac") && "ontouchend" in document)
-  }
   function isChromeBasedBrowser() {
     return !!(window as any).chrome;
   }
@@ -64,7 +48,7 @@ export const useIOStore = defineStore("io", () => {
       // by setting audio context to use it some resampling
       // on the io webworker will be avoided.
       const voiceSampleRate = 16000;
-      let options: AudioContextOptions = {};
+      let options: AudioContextOptions = { };
       if (isChromeBasedBrowser()) {
         // built-in resample seems to work great in chrome, not in safari, firefox remains untested.
         options.sampleRate = voiceSampleRate;
@@ -458,9 +442,6 @@ export const useIOStore = defineStore("io", () => {
         return;
       }
       console.debug("main: running media command" + mediaCommandData.type);
-      if (isIOSBrowser()) {
-        await audioSource?.suspend();
-      }
       if ('start' === mediaCommandData.type) {
         mediaSessionStore.startMedia(mediaCommandData.provider, {
           mediaId: mediaCommandData.mediaId,
@@ -512,14 +493,6 @@ export const useIOStore = defineStore("io", () => {
     } catch (error) {
       console.error("Error while running media command: ", error);
     } finally {
-      if (isIOSBrowser()) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 4000));
-          await audioSource?.resume();
-        } catch (error) {
-          console.error("Unable to resume audio source: ", error);
-        }
-      }
       unlock();
     }
   }
