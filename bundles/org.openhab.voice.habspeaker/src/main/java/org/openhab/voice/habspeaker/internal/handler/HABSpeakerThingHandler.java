@@ -357,10 +357,10 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
             updateState(WEB_AUDIO_CHANNEL, audioMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(audioMediaUrl));
         }
         if (isLinked(MEDIA_CURRENT_SECOND_CHANNEL)) {
-            updateState(MEDIA_CURRENT_SECOND_CHANNEL, new DecimalType(mediaState.currentSecond));
+            updateState(MEDIA_CURRENT_SECOND_CHANNEL, new DecimalType((Number) mediaState.currentSecond));
         }
         if (isLinked(MEDIA_TOTAL_SECONDS_CHANNEL)) {
-            updateState(MEDIA_TOTAL_SECONDS_CHANNEL, new DecimalType(mediaState.totalSeconds));
+            updateState(MEDIA_TOTAL_SECONDS_CHANNEL, new DecimalType((Number) mediaState.totalSeconds));
         }
         if (isLinked(MEDIA_PROGRESS_CHANNEL)) {
             updateState(MEDIA_PROGRESS_CHANNEL, new PercentType(
