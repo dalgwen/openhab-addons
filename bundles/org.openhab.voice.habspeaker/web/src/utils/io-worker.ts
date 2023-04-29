@@ -195,8 +195,13 @@ export default class IOWorker {
    * @returns {WebSocket}
    */
   connectWebSocket() {
+    let retryRef: any = null;
     const retry = () => {
-      setTimeout(this.connectWebSocket.bind(this), 10000);
+      if (retryRef) {
+        clearTimeout(retryRef);
+        retryRef = null;
+      }
+      retryRef = setTimeout(this.connectWebSocket.bind(this), 10000);
     };
     let wsRef = this.wsRef;
     const wsProtocols = ['habspeaker'];
