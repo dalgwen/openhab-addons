@@ -48,7 +48,7 @@ export const useIOStore = defineStore("io", () => {
       // by setting audio context to use it some resampling
       // on the io webworker will be avoided.
       const voiceSampleRate = 16000;
-      let options: AudioContextOptions = { };
+      let options: AudioContextOptions = {};
       if (isChromeBasedBrowser()) {
         // built-in resample seems to work great in chrome, not in safari, firefox remains untested.
         options.sampleRate = voiceSampleRate;
@@ -229,11 +229,19 @@ export const useIOStore = defineStore("io", () => {
     let sinkConfig = { ...defaultSinkConfig };
     let remoteSpotMode = false;
     startVoiceAudioContext();
-    audioSource = new WebAudioSource(getVoiceAudioContext());
+    const audioContext = getVoiceAudioContext();
+    let WebAudioSinkImpl = WebAudioSink;
+    if (!isWorkletSupported()) {
+      // keep using the processor api on older browsers
+      console.warn("No worklet support, falling back to old audio sink implementation");
+      WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+    }
+    WebAudioSinkImpl.setup(audioContext);
+    audioSource = new WebAudioSource(audioContext);
     await audioSource.resume();
     if (isWorkletSupported()) {
-      await WebAudioSink.registerProcessor(getVoiceAudioContext());
-      await getVoiceAudioContext().audioWorklet.addModule(audioPortWorklet);
+      await WebAudioSink.registerProcessor(audioContext);
+      await audioContext.audioWorklet.addModule(audioPortWorklet);
     }
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(() => {
@@ -426,6 +434,13 @@ export const useIOStore = defineStore("io", () => {
     function onSinkSpeaking(speaking: boolean) {
       const speakingValue = Array.from(activeSinks.values()).some(i => i.isPlaying());
       if (speakingValue != currentSpeaking) {
+        let WebAudioSinkImpl = WebAudioSink;
+        if (!isWorkletSupported()) {
+          // keep using the processor api on older browsers
+          console.warn("No worklet support, falling back to old audio sink implementation");
+          WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+        }
+        speakingValue ? WebAudioSinkImpl.audioElement?.play() : WebAudioSinkImpl.audioElement?.pause();
         currentSpeaking = speakingValue;
         setSpeaking(speakingValue);
       }

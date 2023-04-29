@@ -3,13 +3,13 @@ class AudioCache {
     silence = new Float32Array(BUFFER_SIZE);
     buffer = new Float32Array(0);
     readAudioData(n: number) {
-        var segment = this.buffer.subarray(0, n);
-        this.buffer = this.buffer.subarray(n, this.buffer.length);
+        const segment = this.buffer.slice(0, n);
+        this.buffer = this.buffer.slice(n, this.buffer.length);
         return segment;
     }
     writeAudioData(buffer: Float32Array) {
-        var currentCacheLength = this.buffer.length;
-        var newBuffer = new Float32Array(currentCacheLength + buffer.length);
+        const currentCacheLength = this.buffer.length;
+        const newBuffer = new Float32Array(currentCacheLength + buffer.length);
         newBuffer.set(this.buffer, 0);
         newBuffer.set(buffer, currentCacheLength);
         this.buffer = newBuffer;
@@ -65,7 +65,7 @@ export class SinkCache extends AudioWorkletProcessor {
                 channelData[i] = audioData[i];
             }
         } else {
-            var length = audioData.byteLength / audioData.BYTES_PER_ELEMENT;
+            const length = audioData.byteLength / audioData.BYTES_PER_ELEMENT;
             for (let s = 0; s < length; s++) {
                 // the channel index
                 const c = s % channels;

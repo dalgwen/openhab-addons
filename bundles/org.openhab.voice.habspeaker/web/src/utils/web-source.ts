@@ -21,7 +21,6 @@ export class WebAudioSource {
                     autoGainControl: true,
                     echoCancellation: true,
                     noiseSuppression: true,
-                    suppressLocalAudioPlayback: false,
                 },
                 video: false,
             });

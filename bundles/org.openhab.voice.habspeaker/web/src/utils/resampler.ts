@@ -61,7 +61,7 @@ export class Resampler {
     }
 
     private bufferSlice(sliceAmount: number) {
-        return this.outputBuffer.subarray(0, sliceAmount);
+        return this.outputBuffer.slice(0, sliceAmount);
     }
 
     private linearInterpolation() {
