@@ -1,8 +1,20 @@
+/// <reference lib="webworker" />
+
 import { ReentrantLock } from "reentrant-lock";
 import { StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
-import { Resampler } from "./resampler";
-const SINK_RESAMPLER_CHUNK_SIZE = 4096;
+import { createResampler, Resampler, ResamplerNoop } from "./resampler";
+
+const RESAMPLER_CHUNK_SIZE = 4096;
+
+type SinkContext = {
+  resampler: Resampler;
+  resamplerBuffer: Float32Array;
+  bufferOffset: number;
+  port: MessagePort;
+  buffersCache?: Float32Array[];
+};
+type PostMessage = typeof postMessage;
 /**
  * Handles the websocket connection and the required audio format conversions. 
  */
@@ -15,14 +27,16 @@ export default class IOWorker {
   token = "";
   /**@type {number} */
   sampleRate = 0;
+  streamSampleRate = 0;
   inputResampler?: Resampler;
-  sinkContextStorage = new Map<string, { resampler: Resampler, resamplerBuffer: Float32Array, port?: MessagePort, buffersCache?: Float32Array[] }>();
+  sinkContextStorage = new Map<string, SinkContext>();
   sinkLock = new ReentrantLock();
+  resamplerMode: string = "";
   ohUrl: string = '';
   listenPort?: MessagePort;
   messageACKs = new MessageACKManager("worker");
   configurationACK?: number;
-  constructor(private postMessage: (data: any) => void) {
+  constructor(private postMessage: PostMessage) {
   }
   /**
    *
@@ -53,15 +67,14 @@ export default class IOWorker {
       if (ev.origin !== "" || typeof ev.data !== 'object') {
         return;
       }
-      if ((import.meta as any).env.DEV) {
-        // console.debug("main => worker: ", ev.data);
-      }
       const command = ev.data.cmd as WorkerInCmd;
       switch (command) {
         case WorkerInCmd.INITIALIZE:
           const initData = ev.data as WorkerInCmdType<typeof command>;
           this.id = initData.id;
           this.sampleRate = initData.sampleRate;
+          this.streamSampleRate = initData.sampleRate;
+          this.inputResampler = new ResamplerNoop();
           this.token = initData.token ?? '';
           this.ohUrl = initData.ohUrl
             .replace('https:', 'wss:')
@@ -74,26 +87,29 @@ export default class IOWorker {
           break;
         case WorkerInCmd.LISTEN_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
+          this.listenPort?.close();
           this.listenPort = listenData.port;
-          this.listenPort.onmessage = (ev) => {
-            this.onListen(ev.data);
-          };
+          this.listenPort.onmessage = (ev) => this.onListen(ev.data);
           this.listenPort.start();
           this.postToMainThread(WorkerOutCmd.ACK_MESSAGE, { code: listenData.ack });
           break;
         case WorkerInCmd.SPEAK_PORT:
           const speakPortData = ev.data as WorkerInCmdType<typeof command>;
-          if (speakPortData.port) {
+          if (speakPortData.ready) {
             const sinkContext = this.sinkContextStorage.get(speakPortData.id);
             if (sinkContext) {
-              sinkContext.port = speakPortData.port;
               if (sinkContext.buffersCache != null) {
-                sinkContext.buffersCache.forEach(b => speakPortData.port.postMessage(b, [b.buffer]));
+                sinkContext.port.postMessage(sinkContext.buffersCache);
                 sinkContext.buffersCache = undefined;
               }
             }
           } else {
             // clean up related sink data
+            const sinkContext = this.sinkContextStorage.get(speakPortData.id);
+            if (sinkContext) {
+              sinkContext.resampler.close();
+              sinkContext.port?.close();
+            }
             this.sinkContextStorage.delete(speakPortData.id);
           }
           break;
@@ -131,12 +147,11 @@ export default class IOWorker {
   onListen(buffers: Float32Array[]) {
     if (this.wsRef) {
       // convert to websocket format and send as binary
-      let channelBuffer = buffers[0];
-      let resampler = this.inputResampler;
-      if (!resampler) {
-        resampler = new Resampler(this.sampleRate, 16000, 1, channelBuffer.length);
+      if (!this.inputResampler) {
+        console.error("Resampler not initialized");
+        return;
       }
-      const resampled = resampler.resample(channelBuffer);
+      const resampled = this.inputResampler.resample(buffers[0]);
       this.wsRef.send(audioToInt16Buffer(resampled));
     } else {
       console.error("on listen: WebSocket is not connected");
@@ -151,14 +166,7 @@ export default class IOWorker {
       const command = data.cmd as WebSocketOutCmd;
       switch (command) {
         case WebSocketOutCmd.INITIALIZED:
-          if (this.configurationACK != null) {
-            this.messageACKs.awaitACK(this.configurationACK)
-              .then(() => this.postToMainThread(WorkerOutCmd.INITIALIZED))
-              .catch(() => console.error("worker: speaker initialization aborted"));
-            this.configurationACK = undefined;
-          } else {
-            this.postToMainThread(WorkerOutCmd.INITIALIZED);
-          }
+          this.postToMainThread(WorkerOutCmd.INITIALIZED);
           break;
         case WebSocketOutCmd.START_LISTENING:
           this.postToMainThread(WorkerOutCmd.START_LISTENING);
@@ -168,8 +176,21 @@ export default class IOWorker {
           break;
         case WebSocketOutCmd.CONFIGURE:
           const configureData = data as WebSocketOutCmdType<typeof command>;
-          this.configurationACK = this.messageACKs.createACK();
-          this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
+          (async () => {
+            if (configureData.sampleRate !== -1) {
+              this.streamSampleRate = configureData.sampleRate;
+              this.resamplerMode = configureData.resampleMode;
+            } else {
+              this.streamSampleRate = this.sampleRate;
+            }
+            this.inputResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1, RESAMPLER_CHUNK_SIZE);
+            this.configurationACK = this.messageACKs.createACK();
+            this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
+            await this.messageACKs.awaitACK(this.configurationACK);
+            this.configurationACK = undefined;
+          })()
+            .then(() => this.postToWebSocket(WebSocketInCmd.CONFIGURED))
+            .catch((err) => console.error("worker configuration error:", err));
           break;
         case WebSocketOutCmd.SINK_VOLUME:
           const sinkVolumeData = data as WebSocketOutCmdType<typeof command>;
@@ -257,6 +278,10 @@ export default class IOWorker {
         this.messageACKs.abortACK(this.configurationACK);
         this.configurationACK = undefined;
       }
+      this.listenPort?.close();
+      this.listenPort = undefined;
+      this.inputResampler?.close();
+      this.inputResampler = undefined;
       this.wsRef = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();
@@ -265,70 +290,80 @@ export default class IOWorker {
     return wsRef;
   }
 
-  private sendIncomingAudioBlob(blob: Blob) {
-    return blob.arrayBuffer().then((buffer) => {
-      const streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
-      const streamType = new Uint8Array(buffer.slice(4, 5)).join('');
-      let streamChannels: number;
-      let streamSampleRate: number;
-      switch (streamType) {
-        case StreamType.PCM16BitMono:
-          streamSampleRate = 16000;
-          streamChannels = 1;
-          break;
-        case StreamType.PCM16BitStereo:
-          streamSampleRate = 16000;
-          streamChannels = 2;
-          break;
-        default:
-          console.error("Unknown stream type, aborting: ", streamType);
-          return;
+  private async sendIncomingAudioBlob(blob: Blob) {
+    const buffer = await blob.arrayBuffer();
+    const streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
+    const streamType = new Uint8Array(buffer.slice(4, 5)).join('');
+    let channels: number;
+    switch (streamType) {
+      case StreamType.PCM16BitMono:
+        channels = 1;
+        break;
+      case StreamType.PCM16BitStereo:
+        channels = 2;
+        break;
+      default:
+        console.error("Unknown stream type, aborting: ", streamType);
+        return;
+    }
+    const dataBuffer = buffer.slice(5);
+    let sinkContext = this.sinkContextStorage.get(streamId);
+    // messageChannel.port1.close()
+    if (!sinkContext) {
+      const messageChannel = new MessageChannel();
+
+      sinkContext = {
+        resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels, RESAMPLER_CHUNK_SIZE * channels),
+        resamplerBuffer: new Float32Array(RESAMPLER_CHUNK_SIZE),
+        bufferOffset: 0,
+        buffersCache: [],
+        port: messageChannel.port2,
+      };
+      this.sinkContextStorage.set(streamId, sinkContext);
+      // request the creation of the sink message port
+      this.postMessage({
+        cmd: WorkerOutCmd.SPEAK_PORT,
+        id: streamId,
+        channels: channels,
+        port: messageChannel.port1,
+      }, [messageChannel.port1]);
+    }
+    // transform the incoming buffer to the browser format
+    this.sendSinkAudio(sinkContext, audioFromInt16Buffer(dataBuffer));
+  }
+  private sendSinkAudio(sinkContext: SinkContext, floatBuffer: Float32Array) {
+    const requiredSamples = RESAMPLER_CHUNK_SIZE - sinkContext.bufferOffset;
+    if (floatBuffer.length >= requiredSamples) {
+      sinkContext.resamplerBuffer.set(floatBuffer.subarray(0, requiredSamples), sinkContext.bufferOffset);
+      const resampledBuffer = sinkContext.resampler.resample(sinkContext.resamplerBuffer);
+      if (sinkContext.buffersCache) {
+        // cache this buffer
+        sinkContext.buffersCache.push(resampledBuffer.slice());
+      } else {
+        // send data over the sink message port
+        sinkContext.port.postMessage(resampledBuffer);
       }
-      const dataBuffer = buffer.slice(5);
-      let sinkMetadata = this.sinkContextStorage.get(streamId);
-      if (!sinkMetadata) {
-        sinkMetadata = {
-          resampler: new Resampler(streamSampleRate, this.sampleRate, streamChannels, SINK_RESAMPLER_CHUNK_SIZE * streamChannels),
-          resamplerBuffer: new Float32Array(),
-          buffersCache: [],
-          port: undefined
-        };
-        this.sinkContextStorage.set(streamId, sinkMetadata);
-        // request the creation of the sink message port
-        this.postMessage({
-          cmd: WorkerOutCmd.SPEAK_PORT,
-          id: streamId,
-          channels: streamChannels,
-        });
+      const remaining = floatBuffer.subarray(requiredSamples);
+      if (remaining.length >= RESAMPLER_CHUNK_SIZE) {
+        sinkContext.bufferOffset = 0;
+        this.sendSinkAudio(sinkContext, remaining);
+      } else if (remaining.length > 0) {
+        sinkContext.bufferOffset = remaining.length;
+        sinkContext.resamplerBuffer.set(remaining, 0);
+      } else {
+        sinkContext.bufferOffset = 0;
       }
-      // transform the incoming buffer to the browser format
-      const floatBuffer = audioFromInt16Buffer(dataBuffer);
-      // push data to the resampler buffer
-      const mergedBuffer = new Float32Array(sinkMetadata.resamplerBuffer.length + floatBuffer.length);
-      mergedBuffer.set(sinkMetadata.resamplerBuffer, 0);
-      mergedBuffer.set(floatBuffer, sinkMetadata.resamplerBuffer.length);
-      sinkMetadata.resamplerBuffer = mergedBuffer;
-      // process the resampler buffer
-      while (sinkMetadata.resamplerBuffer.length >= SINK_RESAMPLER_CHUNK_SIZE) {
-        const chunk = sinkMetadata.resamplerBuffer.slice(0, SINK_RESAMPLER_CHUNK_SIZE);
-        sinkMetadata.resamplerBuffer = sinkMetadata.resamplerBuffer.slice(SINK_RESAMPLER_CHUNK_SIZE);
-        const resampledBuffer = sinkMetadata.resampler.resample(chunk);
-        if (sinkMetadata.port) {
-          // send data over the sink message port
-          sinkMetadata.port.postMessage(resampledBuffer, [resampledBuffer.buffer]);
-        } else if (sinkMetadata.buffersCache) {
-          // cache this buffer
-          sinkMetadata.buffersCache.push(resampledBuffer);
-        }
-      }
-    });
+    } else {
+      sinkContext.resamplerBuffer.set(floatBuffer, sinkContext.bufferOffset);
+      sinkContext.bufferOffset = sinkContext.bufferOffset + floatBuffer.length;
+    }
   }
 }
 // WAV conversion utils
 /**
  * Converts a Float32Array into a int16 ArrayBuffer, the required by the server.
  */
-function audioToInt16Buffer(input: Float32Array) {
+function audioToInt16Buffer(input: Float32Array): ArrayBuffer {
   const output = new DataView(new ArrayBuffer(input.length * 2));
   let offset = 0;
   for (let i = 0; i < input.length; i += 1, offset += 2) {
@@ -341,7 +376,7 @@ function audioToInt16Buffer(input: Float32Array) {
 /**
  * Converts a int16 ArrayBuffer into a Float32Array, the required by the browser.
  */
-function audioFromInt16Buffer(buffer: ArrayBuffer) {
+function audioFromInt16Buffer(buffer: ArrayBuffer): Float32Array {
   const view = new DataView(buffer);
   const result = new Float32Array(buffer.byteLength / 2);
   for (let i = 0, offset = 0; i < buffer.byteLength / 2; i += 1, offset += 2) {

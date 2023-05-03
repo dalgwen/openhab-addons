@@ -26,7 +26,7 @@ export type RustpotterOptions = {
   bandPassLowCutoff: number
   bandPassHighCutoff: number
 };
-type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
+type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
 type SpotifyTokenCmd = { token: string };
 type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
@@ -40,6 +40,7 @@ type MediaCommandCmd = { type: 'play' } |
 // Commands from worker to server (no command for sending audio as is sent as binary).
 export enum WebSocketInCmd {
   INITIALIZE = "INITIALIZE",
+  CONFIGURED = "CONFIGURED",
   ON_SPOT = "ON_SPOT",
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_STATE = "MEDIA_STATE",
@@ -79,7 +80,7 @@ export enum WorkerInCmd {
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
   T extends WorkerInCmd.LISTEN_PORT ? { port: MessagePort, ack: number } :
-  T extends WorkerInCmd.SPEAK_PORT ? { id: string, port: MessagePort } :
+  T extends WorkerInCmd.SPEAK_PORT ? { id: string, ready: boolean } :
   T extends WorkerInCmd.ACK_MESSAGE ? { code: number } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
@@ -99,7 +100,7 @@ export enum WorkerOutCmd {
   MEDIA_COMMAND = "MEDIA_COMMAND",
   SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 };
-export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK_PORT ? { id: string, channels: number } :
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK_PORT ? { id: string, channels: number, port: MessagePort } :
   T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
   T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :

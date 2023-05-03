@@ -1,10 +1,86 @@
+import { ConverterType, create as createResamplerWASM } from "@alexanderolsen/libsamplerate-js";
+import type { SRC as ResamplerWASMImpl } from "@alexanderolsen/libsamplerate-js/dist/src";
+export async function createResampler(resampleMode: string, inputSampleRate: number, outputSampleRate: number, channels: number, inputBufferSize: number) {
+    if (inputSampleRate === outputSampleRate) {
+        console.debug("No resampling needed for this stream")
+        return new ResamplerNoop();
+    }
+    let resampler: Resampler;
+    switch (resampleMode) {
+        case "wasm_sinc_best_quality":
+        case "wasm_sinc_medium_quality":
+        case "wasm_sinc_fastest":
+        case "wasm_zero_order_hold":
+        case "wasm_linear":
+            console.debug("Using wasm resampler");
+            resampler = new ResamplerWasm(inputSampleRate, outputSampleRate, channels, resampleMode);
+            break;
+        case "js_default":
+            console.debug("Using js resampler");
+            resampler = new ResamplerJS(inputSampleRate, outputSampleRate, channels, inputBufferSize);
+            break;
+        default:
+            console.warn("Unsupported resampler mode falling back to js implementation");
+            resampler = new ResamplerJS(inputSampleRate, outputSampleRate, channels, inputBufferSize);
+    }
+    await resampler.init();
+    return resampler;
+}
+export interface Resampler {
+    init(): Promise<void>;
+    resample(samples: Float32Array): Float32Array;
+    close(): void;
+}
+export class ResamplerNoop implements Resampler {
+    init(): Promise<void> {
+        return Promise.resolve();
+    }
+    resample(samples: Float32Array): Float32Array {
+        return samples;
+    }
+    close(): void {
+
+    }
+}
+export class ResamplerWasm implements Resampler {
+    resamplerImpl!: ResamplerWASMImpl;
+    constructor(private sampleRate: number, private targetSampleRate: number, private channels: number, private resampleMode: string) { }
+    async init(): Promise<void> {
+        this.resamplerImpl = await createResamplerWASM(this.channels, this.sampleRate, this.targetSampleRate, { converterType: this.getConverterType() });
+    }
+    resample(samples: Float32Array): Float32Array {
+        return this.resamplerImpl.full(samples);
+    }
+    close(): void {
+        this.resamplerImpl.destroy();
+    }
+    private getConverterType() {
+        switch (this.resampleMode) {
+            case "wasm_sinc_best_quality":
+                return ConverterType.SRC_SINC_BEST_QUALITY;
+            case "wasm_sinc_medium_quality":
+                return ConverterType.SRC_SINC_MEDIUM_QUALITY;
+            case "wasm_sinc_fastest":
+                return ConverterType.SRC_SINC_FASTEST;
+            case "wasm_zero_order_hold":
+                return ConverterType.SRC_ZERO_ORDER_HOLD;
+            case "wasm_linear":
+                return ConverterType.SRC_LINEAR;
+            default:
+                console.warn("Invalid resample mode:", this.resampleMode);
+                console.warn("Using linear resample mode");
+                return ConverterType.SRC_LINEAR;
+        }
+    }
+}
+
 // based on https://github.com/taisel/XAudioJS/blob/master/resampler.js
-export class Resampler {
+export class ResamplerJS implements Resampler {
     private fromSampleRate: number;
     private toSampleRate: number;
     private channels: number;
     private inputBufferSize: number;
-    private resampler: (buffer: Float32Array) => Float32Array;
+    private resampler!: (buffer: Float32Array) => Float32Array;
     private ratioWeight: number = 1;
     private lastWeight: number = -1;
     private tailExists: boolean = false;
@@ -20,6 +96,8 @@ export class Resampler {
         this.toSampleRate = toSampleRate;
         this.channels = channels || 0;
         this.inputBufferSize = inputBufferSize;
+    }
+    async init(): Promise<void> {
         if (this.fromSampleRate == this.toSampleRate) {
             this.resampler = (buffer: Float32Array) => buffer;
         } else {
@@ -36,6 +114,9 @@ export class Resampler {
             this.initializeBuffers();
             this.ratioWeight = this.fromSampleRate / this.toSampleRate;
         }
+    }
+    close(): void {
+
     }
 
     initializeBuffers() {
@@ -61,7 +142,7 @@ export class Resampler {
     }
 
     private bufferSlice(sliceAmount: number) {
-        return this.outputBuffer.slice(0, sliceAmount);
+        return this.outputBuffer.subarray(0, sliceAmount);
     }
 
     private linearInterpolation() {

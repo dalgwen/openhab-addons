@@ -1,8 +1,7 @@
 /**
- * Utility class to encapsulate the creation of a media stream audio source node,
- * its volume and its connected audio node processors.
+ * Utility class to encapsulate the creation of a {@link MediaStreamAudioSourceNode}, and its connected {@link AudioNode} processors.
  */
-export class WebAudioSource {
+export class AudioSource {
     private micGainNode: GainNode;
     private suspended: boolean = true;
     private stream?: MediaStream;

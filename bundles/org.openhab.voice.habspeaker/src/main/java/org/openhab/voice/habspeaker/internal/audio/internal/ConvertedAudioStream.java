@@ -41,25 +41,37 @@ import org.tritonus.share.sampled.file.TAudioFileFormat;
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class ConvertedInputStream extends InputStream {
+public class ConvertedAudioStream extends AudioStream {
 
-    private final Logger logger = LoggerFactory.getLogger(ConvertedInputStream.class);
+    private final Logger logger = LoggerFactory.getLogger(ConvertedAudioStream.class);
 
-    private final AudioFormat audioFormat;
-    private final javax.sound.sampled.AudioFormat targetFormat;
+    private final AudioFormat inAudioFormat;
+    private final AudioFormat outAudioFormat;
+    private final javax.sound.sampled.AudioFormat outJAudioFormat;
     private final AudioInputStream pcmNormalizedInputStream;
 
     private long duration = -1;
     private long length = -1;
+    private final boolean rawAudioInput;
 
-    public ConvertedInputStream(AudioStream innerInputStream, long targetSampleRate, int targetChannels)
+    public ConvertedAudioStream(AudioStream innerInputStream, long targetSampleRate, int targetChannels,
+            boolean rawAudioInput) throws UnsupportedAudioFormatException, UnsupportedAudioFileException, IOException {
+        this(innerInputStream, innerInputStream.getFormat(), targetSampleRate, targetChannels, rawAudioInput);
+    }
+
+    public ConvertedAudioStream(InputStream innerInputStream, AudioFormat audioFormat, long targetSampleRate,
+            int targetChannels, boolean rawAudioInput)
             throws UnsupportedAudioFormatException, UnsupportedAudioFileException, IOException {
-        this.audioFormat = innerInputStream.getFormat();
-        this.targetFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
+        this.inAudioFormat = audioFormat;
+        this.outAudioFormat = new AudioFormat(this.inAudioFormat.getContainer(), this.inAudioFormat.getCodec(),
+                this.inAudioFormat.isBigEndian(), this.inAudioFormat.getBitDepth(), null, inAudioFormat.getFrequency(),
+                targetChannels);
+        this.outJAudioFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
                 targetSampleRate, 16, targetChannels, targetChannels * 2, targetSampleRate, false);
         if (innerInputStream instanceof FixedLengthAudioStream) {
             length = ((FixedLengthAudioStream) innerInputStream).length();
         }
+        this.rawAudioInput = rawAudioInput;
         pcmNormalizedInputStream = getPCMStreamNormalized(getPCMStream(innerInputStream));
     }
 
@@ -106,12 +118,12 @@ public class ConvertedInputStream extends InputStream {
      */
     private AudioInputStream getPCMStreamNormalized(AudioInputStream pcmInputStream) {
         javax.sound.sampled.AudioFormat format = pcmInputStream.getFormat();
-        if (format.getChannels() != targetFormat.getChannels()
-                || !format.getEncoding().equals(targetFormat.getEncoding())
-                || format.getSampleSizeInBits() != targetFormat.getSampleSizeInBits()
-                || Math.abs(format.getFrameRate() - targetFormat.getFrameRate()) > 1000) {
-            logger.debug("Sound is not in the target format. Trying to reencode it");
-            return AudioSystem.getAudioInputStream(targetFormat, pcmInputStream);
+        if (format.getChannels() != outJAudioFormat.getChannels()
+                || !format.getEncoding().equals(outJAudioFormat.getEncoding())
+                || format.getSampleSizeInBits() != outJAudioFormat.getSampleSizeInBits()
+                || Math.abs(format.getFrameRate() - outJAudioFormat.getFrameRate()) > 1000) {
+            logger.debug("Sound is not in the target format. Trying to re-encode it");
+            return AudioSystem.getAudioInputStream(outJAudioFormat, pcmInputStream);
         } else {
             return pcmInputStream;
         }
@@ -130,9 +142,21 @@ public class ConvertedInputStream extends InputStream {
      */
     private AudioInputStream getPCMStream(InputStream innerInputStream)
             throws UnsupportedAudioFileException, IOException, UnsupportedAudioFormatException {
+        if (this.rawAudioInput) {
+            if (!AudioFormat.WAV.isCompatible(inAudioFormat)) {
+                throw new UnsupportedAudioFormatException("Unsupported raw streaming", inAudioFormat);
+            }
+            AudioInputStream audioInputStream = new AudioInputStream(innerInputStream, this.outJAudioFormat, length);
+            if (length > 0) {
+                float durationInSeconds = getAudioDurationInSeconds(audioInputStream);
+                duration = Math.round(durationInSeconds * 1000);
+                logger.debug("Duration of input stream : {}ms", duration);
+            }
+            return audioInputStream;
+        }
         // A stream supporting reset operation (reset is mandatory to parse formation without loosing data)
         InputStream resettableInnerInputStream = new BufferedInputStream(innerInputStream);
-        if (AudioFormat.MP3.isCompatible(audioFormat)) {
+        if (AudioFormat.MP3.isCompatible(inAudioFormat)) {
             MpegAudioFileReader mpegAudioFileReader = new MpegAudioFileReader();
             if (length > 0) { // compute duration if possible
                 AudioFileFormat audioFileFormat = mpegAudioFileReader.getAudioFileFormat(resettableInnerInputStream);
@@ -159,19 +183,28 @@ public class ConvertedInputStream extends InputStream {
                     javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16,
                     sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
             return mpegconverter.getAudioInputStream(convertFormat, sourceAIS);
-        } else if (AudioFormat.WAV.isCompatible(audioFormat)) {
+        } else if (AudioFormat.WAV.isCompatible(inAudioFormat)) {
             // return the same input stream, but try to compute the duration first
             AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(resettableInnerInputStream);
             if (length > 0) {
-                int frameSize = audioInputStream.getFormat().getFrameSize();
-                float frameRate = audioInputStream.getFormat().getFrameRate();
-                float durationInSeconds = (length / (frameSize * frameRate));
+                float durationInSeconds = getAudioDurationInSeconds(audioInputStream);
                 duration = Math.round(durationInSeconds * 1000);
                 logger.debug("Duration of input stream : {}ms", duration);
             }
             return audioInputStream;
         } else {
-            throw new UnsupportedAudioFormatException("HABSpeaker audio sink can only play pcm streams", audioFormat);
+            throw new UnsupportedAudioFormatException("HABSpeaker audio sink can only play pcm streams", inAudioFormat);
         }
+    }
+
+    private float getAudioDurationInSeconds(AudioInputStream audioInputStream) {
+        int frameSize = audioInputStream.getFormat().getFrameSize();
+        float frameRate = audioInputStream.getFormat().getFrameRate();
+        return length / (frameSize * frameRate);
+    }
+
+    @Override
+    public AudioFormat getFormat() {
+        return this.outAudioFormat;
     }
 }

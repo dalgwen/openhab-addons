@@ -81,6 +81,14 @@ public class HABSpeakerThingConfig {
      * Use dual channel audio sink
      */
     public boolean sinkStereo = false;
+    /**
+     * Audio sample rate.
+     */
+    public long sampleRate = -1L;
+    /**
+     * Audio sample rate.
+     */
+    public String clientResampleMode = "wasm_sinc_medium_quality";
     // Rustpotter web config
     /**
      * Rustpotter web threshold

@@ -51,6 +51,31 @@
 				<description>Use dual channel audio</description>
 				<default>false</default>
 			</parameter>
+			<parameter name="sampleRate" type="text" groupName="audio">
+				<label>Sample Rate</label>
+				<description>Sample rate used for the audio transmitted between client and server. Setting this to client uses the
+					client audio sample rate, therefore avoid client resampling.</description>
+				<default>-1</default>
+				<options>
+					<option value="16000">16000</option>
+					<option value="44100">44100</option>
+					<option value="48000">48000</option>
+					<option value="-1">Client</option>
+				</options>
+			</parameter>
+			<parameter name="clientResampleMode" type="text" groupName="audio">
+				<label>ClientResampleMode</label>
+				<description>Audio resampling method applied when the transmission is not on the client sample rate</description>
+				<default>wasm_sinc_medium_quality</default>
+				<options>
+					<option value="wasm_sinc_best_quality">Client WASM sinc best quality</option>
+					<option value="wasm_sinc_medium_quality">Client WASM sinc medium quality</option>
+					<option value="wasm_sinc_fastest">Client WASM sinc fastest</option>
+					<option value="wasm_zero_order_hold">Client WASM zero order hold</option>
+					<option value="wasm_linear">Client WASM linear</option>
+					<option value="js_default">Client Javascript</option>
+				</options>
+			</parameter>
 			<!-- Device config -->
 			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
 				<label>Screen Saver Time</label>

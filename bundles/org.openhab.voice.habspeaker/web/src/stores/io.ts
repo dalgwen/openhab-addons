@@ -1,15 +1,15 @@
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { ReentrantLock } from "reentrant-lock";
 import { useScreenSaverStore } from "./screen-saver";
 import { useAuthStore } from "./auth";
 import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 import { useSpotifyPlayerStore } from "./media-players/spotify-player";
-import { WebAudioSource } from "../utils/web-source";
-import { WebAudioSink } from "../utils/web-sink";
-import { WebAudioSink as WebAudioSinkDeprecated } from "../utils/web-sink-deprecated";
+import { AudioSource } from "../utils/audio-source";
+import { AudioSink } from "../utils/audio-sink";
+import { DeprecatedAudioSink } from "../utils/deprecated-audio-sink";
 import { MediaStateCmd, RustpotterOptions, WorkerInCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
-import audioPortWorklet from "../utils/web-source-worklet.ts?sharedworker&url";
+import audioPortWorklet from "../utils/audio-source-worklet.ts?sharedworker&url";
 import { useSettingsStore } from "./settings";
 import { MessageACKManager } from "../utils/message-ack-manager";
 import { platform } from "../platforms";
@@ -19,20 +19,30 @@ export const useIOStore = defineStore("io", () => {
   const mediaCommandLock = new ReentrantLock();
   let listenPortACK: number | undefined;
   let audioContext: AudioContext | null = null;
-  let audioSource: WebAudioSource | null = null;
+  let audioSource: AudioSource | null = null;
   let worker: Worker | null = null;
   let micStreaming = false;
   let currentSpeaking = false;
-  const activeSinks = new Map<string, WebAudioSink>();
+  const activeSinks = new Map<string, AudioSink>();
   let localKsProcessorNode: AudioNode | null = null;
   let stopLocalKsProcessorNode: (() => void) | null = null;
+  const queuedSinkStartFns = [] as (() => void)[];
   let speakerLabel = ref("HAB Speaker");
   const authStore = useAuthStore();
   const { getOHUrl } = useSettingsStore();
   const spotifyStore = useSpotifyPlayerStore();
   const mediaSessionStore = useMediaSessionStore();
-  const { mediaController } = storeToRefs(mediaSessionStore);
+  const { mediaState, mediaController } = storeToRefs(mediaSessionStore);
   const { awakeScreenSaver, setScreenSaverTime, enableScreenDim } = useScreenSaverStore();
+  watch(mediaState, (value, oldValue) => {
+    console.debug("main: Playback state changed to " + value);
+    if (oldValue === PlaybackState.BUFFERING) {
+      while (queuedSinkStartFns.length) {
+        const cb = queuedSinkStartFns.shift();
+        if (cb) setTimeout(cb);
+      }
+    }
+  });
   // state
   const listening = ref(false);
   const speaking = ref(false);
@@ -51,7 +61,7 @@ export const useIOStore = defineStore("io", () => {
       let options: AudioContextOptions = {};
       if (isChromeBasedBrowser()) {
         // built-in resample seems to work great in chrome, not in safari, firefox remains untested.
-        options.sampleRate = voiceSampleRate;
+        // options.sampleRate = voiceSampleRate;
       }
       audioContext = new AudioContext(options);
       console.debug("Audio resample is needed: " + (audioContext.sampleRate !== voiceSampleRate));
@@ -205,7 +215,7 @@ export const useIOStore = defineStore("io", () => {
   }
   // io exposed actions
   function sendSpot() {
-    if (online.value && audioSource && !audioSource.isSuspended()) {
+    if (online.value && audioSource && !audioSource.isSuspended() && mediaState.value !== PlaybackState.BUFFERING) {
       postToWorker(WorkerInCmd.ON_SPOT);
     }
   }
@@ -230,17 +240,12 @@ export const useIOStore = defineStore("io", () => {
     let remoteSpotMode = false;
     startVoiceAudioContext();
     const audioContext = getVoiceAudioContext();
-    let WebAudioSinkImpl = WebAudioSink;
-    if (!isWorkletSupported()) {
-      // keep using the processor api on older browsers
-      console.warn("No worklet support, falling back to old audio sink implementation");
-      WebAudioSinkImpl = WebAudioSinkDeprecated as any;
-    }
-    WebAudioSinkImpl.setup(audioContext);
-    audioSource = new WebAudioSource(audioContext);
+    await audioContext.resume();
+    AudioSink.setup(audioContext);
+    audioSource = new AudioSource(audioContext);
     await audioSource.resume();
     if (isWorkletSupported()) {
-      await WebAudioSink.registerProcessor(audioContext);
+      await AudioSink.registerProcessor(audioContext);
       await audioContext.audioWorklet.addModule(audioPortWorklet);
     }
     // microphone stream checker, to keep the stream alive on undetected disconnections  
@@ -291,7 +296,7 @@ export const useIOStore = defineStore("io", () => {
                         console.error("Unable to start local ks processor", error);
                       }
                     } else {
-                      console.warn("Missed spotConfig configuration");
+                      console.warn("main: Missed spotConfig configuration");
                     }
                     break;
                   case "none":
@@ -329,12 +334,22 @@ export const useIOStore = defineStore("io", () => {
               break;
             case WorkerOutCmd.SPEAK_PORT: {
               const speakData = ev.data as WorkerOutCmdType<typeof command>;
-              // create a message channel to communicate the worker with the sink
-              const audioMessageChannel = new MessageChannel();
-              const sink = createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, audioMessageChannel.port1, onSinkSpeaking);
-              const speakPortCmd = { cmd: WorkerInCmd.SPEAK_PORT, id: sink.getId(), port: audioMessageChannel.port2 };
-              // transfer port to worker
-              worker?.postMessage(speakPortCmd, [speakPortCmd.port]);
+              // create a sink that communicates with the worker through message channel
+              createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, speakData.port, onSinkSpeaking)
+                .then(sink => {
+                  const startSink = () => {
+                    // notify sink ready
+                    worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id: sink.getId(), ready: true });
+                    sink.start();
+                  };
+                  if (mediaState.value === PlaybackState.BUFFERING) {
+                    // avoid start sink while media is buffering, produces glitches on low cpu devices
+                    queuedSinkStartFns.push(startSink);
+                  } else {
+                    setTimeout(startSink);
+                  }
+                })
+                .catch(err => console.error(err));
               break;
             }
             case WorkerOutCmd.START_LISTENING:
@@ -364,7 +379,13 @@ export const useIOStore = defineStore("io", () => {
               break;
             case WorkerOutCmd.MEDIA_COMMAND:
               const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
-              runMediaCommand(mediaCommandData).catch(err => console.error(err));
+              const sendCommand = () => runMediaCommand(mediaCommandData).catch(err => console.error(err));
+              if (mediaCommandData.type === 'play' || mediaCommandData.type == 'pause' || mediaCommandData.type == 'stop') {
+                sendCommand();
+              } else {
+                // try delay command execution to avoid stressing the cpu, because it causes glitches on mobile devices
+                runWhenSilence(sendCommand);
+              }
               break;
             case WorkerOutCmd.SPOTIFY_TOKEN:
               const spotifyTokenData = ev.data as WorkerOutCmdType<typeof command>;
@@ -390,6 +411,17 @@ export const useIOStore = defineStore("io", () => {
         reject(error);
       }
     });
+    async function runWhenSilence(cb: () => void, time = 0) {
+      const delay = 1000;
+      setTimeout(() => {
+        time += delay;
+        if (time < 6000 && (listening.value || speaking.value)) {
+          runWhenSilence(cb, time);
+        } else {
+          setTimeout(cb, 2000);
+        }
+      }, delay);
+    }
     async function startMicStreaming() {
       if (!micStreaming) {
         micStreaming = true;
@@ -434,11 +466,11 @@ export const useIOStore = defineStore("io", () => {
     function onSinkSpeaking(speaking: boolean) {
       const speakingValue = Array.from(activeSinks.values()).some(i => i.isPlaying());
       if (speakingValue != currentSpeaking) {
-        let WebAudioSinkImpl = WebAudioSink;
+        let WebAudioSinkImpl = AudioSink;
         if (!isWorkletSupported()) {
           // keep using the processor api on older browsers
-          console.warn("No worklet support, falling back to old audio sink implementation");
-          WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+          console.warn("main: no worklet support, falling back to old audio sink implementation");
+          WebAudioSinkImpl = DeprecatedAudioSink as any;
         }
         speakingValue ? WebAudioSinkImpl.audioElement?.play() : WebAudioSinkImpl.audioElement?.pause();
         currentSpeaking = speakingValue;
@@ -472,7 +504,7 @@ export const useIOStore = defineStore("io", () => {
       }
       const mediaSessionCtrl = mediaController.value;
       if (!mediaSessionCtrl) {
-        console.warn("Media is not started");
+        console.warn("main: media is not started");
         return;
       }
       switch (mediaCommandData.type) {
@@ -514,33 +546,34 @@ export const useIOStore = defineStore("io", () => {
   /**
    *
    */
-  function createAudioSink(id: string, volume: number, channels: number, audioPort: MessagePort, onSinkSpeaking: (playing: boolean) => void): WebAudioSink {
-    let WebAudioSinkImpl = WebAudioSink;
+  async function createAudioSink(id: string, volume: number, channels: number, audioPort: MessagePort, onSinkSpeaking: (playing: boolean) => void): Promise<AudioSink> {
+    let WebAudioSinkImpl = AudioSink;
     if (!isWorkletSupported()) {
       // keep using the processor api on older browsers
-      console.warn("No worklet support, falling back to old audio sink implementation");
-      WebAudioSinkImpl = WebAudioSinkDeprecated as any;
+      console.warn("main: no worklet support, falling back to old audio sink implementation");
+      WebAudioSinkImpl = DeprecatedAudioSink as any;
     }
     const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSinkImpl(id, audioContext, channels, audioPort, volume, (value) => {
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, volume, (value) => {
       if (value) {
         cancelStopSpeaker();
       } else {
         debouncedStopSpeaker();
       }
     });
+    await sink.setPort(audioPort);
     // Sink teardown timeout id
     let speakerOffTimeout: any = null;
     console.debug(`main: starting sink ${id}`);
     if (audioContext.state != 'running') {
-      audioContext.resume();
+      await audioContext.resume();
     }
     function stopSpeaker() {
       console.debug(`main: stopping sink ${id}`);
       sink.close();
       activeSinks.delete(id);
       // tear down sink on worker
-      worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id });
+      worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id, ready: false });
       speakerOffTimeout = null;
     }
     function debouncedStopSpeaker() {

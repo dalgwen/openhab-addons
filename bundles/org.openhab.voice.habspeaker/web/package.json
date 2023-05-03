@@ -22,6 +22,7 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "@alexanderolsen/libsamplerate-js": "^2.0.3",
     "@fortawesome/fontawesome-svg-core": "^6.2.1",
     "@fortawesome/free-solid-svg-icons": "^6.2.1",
     "@fortawesome/vue-fontawesome": "^3.0.2",
@@ -29,12 +30,12 @@
     "pinia": "^2.0.27",
     "pkce-challenge": "^3.0.0",
     "reentrant-lock": "^2.0.1",
-    "rustpotter-worklet": "2.0.0",
+    "rustpotter-worklet": "2.0.1",
     "vue": "^3.2.41",
     "vue-router": "^4.1.6"
   },
   "devDependencies": {
-    "@types/audioworklet": "0.0.42",
+    "@types/audioworklet": "0.0.43",
     "@types/dom-screen-wake-lock": "^1.0.0",
     "@types/spotify-web-playback-sdk": "^0.1.15",
     "@types/youtube": "^0.0.47",
@@ -43,7 +44,7 @@
     "eslint": "^8.22.0",
     "eslint-plugin-vue": "^9.3.0",
     "prettier": "^2.7.1",
-    "typescript": "^4.6.4",
+    "typescript": "^5.0.4",
     "vite": "^4.0.0",
     "vite-plugin-conditional-compiler": "^0.1.1",
     "vite-plugin-pwa": "^0.14.0",

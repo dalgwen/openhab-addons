@@ -83,23 +83,34 @@ Configure required credentials for the supported media providers:
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config                 | Type    | Group          | Description                                                                |
-|------------------------|---------|----------------|----------------------------------------------------------------------------|
-| sinkVolume             | String  | audio          | Default sink volume.                                                       |
-| sinkStereo             | Boolean | audio          | Use dual channel audio.                                                    |
-| screenSaverTime        | String  | device         | Seconds to activate screen saver (0 for disabled).                         |
-| dimScreen              | Boolean | device         | Prevent device of going to sleep/block (not available on web).             |
-| keepAwake              | Boolean | device         | Lower the screen brightness while the screen saver is enabled.             |
-| enableSpotify          | Boolean | device         | Enable spotify integration on this speaker.                                |
-| stt                    | String  | voice          | The text-to-speech service to use, leave empty to use the default.         |
-| tts                    | String  | voice          | The speech-to-text service to use, leave empty to use the default.         |
-| voice                  | String  | voice          | The voice to use if no voice is specified, leave empty to use the default. |
-| hli                    | String  | voice          | The human language interpreter to use, leave empty to use the default.     |
-| ks                     | String  | voice          | Enables keyword spotting using the specified service.                      |
-| listeningItem          | String  | voice          | If provided, the item will be switched on during the voice recognition.    |
-| rustpotterAvgThreshold | Decimal | rustpotter_web | Spot average threshold (0 for disabled) (only for rustpotter web ks).      |
-| rustpotterThreshold    | Decimal | rustpotter_web | Spot detection threshold (only for rustpotter web ks).                     |
-| rustpotterEagerMode    | Boolean | rustpotter_web | Spot in eager mode (only for rustpotter web ks).                           |
+| Config                       | Type    | Group          | Description                                                                  |
+|------------------------------|---------|----------------|------------------------------------------------------------------------------|
+| sinkVolume                   | String  | audio          | Default sink volume.                                                         |
+| sinkStereo                   | Boolean | audio          | Use dual channel audio.                                                      |
+| sampleRate                   | Number  | audio          | Sample rate used for transmission, set to 'client' to use the device one.    |
+| clientResampleMode           | String  | audio          | Resample mode used by the client when resampling is needed.                  |
+| screenSaverTime              | String  | device         | Seconds to activate screen saver (0 for disabled).                           |
+| dimScreen                    | Boolean | device         | Prevent device of going to sleep/block (not available on web).               |
+| keepAwake                    | Boolean | device         | Lower the screen brightness while the screen saver is enabled.               |
+| enableSpotify                | Boolean | device         | Enable spotify integration on this speaker.                                  |
+| stt                          | String  | voice          | The text-to-speech service to use, leave empty to use the default.           |
+| tts                          | String  | voice          | The speech-to-text service to use, leave empty to use the default.           |
+| voice                        | String  | voice          | The voice to use if no voice is specified, leave empty to use the default.   |
+| hli                          | String  | voice          | The human language interpreter to use, leave empty to use the default.       |
+| ks                           | String  | voice          | Enables keyword spotting using the specified service.                        |
+| listeningItem                | String  | voice          | If provided, the item will be switched on during the voice recognition.      |
+| rustpotterAvgThreshold       | Decimal | rustpotter_web | Spot average threshold (0 for disabled) (only for rustpotter web ks).        |
+| rustpotterThreshold          | Decimal | rustpotter_web | Spot detection threshold (only for rustpotter web ks).                       |
+| rustpotterScoreMode          | Number  | rustpotter_web | Min detection scores (only for rustpotter web ks).                           |
+| rustpotterComparatorRef      | Decimal | rustpotter_web | Comparator reference (only for rustpotter web ks) (Advanced).                |
+| rustpotterComparatorBandSize | Number  | rustpotter_web | Comparator band size (only for rustpotter web ks). (Advanced).               |
+| rustpotterGainNormalizer     | Boolean | rustpotter_web | Enabled the gain-normalizer filter (only for rustpotter web ks).             |
+| rustpotterMinGain            | Decimal | rustpotter_web | Min gain applied by the gain-normalizer filter (only for rustpotter web ks). |
+| rustpotterMaxGain            | Decimal | rustpotter_web | Max gain applied by the gain-normalizer filter (only for rustpotter web ks). |
+| rustpotterGainRef            | Decimal | rustpotter_web | The gain-normalizer RMS reference (only for rustpotter web ks).              |
+| rustpotterBandPass           | Boolean | rustpotter_web | Enabled the band-pass filter (only for rustpotter web ks).                   |
+| rustpotterLowCutoff          | Decimal | rustpotter_web | Low cutoff for the band-pass filter (only for rustpotter web ks).            |
+| rustpotterHighCutoff         | Decimal | rustpotter_web | High cutoff for the band-pass filter (only for rustpotter web ks).           |
 
 ## Thing Channels
 

@@ -19,12 +19,15 @@ import java.io.PipedOutputStream;
 import java.util.Locale;
 import java.util.Set;
 
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
+import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 
 /**
@@ -40,11 +43,13 @@ public class HABSpeakerAudioSource implements AudioSource {
     private final String sourceId;
     private final String sourceLabel;
     private final HABSpeakerIO speakerIO;
+    private final long streamSampleRate;
 
-    public HABSpeakerAudioSource(String id, String label, HABSpeakerIO speakerIO) {
+    public HABSpeakerAudioSource(String id, String label, HABSpeakerIO speakerIO, long streamSampleRate) {
         this.sourceId = id;
         this.sourceLabel = label;
         this.speakerIO = speakerIO;
+        this.streamSampleRate = streamSampleRate;
     }
 
     @Override
@@ -74,8 +79,15 @@ public class HABSpeakerAudioSource implements AudioSource {
                 }
             };
             speakerIO.addSourceListener(pipeOutput);
-            return new HABSpeakerAudioStream(HABSPEAKER_SOURCE_FORMAT, pipeInput);
-        } catch (IOException e) {
+            var originalAudioFormat = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false,
+                    16, null, this.streamSampleRate, 1);
+            if (audioFormat.getFrequency() != null && audioFormat.getFrequency() != this.streamSampleRate) {
+                var convertedAudioStream = new ConvertedAudioStream(pipeInput, originalAudioFormat,
+                        audioFormat.getFrequency(), 1, true);
+                return new HABSpeakerAudioStream(convertedAudioStream.getFormat(), convertedAudioStream);
+            }
+            return new HABSpeakerAudioStream(originalAudioFormat, pipeInput);
+        } catch (IOException | UnsupportedAudioFileException e) {
             throw new AudioException(e);
         }
     }

@@ -19,18 +19,9 @@ const { userInteractionDone, miniMode } = storeToRefs(store);
     </div>
     <div class="microphone-container">
       <span class="led"></span>
-      <span class="microphone"></span>
+      <span class="microphone speaker"></span>
       <span class="leg"></span>
       <span class="support"></span>
-    </div>
-    <div v-if="online" class="sound-container sound-container-animated">
-      <div class="sound" :class="{ 'sound-animated': speaking }">
-        <div class="sound-bar"></div>
-        <div class="sound-bar"></div>
-        <div class="sound-bar"></div>
-        <div class="sound-bar"></div>
-        <div class="sound-bar"></div>
-      </div>
     </div>
   </button>
 </template>
@@ -117,6 +108,49 @@ const { userInteractionDone, miniMode } = storeToRefs(store);
   height: 86%;
 }
 
+
+.speaker-container .speaker {
+  box-sizing: border-box;
+  display: inline-block;
+  background: var(--color-microphone);
+  background-clip: content-box;
+  width: 35% !important;
+  height: 2.2em !important;
+  border: 1em solid transparent;
+  border-radius: 50%;
+  border-right-color: var(--color-microphone);
+  position: absolute;
+  top: 50%;
+  transform: translatey(-50%);
+  left: -17%;
+}
+
+.speaker-container .speaker:after,
+.speaker-container .speaker:before {
+  content: "";
+  width: 7px;
+  background: var(--vt-c-openhab-red);
+  border-right: 1px solid var(--vt-c-openhab-red);
+  border-radius: 12px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.speaker-container .speaker:before {
+  left: 240%;
+  height: 15px;
+  width: 10px;
+  background-color: var(--color-microphone);
+}
+
+.speaker-container .led,
+.speaker-container .leg,
+.speaker-container .support {
+  display: none;
+}
+
+
 .microphone-container .microphone {
   background-color: var(--color-microphone);
   border-radius: 100px;
@@ -148,63 +182,6 @@ const { userInteractionDone, miniMode } = storeToRefs(store);
 
 .loading .microphone-container .led {
   background: var(--color-assistant);
-}
-
-@keyframes bodyanimation {
-  0% {
-    height: 17%;
-  }
-
-  100% {
-    height: 60%;
-  }
-}
-
-.sound-container {
-  position: relative;
-  margin-top: 14%;
-  height: 30%;
-}
-
-.sound {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  width: 100%;
-  border-radius: 50px;
-}
-
-.sound-animated .sound-bar {
-  animation: bodyanimation 0.6s infinite alternate ease-in-out;
-}
-
-.sound-bar {
-  height: 17%;
-  background-color: var(--color-assistant);
-  width: 5%;
-  margin-right: 5%;
-  border-radius: 20px;
-}
-
-.sound-bar:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.sound-bar:nth-child(2) {
-  animation-delay: 0.3s;
-}
-
-.sound-bar:nth-child(3) {
-  animation-delay: 0.6s;
-}
-
-.sound-bar:nth-child(4) {
-  animation-delay: 0.3s;
-}
-
-.sound-bar:nth-child(5) {
-  animation-delay: 0s;
 }
 
 .lds-ring {

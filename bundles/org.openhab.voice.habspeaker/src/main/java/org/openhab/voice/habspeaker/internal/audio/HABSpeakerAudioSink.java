@@ -35,7 +35,7 @@ import org.openhab.core.audio.FixedLengthAudioStream;
 import org.openhab.core.audio.UnsupportedAudioFormatException;
 import org.openhab.core.audio.UnsupportedAudioStreamException;
 import org.openhab.core.library.types.PercentType;
-import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedInputStream;
+import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,13 +62,16 @@ public class HABSpeakerAudioSink implements AudioSink {
     private final String sinkId;
     private final String sinkLabel;
     private final HABSpeakerIO speakerIO;
-    private final int preferredChannels;
+    private final int channelNumber;
+    private final long clientSampleRate;
 
-    public HABSpeakerAudioSink(String id, String label, HABSpeakerIO speakerIO, int preferredChannels) {
+    public HABSpeakerAudioSink(String id, String label, HABSpeakerIO speakerIO, int channelNumber,
+            long clientSampleRate) {
         this.sinkId = id;
         this.sinkLabel = label;
         this.speakerIO = speakerIO;
-        this.preferredChannels = preferredChannels;
+        this.channelNumber = channelNumber;
+        this.clientSampleRate = clientSampleRate;
     }
 
     @Override
@@ -88,35 +91,28 @@ public class HABSpeakerAudioSink implements AudioSink {
             return;
         }
         var format = audioStream.getFormat();
-        ConvertedInputStream convertedInputStream = null;
+        ConvertedAudioStream convertedAudioStream = null;
         OutputStream outputStream = null;
         try {
             if (audioStream instanceof HABSpeakerAudioSource.HABSpeakerAudioStream && isDirectStreamSupported(format)) {
                 // the ui expect a raw wav stream (no format header),
-                // we don't know this so we restrict the direct stream to only hab speaker audio streams
-                var channels = format.getChannels();
-                var bitDepth = format.getBitDepth();
+                // we don't know this, so we restrict the direct stream to only hab speaker audio streams
+                int channels = format.getChannels() != null ? format.getChannels() : 1;
                 var sampleRate = format.getFrequency();
-                StreamType type = channels == null || channels == 1 ? StreamType.PCM16BitMono
-                        : StreamType.PCM16BitStereo;
-                int duration = -1;
-                if (audioStream instanceof FixedLengthAudioStream) {
-                    var audioLength = ((FixedLengthAudioStream) audioStream).length();
-                    if (audioLength > 0 && channels != null && bitDepth != null && sampleRate != null) {
-                        float durationInSeconds = (audioLength / (float) (bitDepth * sampleRate * channels));
-                        duration = Math.round(durationInSeconds * 1000);
-                        logger.debug("Duration of input stream : {}ms", duration);
-                    }
-                }
+                StreamType type = channels == 1 ? StreamType.PCM16BitMono : StreamType.PCM16BitStereo;
                 outputStream = new HABSpeakerAudioOutputStream(speakerIO, type);
-                transferAudio(audioStream, outputStream, duration);
+                var inputStream = audioStream;
+                if (sampleRate != null && sampleRate != this.clientSampleRate) {
+                    inputStream = new ConvertedAudioStream(audioStream, this.clientSampleRate, channels, true);
+                }
+                transferAudio(inputStream, outputStream, -1);
             } else {
                 // we try to convert to one of the supported stream formats
-                var requiredSampleRate = 16000;
-                var streamType = preferredChannels == 1 ? StreamType.PCM16BitMono : StreamType.PCM16BitStereo;
+                var streamType = channelNumber == 1 ? StreamType.PCM16BitMono : StreamType.PCM16BitStereo;
                 outputStream = new HABSpeakerAudioOutputStream(speakerIO, streamType);
-                convertedInputStream = new ConvertedInputStream(audioStream, requiredSampleRate, preferredChannels);
-                transferAudio(convertedInputStream, outputStream, convertedInputStream.getDuration());
+                convertedAudioStream = new ConvertedAudioStream(audioStream, this.clientSampleRate, channelNumber,
+                        false);
+                transferAudio(convertedAudioStream, outputStream, convertedAudioStream.getDuration());
             }
         } catch (UnsupportedAudioFileException e) {
             logger.warn("UnsupportedAudioFileException: {}", e.getMessage());
@@ -126,9 +122,9 @@ public class HABSpeakerAudioSink implements AudioSink {
         } catch (InterruptedException e) {
             logger.warn("InterruptedException: {}", e.getMessage());
         } finally {
-            if (convertedInputStream != null) {
+            if (convertedAudioStream != null) {
                 try {
-                    convertedInputStream.close();
+                    convertedAudioStream.close();
                     logger.debug("ConvertedAudioStream {} closed", speakerIO.getId());
                 } catch (IOException e) {
                     logger.warn("IOException: {}", e.getMessage(), e);
@@ -154,10 +150,8 @@ public class HABSpeakerAudioSink implements AudioSink {
     private boolean isDirectStreamSupported(AudioFormat format) {
         var bigEndian = format.isBigEndian();
         var bitDepth = format.getBitDepth();
-        var frequency = format.getFrequency();
         return AudioFormat.WAV.isCompatible(format) && //
                 bitDepth != null && bitDepth == 16 && //
-                frequency != null && frequency == 16000L && //
                 bigEndian != null && !bigEndian;
     }
 

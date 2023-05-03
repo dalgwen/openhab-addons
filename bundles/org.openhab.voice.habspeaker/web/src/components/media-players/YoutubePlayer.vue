@@ -13,16 +13,19 @@ watch(mediaTarget, (value) => {
         youtubePlayerStore.playVideo(value);
     }
 });
-onMounted(()=> {
+onMounted(() => {
     console.debug("main: youtube player mounted");
-    if(youtubeContainer.value) {
+    if (youtubeContainer.value) {
         youtubeContainer.value.innerHTML = '<div id="youtube-player"></div>';
     }
     if (mediaTarget.value) {
         youtubePlayerStore.playVideo(mediaTarget.value);
     }
 });
-onUnmounted(youtubePlayerStore.destroyPlayer);
+onUnmounted(() => {
+    console.debug("main: youtube player unmounted");
+    youtubePlayerStore.destroyPlayer();
+});
 </script>
 <template>
     <div :ref="(el) => { youtubeContainer = el as any }" id="youtube-player-container" class="yt-container">

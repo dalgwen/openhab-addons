@@ -96,14 +96,12 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         return thingHandler;
     }
 
-    protected @Nullable Map<String, Object> getSpeakerConfig(@Nullable HABSpeakerIOHandler handler)
-            throws IllegalStateException {
-        if (handler == null) {
-            return null;
-        }
+    protected Map<String, Object> getSpeakerConfigMessage(HABSpeakerIOHandler handler) throws IllegalStateException {
         var config = handler.getSpeakerConfig();
         var initializedConfig = new HashMap<String, Object>();
         initializedConfig.put("sinkVolume", config.sinkVolume);
+        initializedConfig.put("sampleRate", config.sampleRate);
+        initializedConfig.put("resampleMode", config.clientResampleMode);
         initializedConfig.put("screenSaverTime", config.screenSaverTime);
         initializedConfig.put("dimScreen", config.dimScreen);
         initializedConfig.put("keepAwake", config.keepAwake);
@@ -173,7 +171,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         return modelFile.exists();
     }
 
-    protected synchronized void registerSpeakerComponents(String id, long requiredSinkSampleRate,
+    protected synchronized void registerSpeakerComponents(String id, long clientSampleRate,
             @Nullable HABSpeakerIOHandler thingHandler) throws IOException {
         if (id.isBlank()) {
             throw new IOException("Unable to register audio components");
@@ -194,10 +192,10 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         }
         initialized = true;
         // register source
-        var source = new HABSpeakerAudioSource(getSourceId(id), label, this);
+        var source = new HABSpeakerAudioSource(getSourceId(id), label, this, clientSampleRate);
         registerAudioComponent(source);
         // register sink
-        var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1);
+        var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1, clientSampleRate);
         registerAudioComponent(sink);
         // init dialog
         STTService stt = null;

@@ -62,6 +62,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private @Nullable ScheduledFuture<?> scheduledDisconnection;
     private int sinkVolume;
     private int mediaVolume;
+    private long streamSampleRate;
     private @Nullable MediaState mediaState;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
@@ -73,65 +74,77 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
 
     public void handleCommand(WebsocketInputCommand command, Map<String, Object> data) {
         logger.debug("Handling command {}", command);
-        switch (command) {
-            case INITIALIZE:
-                var requiredSinkSampleRate = (int) data.get("sampleRate");
-                var scheduledDisconnection = this.scheduledDisconnection;
-                if (scheduledDisconnection != null) {
-                    scheduledDisconnection.cancel(true);
-                }
-                id = (String) data.getOrDefault("id", "");
-                try {
+        var thingHandler = getThingHandler();
+        try {
+            switch (command) {
+                case INITIALIZE:
+                    streamSampleRate = (int) data.get("sampleRate");
+                    var scheduledDisconnection = this.scheduledDisconnection;
+                    if (scheduledDisconnection != null) {
+                        scheduledDisconnection.cancel(true);
+                    }
+                    id = (String) data.getOrDefault("id", "");
                     servlet.addHandler(this);
-                    var thingHandler = this.thingHandler;
-                    var speakerConfig = getSpeakerConfig(thingHandler);
-                    if (speakerConfig != null) {
-                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE, speakerConfig);
+                    thingHandler = getThingHandler();
+                    if (thingHandler != null) {
+                        if (thingHandler.getSpeakerConfig().sampleRate != -1L) {
+                            streamSampleRate = thingHandler.getSpeakerConfig().sampleRate;
+                        }
+                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE,
+                                getSpeakerConfigMessage(thingHandler));
+                    } else {
+                        registerSpeakerComponents(id, streamSampleRate, null);
+                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
                     }
-                    registerSpeakerComponents(id, requiredSinkSampleRate, thingHandler);
+                    break;
+                case CONFIGURED:
+                    if (thingHandler == null) {
+                        throw new IOException("configured command send by unregistered speaker");
+                    }
+                    registerSpeakerComponents(id, streamSampleRate, thingHandler);
                     sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
-                } catch (IOException | IllegalStateException e) {
-                    logger.warn("Disconnecting client: {}", e.getMessage());
-                    disconnect();
-                }
-                break;
-            case ON_SPOT:
-                onRemoteSpot();
-                break;
-            case SINK_VOLUME:
-                try {
-                    sinkVolume = Integer.parseInt(data.getOrDefault("value", "0").toString());
-                    if (thingHandler != null) {
-                        thingHandler.onSinkVolumeUpdate(sinkVolume);
+                    break;
+                case ON_SPOT:
+                    onRemoteSpot();
+                    break;
+                case SINK_VOLUME:
+                    try {
+                        sinkVolume = Integer.parseInt(data.getOrDefault("value", "0").toString());
+                        if (thingHandler != null) {
+                            thingHandler.onSinkVolumeUpdate(sinkVolume);
+                        }
+                    } catch (NumberFormatException e) {
+                        logger.warn("Unable to parse sink volume");
                     }
-                } catch (NumberFormatException e) {
-                    logger.warn("Unable to parse sink volume");
-                }
-            case MEDIA_STATE:
-                try {
-                    var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
-                    var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
-                    var playbackState = PlaybackStates
-                            .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
-                    var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
-                    var provider = data.getOrDefault("provider", "").toString();
-                    var mediaId = data.getOrDefault("id", "").toString();
-                    @Nullable
-                    String playlistId = data.containsKey("playlistId") ? data.get("playlistId").toString() : null;
-                    var playlistIndex = Integer.parseInt(data.getOrDefault("playlistIndex", "0").toString());
-                    mediaVolume = volume;
-                    var mediaState = new MediaState(MediaProvider.fromString(provider), mediaId, playlistId,
-                            playlistIndex, currentSecond, totalSeconds, playbackState);
-                    this.mediaState = mediaState;
-                    if (thingHandler != null) {
-                        thingHandler.onMediaStateUpdate(mediaState, volume);
+                case MEDIA_STATE:
+                    try {
+                        var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
+                        var totalSeconds = Long.parseLong(data.getOrDefault("totalSeconds", "0").toString());
+                        var playbackState = PlaybackStates
+                                .valueOf(data.getOrDefault("state", "stopped").toString().toUpperCase());
+                        var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
+                        var provider = data.getOrDefault("provider", "").toString();
+                        var mediaId = data.getOrDefault("id", "").toString();
+                        @Nullable
+                        String playlistId = data.containsKey("playlistId") ? data.get("playlistId").toString() : null;
+                        var playlistIndex = Integer.parseInt(data.getOrDefault("playlistIndex", "0").toString());
+                        mediaVolume = volume;
+                        var mediaState = new MediaState(MediaProvider.fromString(provider), mediaId, playlistId,
+                                playlistIndex, currentSecond, totalSeconds, playbackState);
+                        this.mediaState = mediaState;
+                        if (thingHandler != null) {
+                            thingHandler.onMediaStateUpdate(mediaState, volume);
+                        }
+                    } catch (NumberFormatException | IllegalStateException e) {
+                        logger.warn("Unable to parse media state: {}", e.getMessage());
                     }
-                } catch (NumberFormatException | IllegalStateException e) {
-                    logger.warn("Unable to parse media state: {}", e.getMessage());
-                }
-                break;
-            default:
-                logger.warn("Unhandled JSON command: {}", data);
+                    break;
+                default:
+                    logger.warn("Unhandled JSON command: {}", data);
+            }
+        } catch (IOException | IllegalStateException e) {
+            logger.warn("Disconnecting client: {}", e.getMessage());
+            disconnect();
         }
     }
 
@@ -400,6 +413,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
 
     private enum WebsocketInputCommand {
         INITIALIZE,
+        CONFIGURED,
         ON_SPOT,
         SINK_VOLUME,
         MEDIA_STATE,

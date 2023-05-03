@@ -3,8 +3,8 @@ import { defineStore, storeToRefs } from "pinia";
 import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 import { platform } from "../platforms";
 const USER_INPUT_EVENTS = [
-  'click', 'contextmenu', 'auxclick', 'dblclick',
-  'mouseup', 'pointerup', 'touchend', 'keyup'
+  'contextmenu', 'auxclick', 'dblclick',
+  'pointerup', 'touchend', 'keyup'
 ];
 export const useScreenSaverStore = defineStore("screenSaver", () => {
   const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
@@ -32,6 +32,7 @@ export const useScreenSaverStore = defineStore("screenSaver", () => {
     if (screenSaverTimeout) clearTimeout(screenSaverTimeout);
   }
   function awakeScreenSaver() {
+    console.debug("main: awake screen saver");
     disableScreenSaver();
     if (isScreenSaverEnabled()) {
       screenSaverTimeout = setTimeout(() => {

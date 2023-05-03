@@ -13,6 +13,12 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
     let mediaVolumeBackup = -1;
     let muteMediaCounter = 0;
     let updatingVolume = false;
+    watch(mediaController, (mediaController) => {
+        if (mediaController) {
+            mediaController.getPlaybackState()
+                .then((state) => mediaState.value = state);
+        }
+    })
     function setMediaVolume(value: number) {
         if (mediaVolumeBackup === -1) {
             mediaVolume = value;
@@ -103,6 +109,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
     });
     function updateProvider(provider: string) {
         mediaProvider.value = provider;
+        mediaState.value = PlaybackState.BUFFERING;
     }
     function startMedia(provider: string, media: MediaTarget) {
         stopMediaUpdateInterval();
@@ -129,7 +136,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
                 mediaTarget.value = undefined;
                 if (mediaProvider.value !== MediaProvider.SPOTIFY) {
                     // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
-                    mediaProvider.value = "";
+                    updateProvider("");
                 }
                 const spotifyUri = media.playlistId ?? media.mediaId;
                 if (spotifyUri) {
@@ -150,7 +157,7 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
             case 'spotify':
                 if (mediaProvider.value !== MediaProvider.SPOTIFY) {
                     // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
-                    mediaProvider.value = "";
+                    updateProvider("");
                 }
                 spotifyStore.claimPlayback()
                     .then(() => startMediaUpdateInterval())
