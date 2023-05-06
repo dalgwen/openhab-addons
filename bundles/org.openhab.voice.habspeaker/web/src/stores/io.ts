@@ -369,7 +369,7 @@ export const useIOStore = defineStore("io", () => {
             case WorkerOutCmd.MEDIA_COMMAND:
               const mediaCommandData = ev.data as WorkerOutCmdType<typeof command>;
               const sendCommand = () => runMediaCommand(mediaCommandData).catch(err => console.error(err));
-              if (mediaCommandData.type === 'play' || mediaCommandData.type == 'pause' || mediaCommandData.type == 'stop') {
+              if (mediaCommandData.type === 'play' || mediaCommandData.type == 'pause') {
                 sendCommand();
               } else {
                 // try delay command execution to avoid stressing the cpu, because it causes glitches on mobile devices
@@ -404,10 +404,10 @@ export const useIOStore = defineStore("io", () => {
       const delay = 1000;
       setTimeout(() => {
         time += delay;
-        if (time < 6000 && (listening.value || speaking.value)) {
+        if (time < 5000 && (listening.value || speaking.value)) {
           runWhenSilence(cb, time);
         } else {
-          setTimeout(cb, 2000);
+          cb();
         }
       }, delay);
     }
