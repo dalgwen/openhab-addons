@@ -4,6 +4,7 @@ import { ReentrantLock } from "reentrant-lock";
 import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
 import { createResampler, Resampler, ResamplerNoop } from "./resampler";
+import { CircularBufferExecutor } from "./circular-buffer";
 
 /** Size of the circular buffer used to ensure a constant chunk size */
 const SINK_CHUNK_SIZE = 4096;
@@ -14,9 +15,7 @@ type SinkContext = {
   /** The resampler implementation used, can be a noop */
   resampler: Resampler;
   /** Circular buffer used to ensure a constant chunk size */
-  buffer: Float32Array;
-  /** Next write offset */
-  bufferOffset: number;
+  bufferedExecutor: CircularBufferExecutor<Float32Array>;
   /** Cache to be used until the message port is available */
   buffersCache: Float32Array[];
   /** Indicates that the data streaming from the server has ended */
@@ -105,7 +104,7 @@ export default class IOWorker {
           const listenData = ev.data as WorkerInCmdType<typeof command>;
           this.sourcePort?.close();
           this.sourcePort = listenData.port;
-          this.sourcePort.onmessage = (ev) => this.handleSourceAudioBuffer(ev.data[0]);
+          this.sourcePort.onmessage = (ev) => this.handleSourceAudioBuffer(ev.data);
           this.sourcePort.start();
           this.postToMainThread(WorkerOutCmd.ACK_MESSAGE, { code: listenData.ack });
           break;
@@ -323,6 +322,11 @@ export default class IOWorker {
   /**
    * Sends audio to the audio system, after encode it as a float 32 buffer.
    * When it gets a new sink id (extracted from the buffer), it creates a sink context, request the required setup to the main thread.
+   * 
+   * If there is message port in the correspondent {@link SinkContext} sends audio though it,
+   * else cache the audio into the sink context cache, so it can be send when the port is ready.
+   * 
+   * Resamples the audio when needed from stream sample rate to the audio context sample rate.
    */
   private async handleSinkAudioBuffer(buffer: ArrayBuffer) {
     const streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
@@ -342,10 +346,20 @@ export default class IOWorker {
     const dataBuffer = buffer.slice(5);
     let sinkContext = this.sinkContextStorage.get(streamId);
     if (!sinkContext) {
+      const sendSinkData = (buffer: Float32Array) => {
+        const { resampler, port, buffersCache } = sinkContext as SinkContext;
+        const resampledBuffer = resampler.resample(buffer);
+        if (port) {
+          // send data over the sink message port
+          port.postMessage(resampledBuffer);
+        } else {
+          // cache this buffer, 
+          buffersCache.push(resampledBuffer.slice());
+        }
+      };
       sinkContext = {
         resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels, SINK_CHUNK_SIZE * channels),
-        buffer: new Float32Array(SINK_CHUNK_SIZE),
-        bufferOffset: 0,
+        bufferedExecutor: new CircularBufferExecutor(new Float32Array(SINK_CHUNK_SIZE), sendSinkData),
         buffersCache: [],
         streamEnded: false,
         port: undefined,
@@ -366,41 +380,10 @@ export default class IOWorker {
         return;
       }
     }
-    // transform the incoming buffer to the browser format
-    this.sendSinkAudio(sinkContext, audioFromInt16Buffer(dataBuffer));
-  }
-  /**
-   * If there is message port in the provided {@link SinkContext} sends audio though it,
-   * else cache the audio into the sink context cache, so it can be send when the port is ready.
-   * 
-   * Resamples the audio when needed from stream sample rate to the audio context sample rate.
-   */
-  private sendSinkAudio(sinkContext: SinkContext, audioBuffer: Float32Array) {
-    const requiredSamples = SINK_CHUNK_SIZE - sinkContext.bufferOffset;
-    if (audioBuffer.length >= requiredSamples) {
-      sinkContext.buffer.set(audioBuffer.subarray(0, requiredSamples), sinkContext.bufferOffset);
-      const resampledBuffer = sinkContext.resampler.resample(sinkContext.buffer);
-      if (sinkContext.port) {
-        // send data over the sink message port
-        sinkContext.port.postMessage(resampledBuffer);
-      } else {
-        // cache this buffer, 
-        sinkContext.buffersCache.push(resampledBuffer.slice());
-      }
-      const remaining = audioBuffer.subarray(requiredSamples);
-      if (remaining.length >= SINK_CHUNK_SIZE) {
-        sinkContext.bufferOffset = 0;
-        this.sendSinkAudio(sinkContext, remaining);
-      } else if (remaining.length > 0) {
-        sinkContext.bufferOffset = remaining.length;
-        sinkContext.buffer.set(remaining, 0);
-      } else {
-        sinkContext.bufferOffset = 0;
-      }
-    } else {
-      sinkContext.buffer.set(audioBuffer, sinkContext.bufferOffset);
-      sinkContext.bufferOffset = sinkContext.bufferOffset + audioBuffer.length;
-    }
+    // transform the incoming buffer to the browser format and send
+    sinkContext.bufferedExecutor
+      .process(audioFromInt16Buffer(dataBuffer))
+      .catch(err => console.error("Error sending sink data:", err));
   }
 }
 // WAV conversion utils
