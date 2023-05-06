@@ -237,6 +237,13 @@ export const useIOStore = defineStore("io", () => {
     }
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(() => {
+      const audioContext = getVoiceAudioContext();
+      const outTimestamp = audioContext.getOutputTimestamp();
+      const contextTime = audioContext.currentTime;
+      const outTime = outTimestamp.contextTime ?? NaN;
+      const performanceTime = outTimestamp.performanceTime;
+      const diff = !Number.isNaN(outTime) ? (contextTime - outTime).toFixed(3) : NaN;
+      console.debug(`main: audio context report; Current Time: ${contextTime.toFixed(3)}, Output time: ${outTime?.toFixed(3)}, Time Diff: ${diff}, Performance: ${performanceTime}`);
       if (audioSource && !audioSource.isSuspended()) {
         audioSource.resume();
       }
