@@ -4,45 +4,53 @@ import { AudioCache } from "./audio-cache";
  * 
  */
 export class AudioSinkWorklet extends AudioWorkletProcessor {
-    playing: boolean = false;
-    audioCache = new AudioCache();
+    private audioCache = new AudioCache();
+    private streaming: boolean = true;
+    private done: boolean = false;
     constructor() {
         super();
-        this.port.onmessage = (ev) => {
-            const type = ev.data.type;
-            const port = ev.data.port;
-            if (type === 'audio_input_port' && port instanceof MessagePort) {
-                // this port is directly connected to the io webworker
-                port.onmessage = (ev) => {
-                    if (ev.data instanceof Float32Array) {
-                        this.audioCache.writeAudioData(ev.data);
-                    } else if (Array.isArray(ev.data)) {
-                        ev.data.forEach(buffer => this.audioCache.writeAudioData(buffer));
-                    }
-                };
-                this.port.postMessage({ type: 'ready' });
-            }
-        };
+        this.port.onmessage = (ev) => this.handlePortMessage(ev.data);
     }
-    listener(listening: boolean) {
-        this.port.postMessage({ type: 'listening', value: listening });
-    }
-    process(inputs: Float32Array[][], outputs: Float32Array[][]) {
-        const channels = outputs[0].length;
-        const frameLength = outputs[0][0].length;
-        const bufferSize = frameLength * channels;
-        if (!this.audioCache.available(bufferSize)) {
-            if (this.playing) {
-                this.playing = false;
-                this.listener(false);
-            }
-            return true;
+    handlePortMessage(data: Float32Array | Float32Array[] | false) {
+        if (data instanceof Float32Array) {
+            this.audioCache.writeAudioData(data);
+        } else if (Array.isArray(data)) {
+            data.forEach(buffer => this.audioCache.writeAudioData(buffer));
+        } else if (data === false) {
+            this.streaming = false;
         }
-        if (!this.playing) {
-            this.playing = true;
-            this.listener(true);
+    }
+    process(_: Float32Array[][], outputs: Float32Array[][]) {
+        const frameLength = outputs[0][0].length;
+        const channels = outputs[0].length;
+        const bufferSize = frameLength * channels;
+        const dataAvailable = this.audioCache.available(bufferSize);
+        if (!dataAvailable) {
+            if (this.streaming) {
+                return true;
+            } else {
+                if (this.audioCache.size() !== 0) {
+                    // send remaining audio
+                    const audioData = new Float32Array(bufferSize);
+                    audioData.set(this.audioCache.readAudioData(this.audioCache.size()), 0);
+                    this.writeAudioSamples(audioData, outputs, channels);
+                    return true;
+                }
+                if (!this.done) {
+                    this.done = true;
+                    // notify completion
+                    this.port.postMessage(false);
+                    this.port.close();
+                }
+                return false;
+            }
         }
         const audioData = this.audioCache.readAudioData(bufferSize);
+        this.writeAudioSamples(audioData, outputs, channels);
+        return true;
+    }
+
+    private writeAudioSamples(audioData: Float32Array, outputs: Float32Array[][], channels: number) {
         if (channels == 1) {
             outputs[0][0].set(audioData, 0);
         } else {
@@ -52,7 +60,6 @@ export class AudioSinkWorklet extends AudioWorkletProcessor {
                 channelsData[channelIndex][(sampleNumber - channelIndex) / channels] = sample;
             });
         }
-        return true;
     }
 }
 

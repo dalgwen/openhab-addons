@@ -1,5 +1,10 @@
-
-// raw audio
+/**
+ * Byte that indicates stream termination, (when allow after "4 bytes id" + "stream type byte" )
+ */
+export const SINK_TERMINATION_BYTE = "0";
+/**
+ * Byte that indicates sink stream format, 5 position of each chunk
+ */
 export enum StreamType {
   // 16000Hz 16bit int 1 channel little-endian
   PCM16BitMono = "1",
@@ -69,8 +74,8 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
 // Commands from main thread to worker.
 export enum WorkerInCmd {
   INITIALIZE = "INITIALIZE",
-  LISTEN_PORT = "LISTEN_PORT",
-  SPEAK_PORT = "SPEAK_PORT",
+  SOURCE_PORT = "SOURCE_PORT",
+  SINK_PORT = "SINK_PORT",
   ON_SPOT = "ON_SPOT",
   ACK_MESSAGE = "ACK_MESSAGE",
   RESET_CONNECTION = "RESET_CONNECTION",
@@ -79,8 +84,8 @@ export enum WorkerInCmd {
   MEDIA_STATE = "MEDIA_STATE",
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
-  T extends WorkerInCmd.LISTEN_PORT ? { port: MessagePort, ack: number } :
-  T extends WorkerInCmd.SPEAK_PORT ? { id: string, ready: boolean } :
+  T extends WorkerInCmd.SOURCE_PORT ? { port: MessagePort, ack: number } :
+  T extends WorkerInCmd.SINK_PORT ? { id: string, port: MessagePort } :
   T extends WorkerInCmd.ACK_MESSAGE ? { code: number } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
@@ -93,17 +98,19 @@ export enum WorkerOutCmd {
   INITIALIZED = "INITIALIZED",
   ACK_MESSAGE = "ACK_MESSAGE",
   OFFLINE = "OFFLINE",
-  SPEAK_PORT = "SPEAK_PORT",
+  START_SINK = "START_SINK",
+  STOP_SINK = "STOP_SINK",
   START_LISTENING = "START_LISTENING",
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
   SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 };
-export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.SPEAK_PORT ? { id: string, channels: number, port: MessagePort } :
-  T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
-  T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
+  T extends WorkerOutCmd.START_SINK ? { id: string, channels: number } :
+  T extends WorkerOutCmd.STOP_SINK ? { id: string } :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
   T extends WorkerOutCmd.SPOTIFY_TOKEN ? SpotifyTokenCmd :
+  T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
   never;

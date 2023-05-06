@@ -2,9 +2,9 @@
  * Utility class to cache and consume audio chunks
  */
 export class AudioCache {
-    buffers: Float32Array[] = [];
-    offset = 0;
-    length = 0;
+    private buffers: Float32Array[] = [];
+    private offset = 0;
+    private length = 0;
     readAudioData(n: number) {
         this.length -= n;
         const currentBuffer = this.buffers[0];
@@ -50,6 +50,9 @@ export class AudioCache {
     }
     available(size: number) {
         return this.length >= size;
+    }
+    size() {
+        return this.length;
     }
     clean() {
         this.buffers = [];

@@ -1,4 +1,4 @@
-import { ref, watch } from "vue";
+import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { ReentrantLock } from "reentrant-lock";
 import { useScreenSaverStore } from "./screen-saver";
@@ -22,11 +22,9 @@ export const useIOStore = defineStore("io", () => {
   let audioSource: AudioSource | null = null;
   let worker: Worker | null = null;
   let micStreaming = false;
-  let currentSpeaking = false;
   const activeSinks = new Map<string, AudioSink>();
   let localKsProcessorNode: AudioNode | null = null;
   let stopLocalKsProcessorNode: (() => void) | null = null;
-  const queuedSinkStartFns = [] as (() => void)[];
   let speakerLabel = ref("HAB Speaker");
   const authStore = useAuthStore();
   const { getOHUrl } = useSettingsStore();
@@ -34,15 +32,6 @@ export const useIOStore = defineStore("io", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaState, mediaController } = storeToRefs(mediaSessionStore);
   const { awakeScreenSaver, setScreenSaverTime, enableScreenDim } = useScreenSaverStore();
-  watch(mediaState, (value, oldValue) => {
-    console.debug("main: Playback state changed to " + value);
-    if (oldValue === PlaybackState.BUFFERING) {
-      while (queuedSinkStartFns.length) {
-        const cb = queuedSinkStartFns.shift();
-        if (cb) setTimeout(cb);
-      }
-    }
-  });
   // state
   const listening = ref(false);
   const speaking = ref(false);
@@ -85,7 +74,7 @@ export const useIOStore = defineStore("io", () => {
     if (isWorkletSupported()) {
       const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'habspeaker-source-worklet', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
       listenPortACK = messageACKs.createACK();
-      const command = { cmd: WorkerInCmd.LISTEN_PORT, port: _webSocketWorkletNode.port, ack: listenPortACK };
+      const command = { cmd: WorkerInCmd.SOURCE_PORT, port: _webSocketWorkletNode.port, ack: listenPortACK };
       worker?.postMessage(command, [command.port]);
       await messageACKs.awaitACK(listenPortACK);
       listenPortACK = undefined;
@@ -93,7 +82,7 @@ export const useIOStore = defineStore("io", () => {
     } else {
       const audioMessagePort = new MessageChannel();
       listenPortACK = messageACKs.createACK();
-      const command = { cmd: WorkerInCmd.LISTEN_PORT, port: audioMessagePort.port1, ack: listenPortACK };
+      const command = { cmd: WorkerInCmd.SOURCE_PORT, port: audioMessagePort.port1, ack: listenPortACK };
       worker?.postMessage(command, [command.port]);
       await messageACKs.awaitACK(listenPortACK);
       listenPortACK = undefined;
@@ -332,26 +321,31 @@ export const useIOStore = defineStore("io", () => {
               setOnline(false);
               stopAllMicProcessors();
               break;
-            case WorkerOutCmd.SPEAK_PORT: {
-              const speakData = ev.data as WorkerOutCmdType<typeof command>;
+            case WorkerOutCmd.START_SINK:
+              const startSinkCmd = ev.data as WorkerOutCmdType<typeof command>;
               // create a sink that communicates with the worker through message channel
-              createAudioSink(speakData.id, sinkConfig.volume, speakData.channels, speakData.port, onSinkSpeaking)
+              createAudioSink(startSinkCmd.id, sinkConfig.volume, startSinkCmd.channels)
                 .then(sink => {
-                  const startSink = () => {
-                    // notify sink ready
-                    worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id: sink.getId(), ready: true });
-                    sink.start();
-                  };
-                  if (mediaState.value === PlaybackState.BUFFERING) {
-                    // avoid start sink while media is buffering, produces glitches on low cpu devices
-                    queuedSinkStartFns.push(startSink);
-                  } else {
-                    setTimeout(startSink);
-                  }
+                  sink.start();
+                  const sinkPortCmd = { cmd: WorkerInCmd.SINK_PORT, id: sink.getId(), port: sink.getMessagePort() };
+                  worker?.postMessage(sinkPortCmd, [sinkPortCmd.port]);
                 })
                 .catch(err => console.error(err));
               break;
-            }
+            case WorkerOutCmd.STOP_SINK:
+              const stopSinkCmd = ev.data as WorkerOutCmdType<typeof command>;
+              const sink = activeSinks.get(stopSinkCmd.id);
+              if (sink) {
+                console.debug(`main: stopping sink ${stopSinkCmd.id}`);
+                sink.close();
+                activeSinks.delete(id);
+                if (activeSinks.size === 0) {
+                  setSpeaking(false);
+                }
+              } else {
+                console.error("main: unable to stop sink, not found ", stopSinkCmd.id);
+              }
+              break;
             case WorkerOutCmd.START_LISTENING:
               if (!online.value) {
                 console.debug("main: ignoring start listening message before init");
@@ -463,20 +457,6 @@ export const useIOStore = defineStore("io", () => {
         }
       }
     }
-    function onSinkSpeaking(speaking: boolean) {
-      const speakingValue = Array.from(activeSinks.values()).some(i => i.isPlaying());
-      if (speakingValue != currentSpeaking) {
-        let WebAudioSinkImpl = AudioSink;
-        if (!isWorkletSupported()) {
-          // keep using the processor api on older browsers
-          console.warn("main: no worklet support, falling back to old audio sink implementation");
-          WebAudioSinkImpl = DeprecatedAudioSink as any;
-        }
-        speakingValue ? WebAudioSinkImpl.audioElement?.play() : WebAudioSinkImpl.audioElement?.pause();
-        currentSpeaking = speakingValue;
-        setSpeaking(speakingValue);
-      }
-    }
   }
   /**
    * 
@@ -546,7 +526,7 @@ export const useIOStore = defineStore("io", () => {
   /**
    *
    */
-  async function createAudioSink(id: string, volume: number, channels: number, audioPort: MessagePort, onSinkSpeaking: (playing: boolean) => void): Promise<AudioSink> {
+  async function createAudioSink(id: string, volume: number, channels: number): Promise<AudioSink> {
     let WebAudioSinkImpl = AudioSink;
     if (!isWorkletSupported()) {
       // keep using the processor api on older browsers
@@ -554,42 +534,16 @@ export const useIOStore = defineStore("io", () => {
       WebAudioSinkImpl = DeprecatedAudioSink as any;
     }
     const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSinkImpl(id, audioContext, channels, volume, (value) => {
-      if (value) {
-        cancelStopSpeaker();
-      } else {
-        debouncedStopSpeaker();
-      }
-    });
-    await sink.setPort(audioPort);
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, volume);
     // Sink teardown timeout id
-    let speakerOffTimeout: any = null;
     console.debug(`main: starting sink ${id}`);
     if (audioContext.state != 'running') {
       await audioContext.resume();
     }
-    function stopSpeaker() {
-      console.debug(`main: stopping sink ${id}`);
-      sink.close();
-      activeSinks.delete(id);
-      // tear down sink on worker
-      worker?.postMessage({ cmd: WorkerInCmd.SPEAK_PORT, id, ready: false });
-      speakerOffTimeout = null;
-    }
-    function debouncedStopSpeaker() {
-      if (!speakerOffTimeout) {
-        speakerOffTimeout = setTimeout(() => stopSpeaker(), 500);
-      }
-      onSinkSpeaking(false);
-    }
-    function cancelStopSpeaker() {
-      if (speakerOffTimeout) {
-        clearTimeout(speakerOffTimeout);
-        speakerOffTimeout = null;
-      }
-      onSinkSpeaking(true);
-    }
     activeSinks.set(sink.getId(), sink);
+    if (activeSinks.size === 1) {
+      setSpeaking(true);
+    }
     return sink;
   }
   return {

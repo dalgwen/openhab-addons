@@ -1,66 +1,82 @@
 /// <reference lib="webworker" />
 
 import { ReentrantLock } from "reentrant-lock";
-import { StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
+import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
 import { createResampler, Resampler, ResamplerNoop } from "./resampler";
 
-const RESAMPLER_CHUNK_SIZE = 4096;
+/** Size of the circular buffer used to ensure a constant chunk size */
+const SINK_CHUNK_SIZE = 4096;
 
+
+/** Contains the state and resources of an active sink */
 type SinkContext = {
+  /** The resampler implementation used, can be a noop */
   resampler: Resampler;
-  resamplerBuffer: Float32Array;
+  /** Circular buffer used to ensure a constant chunk size */
+  buffer: Float32Array;
+  /** Next write offset */
   bufferOffset: number;
-  port: MessagePort;
-  buffersCache?: Float32Array[];
+  /** Cache to be used until the message port is available */
+  buffersCache: Float32Array[];
+  /** Indicates that the data streaming from the server has ended */
+  streamEnded: boolean;
+  /** Message port used to feed the chunks into the audio system */
+  port?: MessagePort;
 };
 type PostMessage = typeof postMessage;
+
 /**
  * Handles the websocket connection and the required audio format conversions. 
  */
 export default class IOWorker {
-  /**@type {WebSocket} */
-  wsRef?: WebSocket;
-  /**@type {string} */
+  /** A WebSocket connection to openHAB */
+  socket?: WebSocket;
+  /** Speaker id */
   id = "";
-  /**@type {string} */
+  /** OpenHAB token */
   token = "";
-  /**@type {number} */
+  /** Sample rate of the audio context sample rate */
   sampleRate = 0;
+  /** Sample rate of the audio send between openHAB and the UI */
   streamSampleRate = 0;
-  inputResampler?: Resampler;
+  /** Used to receive the audio data from the WebAudioAPI */
+  sourcePort?: MessagePort;
+  /** Holds the resampler used to convert from the sampleRate to the streamSampleRate, or a noop resampler*/
+  sourceResampler?: Resampler;
+  /** Stores each sink context by its id */
   sinkContextStorage = new Map<string, SinkContext>();
+  /** Lock used to ensure sink data chunks are processed in order */
   sinkLock = new ReentrantLock();
+  /** Defines the resampler implementation to use */
   resamplerMode: string = "";
+  /** Holds the openHAB server url */
   ohUrl: string = '';
-  listenPort?: MessagePort;
-  messageACKs = new MessageACKManager("worker");
+  /** Used to wait for some tasks to be done on the main thread */
+  ackManager = new MessageACKManager("worker");
+  /** Token used to wait until the main thread has handled the speaker configuration message */
   configurationACK?: number;
   constructor(private postMessage: PostMessage) {
   }
   /**
-   *
-   * @param {string} command
-   * @param {any} args
+   * Sends a {@link WorkerOutCmd} to the main thread
    */
   postToMainThread<T extends WorkerOutCmd>(cmd: T, args?: WorkerOutCmdType<T>) {
     this.postMessage({ cmd, ...(args ?? {}) });
   }
   /**
    *
-   * @param {string} command
-   * @param {any} args
+   * Send a {@link WebSocketInCmd} to the openHAB server
    */
   postToWebSocket<T extends WebSocketInCmd>(cmd: T, args?: WebSocketInCmdType<T>) {
-    if (this.wsRef && this.wsRef.readyState == this.wsRef.OPEN) {
-      this.wsRef.send(JSON.stringify({ cmd, ...args }));
+    if (this.socket && this.socket.readyState == this.socket.OPEN) {
+      this.socket.send(JSON.stringify({ cmd, ...args }));
     } else {
       console.error("post cmd " + cmd + ": WebSocket is not connected");
     }
   }
   /**
-   *
-   * @param {MessageEvent<{cmd: string, data: any}>} ev
+   * Handles the {@link WorkerInCmd} received from the main thread
    */
   onMainThreadCommand(ev: any) {
     try {
@@ -74,7 +90,7 @@ export default class IOWorker {
           this.id = initData.id;
           this.sampleRate = initData.sampleRate;
           this.streamSampleRate = initData.sampleRate;
-          this.inputResampler = new ResamplerNoop();
+          this.sourceResampler = new ResamplerNoop();
           this.token = initData.token ?? '';
           this.ohUrl = initData.ohUrl
             .replace('https:', 'wss:')
@@ -83,34 +99,41 @@ export default class IOWorker {
           break;
         case WorkerInCmd.ACK_MESSAGE:
           const ackData = ev.data as WorkerInCmdType<typeof command>;
-          this.messageACKs.confirmACK(ackData.code);
+          this.ackManager.confirmACK(ackData.code);
           break;
-        case WorkerInCmd.LISTEN_PORT:
+        case WorkerInCmd.SOURCE_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
-          this.listenPort?.close();
-          this.listenPort = listenData.port;
-          this.listenPort.onmessage = (ev) => this.onListen(ev.data);
-          this.listenPort.start();
+          this.sourcePort?.close();
+          this.sourcePort = listenData.port;
+          this.sourcePort.onmessage = (ev) => this.handleSourceAudioBuffer(ev.data[0]);
+          this.sourcePort.start();
           this.postToMainThread(WorkerOutCmd.ACK_MESSAGE, { code: listenData.ack });
           break;
-        case WorkerInCmd.SPEAK_PORT:
+        case WorkerInCmd.SINK_PORT:
           const speakPortData = ev.data as WorkerInCmdType<typeof command>;
-          if (speakPortData.ready) {
-            const sinkContext = this.sinkContextStorage.get(speakPortData.id);
-            if (sinkContext) {
-              if (sinkContext.buffersCache != null) {
-                sinkContext.port.postMessage(sinkContext.buffersCache);
-                sinkContext.buffersCache = undefined;
+          const sinkContext = this.sinkContextStorage.get(speakPortData.id);
+          if (sinkContext) {
+            const sinkPort = sinkContext.port = speakPortData.port;
+            sinkPort.onmessage = (ev) => {
+              if (ev.data === false) {
+                // clean up sink context
+                console.debug("cleaning up sink ", speakPortData.id);
+                this.sinkContextStorage.delete(speakPortData.id);
+                sinkContext.resampler.close();
+                sinkPort.close();
+                this.postToMainThread(WorkerOutCmd.STOP_SINK, { id: speakPortData.id });
               }
+            };
+            sinkPort.start();
+            if (sinkContext.buffersCache.length) {
+              sinkPort.postMessage(sinkContext.buffersCache);
+            }
+            if (sinkContext.streamEnded) {
+              // notify streamCompletion
+              sinkPort.postMessage(false);
             }
           } else {
-            // clean up related sink data
-            const sinkContext = this.sinkContextStorage.get(speakPortData.id);
-            if (sinkContext) {
-              sinkContext.resampler.close();
-              sinkContext.port?.close();
-            }
-            this.sinkContextStorage.delete(speakPortData.id);
+            console.error("Unable to handle sink port, missing sink context");
           }
           break;
         case WorkerInCmd.ON_SPOT:
@@ -131,8 +154,8 @@ export default class IOWorker {
         case WorkerInCmd.RESET_CONNECTION:
           const { id } = ev.data as WorkerInCmdType<typeof command>;
           this.id = id;
-          if (this.wsRef) {
-            this.wsRef.close();
+          if (this.socket) {
+            this.socket.close();
           } else {
             console.error("reset connection: WebSocket is not connected");
           }
@@ -144,20 +167,9 @@ export default class IOWorker {
       console.error("Error handling command in worker: ", error);
     }
   }
-  onListen(buffers: Float32Array[]) {
-    if (this.wsRef) {
-      // convert to websocket format and send as binary
-      if (!this.inputResampler) {
-        console.error("Resampler not initialized");
-        return;
-      }
-      const resampled = this.inputResampler.resample(buffers[0]);
-      this.wsRef.send(audioToInt16Buffer(resampled));
-    } else {
-      console.error("on listen: WebSocket is not connected");
-    }
-  }
-
+  /**
+   * Handles the {@link WebSocketOutCmd} received from OpenHAB
+   */
   onWebSocketCommand(data: any) {
     try {
       if ((import.meta as any).env.DEV) {
@@ -183,10 +195,10 @@ export default class IOWorker {
             } else {
               this.streamSampleRate = this.sampleRate;
             }
-            this.inputResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1, RESAMPLER_CHUNK_SIZE);
-            this.configurationACK = this.messageACKs.createACK();
+            this.sourceResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1, SINK_CHUNK_SIZE);
+            this.configurationACK = this.ackManager.createACK();
             this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
-            await this.messageACKs.awaitACK(this.configurationACK);
+            await this.ackManager.awaitACK(this.configurationACK);
             this.configurationACK = undefined;
           })()
             .then(() => this.postToWebSocket(WebSocketInCmd.CONFIGURED))
@@ -212,10 +224,9 @@ export default class IOWorker {
     }
   }
   /**
-   *
-   * @returns {WebSocket}
+   *  Starts the websocket connection to the openHAB server, with retry on error/disconnection.
    */
-  connectWebSocket() {
+  private connectWebSocket() {
     let retryRef: any = null;
     const retry = () => {
       if (retryRef) {
@@ -224,14 +235,14 @@ export default class IOWorker {
       }
       retryRef = setTimeout(this.connectWebSocket.bind(this), 10000);
     };
-    let wsRef = this.wsRef;
+    let wsRef = this.socket;
     const wsProtocols = ['habspeaker'];
     if (this.token.length) {
       // send the token info as an alternative protocol
       wsProtocols.push(`oh_token-${this.token}`);
     }
     try {
-      wsRef = this.wsRef = new WebSocket(`${this.ohUrl}/habspeaker/ws`, wsProtocols);
+      wsRef = this.socket = new WebSocket(`${this.ohUrl}/habspeaker/ws`, wsProtocols);
     } catch (error) {
       console.error(error);
       return retry();
@@ -255,12 +266,16 @@ export default class IOWorker {
       const msgType = typeof msg.data;
       switch (msgType) {
         case "string":
+          // incoming command
           this.onWebSocketCommand(JSON.parse(msg.data));
           break;
         case "object":
           if (msg.data instanceof Blob) {
+            // incoming audio
             const blob = msg.data;
-            this.sinkLock.lock(() => this.sendIncomingAudioBlob(blob)).catch(err => console.error(err));
+            this.sinkLock
+              .lock(() => blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer)))
+              .catch(err => console.error("worker: error on sink blob", err));
             if ((import.meta as any).env.DEV) {
               console.debug("websocket => worker: Binary data");
             }
@@ -275,25 +290,43 @@ export default class IOWorker {
     wsRef.addEventListener("close", () => {
       console.warn("websocket => worker: connection closed");
       if (this.configurationACK != null) {
-        this.messageACKs.abortACK(this.configurationACK);
+        this.ackManager.abortACK(this.configurationACK);
         this.configurationACK = undefined;
       }
-      this.listenPort?.close();
-      this.listenPort = undefined;
-      this.inputResampler?.close();
-      this.inputResampler = undefined;
-      this.wsRef = undefined;
+      this.sourcePort?.close();
+      this.sourcePort = undefined;
+      this.sourceResampler?.close();
+      this.sourceResampler = undefined;
+      this.socket = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();
     });
     wsRef.addEventListener("error", (err) => console.error("ERROR:", err));
     return wsRef;
   }
-
-  private async sendIncomingAudioBlob(blob: Blob) {
-    const buffer = await blob.arrayBuffer();
+  /**
+   * Sends audio though a {@link WebSocket} after encode it as a int 16 buffer.
+   * Resamples the audio when needed from audio context sample rate to the sample rate.
+   */
+  private handleSourceAudioBuffer(buffer: Float32Array) {
+    if (this.socket) {
+      if (!this.sourceResampler) {
+        console.error("Error sending audio to oh: Resampler not initialized");
+        return;
+      }
+      const resampled = this.sourceResampler.resample(buffer);
+      this.socket.send(audioToInt16Buffer(resampled));
+    } else {
+      console.error("Error sending audio to oh: WebSocket is not connected");
+    }
+  }
+  /**
+   * Sends audio to the audio system, after encode it as a float 32 buffer.
+   * When it gets a new sink id (extracted from the buffer), it creates a sink context, request the required setup to the main thread.
+   */
+  private async handleSinkAudioBuffer(buffer: ArrayBuffer) {
     const streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
-    const streamType = new Uint8Array(buffer.slice(4, 5)).join('');
+    const streamType = new Uint8Array(buffer.slice(4, 5)).toString();
     let channels: number;
     switch (streamType) {
       case StreamType.PCM16BitMono:
@@ -308,54 +341,65 @@ export default class IOWorker {
     }
     const dataBuffer = buffer.slice(5);
     let sinkContext = this.sinkContextStorage.get(streamId);
-    // messageChannel.port1.close()
     if (!sinkContext) {
-      const messageChannel = new MessageChannel();
-
       sinkContext = {
-        resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels, RESAMPLER_CHUNK_SIZE * channels),
-        resamplerBuffer: new Float32Array(RESAMPLER_CHUNK_SIZE),
+        resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels, SINK_CHUNK_SIZE * channels),
+        buffer: new Float32Array(SINK_CHUNK_SIZE),
         bufferOffset: 0,
         buffersCache: [],
-        port: messageChannel.port2,
+        streamEnded: false,
+        port: undefined,
       };
       this.sinkContextStorage.set(streamId, sinkContext);
-      // request the creation of the sink message port
-      this.postMessage({
-        cmd: WorkerOutCmd.SPEAK_PORT,
+      // request the setup of a sink to the main thead
+      this.postToMainThread(WorkerOutCmd.START_SINK, {
         id: streamId,
         channels: channels,
-        port: messageChannel.port1,
-      }, [messageChannel.port1]);
+      });
+    }
+    if (dataBuffer.byteLength === 1) {
+      if (SINK_TERMINATION_BYTE === new Uint8Array(dataBuffer).toString()) {
+        sinkContext.streamEnded = true;
+        if (sinkContext.port) {
+          sinkContext.port.postMessage(false);
+        }
+        return;
+      }
     }
     // transform the incoming buffer to the browser format
     this.sendSinkAudio(sinkContext, audioFromInt16Buffer(dataBuffer));
   }
-  private sendSinkAudio(sinkContext: SinkContext, floatBuffer: Float32Array) {
-    const requiredSamples = RESAMPLER_CHUNK_SIZE - sinkContext.bufferOffset;
-    if (floatBuffer.length >= requiredSamples) {
-      sinkContext.resamplerBuffer.set(floatBuffer.subarray(0, requiredSamples), sinkContext.bufferOffset);
-      const resampledBuffer = sinkContext.resampler.resample(sinkContext.resamplerBuffer);
-      if (sinkContext.buffersCache) {
-        // cache this buffer
-        sinkContext.buffersCache.push(resampledBuffer.slice());
-      } else {
+  /**
+   * If there is message port in the provided {@link SinkContext} sends audio though it,
+   * else cache the audio into the sink context cache, so it can be send when the port is ready.
+   * 
+   * Resamples the audio when needed from stream sample rate to the audio context sample rate.
+   */
+  private sendSinkAudio(sinkContext: SinkContext, audioBuffer: Float32Array) {
+    const requiredSamples = SINK_CHUNK_SIZE - sinkContext.bufferOffset;
+    if (audioBuffer.length >= requiredSamples) {
+      sinkContext.buffer.set(audioBuffer.subarray(0, requiredSamples), sinkContext.bufferOffset);
+      const resampledBuffer = sinkContext.resampler.resample(sinkContext.buffer);
+      if (sinkContext.port) {
         // send data over the sink message port
         sinkContext.port.postMessage(resampledBuffer);
+      } else {
+        // cache this buffer, 
+        sinkContext.buffersCache.push(resampledBuffer.slice());
       }
-      const remaining = floatBuffer.subarray(requiredSamples);
-      if (remaining.length >= RESAMPLER_CHUNK_SIZE) {
+      const remaining = audioBuffer.subarray(requiredSamples);
+      if (remaining.length >= SINK_CHUNK_SIZE) {
         sinkContext.bufferOffset = 0;
         this.sendSinkAudio(sinkContext, remaining);
       } else if (remaining.length > 0) {
         sinkContext.bufferOffset = remaining.length;
-        sinkContext.resamplerBuffer.set(remaining, 0);
+        sinkContext.buffer.set(remaining, 0);
       } else {
         sinkContext.bufferOffset = 0;
       }
     } else {
-      sinkContext.resamplerBuffer.set(floatBuffer, sinkContext.bufferOffset);
-      sinkContext.bufferOffset = sinkContext.bufferOffset + floatBuffer.length;
+      sinkContext.buffer.set(audioBuffer, sinkContext.bufferOffset);
+      sinkContext.bufferOffset = sinkContext.bufferOffset + audioBuffer.length;
     }
   }
 }
@@ -387,7 +431,7 @@ function audioFromInt16Buffer(buffer: ArrayBuffer): Float32Array {
   return result;
 }
 
-// worker start up
+// bind the WebWorker context to an IOWorker instance
 if (typeof postMessage !== "undefined") {
   const ioWorker = new IOWorker(postMessage.bind(this));
   onmessage = ioWorker.onMainThreadCommand.bind(ioWorker);

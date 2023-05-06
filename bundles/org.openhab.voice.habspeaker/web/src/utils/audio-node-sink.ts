@@ -6,13 +6,14 @@ export class AudioNodeSink {
     private static destination?: MediaStreamAudioDestinationNode;
     private gainNode: GainNode;
     protected playing: boolean = false;
-    constructor(private id: string, private audioContext: AudioContext, private sinkProcessorNode: AudioNode, protected channels: number, volume: number, protected listener: (playing: boolean) => void) {
+    constructor(private id: string, private audioContext: AudioContext, private sinkProcessorNode: AudioNode, protected channels: number, volume: number) {
         this.gainNode = audioContext.createGain();
         this.gainNode.gain.value = (volume / 100);
     }
     static setup(audioContext: AudioContext) {
         const destination = AudioNodeSink.destination = audioContext.createMediaStreamDestination();
         const audioElement = AudioNodeSink.audioElement = document.createElement('audio');
+        audioElement.autoplay = true;
         audioElement.srcObject = destination.stream;
     }
     start() {

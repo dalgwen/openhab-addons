@@ -41,12 +41,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerAudioSink} class defines the speaker Audio Sink
+ * The {@link HABSpeakerAudioSink} class is the HABSpeaker web ui Audio Sink implementation
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
 public class HABSpeakerAudioSink implements AudioSink {
+    /**
+     * Byte send to the sink after last chunk to indicate that streaming has ended.
+     * Should try to be send event on and error as the ui uses this as an indication to cleaning up sink resources.
+     */
+    private static byte TERMINATION_BYTE = (byte) 0;
     private static final HashSet<AudioFormat> SUPPORTED_FORMATS = new HashSet<>();
     private static final HashSet<Class<? extends AudioStream>> SUPPORTED_STREAMS = new HashSet<>();
 
@@ -155,10 +160,19 @@ public class HABSpeakerAudioSink implements AudioSink {
                 bigEndian != null && !bigEndian;
     }
 
-    private void transferAudio(InputStream convertedInputStream, OutputStream outputStream, long duration)
+    private void transferAudio(InputStream inputStream, OutputStream outputStream, long duration)
             throws IOException, InterruptedException {
         Instant start = Instant.now();
-        convertedInputStream.transferTo(outputStream);
+        try {
+            inputStream.transferTo(outputStream);
+        } finally {
+            try {
+                // send a byte indicating this stream has ended, so it can be tear down on the client
+                outputStream.write(new byte[] { TERMINATION_BYTE }, 0, 1);
+            } catch (IOException e) {
+                logger.warn("Unable to send termination byte to sink {}", sinkId);
+            }
+        }
         if (duration != -1) {
             Instant end = Instant.now();
             long millisSecondTimedToSendAudioData = Duration.between(start, end).toMillis();
@@ -230,6 +244,9 @@ public class HABSpeakerAudioSink implements AudioSink {
         }
     }
 
+    /**
+     * Byte sent in the 5th position of each chunk that indicates format
+     */
     private enum StreamType {
         // 16000Hz 16bit int 1 channel little-endian
         PCM16BitMono((byte) 1),
