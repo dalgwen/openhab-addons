@@ -84,6 +84,7 @@ export const useYoutubePlayerStore = defineStore("youtube", () => {
       height: '0', // iframe height/width is forced by the global styles
       width: '0',
       playerVars,
+      host: 'https://www.youtube-nocookie.com',
       events: {
         'onReady': onPlayerReady,
         'onStateChange': onPlayerStateChange
