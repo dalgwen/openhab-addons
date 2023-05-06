@@ -14,7 +14,7 @@ const SINK_CHUNK_SIZE = 4096;
 type SinkContext = {
   /** The resampler implementation used, can be a noop */
   resampler: Resampler;
-  /** Circular buffer used to ensure a constant chunk size */
+  /** Circular buffer executor used to ensure a constant chunk size */
   bufferedExecutor: CircularBufferExecutor<Float32Array>;
   /** Cache to be used until the message port is available */
   buffersCache: Float32Array[];
@@ -344,17 +344,16 @@ export default class IOWorker {
         return;
     }
     const dataBuffer = buffer.slice(5);
-    let sinkContext = this.sinkContextStorage.get(streamId);
+    let sinkContext = this.sinkContextStorage.get(streamId) as SinkContext;
     if (!sinkContext) {
       const sendSinkData = (buffer: Float32Array) => {
-        const { resampler, port, buffersCache } = sinkContext as SinkContext;
-        const resampledBuffer = resampler.resample(buffer);
-        if (port) {
+        const resampledBuffer = sinkContext.resampler.resample(buffer);
+        if (sinkContext.port) {
           // send data over the sink message port
-          port.postMessage(resampledBuffer);
+          sinkContext.port.postMessage(resampledBuffer);
         } else {
           // cache this buffer, 
-          buffersCache.push(resampledBuffer.slice());
+          sinkContext.buffersCache.push(resampledBuffer.slice());
         }
       };
       sinkContext = {

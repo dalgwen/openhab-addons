@@ -40,13 +40,8 @@ export const useIOStore = defineStore("io", () => {
   // voice setup
   function startVoiceAudioContext() {
     if (!audioContext) {
-      // this is the sample rate required by the server,
-      // by setting audio context to use it some resampling
-      // on the io webworker will be avoided.
-      const voiceSampleRate = 16000;
-      let options: AudioContextOptions = {};
+      let options: AudioContextOptions = { latencyHint: 0.3 };
       audioContext = new AudioContext(options);
-      console.debug("Audio resample is needed: " + (audioContext.sampleRate !== voiceSampleRate));
     }
   }
   function isWorkletSupported() {
@@ -151,11 +146,6 @@ export const useIOStore = defineStore("io", () => {
     listening.value = value;
   }
   function setSpeaking(value: boolean) {
-    if (value) {
-      AudioSink.audioElement?.play();
-    } else {
-      AudioSink.audioElement?.pause();
-    }
     awakeScreenSaver();
     mediaSessionStore.muteMediaVolume(value);
     speaking.value = value;
@@ -330,8 +320,8 @@ export const useIOStore = defineStore("io", () => {
               const startSinkCmd = ev.data as WorkerOutCmdType<typeof command>;
               // create a sink that communicates with the worker through message channel
               createAudioSink(startSinkCmd.id, sinkConfig.volume, startSinkCmd.channels)
-                .then(sink => {
-                  sink.start();
+                .then(async sink => {
+                  await sink.start();
                   const sinkPortCmd = { cmd: WorkerInCmd.SINK_PORT, id: sink.getId(), port: sink.getMessagePort() };
                   worker?.postMessage(sinkPortCmd, [sinkPortCmd.port]);
                 })
