@@ -77,22 +77,22 @@
 				</options>
 			</parameter>
 			<!-- Device config -->
-			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="ui">
+			<parameter name="screenSaverTime" type="decimal" min="0" max="600" step="1" groupName="device">
 				<label>Screen Saver Time</label>
 				<description>Seconds to activate screen saver (0 for disabled)</description>
 				<default>30</default>
 			</parameter>
-			<parameter name="dimScreen" type="boolean">
+			<parameter name="dimScreen" type="boolean" groupName="device">
 				<label>Dim Device Screen</label>
 				<description>Lower the screen brightness while the screen saver is enabled.</description>
 				<default>false</default>
 			</parameter>
-			<parameter name="keepAwake" type="boolean">
+			<parameter name="keepAwake" type="boolean" groupName="device">
 				<label>Keep device awake</label>
 				<description>Prevent device from going to sleep/block while running the application.</description>
 				<default>false</default>
 			</parameter>
-			<parameter name="enableSpotify" type="boolean">
+			<parameter name="enableSpotify" type="boolean" groupName="device">
 				<label>Spotify Speaker</label>
 				<description>Enable spotify integration on this speaker.</description>
 				<default>true</default>
