@@ -36,10 +36,7 @@ export const useIOStore = defineStore("io", () => {
   const listening = ref(false);
   const speaking = ref(false);
   const online = ref(false);
-  // detect browser
-  function isChromeBasedBrowser() {
-    return !!(window as any).chrome;
-  }
+
   // voice setup
   function startVoiceAudioContext() {
     if (!audioContext) {
@@ -48,10 +45,6 @@ export const useIOStore = defineStore("io", () => {
       // on the io webworker will be avoided.
       const voiceSampleRate = 16000;
       let options: AudioContextOptions = {};
-      if (isChromeBasedBrowser()) {
-        // built-in resample seems to work great in chrome, not in safari, firefox remains untested.
-        // options.sampleRate = voiceSampleRate;
-      }
       audioContext = new AudioContext(options);
       console.debug("Audio resample is needed: " + (audioContext.sampleRate !== voiceSampleRate));
     }
@@ -158,6 +151,11 @@ export const useIOStore = defineStore("io", () => {
     listening.value = value;
   }
   function setSpeaking(value: boolean) {
+    if (value) {
+      AudioSink.audioElement?.play();
+    } else {
+      AudioSink.audioElement?.pause();
+    }
     awakeScreenSaver();
     mediaSessionStore.muteMediaVolume(value);
     speaking.value = value;

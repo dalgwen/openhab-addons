@@ -11,10 +11,9 @@ export class AudioNodeSink {
         this.gainNode.gain.value = (volume / 100);
     }
     static setup(audioContext: AudioContext) {
-        const destination = AudioNodeSink.destination = audioContext.createMediaStreamDestination();
-        const audioElement = AudioNodeSink.audioElement = document.createElement('audio');
-        audioElement.autoplay = true;
-        audioElement.srcObject = destination.stream;
+        AudioNodeSink.destination = audioContext.createMediaStreamDestination();
+        AudioNodeSink.audioElement = document.createElement('audio');
+        AudioNodeSink.audioElement.srcObject = AudioNodeSink.destination.stream;
     }
     start() {
         if (!AudioNodeSink.destination) {
