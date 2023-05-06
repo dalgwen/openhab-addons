@@ -1,62 +1,39 @@
-import { onUnmounted, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
 import { platform } from "../platforms";
-const USER_INPUT_EVENTS = [
-  'contextmenu', 'auxclick', 'dblclick',
-  'pointerup', 'touchend', 'keyup'
-];
+import { ScreenSaverManager } from "../utils/screen-saver-manager";
 export const useScreenSaverStore = defineStore("screenSaver", () => {
   const { mediaController, mediaState } = storeToRefs(useMediaSessionStore());
-  let screenSaverTime = 120;
-  let screenSaverTimeout: any = null;
-  let notifyPlatform = false;
+  let dimScreen = false;
   const screenSaverEnabled = ref(false);
+  const manager = new ScreenSaverManager(showScreenSaver, isScreenSaverBlocked);
+  manager.setSeconds(300);
+  manager.bindUserEvents();
   function showScreenSaver(value: boolean) {
     screenSaverEnabled.value = value;
-    if (notifyPlatform) {
+    if (dimScreen) {
       platform.dimDeviceScreen(value)
         .then(() => console.debug("Screen dimmed: " + value))
         .catch(err => console.error("Error setting screen brightness: ", err));
     }
   }
   function enableScreenDim(value: boolean) {
-    notifyPlatform = value;
+    dimScreen = value;
   }
-  function isScreenSaverEnabled() {
+  function isScreenSaverBlocked() {
     var mediaCtrl = mediaController.value;
-    return screenSaverTime > 0 && (!mediaCtrl || !mediaCtrl.getAwakeScreen() || mediaState.value != PlaybackState.PLAYING);
+    return mediaCtrl?.getAwakeScreen() || mediaState.value == PlaybackState.PLAYING;
   }
-  function disableScreenSaver() {
-    if (screenSaverEnabled.value) showScreenSaver(false);
-    if (screenSaverTimeout) clearTimeout(screenSaverTimeout);
+  function setScreenSaverTime(seconds: number) {
+    manager.setSeconds(seconds);
   }
   function awakeScreenSaver() {
     console.debug("main: awake screen saver");
-    disableScreenSaver();
-    if (isScreenSaverEnabled()) {
-      screenSaverTimeout = setTimeout(() => {
-        screenSaverTimeout = null;
-        showScreenSaver(true);
-      }, screenSaverTime * 1000);
-    }
+    manager.awake();
   }
-  function setScreenSaverTime(seconds: number) {
-    screenSaverTime = seconds;
-    awakeScreenSaver();
-  }
-  USER_INPUT_EVENTS.forEach((eventName) => {
-    window.addEventListener(eventName, awakeScreenSaver, { capture: true });
-  });
-  watch(mediaController, awakeScreenSaver);
-  watch(mediaState, awakeScreenSaver);
-  awakeScreenSaver();
-  onUnmounted(() => {
-    USER_INPUT_EVENTS.forEach((eventName) => {
-      window.removeEventListener(eventName, awakeScreenSaver, { capture: true });
-    });
-    disableScreenSaver();
-  });
+  watch(mediaController, manager.awake);
+  watch(mediaState, manager.awake);
   return {
     awakeScreenSaver,
     screenSaverEnabled,
