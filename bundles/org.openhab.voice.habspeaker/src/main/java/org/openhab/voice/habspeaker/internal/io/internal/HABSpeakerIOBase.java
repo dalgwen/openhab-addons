@@ -295,7 +295,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
             }
             logger.debug("Starting drop-in to {}", speakerIO.getId());
             try {
-                dropInSink.process(source.getInputStream(HABSpeakerAudioSource.HABSPEAKER_SOURCE_FORMAT));
+                dropInSink.process(source.getInputStream(((HABSpeakerAudioSource) source).getInternalStreamFormat()));
             } catch (AudioException | ArrayIndexOutOfBoundsException e) {
                 logger.warn("{} while running drop-in {}: ", e.getClass().getName(), getId(), e);
                 stopDropIn();

@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -37,19 +38,26 @@ import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
  */
 @NonNullByDefault
 public class HABSpeakerAudioSource implements AudioSource {
-    public static final AudioFormat HABSPEAKER_SOURCE_FORMAT = new AudioFormat(AudioFormat.CONTAINER_WAVE,
-            AudioFormat.CODEC_PCM_SIGNED, false, 16, null, 16000L, 1);
-    private final Set<AudioFormat> supportedFormats = Set.of(HABSPEAKER_SOURCE_FORMAT);
+    private final Set<AudioFormat> supportedFormats = new HashSet<>();
     private final String sourceId;
     private final String sourceLabel;
     private final HABSpeakerIO speakerIO;
     private final long streamSampleRate;
+    private final AudioFormat internalStreamFormat;
 
     public HABSpeakerAudioSource(String id, String label, HABSpeakerIO speakerIO, long streamSampleRate) {
         this.sourceId = id;
         this.sourceLabel = label;
         this.speakerIO = speakerIO;
         this.streamSampleRate = streamSampleRate;
+        this.internalStreamFormat = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16,
+                null, streamSampleRate, 1);
+        supportedFormats.add(this.internalStreamFormat);
+        if (streamSampleRate != 16000L) {
+            // we also support this one resampling the stream
+            supportedFormats.add(new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16,
+                    null, 16000L, 1));
+        }
     }
 
     @Override
@@ -65,6 +73,10 @@ public class HABSpeakerAudioSource implements AudioSource {
     @Override
     public Set<AudioFormat> getSupportedFormats() {
         return supportedFormats;
+    }
+
+    public AudioFormat getInternalStreamFormat() {
+        return internalStreamFormat;
     }
 
     @Override

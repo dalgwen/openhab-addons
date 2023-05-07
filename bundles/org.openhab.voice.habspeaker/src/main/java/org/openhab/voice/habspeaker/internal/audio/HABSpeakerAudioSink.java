@@ -49,18 +49,15 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerAudioSink implements AudioSink {
     /**
      * Byte send to the sink after last chunk to indicate that streaming has ended.
-     * Should try to be send event on and error as the ui uses this as an indication to cleaning up sink resources.
+     * Should try to be sent event on and error as the client should be aware that data transmission has ended.
      */
     private static byte TERMINATION_BYTE = (byte) 0;
-    private static final HashSet<AudioFormat> SUPPORTED_FORMATS = new HashSet<>();
+    private final HashSet<AudioFormat> supportedFormats = new HashSet<>();
     private static final HashSet<Class<? extends AudioStream>> SUPPORTED_STREAMS = new HashSet<>();
 
     static {
-        SUPPORTED_FORMATS.add(
-                new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16, null, 16000L));
-        SUPPORTED_FORMATS.add(AudioFormat.WAV);
-        SUPPORTED_FORMATS.add(AudioFormat.MP3);
         SUPPORTED_STREAMS.add(FixedLengthAudioStream.class);
+        SUPPORTED_STREAMS.add(HABSpeakerAudioSource.HABSpeakerAudioStream.class);
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerAudioSink.class);
 
@@ -69,6 +66,7 @@ public class HABSpeakerAudioSink implements AudioSink {
     private final HABSpeakerIO speakerIO;
     private final int channelNumber;
     private final long clientSampleRate;
+    private final AudioFormat internalStreamFormat;
 
     public HABSpeakerAudioSink(String id, String label, HABSpeakerIO speakerIO, int channelNumber,
             long clientSampleRate) {
@@ -77,6 +75,15 @@ public class HABSpeakerAudioSink implements AudioSink {
         this.speakerIO = speakerIO;
         this.channelNumber = channelNumber;
         this.clientSampleRate = clientSampleRate;
+        this.internalStreamFormat = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16,
+                null, clientSampleRate);
+        supportedFormats.add(this.internalStreamFormat);
+        supportedFormats.add(AudioFormat.WAV);
+        supportedFormats.add(AudioFormat.MP3);
+    }
+
+    public AudioFormat getInternalStreamFormat() {
+        return internalStreamFormat;
     }
 
     @Override
@@ -186,7 +193,7 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     @Override
     public Set<AudioFormat> getSupportedFormats() {
-        return SUPPORTED_FORMATS;
+        return supportedFormats;
     }
 
     @Override
