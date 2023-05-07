@@ -6,7 +6,6 @@ export class AudioNodeSink {
     private static destination?: MediaStreamAudioDestinationNode;
     private static connectedNodes = 0;
     private gainNode: GainNode;
-    protected playing: boolean = false;
     constructor(private id: string, private audioContext: AudioContext, private sinkProcessorNode: AudioNode, protected channels: number, volume: number) {
         this.gainNode = audioContext.createGain();
         this.gainNode.gain.value = (volume / 100);
@@ -43,8 +42,5 @@ export class AudioNodeSink {
         }
         this.sinkProcessorNode.disconnect();
         this.gainNode.disconnect();
-    }
-    isPlaying() {
-        return this.playing;
     }
 }
