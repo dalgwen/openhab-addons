@@ -95,7 +95,7 @@
 			<parameter name="enableSpotify" type="boolean" groupName="device">
 				<label>Spotify Speaker</label>
 				<description>Enable spotify integration on this speaker.</description>
-				<default>true</default>
+				<default>false</default>
 			</parameter>
 			<!-- Voice config -->
 			<parameter name="tts" type="text" groupName="voice">
