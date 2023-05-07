@@ -209,7 +209,7 @@ export const useIOStore = defineStore("io", () => {
       postToWorker(WorkerInCmd.TOKEN_RENEW, { token });
     }
   }
-  async function init(id: string, token: string) {
+  async function init(speakerId: string, token: string) {
     const defaultSinkConfig = {
       volume: 100,
     };
@@ -249,7 +249,7 @@ export const useIOStore = defineStore("io", () => {
           name: "hab_speaker-worker",
           type: "module",
         });
-        worker.onmessage = (ev) => {
+        worker.onmessage = (ev: MessageEvent<any>) => {
           if ((import.meta as any).env.DEV) {
             console.debug("worker => main thread:", ev.data);
           }
@@ -336,8 +336,8 @@ export const useIOStore = defineStore("io", () => {
               const sink = activeSinks.get(stopSinkCmd.id);
               if (sink) {
                 console.debug(`main: stopping sink ${stopSinkCmd.id}`);
+                activeSinks.delete(stopSinkCmd.id);
                 sink.close();
-                activeSinks.delete(id);
                 if (activeSinks.size === 0) {
                   setSpeaking(false);
                 }
@@ -393,7 +393,7 @@ export const useIOStore = defineStore("io", () => {
         getOHUrl().then((ohUrl) => {
           worker?.postMessage({
             cmd: WorkerInCmd.INITIALIZE,
-            id,
+            id: speakerId,
             token,
             sampleRate: getVoiceAudioContext().sampleRate,
             ohUrl,
@@ -405,7 +405,7 @@ export const useIOStore = defineStore("io", () => {
       }
     });
     async function runWhenSilence(cb: () => void, delay = 1500, max = 5000) {
-      let  elapsed = 0;
+      let elapsed = 0;
       const interval = setInterval(() => {
         elapsed += delay;
         if (elapsed > max || !(listening.value || speaking.value)) {
