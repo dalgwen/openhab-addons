@@ -318,12 +318,16 @@ export const useIOStore = defineStore("io", () => {
               break;
             case WorkerOutCmd.START_SINK:
               const startSinkCmd = ev.data as WorkerOutCmdType<typeof command>;
-              // create a sink that communicates with the worker through message channel
               createAudioSink(startSinkCmd.id, sinkConfig.volume, startSinkCmd.channels)
                 .then(async sink => {
-                  await sink.start();
                   const sinkPortCmd = { cmd: WorkerInCmd.SINK_PORT, id: sink.getId(), port: sink.getMessagePort() };
                   worker?.postMessage(sinkPortCmd, [sinkPortCmd.port]);
+                  activeSinks.set(sink.getId(), sink);
+                  const startSpeaking = activeSinks.size === 1;
+                  await sink.start();
+                  if (startSpeaking) {
+                    setSpeaking(true);
+                  }
                 })
                 .catch(err => console.error(err));
               break;
@@ -400,13 +404,12 @@ export const useIOStore = defineStore("io", () => {
         reject(error);
       }
     });
-    async function runWhenSilence(cb: () => void, time = 0) {
-      const delay = 1000;
-      setTimeout(() => {
-        time += delay;
-        if (time < 5000 && (listening.value || speaking.value)) {
-          runWhenSilence(cb, time);
-        } else {
+    async function runWhenSilence(cb: () => void, delay = 1500, max = 5000) {
+      let  elapsed = 0;
+      const interval = setInterval(() => {
+        elapsed += delay;
+        if (elapsed > max || !(listening.value || speaking.value)) {
+          clearInterval(interval);
           cb();
         }
       }, delay);
@@ -528,17 +531,12 @@ export const useIOStore = defineStore("io", () => {
       console.warn("main: no worklet support, falling back to old audio sink implementation");
       WebAudioSinkImpl = DeprecatedAudioSink as any;
     }
-    const audioContext = getVoiceAudioContext();
-    const sink = new WebAudioSinkImpl(id, audioContext, channels, volume);
-    // Sink teardown timeout id
     console.debug(`main: starting sink ${id}`);
+    const audioContext = getVoiceAudioContext();
     if (audioContext.state != 'running') {
       await audioContext.resume();
     }
-    activeSinks.set(sink.getId(), sink);
-    if (activeSinks.size === 1) {
-      setSpeaking(true);
-    }
+    const sink = new WebAudioSinkImpl(id, audioContext, channels, volume);
     return sink;
   }
   return {
