@@ -252,7 +252,7 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
             @Nullable Locale locale) {
         if (context == null && SPEAKER_CONFIG_URI.equals(uri.toString())) {
             switch (param) {
-                case "hli":
+                case "hlis":
                     return voiceManager.getHLIs().stream()
                             .sorted((hli1, hli2) -> hli1.getLabel(locale).compareToIgnoreCase(hli2.getLabel(locale)))
                             .map(hli -> new ParameterOption(hli.getId(), hli.getLabel(locale)))

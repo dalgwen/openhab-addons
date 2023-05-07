@@ -110,9 +110,9 @@
 				<label>Voice</label>
 				<description>The voice to use if no voice is specified, leave empty to use the default.</description>
 			</parameter>
-			<parameter name="hli" type="text" groupName="voice">
-				<label>Human Language Interpreter</label>
-				<description>The human language interpreter to use, leave empty to use the default.</description>
+			<parameter name="hlis" type="text" groupName="voice" multiple="true">
+				<label>Human Language Interpreters</label>
+				<description>The human language interpreters to use, leave empty to use the default.</description>
 			</parameter>
 			<parameter name="ks" type="text" groupName="voice">
 				<label>Keyword Spotter</label>

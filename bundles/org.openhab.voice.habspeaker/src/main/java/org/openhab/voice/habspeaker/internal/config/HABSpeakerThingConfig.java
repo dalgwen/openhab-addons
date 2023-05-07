@@ -12,6 +12,8 @@
  */
 package org.openhab.voice.habspeaker.internal.config;
 
+import java.util.List;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -53,9 +55,9 @@ public class HABSpeakerThingConfig {
      */
     public String voice = "";
     /**
-     * Custom hli service for this speaker
+     * Custom interpreters chain for this speaker
      */
-    public String hli = "";
+    public List<String> hlis = List.of();
     /**
      * Enables ks service for this speaker
      */

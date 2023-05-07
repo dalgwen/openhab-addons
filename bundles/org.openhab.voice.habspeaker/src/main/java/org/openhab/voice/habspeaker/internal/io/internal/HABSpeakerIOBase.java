@@ -16,6 +16,7 @@ import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_
 import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
@@ -204,8 +205,9 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         KSService ks = null;
         String keyword = configProvider.getSystemKeyword();
         var defaultHLI = voiceManager.getHLI();
-        List<HumanLanguageInterpreter> hlis = defaultHLI == null ? List.of(speakerLanguageInterpreter)
+        List<HumanLanguageInterpreter> defaultHlis = defaultHLI == null ? List.of(speakerLanguageInterpreter)
                 : List.of(speakerLanguageInterpreter, defaultHLI);
+        List<HumanLanguageInterpreter> hlis = defaultHlis;
         if (thingHandler != null) {
             var speakerConfig = thingHandler.getSpeakerConfig();
             if (!speakerConfig.stt.isBlank()) {
@@ -218,10 +220,12 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
                 voice = voiceManager.getAllVoices().stream().filter(v -> v.getUID().equals(speakerConfig.voice))
                         .findAny().orElse(null);
             }
-            HumanLanguageInterpreter hli = !speakerConfig.hli.isBlank() ? voiceManager.getHLI(speakerConfig.hli)
-                    : defaultHLI;
-            if (hli != null) {
-                hlis = List.of(speakerLanguageInterpreter, hli);
+            hlis = voiceManager.getHLIsByIds(speakerConfig.hlis);
+            if (!hlis.isEmpty()) {
+                ArrayList<HumanLanguageInterpreter> finalInterpreters = new ArrayList<>();
+                finalInterpreters.add(speakerLanguageInterpreter);
+                finalInterpreters.addAll(hlis);
+                hlis = finalInterpreters;
             }
             if (!speakerConfig.keyword.isBlank()) {
                 keyword = speakerConfig.keyword;
