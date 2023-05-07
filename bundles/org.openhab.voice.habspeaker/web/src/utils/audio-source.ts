@@ -31,7 +31,7 @@ export class AudioSource {
         }
     }
     isSuspended() {
-        return this.suspended;
+        return this.suspended || this.audioContext.state !== 'running';
     }
     async suspend() {
         console.debug("main: suspending audio source");
