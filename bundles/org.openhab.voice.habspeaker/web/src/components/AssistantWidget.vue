@@ -2,15 +2,27 @@
 import { storeToRefs } from "pinia";
 import { useAssistantStore } from "../stores/assistant";
 import { useIOStore } from "../stores/io";
+import { ref, watch } from "vue";
 const store = useAssistantStore();
 const { startListening } = store;
 const { listening, speaking, online } = storeToRefs(useIOStore());
 const { userInteractionDone, miniMode } = storeToRefs(store);
+const ring = ref<HTMLButtonElement | null>(null);
+watch(listening, (value) => {
+  if (!ring.value) {
+    return;
+  }
+  if (value) {
+    ring.value.classList.add("pulsate");
+  } else {
+    ring.value.classList.remove("pulsate");
+  }
+});
 </script>
 <template>
-  <button id="speech" :disabled="!online" @click="startListening" :class="{ listening, 'mic-btn-mini': miniMode }"
+  <button id="speech" :disabled="!online" @click="startListening" :class="{ 'mic-btn-mini': miniMode }"
     class="mic-btn">
-    <div v-if="online" class="pulse-ring"></div>
+    <div v-if="online" ref="ring" class="pulse-ring"></div>
     <div v-if="userInteractionDone && !online" class="lds-ring">
       <div></div>
       <div></div>
@@ -93,7 +105,7 @@ const { userInteractionDone, miniMode } = storeToRefs(store);
   }
 }
 
-.listening .pulse-ring {
+.pulsate {
   animation: pulsate infinite 1.5s;
 }
 
