@@ -1,12 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { storeToRefs } from "pinia";
 import { ref, onUnmounted, watch } from "vue";
 import { useScreenSaverStore } from "../stores/screen-saver";
 const screenSaverStore = useScreenSaverStore();
 const { screenSaverEnabled } = storeToRefs(screenSaverStore);
-const logo = ref(null);
+const logo = ref<HTMLImageElement | null>(null);
 function moveIcon() {
-    function getRandomArbitrary(min, max) {
+    function getRandomArbitrary(min: number, max: number) {
         return Math.round((Math.random() * (max - min) + min) * 100) / 100
     }
     const logoHtmlElement = logo.value;
@@ -15,16 +15,15 @@ function moveIcon() {
         logoHtmlElement.style.left = getRandomArbitrary(10, 90) + "%";
     }
 }
-let iconMovementInterval;
-function setupIconMovement() {
-    if (screenSaverEnabled.value) {
+let iconMovementInterval: any;
+function setupIconMovement(value: boolean) {
+    if (value) {
         iconMovementInterval = setInterval(moveIcon, 5000);
     } else {
         clearInterval(iconMovementInterval);
     }
 }
 watch(screenSaverEnabled, setupIconMovement);
-setupIconMovement();
 onUnmounted(() => {
     clearInterval(iconMovementInterval);
 });
