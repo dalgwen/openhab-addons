@@ -8,6 +8,7 @@ const { startListening } = store;
 const { listening, speaking, online } = storeToRefs(useIOStore());
 const { userInteractionDone, miniMode } = storeToRefs(store);
 const ring = ref<HTMLButtonElement | null>(null);
+const icon = ref<HTMLButtonElement | null>(null);
 watch(listening, (value) => {
   if (!ring.value) {
     return;
@@ -18,10 +19,20 @@ watch(listening, (value) => {
     ring.value.classList.remove("pulsate");
   }
 });
+watch(speaking, (value) => {
+  if (!icon.value) {
+    return;
+  }
+  if (value) {
+    icon.value.classList.add("speaker");
+  } else {
+    icon.value.classList.remove("speaker");
+  }
+});
+
 </script>
 <template>
-  <button id="speech" :disabled="!online" @click="startListening" :class="{ 'mic-btn-mini': miniMode }"
-    class="mic-btn">
+  <button id="speech" :disabled="!online" @click="startListening" :class="{ 'mic-btn-mini': miniMode }" class="mic-btn">
     <div v-if="online" ref="ring" class="pulse-ring"></div>
     <div v-if="userInteractionDone && !online" class="lds-ring">
       <div></div>
@@ -31,7 +42,7 @@ watch(listening, (value) => {
     </div>
     <div class="microphone-container">
       <span class="led"></span>
-      <span class="microphone speaker"></span>
+      <span class="microphone" ref="icon"></span>
       <span class="leg"></span>
       <span class="support"></span>
     </div>
@@ -121,24 +132,24 @@ watch(listening, (value) => {
 }
 
 
-.speaker-container .speaker {
+.speaker {
+  z-index: 3;
   box-sizing: border-box;
   display: inline-block;
   background: var(--color-microphone);
   background-clip: content-box;
-  width: 35% !important;
-  height: 2.2em !important;
+  height: 2.5em !important;
   border: 1em solid transparent;
-  border-radius: 50%;
+  border-radius: 50%!important;
   border-right-color: var(--color-microphone);
   position: absolute;
   top: 50%;
   transform: translatey(-50%);
-  left: -17%;
+  left: -15%;
 }
 
-.speaker-container .speaker:after,
-.speaker-container .speaker:before {
+.speaker:after,
+.speaker:before {
   content: "";
   width: 7px;
   background: var(--vt-c-openhab-red);
@@ -149,17 +160,10 @@ watch(listening, (value) => {
   transform: translate(-50%, -50%);
 }
 
-.speaker-container .speaker:before {
-  left: 240%;
-  height: 15px;
-  width: 10px;
+.speaker:before {
+  height: 25px;
+  width: 15px;
   background-color: var(--color-microphone);
-}
-
-.speaker-container .led,
-.speaker-container .leg,
-.speaker-container .support {
-  display: none;
 }
 
 
