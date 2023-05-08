@@ -15,7 +15,7 @@
     "build:electron": "vite build --mode electron && electron-builder",
     "sync:capacitor": "npm run fix-capacitor-plugins && cap sync && npm run rm-fix-capacitor-plugins",
     "build:capacitor": "vite build --mode capacitor && cap copy",
-    "install-capacitor-plugins": "npm i capacitor-voice-recorder @capacitor/preferences @capacitor/dialog @capacitor-community/screen-brightness @capacitor-community/keep-awake",
+    "install-capacitor-plugins": "npm i capacitor-voice-recorder@^4.0.0 @capacitor/preferences@^4.0.0 @capacitor/dialog@^4.0.0 @capacitor-community/screen-brightness@^4.0.0 @capacitor-community/keep-awake@^3.0.0",
     "rm-capacitor-plugins": "npm rm capacitor-voice-recorder @capacitor/preferences @capacitor/dialog @capacitor-community/screen-brightness @capacitor-community/keep-awake",
     "fix-capacitor-plugins": "npm run install-capacitor-plugins -- --save-dev",
     "rm-fix-capacitor-plugins": "npm run rm-capacitor-plugins -- --save-dev && npm run install-capacitor-plugins -- --save-optional && npm i",
