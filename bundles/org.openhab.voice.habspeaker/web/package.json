@@ -1,10 +1,11 @@
 {
   "name": "hab-speaker",
   "author": {
-    "name": "GiviMAD"
+    "name": "Miguel Álvarez Díez (GiviMAD)"
   },
-  "description": "A smart speaker UI concept for openHAB",
-  "version": "0.0.20",
+  "description": "A web UI to consume OpenHAB's dialog processing capabilities",
+  "version": "0.0.21",
+  "private": true,
   "scripts": {
     "dev": "vite --mode pwa",
     "dev:electron": "vite --mode electron",
