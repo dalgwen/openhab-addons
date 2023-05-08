@@ -50,8 +50,8 @@
         <version>1.9.0</version>
 
         <configuration>
-          <nodeVersion>v16.15.0</nodeVersion>
-          <npmVersion>8.11.0</npmVersion>
+          <nodeVersion>v18.16.0</nodeVersion>
+          <npmVersion>9.5.1</npmVersion>
           <workingDirectory>web</workingDirectory>
         </configuration>
 
