@@ -78,7 +78,9 @@ export const useAuthStore = defineStore("auth", () => {
         .then(() => console.debug('Spotify initialized'))
         .catch(err => console.error("Spotify error: ", err));
     }
-  })();
+  })().catch(err => {
+    console.error("Auth error:", err);
+  });
   return { getUIConfig, getAccessToken, authorize };
 });
 
