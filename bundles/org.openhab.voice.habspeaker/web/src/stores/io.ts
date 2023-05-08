@@ -112,7 +112,7 @@ export const useIOStore = defineStore("io", () => {
       gainRef: options.gainRef,
     });
     rp.onspot = (detection) => {
-      console.debug(`main: spotted '${detection.name}' with score: ${detection.score}`);
+      console.debug('main: keyword spotted', detection);
       sendSpot();
     };
     if (stopLocalKsProcessorNode) {
