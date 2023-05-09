@@ -42,7 +42,7 @@ export default class IOWorker {
   /** Used to receive the audio data from the WebAudioAPI */
   sourcePort?: MessagePort;
   /** Holds the resampler used to convert from the sampleRate to the streamSampleRate, or a noop resampler*/
-  sourceResampler?: Resampler;
+  sourceResampler: Resampler = new ResamplerNoop();
   /** Stores each sink context by its id */
   sinkContextStorage = new Map<string, SinkContext>();
   /** Lock used to ensure sink data chunks are processed in order */
@@ -295,7 +295,7 @@ export default class IOWorker {
       this.sourcePort?.close();
       this.sourcePort = undefined;
       this.sourceResampler?.close();
-      this.sourceResampler = undefined;
+      this.sourceResampler = new ResamplerNoop();
       this.socket = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();
@@ -305,7 +305,7 @@ export default class IOWorker {
   }
   /**
    * Sends audio though a {@link WebSocket} after encode it as a int 16 buffer.
-   * Resamples the audio when needed from audio context sample rate to the sample rate.
+   * Resamples the audio when needed from audio context sample rate to the stream sample rate.
    */
   private handleSourceAudioBuffer(buffer: Float32Array) {
     if (this.socket) {
