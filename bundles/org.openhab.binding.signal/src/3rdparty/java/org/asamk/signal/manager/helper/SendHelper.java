@@ -178,6 +178,7 @@ public class SendHelper {
         } catch (IOException e) {
             var address = context.getRecipientHelper().resolveSignalServiceAddress(account.getSelfRecipientId());
             logger.warn("Failed to send message due to IO exception: {}", e.getMessage());
+            logger.debug("Exception", e);
             return SendMessageResult.networkFailure(address);
         }
     }
@@ -288,21 +289,41 @@ public class SendHelper {
                                 }
                             }
                         }, () -> false, urgent);
-        final SenderKeySenderHandler senderKeySender = (distId, recipients, unidentifiedAccess, isRecipientUpdate) -> {
-            final var res = messageSender.sendGroupDataMessage(distId, recipients, unidentifiedAccess,
-                    isRecipientUpdate, contentHint, message, SignalServiceMessageSender.SenderKeyGroupEvents.EMPTY,
-                    urgent, false);
-            synchronized (entryId) {
-                if (entryId.get() == -1) {
-                    final var newId = messageSendLogStore.insertIfPossible(message.getTimestamp(), res, contentHint,
-                            urgent);
-                    entryId.set(newId);
-                } else {
-                    messageSendLogStore.addRecipientToExistingEntryIfPossible(entryId.get(), res);
-                }
-            }
-            return res;
-        };
+        final SenderKeySenderHandler senderKeySender = (distId, recipients, unidentifiedAccess, isRecipientUpdate) -> messageSender.sendGroupDataMessage(
+                distId,
+                recipients,
+                unidentifiedAccess,
+                isRecipientUpdate,
+                contentHint,
+                message,
+                SignalServiceMessageSender.SenderKeyGroupEvents.EMPTY,
+                urgent,
+                false,
+                sendResult -> {
+                    logger.trace("Partial message send results: {}", sendResult.size());
+                    synchronized (entryId) {
+                        if (entryId.get() == -1) {
+                            final var newId = messageSendLogStore.insertIfPossible(message.getTimestamp(),
+                                    sendResult,
+                                    contentHint,
+                                    urgent);
+                            entryId.set(newId);
+                        } else {
+                            messageSendLogStore.addRecipientToExistingEntryIfPossible(entryId.get(), sendResult);
+                        }
+                    }
+                    synchronized (entryId) {
+                        if (entryId.get() == -1) {
+                            final var newId = messageSendLogStore.insertIfPossible(message.getTimestamp(),
+                                    sendResult,
+                                    contentHint,
+                                    urgent);
+                            entryId.set(newId);
+                        } else {
+                            messageSendLogStore.addRecipientToExistingEntryIfPossible(entryId.get(), sendResult);
+                        }
+                    }
+                });
         final var results = sendGroupMessageInternal(legacySender, senderKeySender, recipientIds, distributionId);
 
         for (var r : results) {
@@ -410,7 +431,11 @@ public class SendHelper {
             }
 
             final var serviceId = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId)
-                    .getServiceId();
+                    .serviceId()
+                    .orElse(null);
+            if (serviceId == null) {
+                continue;
+            }
             final var identity = account.getIdentityKeyStore().getIdentityInfo(serviceId);
             if (identity == null || !identity.getTrustLevel().isTrusted()) {
                 continue;
@@ -539,6 +564,7 @@ public class SendHelper {
             return SendMessageResult.identityFailure(address, e.getIdentityKey());
         } catch (IOException e) {
             logger.warn("Failed to send message due to IO exception: {}", e.getMessage());
+            logger.debug("Exception", e);
             return SendMessageResult.networkFailure(address);
         }
     }

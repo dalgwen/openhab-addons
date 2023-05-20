@@ -24,8 +24,9 @@ public abstract class Database implements AutoCloseable {
         this.dataSource = dataSource;
     }
 
-    public static <T extends Database> T initDatabase(File databaseFile, Function<HikariDataSource, T> newDatabase)
-            throws SQLException {
+    public static <T extends Database> T initDatabase(
+            File databaseFile, Function<HikariDataSource, T> newDatabase
+    ) throws SQLException {
         HikariDataSource dataSource = null;
 
         try {

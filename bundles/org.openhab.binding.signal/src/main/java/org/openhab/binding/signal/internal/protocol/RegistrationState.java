@@ -23,6 +23,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 public enum RegistrationState {
     NO_VALID_USER,
     CAPTCHA_NEEDED,
+    RATE_LIMIT,
     VERIFICATION_CODE_NEEDED,
     QR_CODE_NEEDED,
     REGISTER_NEEDED,
