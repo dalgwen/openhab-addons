@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.asamk.signal.manager.api.TrustLevel;
@@ -147,7 +148,7 @@ public class IdentityKeyStore {
                             + "                    FROM %s AS i\n", TABLE_IDENTITY);
             try (final var statement = connection.prepareStatement(sql)) {
                 return Utils.executeQueryForStream(statement, this::getIdentityInfoFromResultSet)
-                        .collect(Collectors.toList());
+                        .filter(Objects::nonNull).collect(Collectors.toList());
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed read from identity store", e);
