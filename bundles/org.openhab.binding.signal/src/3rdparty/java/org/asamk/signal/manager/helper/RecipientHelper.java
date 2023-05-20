@@ -1,7 +1,6 @@
 package org.asamk.signal.manager.helper;
 
 import java.io.IOException;
-import java.security.SignatureException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,11 +11,11 @@ import java.util.Set;
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.api.RecipientIdentifier;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
-import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.usernames.BaseUsernameException;
+import org.signal.libsignal.usernames.Username;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.ACI;
@@ -24,9 +23,7 @@ import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.services.CdsiV2Service;
-import org.whispersystems.signalservice.internal.contacts.crypto.Quote;
-import org.whispersystems.signalservice.internal.contacts.crypto.UnauthenticatedQuoteException;
-import org.whispersystems.signalservice.internal.contacts.crypto.UnauthenticatedResponseException;
+import org.whispersystems.util.Base64UrlSafe;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -55,7 +52,7 @@ public class RecipientHelper {
         final var number = address.number().get();
         final ServiceId serviceId;
         try {
-            serviceId = getRegisteredUser(number);
+            serviceId = getRegisteredUserByNumber(number);
         } catch (UnregisteredRecipientException e) {
             logger.warn("Failed to get uuid for e164 number: {}", number);
             // Return SignalServiceAddress with unknown UUID
@@ -87,17 +84,37 @@ public class RecipientHelper {
     public RecipientId resolveRecipient(final RecipientIdentifier.Single recipient)
             throws UnregisteredRecipientException {
         if (recipient instanceof RecipientIdentifier.Uuid) {
-            return account.getRecipientResolver()
-                    .resolveRecipient(ServiceId.from(((RecipientIdentifier.Uuid) recipient).uuid()));
-        } else {
-            final var number = ((RecipientIdentifier.Number) recipient).number();
-            return account.getRecipientStore().resolveRecipient(number, () -> {
+            RecipientIdentifier.Uuid uuidRecipient = (RecipientIdentifier.Uuid) recipient;
+            return account.getRecipientResolver().resolveRecipient(ServiceId.from(uuidRecipient.uuid()));
+        } else if (recipient instanceof RecipientIdentifier.Number) {
+            RecipientIdentifier.Number numberRecipient = (RecipientIdentifier.Number) recipient;
+            final var number = numberRecipient.number();
+            return account.getRecipientStore().resolveRecipientByNumber(number, () -> {
                 try {
-                    return getRegisteredUser(number);
+                    return getRegisteredUserByNumber(number);
                 } catch (Exception e) {
                     return null;
                 }
             });
+        } else if (recipient instanceof RecipientIdentifier.Username) {
+            RecipientIdentifier.Username usernameRecipient = (RecipientIdentifier.Username) recipient;
+            final var username = usernameRecipient.username();
+            return account.getRecipientStore().resolveRecipientByUsername(username, () -> {
+                try {
+                    return getRegisteredUserByUsername(username);
+                } catch (Exception e) {
+                    return null;
+                }
+            });
+        }
+        throw new AssertionError("Unexpected RecipientIdentifier: " + recipient);
+    }
+
+    public Optional<RecipientId> resolveRecipientOptional(final RecipientIdentifier.Single recipient) {
+        try {
+            return Optional.of(resolveRecipient(recipient));
+        } catch (UnregisteredRecipientException e) {
+            return Optional.empty();
         }
     }
 
@@ -108,19 +125,13 @@ public class RecipientHelper {
             return recipientId;
         }
         final var number = address.getNumber().get();
-        final var serviceId = getRegisteredUser(number);
+        final var serviceId = getRegisteredUserByNumber(number);
         return account.getRecipientTrustedResolver()
                 .resolveRecipientTrusted(new SignalServiceAddress(serviceId, number));
     }
 
     public Map<String, RegisteredUser> getRegisteredUsers(final Set<String> numbers) throws IOException {
-        Map<String, RegisteredUser> registeredUsers;
-        try {
-            registeredUsers = getRegisteredUsersV2(numbers, true);
-        } catch (IOException e) {
-            logger.warn("CDSI request failed, trying fallback to CDS", e);
-            registeredUsers = getRegisteredUsersV1(numbers);
-        }
+        Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, true);
 
         // Store numbers as recipients, so we have the number/uuid association
         registeredUsers.forEach((number, u) -> account.getRecipientTrustedResolver().resolveRecipientTrusted(u.aci,
@@ -129,7 +140,8 @@ public class RecipientHelper {
         return registeredUsers;
     }
 
-    private ServiceId getRegisteredUser(final String number) throws IOException, UnregisteredRecipientException {
+    private ServiceId getRegisteredUserByNumber(final String number)
+            throws IOException, UnregisteredRecipientException {
         final Map<String, RegisteredUser> aciMap;
         try {
             aciMap = getRegisteredUsers(Set.of(number));
@@ -141,21 +153,6 @@ public class RecipientHelper {
             throw new UnregisteredRecipientException(new org.asamk.signal.manager.api.RecipientAddress(null, number));
         }
         return user.getServiceId();
-    }
-
-    private Map<String, RegisteredUser> getRegisteredUsersV1(final Set<String> numbers) throws IOException {
-        final Map<String, ACI> response;
-        try {
-            response = dependencies.getAccountManager().getRegisteredUsers(ServiceConfig.getIasKeyStore(), numbers,
-                    serviceEnvironmentConfig.getCdsMrenclave());
-        } catch (Quote.InvalidQuoteFormatException | UnauthenticatedQuoteException | SignatureException
-                | UnauthenticatedResponseException | InvalidKeyException | NumberFormatException e) {
-            throw new IOException(e);
-        }
-        final var registeredUsers = new HashMap<String, RegisteredUser>();
-        response.forEach(
-                (key, value) -> registeredUsers.put(key, new RegisteredUser(Optional.of(value), Optional.empty())));
-        return registeredUsers;
     }
 
     private Map<String, RegisteredUser> getRegisteredUsersV2(final Set<String> numbers, boolean useCompat)
@@ -180,8 +177,9 @@ public class RecipientHelper {
     }
 
     @SuppressWarnings("unused")
-    private ACI getRegisteredUserByUsername(String username) throws IOException {
-        return dependencies.getAccountManager().getAciByUsername(username);
+    private ACI getRegisteredUserByUsername(String username) throws IOException, BaseUsernameException {
+        return dependencies.getAccountManager()
+                .getAciByUsernameHash(Base64UrlSafe.encodeBytesWithoutPadding(Username.hash(username)));
     }
 
     public static class RegisteredUser {
@@ -192,8 +190,8 @@ public class RecipientHelper {
             super();
             Optional<PNI> _pni = pni;
             Optional<ACI> _aci = aci;
-            _aci = _aci.isPresent() && _aci.get().equals(ServiceId.UNKNOWN) ? Optional.empty() : _aci;
-            _pni = _pni.isPresent() && _pni.get().equals(ServiceId.UNKNOWN) ? Optional.empty() : _pni;
+            _aci = _aci.isPresent() && _aci.get().isUnknown() ? Optional.empty() : _aci;
+            _pni = _pni.isPresent() && _pni.get().isUnknown() ? Optional.empty() : _pni;
             if (_aci.isEmpty() && _pni.isEmpty()) {
                 throw new AssertionError("Must have either a ACI or PNI!");
             }

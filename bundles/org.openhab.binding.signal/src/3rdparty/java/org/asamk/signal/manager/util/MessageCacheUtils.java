@@ -86,10 +86,19 @@ public class MessageCacheUtils {
             @SuppressWarnings("null")
             Optional<SignalServiceAddress> addressOptional = sourceServiceId == null ? Optional.empty()
                     : Optional.of(new SignalServiceAddress(sourceServiceId, source));
-            return new SignalServiceEnvelope(type, addressOptional, sourceDevice, timestamp, content,
-                    serverReceivedTimestamp, serverDeliveredTimestamp, uuid,
-                    destinationUuid == null ? UuidUtil.UNKNOWN_UUID.toString() : destinationUuid, isUrgent,
-                    updatedPni == null ? "" : updatedPni, isStory);
+            return new SignalServiceEnvelope(type,
+                    addressOptional,
+                    sourceDevice,
+                    timestamp,
+                    content,
+                    serverReceivedTimestamp,
+                    serverDeliveredTimestamp,
+                    uuid,
+                    destinationUuid == null ? UuidUtil.UNKNOWN_UUID.toString() : destinationUuid,
+                    isUrgent,
+                    isStory,
+                    null,
+                    updatedPni == null ? "" : updatedPni);
         }
     }
 

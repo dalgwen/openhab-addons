@@ -15,7 +15,8 @@
   <name>openHAB Add-ons :: Bundles :: Signal Binding</name>
 
   <properties>
-    <bnd.importpackage>!android.*,!com.android.*,!dalvik.*,!javax.annotation.meta,!org.apache.harmony.xnet.provider.jsse,!org.conscrypt,!sun.security.ssl,!kotlin.*,!org.bouncycastle.jsse.*,!org.openjsse.javax.net.ssl.*,!org.openjsse.net.ssl.*,!com.codahale.metrics.health,!com.codahale.metrics,!io.prometheus.client,!org.bouncycastle.asn1.*,!org.jetbrains.kotlin.*,!org.hibernate,!org.hibernate.*,!okio,!io.micrometer.core,!io.micrometer.core.*,!javassist,!javassist.*,!okhttp3,!org.signal.libsignal.*</bnd.importpackage>
+    <bnd.importpackage>!android.*,!com.android.*,!dalvik.*,!javax.annotation.meta,!org.apache.harmony.xnet.provider.jsse,!org.conscrypt,!sun.security.ssl,!kotlin.*,!org.bouncycastle.jsse.*,!org.openjsse.javax.net.ssl.*,!org.openjsse.net.ssl.*,!com.codahale.metrics.health,!com.codahale.metrics,!io.prometheus.client,!org.bouncycastle.asn1.*,!org.jetbrains.kotlin.*,!org.hibernate,!org.hibernate.*,!okio,!io.micrometer.core,!io.micrometer.core.*,!javassist,!javassist.*,!okhttp3,!org.signal.libsignal.*,!com.squareup.*,!org.sqlite.*</bnd.importpackage>
+    <!-- <dep.noembedding>sqlite-jdbc</dep.noembedding> -->
     <slf4j.version>1.7.32</slf4j.version>
   </properties>
 
@@ -23,13 +24,13 @@
     <dependency>
       <artifactId>signal-service-java</artifactId>
       <groupId>com.github.turasa</groupId>
-      <version>2.15.3_unofficial_65</version>
+      <version>2.15.3_unofficial_69</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.signal</groupId>
       <artifactId>libsignal-client</artifactId>
-      <version>0.21.1</version>
+      <version>0.22.0</version>
       <scope>compile</scope>
     </dependency>
     <dependency>

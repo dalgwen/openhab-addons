@@ -8,7 +8,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.asamk.signal.manager.api.StickerPackId;
-import org.eclipse.jdt.annotation.Nullable;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -22,7 +21,7 @@ public class LegacyStickerStore {
             var packId = StickerPackId.deserialize(Base64.getDecoder().decode(s.packId));
             if (packIds.contains(packId)) {
                 // Remove legacy duplicate packIds ...
-                return Optional.<StickerPack> empty();
+                return Optional.<StickerPack>empty();
             }
             packIds.add(packId);
             var packKey = Base64.getDecoder().decode(s.packKey);
@@ -35,7 +34,7 @@ public class LegacyStickerStore {
 
     public static class Storage {
 
-        private final List<@Nullable Sticker> stickers;
+        private final List<Sticker> stickers;
 
         public Storage(@JsonProperty("stickers") List<Sticker> stickers) {
             super();

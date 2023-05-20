@@ -1,7 +1,5 @@
 package org.asamk.signal.manager;
 
-import static org.asamk.signal.manager.config.ServiceConfig.capabilities;
-
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -84,6 +82,10 @@ public class SignalDependencies {
         return serviceEnvironmentConfig;
     }
 
+    public SignalSessionLock getSessionLock() {
+        return sessionLock;
+    }
+
     public SignalServiceAccountManager getAccountManager() {
         return getOrCreate(() -> accountManager,
                 () -> accountManager = new SignalServiceAccountManager(
@@ -103,18 +105,14 @@ public class SignalDependencies {
 
     public GroupsV2Operations getGroupsV2Operations() {
         return getOrCreate(() -> groupsV2Operations,
-                () -> groupsV2Operations = capabilities.isGv2()
-                        ? new GroupsV2Operations(
-                                ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration()),
-                                ServiceConfig.GROUP_MAX_SIZE)
-                        : null);
+                () -> groupsV2Operations = new GroupsV2Operations(
+                        ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration()),
+                        ServiceConfig.GROUP_MAX_SIZE));
     }
 
     private ClientZkOperations getClientZkOperations() {
-        return getOrCreate(() -> clientZkOperations,
-                () -> clientZkOperations = capabilities.isGv2()
-                        ? ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration())
-                        : null);
+        return getOrCreate(() -> clientZkOperations, () -> clientZkOperations = ClientZkOperations
+                .create(serviceEnvironmentConfig.getSignalServiceConfiguration()));
     }
 
     private ClientZkProfileOperations getClientZkProfileOperations() {

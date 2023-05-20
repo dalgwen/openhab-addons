@@ -91,7 +91,7 @@ public class SignalConversationHandler extends BaseThingHandler {
     protected void checkAndReceive(RecipientAddress address, String message) {
         String conversationRecipient = getRecipient();
         // is the recipient the one handled by this conversation ? :
-        String uuid = address.getServiceId().toString();
+        String uuid = address.uuid().orElse(RecipientAddress.UNKNOWN_UUID).toString();
         String number = address.getLegacyIdentifier();
         if (conversationRecipient.equals(uuid) || conversationRecipient.equals(number)) {
             updateState(SignalBindingConstants.CHANNEL_RECEIVED, new StringType(message));
