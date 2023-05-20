@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalWebSocket;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.websocket.WebSocketConnectionState;
 import org.whispersystems.signalservice.api.websocket.WebSocketUnavailableException;
 
@@ -136,23 +137,28 @@ public class ReceiveHelper {
             logger.debug("Checking for new message from server");
             try {
                 isWaitingForMessage = true;
-                var result = signalWebSocket.readOrEmpty(timeout.toMillis(), envelope1 -> {
+                var queueNotEmpty = signalWebSocket.readMessageBatch(timeout.toMillis(), 1, batch -> {
+                    logger.debug("Retrieved {} envelopes!", batch.size());
                     isWaitingForMessage = false;
-                    final var recipientId = envelope1.hasSourceUuid()
-                            ? account.getRecipientResolver().resolveRecipient(envelope1.getSourceAddress())
-                            : null;
-                    logger.trace("Storing new message from {}", recipientId);
-                    // store message on disk, before acknowledging receipt to the server
-                    cachedMessage[0] = account.getMessageCache().cacheMessage(envelope1, recipientId);
+                    for (final var it : batch) {
+                        SignalServiceEnvelope envelope1 = new SignalServiceEnvelope(it.getEnvelope(),
+                                it.getServerDeliveredTimestamp());
+                        final var recipientId = envelope1.hasSourceUuid() ? account.getRecipientResolver()
+                                .resolveRecipient(envelope1.getSourceAddress()) : null;
+                        logger.trace("Storing new message from {}", recipientId);
+                        // store message on disk, before acknowledging receipt to the server
+                        cachedMessage[0] = account.getMessageCache().cacheMessage(envelope1, recipientId);
+                    }
+                    return true;
                 });
                 isWaitingForMessage = false;
                 backOffCounter = 0;
 
-                if (result.isPresent()) {
+                if (queueNotEmpty) {
                     if (remainingMessages > 0) {
                         remainingMessages -= 1;
                     }
-                    envelope = result.get();
+                    envelope = cachedMessage[0].loadEnvelope();
                     logger.debug("New message received from server");
                 } else {
                     logger.debug("Received indicator that server queue is empty");
@@ -214,8 +220,9 @@ public class ReceiveHelper {
                 if (exception instanceof UntrustedIdentityException) {
                     logger.debug("Keeping message with untrusted identity in message cache");
                     final var address = ((UntrustedIdentityException) exception).getSender();
-                    final var recipientId = account.getRecipientResolver().resolveRecipient(address.getServiceId());
-                    if (!envelope.hasSourceUuid()) {
+                    if (!envelope.hasSourceUuid() && address.uuid().isPresent()) {
+                        final var recipientId = account.getRecipientResolver()
+                                .resolveRecipient(ServiceId.from(address.uuid().get()));
                         try {
                             cachedMessage[0] = account.getMessageCache().replaceSender(cachedMessage[0], recipientId);
                         } catch (IOException ioException) {

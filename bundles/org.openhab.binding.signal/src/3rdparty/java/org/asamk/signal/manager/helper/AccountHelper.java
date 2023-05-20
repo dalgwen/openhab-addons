@@ -13,13 +13,16 @@ import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.InvalidDeviceLinkException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
-import org.asamk.signal.manager.config.ServiceConfig;
+import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.NumberVerificationUtils;
+import org.asamk.signal.manager.util.Utils;
 import org.signal.libsignal.protocol.IdentityKeyPair;
 import org.signal.libsignal.protocol.InvalidKeyException;
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
+import org.signal.libsignal.usernames.BaseUsernameException;
+import org.signal.libsignal.usernames.Username;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.account.ChangePhoneNumberRequest;
@@ -27,10 +30,16 @@ import org.whispersystems.signalservice.api.push.ACI;
 import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.ServiceIdType;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
+import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedException;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
 import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
 import org.whispersystems.signalservice.api.util.DeviceNameUtil;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
+import org.whispersystems.util.Base64UrlSafe;
+
+import java.util.ArrayList;
+import java.util.Objects;
+import static org.whispersystems.signalservice.internal.util.Util.isEmpty;
 
 public class AccountHelper {
 
@@ -122,9 +131,14 @@ public class AccountHelper {
     }
 
     public void startChangeNumber(String newNumber, String captcha, boolean voiceVerification)
-            throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException {
+            throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException {
         final var accountManager = dependencies.createUnauthenticatedAccountManager(newNumber, account.getPassword());
-        NumberVerificationUtils.requestVerificationCode(accountManager, captcha, voiceVerification);
+        String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
+                account.getSessionId(newNumber),
+                id -> account.setSessionId(newNumber, id),
+                voiceVerification,
+                captcha);
+        NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
     }
 
     public void finishChangeNumber(String newNumber, String verificationCode, String pin)
@@ -133,13 +147,107 @@ public class AccountHelper {
         final List<OutgoingPushMessage> deviceMessages = null;
         final Map<String, SignedPreKeyEntity> devicePniSignedPreKeys = null;
         final Map<String, Integer> pniRegistrationIds = null;
-        final var result = NumberVerificationUtils.verifyNumber(verificationCode, pin, context.getPinHelper(),
-                (verificationCode1, registrationLock) -> dependencies.getAccountManager()
-                        .changeNumber(new ChangePhoneNumberRequest(newNumber, verificationCode1, registrationLock,
-                                account.getPniIdentityKeyPair().getPublicKey(), deviceMessages, devicePniSignedPreKeys,
-                                pniRegistrationIds)));
+        var sessionId = account.getSessionId(account.getNumber());
+        final var result = NumberVerificationUtils.verifyNumber(sessionId,
+                verificationCode,
+                pin,
+                context.getPinHelper(),
+                (sessionId1, verificationCode1, registrationLock) -> {
+                    final var accountManager = dependencies.getAccountManager();
+                    try {
+                        Utils.handleResponseException(accountManager.verifyAccount(verificationCode, sessionId1));
+                    } catch (AlreadyVerifiedException e) {
+                        // Already verified so can continue changing number
+                    }
+                    return Utils.handleResponseException(accountManager.changeNumber(new ChangePhoneNumberRequest(
+                            sessionId1,
+                            null,
+                            newNumber,
+                            registrationLock,
+                            account.getPniIdentityKeyPair().getPublicKey(),
+                            deviceMessages,
+                            devicePniSignedPreKeys,
+                            pniRegistrationIds)));
+                });
         // TODO handle response
         updateSelfIdentifiers(newNumber, account.getAci(), PNI.parseOrThrow(result.first().getPni()));
+    }
+
+    public static final int USERNAME_MIN_LENGTH = 3;
+    public static final int USERNAME_MAX_LENGTH = 32;
+
+    public String reserveUsername(String nickname) throws IOException, BaseUsernameException {
+        final var currentUsername = account.getUsername();
+        if (currentUsername != null) {
+            final var currentNickname = currentUsername.substring(0, currentUsername.indexOf('.'));
+            if (currentNickname.equals(nickname)) {
+                refreshCurrentUsername();
+                return currentUsername;
+            }
+        }
+
+        final var candidates = Username.generateCandidates(nickname, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH);
+        final var candidateHashes = new ArrayList<String>();
+        for (final var candidate : candidates) {
+            candidateHashes.add(Base64UrlSafe.encodeBytesWithoutPadding(Username.hash(candidate)));
+        }
+
+        final var response = dependencies.getAccountManager().reserveUsername(candidateHashes);
+        final var hashIndex = candidateHashes.indexOf(response.getUsernameHash());
+        if (hashIndex == -1) {
+            logger.warn("[reserveUsername] The response hash could not be found in our set of candidateHashes.");
+            throw new IOException("Unexpected username response");
+        }
+
+        logger.debug("[reserveUsername] Successfully reserved username.");
+        final var username = candidates.get(hashIndex);
+
+        dependencies.getAccountManager().confirmUsername(username, response);
+        account.setUsername(username);
+        account.getRecipientStore().resolveSelfRecipientTrusted(account.getSelfRecipientAddress());
+        logger.debug("[confirmUsername] Successfully confirmed username.");
+
+        return username;
+    }
+
+    public void refreshCurrentUsername() throws IOException, BaseUsernameException {
+        final var localUsername = account.getUsername();
+        if (localUsername == null) {
+            return;
+        }
+
+        final var whoAmIResponse = dependencies.getAccountManager().getWhoAmI();
+        final var serverUsernameHash = whoAmIResponse.getUsernameHash();
+        final var hasServerUsername = !isEmpty(serverUsernameHash);
+        final var localUsernameHash = Base64UrlSafe.encodeBytesWithoutPadding(Username.hash(localUsername));
+
+        if (!hasServerUsername) {
+            logger.debug("No remote username is set.");
+        }
+
+        if (!Objects.equals(localUsernameHash, serverUsernameHash)) {
+            logger.debug("Local username hash does not match server username hash.");
+        }
+
+        if (!hasServerUsername || !Objects.equals(localUsernameHash, serverUsernameHash)) {
+            logger.debug("Attempting to resynchronize username.");
+            tryReserveConfirmUsername(localUsername, localUsernameHash);
+        } else {
+            logger.debug("Username already set, not refreshing.");
+        }
+    }
+
+    private void tryReserveConfirmUsername(final String username, String localUsernameHash) throws IOException {
+        final var response = dependencies.getAccountManager().reserveUsername(List.of(localUsernameHash));
+        logger.debug("[reserveUsername] Successfully reserved existing username.");
+        dependencies.getAccountManager().confirmUsername(username, response);
+        logger.debug("[confirmUsername] Successfully confirmed existing username.");
+    }
+
+    public void deleteUsername() throws IOException {
+        dependencies.getAccountManager().deleteUsername();
+        account.setUsername(null);
+        logger.debug("[deleteUsername] Successfully deleted the username.");
     }
 
     public void setDeviceName(String deviceName) {
@@ -149,11 +257,7 @@ public class AccountHelper {
     }
 
     public void updateAccountAttributes() throws IOException {
-        dependencies.getAccountManager().setAccountAttributes(null, account.getLocalRegistrationId(), true, null,
-                account.getRegistrationLock(), account.getSelfUnidentifiedAccessKey(),
-                account.isUnrestrictedUnidentifiedAccess(), ServiceConfig.capabilities,
-                account.isDiscoverableByPhoneNumber(), account.getEncryptedDeviceName(),
-                account.getLocalPniRegistrationId());
+        dependencies.getAccountManager().setAccountAttributes(account.getAccountAttributes(null));
     }
 
     public void addDevice(DeviceLinkInfo deviceLinkInfo) throws IOException, InvalidDeviceLinkException {

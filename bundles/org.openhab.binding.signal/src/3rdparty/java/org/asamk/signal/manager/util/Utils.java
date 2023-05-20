@@ -1,5 +1,7 @@
 package org.asamk.signal.manager.util;
 
+import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.internal.ServiceResponse;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -57,27 +59,39 @@ public class Utils {
         }
     }
 
-    public static Fingerprint computeSafetyNumber(boolean isUuidCapable, RecipientAddress ownAddress,
-            IdentityKey ownIdentityKey, RecipientAddress theirAddress, IdentityKey theirIdentityKey) {
-        int version;
-        byte[] ownId;
-        byte[] theirId;
+    public static Fingerprint computeSafetyNumberForNumber(
+            String ownNumber, IdentityKey ownIdentityKey, String theirNumber, IdentityKey theirIdentityKey
+    ) {
+        // Version 1: E164 user
+        final var version = 1;
+        final var ownId = ownNumber.getBytes(StandardCharsets.UTF_8);
+        final var theirId = theirNumber.getBytes(StandardCharsets.UTF_8);
 
-        if (!isUuidCapable && ownAddress.number().isPresent() && theirAddress.number().isPresent()) {
-            // Version 1: E164 user
-            version = 1;
-            ownId = ownAddress.number().get().getBytes();
-            theirId = theirAddress.number().get().getBytes();
-        } else if (isUuidCapable && theirAddress.serviceId().isPresent()) {
-            // Version 2: UUID user
-            version = 2;
-            ownId = ownAddress.getServiceId().toByteArray();
-            theirId = theirAddress.getServiceId().toByteArray();
-        } else {
-            return null;
-        }
+        return getFingerprint(version, ownId, ownIdentityKey, theirId, theirIdentityKey);
+    }
 
-        return new NumericFingerprintGenerator(5200).createFor(version, ownId, ownIdentityKey, theirId,
+    public static Fingerprint computeSafetyNumberForUuid(
+            ServiceId ownServiceId, IdentityKey ownIdentityKey, ServiceId theirServiceId, IdentityKey theirIdentityKey
+    ) {
+        // Version 2: UUID user
+        final var version = 2;
+        final var ownId = ownServiceId.toByteArray();
+        final var theirId = theirServiceId.toByteArray();
+
+        return getFingerprint(version, ownId, ownIdentityKey, theirId, theirIdentityKey);
+    }
+
+    private static Fingerprint getFingerprint(
+            final int version,
+            final byte[] ownId,
+            final IdentityKey ownIdentityKey,
+            final byte[] theirId,
+            final IdentityKey theirIdentityKey
+    ) {
+        return new NumericFingerprintGenerator(5200).createFor(version,
+                ownId,
+                ownIdentityKey,
+                theirId,
                 theirIdentityKey);
     }
 
@@ -119,5 +133,17 @@ public class Utils {
             map.put(name, value);
         }
         return map;
+    }
+
+    public static <T> T handleResponseException(final ServiceResponse<T> response) throws IOException {
+        final var throwableOptional = response.getExecutionError().or(response::getApplicationError);
+        if (throwableOptional.isPresent()) {
+            if (throwableOptional.get() instanceof IOException) {
+                throw (IOException) throwableOptional.get();
+            } else {
+                throw new IOException(throwableOptional.get());
+            }
+        }
+        return response.getResult().orElse(null);
     }
 }

@@ -35,13 +35,12 @@ Also, note that if you use docker with openHAB, you have to lift the cryptograph
 
 ## Captcha (for signalaccount only)
 
-Unfortunately, registering a custom agent (a non-mobile device), is tedious. Signal protects its network with a captcha anti-bot registration system.
+Unfortunately, registering a custom agent (a non-mobile device), requires additional step. Signal protects its network with a captcha anti-bot registration system.
 
 So, the Signal network will probably require a captcha to register your number. This is a string, returned by a dedicated web page, proving that you are a human. You have then to provide it to the binding.
 
-In order to get one, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and intercept the response with the browser developer tool (use Chrome for this). You can see the full procedure in the following screencap.
+In order to get one, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and copy/paste the resulting link in the signal account thing configuration.
 
-![Captcha obtention procedure](doc/signal-captcha.gif "Captcha")
 
 ## Thing Configuration
 
@@ -133,10 +132,10 @@ signalAction.sendSignal("+33123456789", "Hello world!")
 You can also send image with this action, using file path, web resource, item of type Image, or direct dataUri :
 
 ```
-signalAction.sendSignalImage("+33123456789", "/path/to/image.png")
-signalAction.sendSignalImage("+33123456789", "https://www.openhab.org/openhab-logo-top.png")
-signalAction.sendSignalImage("+33123456789", MyImageItem.state.toFullString)
-signalAction.sendSignalImage("+33123456789", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwQAADsEBuJFr7QAAABl0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC4yMfEgaZUAAAAfSURBVDhPY/j+v49sNKqZRDSqmUQ0qplENPI0/+8DAOnW7m6FxOUUAAAAAElFTkSuQmCC")
+signalAction.sendSignalImage("+33123456789", "/path/to/image.png", "Look at this !")
+signalAction.sendSignalImage("+33123456789", "https://www.openhab.org/openhab-logo-top.png", "")
+signalAction.sendSignalImage("+33123456789", MyImageItem.state.toFullString, "")
+signalAction.sendSignalImage("+33123456789", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwQAADsEBuJFr7QAAABl0RVh0U29mdHdhcmUAcGFpbnQubmV0IDQuMC4yMfEgaZUAAAAfSURBVDhPY/j+v49sNKqZRDSqmUQ0qplENPI0/+8DAOnW7m6FxOUUAAAAAElFTkSuQmCC", "Image inline !")
 
 ```
 

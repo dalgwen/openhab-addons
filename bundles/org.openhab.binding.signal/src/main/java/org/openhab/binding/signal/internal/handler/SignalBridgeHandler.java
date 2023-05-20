@@ -167,7 +167,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
             }
         } catch (IncompleteRegistrationException e) {
             String message = "Incomplete registration: " + e.getMessage();
-            getConfig().put(SignalBindingConstants.PROPERTY_QRCODE, null);
+            getConfig().remove(SignalBindingConstants.PROPERTY_QRCODE);
             checkScheduled.cancel(false);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
         } catch (IOException e) {
@@ -250,7 +250,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
      * @param recipient The recipient for the message
      * @param image The image to sent. Use a scheme at the beginning (either file:, http:, base64
      */
-    public DeliveryReport sendImage(String recipient, String image) {
+    public DeliveryReport sendImage(String recipient, String image, @Nullable String text) {
 
         logger.debug("Sending photo message to {}", recipient);
         SignalService signalServiceFinal = signalService;
@@ -287,7 +287,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
             return new DeliveryReport(DeliveryStatus.FAILED, recipient);
         }
 
-        return signalServiceFinal.send(recipient, "", attachment);
+        return signalServiceFinal.send(recipient, text == null ? "" : text, attachment);
     }
 
     /**

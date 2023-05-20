@@ -98,8 +98,16 @@ public class StorageHelper {
         }
 
         final var contactRecord = record.getContact().get();
-        final var address = new RecipientAddress(contactRecord.getServiceId(), contactRecord.getNumber().orElse(null));
-        final var recipientId = account.getRecipientResolver().resolveRecipient(address);
+        final var serviceId = contactRecord.getServiceId();
+        if (contactRecord.getNumber().isEmpty() && serviceId.isUnknown()) {
+            return;
+        }
+        final var address = new RecipientAddress(serviceId, contactRecord.getNumber().orElse(null));
+        var recipientId = account.getRecipientResolver().resolveRecipient(address);
+        if (serviceId.isValid() && contactRecord.getUsername().isPresent()) {
+            recipientId = account.getRecipientTrustedResolver()
+                    .resolveRecipientTrusted(serviceId, contactRecord.getUsername().get());
+        }
 
         final var contact = account.getContactStore().getContact(recipientId);
         final var blocked = contact != null && contact.isBlocked();
@@ -146,16 +154,15 @@ public class StorageHelper {
                 logger.warn("Received invalid contact profile key from storage");
             }
         }
-        if (contactRecord.getIdentityKey().isPresent()) {
+        if (contactRecord.getIdentityKey().isPresent() && serviceId.isValid()) {
             try {
                 logger.trace("Storing identity key {}", recipientId);
                 final var identityKey = new IdentityKey(contactRecord.getIdentityKey().get());
-                account.getIdentityKeyStore().saveIdentity(address.getServiceId(), identityKey);
+                account.getIdentityKeyStore().saveIdentity(serviceId, identityKey);
 
                 final var trustLevel = TrustLevel.fromIdentityState(contactRecord.getIdentityState());
                 if (trustLevel != null) {
-                    account.getIdentityKeyStore().setIdentityTrustLevel(address.getServiceId(), identityKey,
-                            trustLevel);
+                    account.getIdentityKeyStore().setIdentityTrustLevel(serviceId, identityKey, trustLevel);
                 }
             } catch (InvalidKeyException e) {
                 logger.warn("Received invalid contact identity key from storage");
@@ -248,6 +255,7 @@ public class StorageHelper {
             account.getConfigurationStore().setPhoneNumberSharingMode(pnsm);
         }
         account.getConfigurationStore().setPhoneNumberUnlisted(accountRecord.isPhoneNumberUnlisted());
+        account.setUsername(accountRecord.getUsername());
 
         if (accountRecord.getProfileKey().isPresent()) {
             ProfileKey profileKey;

@@ -1,20 +1,20 @@
 package org.asamk.signal.manager.storage.stickerPacks;
 
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 
 import org.asamk.signal.manager.api.StickerPack;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class JsonStickerPack {
 
-    private final String title;
-    private final String author;
-    private final JsonSticker cover;
-    private final List<JsonSticker> stickers;
+    private String title;
+    private String author;
+    private JsonSticker cover;
+    private List<JsonSticker> stickers;
 
-    public JsonStickerPack(@JsonProperty("title") String title, @JsonProperty("author") String author, @JsonProperty("cover") JsonSticker cover, @JsonProperty("stickers") List<JsonSticker> stickers) {
+    public JsonStickerPack(@JsonProperty("title") String title, @JsonProperty("author") String author,
+            @JsonProperty("cover") JsonSticker cover, @JsonProperty("stickers") List<JsonSticker> stickers) {
         super();
         this.title = title;
         this.author = author;
@@ -28,7 +28,8 @@ public class JsonStickerPack {
         private final String file;
         private final String contentType;
 
-        public JsonSticker(@JsonProperty("id") Integer id, @JsonProperty("emoji") String emoji, @JsonProperty("file") String file, @JsonProperty("contentType") String contentType) {
+        public JsonSticker(@JsonProperty("id") Integer id, @JsonProperty("emoji") String emoji,
+                @JsonProperty("file") String file, @JsonProperty("contentType") String contentType) {
             super();
             this.id = id;
             this.emoji = emoji;
@@ -57,6 +58,22 @@ public class JsonStickerPack {
         }
     }
 
+    public String getTitle() {
+        return title;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public JsonSticker getCover() {
+        return cover;
+    }
+
+    public List<JsonSticker> getStickers() {
+        return stickers;
+    }
+
     public String title() {
         return title;
     }
@@ -72,4 +89,21 @@ public class JsonStickerPack {
     public List<JsonSticker> stickers() {
         return stickers;
     }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public void setCover(JsonSticker cover) {
+        this.cover = cover;
+    }
+
+    public void setStickers(List<JsonSticker> stickers) {
+        this.stickers = stickers;
+    }
+
 }

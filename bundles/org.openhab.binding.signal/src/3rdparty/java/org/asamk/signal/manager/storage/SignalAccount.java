@@ -82,6 +82,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalServiceAccountDataStore;
 import org.whispersystems.signalservice.api.SignalServiceDataStore;
+import org.whispersystems.signalservice.api.account.AccountAttributes;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
 import org.whispersystems.signalservice.api.push.ACI;
@@ -96,6 +97,8 @@ import org.whispersystems.signalservice.api.util.UuidUtil;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static org.asamk.signal.manager.config.ServiceConfig.getCapabilities;
 
 public class SignalAccount implements Closeable {
 
@@ -117,8 +120,11 @@ public class SignalAccount implements Closeable {
     private String accountPath;
     private ServiceEnvironment serviceEnvironment;
     private String number;
+    private String username;
     private ACI aci;
     private PNI pni;
+    private String sessionId;
+    private String sessionNumber;
     private String encryptedDeviceName;
     private int deviceId = SignalServiceAddress.DEFAULT_DEVICE_ID;
     private boolean isMultiDevice = false;
@@ -345,9 +351,9 @@ public class SignalAccount implements Closeable {
     }
 
     public void removeRecipient(final RecipientId recipientId) {
+        final var recipientAddress = getRecipientStore().resolveRecipientAddress(recipientId);
         getRecipientStore().deleteRecipientData(recipientId);
         getMessageCache().deleteMessages(recipientId);
-        final var recipientAddress = getRecipientStore().resolveRecipientAddress(recipientId);
         if (recipientAddress.serviceId().isPresent()) {
             final var serviceId = recipientAddress.serviceId().get();
             getAciSessionStore().deleteAllSessions(serviceId);
@@ -466,6 +472,9 @@ public class SignalAccount implements Closeable {
             serviceEnvironment = ServiceEnvironment.valueOf(rootNode.get("serviceEnvironment").asText());
         }
         registered = Utils.getNotNullNode(rootNode, "registered").asBoolean();
+        if (rootNode.hasNonNull("usernameIdentifier")) {
+            username = rootNode.get("usernameIdentifier").asText();
+        }
         if (rootNode.hasNonNull("uuid")) {
             try {
                 aci = ACI.parseOrThrow(rootNode.get("uuid").asText());
@@ -479,6 +488,12 @@ public class SignalAccount implements Closeable {
             } catch (IllegalArgumentException e) {
                 throw new IOException("Config file contains an invalid pni, needs to be a valid UUID", e);
             }
+        }
+        if (rootNode.hasNonNull("sessionId")) {
+            sessionId = rootNode.get("sessionId").asText();
+        }
+        if (rootNode.hasNonNull("sessionNumber")) {
+            sessionNumber = rootNode.get("sessionNumber").asText();
         }
         if (rootNode.hasNonNull("deviceName")) {
             encryptedDeviceName = rootNode.get("deviceName").asText();
@@ -717,7 +732,7 @@ public class SignalAccount implements Closeable {
                 if (identity.getAddress().serviceId().isEmpty()) {
                     continue;
                 }
-                final var serviceId = identity.getAddress().getServiceId();
+                final var serviceId = identity.getAddress().serviceId().get();
                 getIdentityKeyStore().saveIdentity(serviceId, identity.getIdentityKey());
                 getIdentityKeyStore().setIdentityTrustLevel(serviceId, identity.getIdentityKey(),
                         identity.getTrustLevel());
@@ -826,7 +841,11 @@ public class SignalAccount implements Closeable {
             var rootNode = jsonProcessor.createObjectNode();
             rootNode.put("version", CURRENT_STORAGE_VERSION).put("username", number)
                     .put("serviceEnvironment", serviceEnvironment == null ? null : serviceEnvironment.name())
-                    .put("uuid", aci == null ? null : aci.toString()).put("pni", pni == null ? null : pni.toString())
+                    .put("usernameIdentifier", username)
+                    .put("uuid", aci == null ? null : aci.toString())
+                    .put("pni", pni == null ? null : pni.toString())
+                    .put("sessionId", sessionId)
+                    .put("sessionNumber", sessionNumber)
                     .put("deviceName", encryptedDeviceName).put("deviceId", deviceId)
                     .put("isMultiDevice", isMultiDevice).put("lastReceiveTimestamp", lastReceiveTimestamp)
                     .put("password", password).put("registrationId", localRegistrationId)
@@ -1162,6 +1181,15 @@ public class SignalAccount implements Closeable {
         save();
     }
 
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(final String username) {
+        this.username = username;
+        save();
+    }
+
     public ServiceEnvironment getServiceEnvironment() {
         return serviceEnvironment;
     }
@@ -1169,6 +1197,25 @@ public class SignalAccount implements Closeable {
     public void setServiceEnvironment(final ServiceEnvironment serviceEnvironment) {
         this.serviceEnvironment = serviceEnvironment;
         save();
+    }
+
+    public AccountAttributes getAccountAttributes(String registrationLock) {
+        return new AccountAttributes(null,
+                getLocalRegistrationId(),
+                true,
+                null,
+                registrationLock != null ? registrationLock : getRegistrationLock(),
+                getSelfUnidentifiedAccessKey(),
+                isUnrestrictedUnidentifiedAccess(),
+                getAccountCapabilities(),
+                isDiscoverableByPhoneNumber(),
+                encryptedDeviceName,
+                getLocalPniRegistrationId(),
+                null); // TODO recoveryPassword?
+    }
+
+    public AccountAttributes.Capabilities getAccountCapabilities() {
+        return getCapabilities(isPrimaryDevice());
     }
 
     public ServiceId getAccountId(ServiceIdType serviceIdType) {
@@ -1214,11 +1261,24 @@ public class SignalAccount implements Closeable {
     }
 
     public RecipientAddress getSelfRecipientAddress() {
-        return new RecipientAddress(aci, pni, number);
+        return new RecipientAddress(aci, pni, number, username);
     }
 
     public RecipientId getSelfRecipientId() {
         return getRecipientResolver().resolveRecipient(getSelfRecipientAddress());
+    }
+
+    public String getSessionId(final String forNumber) {
+        if (!forNumber.equals(sessionNumber)) {
+            return null;
+        }
+        return sessionId;
+    }
+
+    public void setSessionId(final String sessionNumber, final String sessionId) {
+        this.sessionNumber = sessionNumber;
+        this.sessionId = sessionId;
+        save();
     }
 
     public byte[] getEncryptedDeviceName() {
@@ -1252,7 +1312,7 @@ public class SignalAccount implements Closeable {
 
     public void setPniIdentityKeyPair(final IdentityKeyPair identityKeyPair) {
         pniIdentityKeyPair = identityKeyPair;
-        final var pniPublicKey = getPniIdentityKeyPair().getPublicKey();
+        final var pniPublicKey = identityKeyPair.getPublicKey();
         getIdentityKeyStore().saveIdentity(getPni(), pniPublicKey);
         getIdentityKeyStore().setIdentityTrustLevel(getPni(), pniPublicKey, TrustLevel.TRUSTED_VERIFIED);
         save();
@@ -1468,9 +1528,13 @@ public class SignalAccount implements Closeable {
         final var aciPublicKey = getAciIdentityKeyPair().getPublicKey();
         getIdentityKeyStore().saveIdentity(getAci(), aciPublicKey);
         getIdentityKeyStore().setIdentityTrustLevel(getAci(), aciPublicKey, TrustLevel.TRUSTED_VERIFIED);
-        final var pniPublicKey = getPniIdentityKeyPair().getPublicKey();
-        getIdentityKeyStore().saveIdentity(getPni(), pniPublicKey);
-        getIdentityKeyStore().setIdentityTrustLevel(getPni(), pniPublicKey, TrustLevel.TRUSTED_VERIFIED);
+        if (getPniIdentityKeyPair() == null) {
+            setPniIdentityKeyPair(KeyUtils.generateIdentityKeyPair());
+        } else {
+            final var pniPublicKey = getPniIdentityKeyPair().getPublicKey();
+            getIdentityKeyStore().saveIdentity(getPni(), pniPublicKey);
+            getIdentityKeyStore().setIdentityTrustLevel(getPni(), pniPublicKey, TrustLevel.TRUSTED_VERIFIED);
+        }
     }
 
     public void deleteAccountData() throws IOException {

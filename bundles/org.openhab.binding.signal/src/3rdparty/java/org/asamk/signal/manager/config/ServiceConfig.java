@@ -28,12 +28,7 @@ public class ServiceConfig {
 
     private final static KeyStore iasKeyStore;
 
-    public static final AccountAttributes.Capabilities capabilities;
-
     static {
-        capabilities = new AccountAttributes.Capabilities(false, true, false, true, true, true, true, true, false,
-                false);
-
         try {
             TrustStore contactTrustStore = new IasTrustStore();
 
@@ -45,6 +40,21 @@ public class ServiceConfig {
         } catch (KeyStoreException | CertificateException | IOException | NoSuchAlgorithmException e) {
             throw new AssertionError(e);
         }
+    }
+
+    public static AccountAttributes.Capabilities getCapabilities(boolean isPrimaryDevice) {
+        final var giftBadges = !isPrimaryDevice;
+        return new AccountAttributes.Capabilities(false,
+                true,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                giftBadges,
+                false,
+                false);
     }
 
     public static boolean isSignalClientAvailable() {
@@ -78,13 +88,13 @@ public class ServiceConfig {
                 return new ServiceEnvironmentConfig(serviceEnvironment,
                         LiveConfig.createDefaultServiceConfiguration(interceptors),
                         LiveConfig.getUnidentifiedSenderTrustRoot(), LiveConfig.createKeyBackupConfig(),
-                        LiveConfig.createFallbackKeyBackupConfigs(), LiveConfig.getCdsMrenclave(),
+                        LiveConfig.createFallbackKeyBackupConfigs(),
                         LiveConfig.getCdsiMrenclave());
             case STAGING:
                 return new ServiceEnvironmentConfig(serviceEnvironment,
                         StagingConfig.createDefaultServiceConfiguration(interceptors),
                         StagingConfig.getUnidentifiedSenderTrustRoot(), StagingConfig.createKeyBackupConfig(),
-                        StagingConfig.createFallbackKeyBackupConfigs(), StagingConfig.getCdsMrenclave(),
+                        StagingConfig.createFallbackKeyBackupConfigs(),
                         StagingConfig.getCdsiMrenclave());
         }
     }

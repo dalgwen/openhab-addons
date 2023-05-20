@@ -16,8 +16,6 @@
  */
 package org.asamk.signal.manager;
 
-import static org.asamk.signal.manager.config.ServiceConfig.capabilities;
-
 import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -26,6 +24,7 @@ import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
+import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
@@ -33,6 +32,8 @@ import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.PinHelper;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.util.NumberVerificationUtils;
+import org.asamk.signal.manager.util.Utils;
+import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalServiceAccountManager;
@@ -41,7 +42,7 @@ import org.whispersystems.signalservice.api.groupsv2.GroupsV2Operations;
 import org.whispersystems.signalservice.api.push.ACI;
 import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.internal.ServiceResponse;
+import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedException;
 import org.whispersystems.signalservice.internal.push.VerifyAccountResponse;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 
@@ -94,9 +95,11 @@ class RegistrationManagerImpl implements RegistrationManager {
     }
 
     @Override
-    public void register(boolean voiceVerification, String captcha)
-            throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException {
-        if (account.isRegistered() && account.getServiceEnvironment() != null
+    public void register(
+            boolean voiceVerification, String captcha
+    ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException {
+        if (account.isRegistered()
+                && account.getServiceEnvironment() != null
                 && account.getServiceEnvironment() != serviceEnvironmentConfig.getType()) {
             throw new IOException("Account is registered in another environment: " + account.getServiceEnvironment());
         }
@@ -105,14 +108,24 @@ class RegistrationManagerImpl implements RegistrationManager {
             return;
         }
 
-        NumberVerificationUtils.requestVerificationCode(accountManager, captcha, voiceVerification);
+        String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
+                account.getSessionId(account.getNumber()),
+                id -> account.setSessionId(account.getNumber(), id),
+                voiceVerification,
+                captcha);
+        NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
     }
 
     @Override
-    public void verifyAccount(String verificationCode, String pin)
-            throws IOException, PinLockedException, IncorrectPinException {
+    public void verifyAccount(
+            String verificationCode, String pin
+    ) throws IOException, PinLockedException, IncorrectPinException {
         String _pin = pin;
-        final var result = NumberVerificationUtils.verifyNumber(verificationCode, _pin, pinHelper,
+        var sessionId = account.getSessionId(account.getNumber());
+        final var result = NumberVerificationUtils.verifyNumber(sessionId,
+                verificationCode,
+                pin,
+                pinHelper,
                 this::verifyAccountWithCode);
         final var response = result.first();
         final var masterKey = result.second();
@@ -142,6 +155,12 @@ class RegistrationManagerImpl implements RegistrationManager {
                 logger.warn("Failed to set default profile: {}", e.getMessage());
             }
 
+            try {
+                m.refreshCurrentUsername();
+            } catch (IOException | BaseUsernameException e) {
+                logger.warn("Failed to refresh current username", e);
+            }
+
             if (newManagerListener != null) {
                 newManagerListener.accept(m);
                 m = null;
@@ -167,13 +186,12 @@ class RegistrationManagerImpl implements RegistrationManager {
 
     private boolean attemptReactivateAccount() {
         try {
-            final var accountManager = new SignalServiceAccountManager(
-                    serviceEnvironmentConfig.getSignalServiceConfiguration(), account.getCredentialsProvider(),
-                    userAgent, null, ServiceConfig.AUTOMATIC_NETWORK_RETRY);
-            accountManager.setAccountAttributes(null, account.getLocalRegistrationId(), true, null,
-                    account.getRegistrationLock(), account.getSelfUnidentifiedAccessKey(),
-                    account.isUnrestrictedUnidentifiedAccess(), capabilities, account.isDiscoverableByPhoneNumber(),
-                    account.getEncryptedDeviceName(), account.getLocalPniRegistrationId());
+            final var accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.getSignalServiceConfiguration(),
+                    account.getCredentialsProvider(),
+                    userAgent,
+                    null,
+                    ServiceConfig.AUTOMATIC_NETWORK_RETRY);
+            accountManager.setAccountAttributes(account.getAccountAttributes(null));
             account.setRegistered(true);
             logger.info("Reactivated existing account, verify is not necessary.");
             if (newManagerListener != null) {
@@ -189,19 +207,18 @@ class RegistrationManagerImpl implements RegistrationManager {
         return false;
     }
 
-    private ServiceResponse<VerifyAccountResponse> verifyAccountWithCode(final String verificationCode,
-            final String registrationLock) {
-        if (registrationLock == null) {
-            return accountManager.verifyAccount(verificationCode, account.getLocalRegistrationId(), true,
-                    account.getSelfUnidentifiedAccessKey(), account.isUnrestrictedUnidentifiedAccess(),
-                    ServiceConfig.capabilities, account.isDiscoverableByPhoneNumber(),
-                    account.getLocalPniRegistrationId());
-        } else {
-            return accountManager.verifyAccountWithRegistrationLockPin(verificationCode,
-                    account.getLocalRegistrationId(), true, registrationLock, account.getSelfUnidentifiedAccessKey(),
-                    account.isUnrestrictedUnidentifiedAccess(), ServiceConfig.capabilities,
-                    account.isDiscoverableByPhoneNumber(), account.getLocalPniRegistrationId());
+    private VerifyAccountResponse verifyAccountWithCode(
+            final String sessionId, final String verificationCode, final String registrationLock
+    ) throws IOException {
+        try {
+            Utils.handleResponseException(accountManager.verifyAccount(verificationCode, sessionId));
+        } catch (AlreadyVerifiedException e) {
+            // Already verified so can continue registering
         }
+        return Utils.handleResponseException(accountManager.registerAccount(sessionId,
+                null,
+                account.getAccountAttributes(registrationLock),
+                true));
     }
 
     @Override
