@@ -41,6 +41,8 @@ import org.whispersystems.signalservice.api.util.DeviceNameUtil;
 import org.whispersystems.signalservice.internal.push.ConfirmCodeMessage;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 
+import static org.asamk.signal.manager.config.ServiceConfig.getCapabilities;
+
 class ProvisioningManagerImpl implements ProvisioningManager {
 
     private final static Logger logger = LoggerFactory.getLogger(ProvisioningManagerImpl.class);
@@ -117,7 +119,12 @@ class ProvisioningManagerImpl implements ProvisioningManager {
 
         logger.debug("Finishing new device registration");
         var deviceId = accountManager.finishNewDeviceRegistration(ret.getProvisioningCode(),
-                new ConfirmCodeMessage(false, true, registrationId, pniRegistrationId, encryptedDeviceName, null));
+                new ConfirmCodeMessage(false,
+                        true,
+                        registrationId,
+                        pniRegistrationId,
+                        encryptedDeviceName,
+                        getCapabilities(false)));
 
         // Create new account with the synced identity
         var profileKey = ret.getProfileKey() == null ? KeyUtils.createProfileKey() : ret.getProfileKey();
@@ -128,6 +135,7 @@ class ProvisioningManagerImpl implements ProvisioningManager {
                     serviceEnvironmentConfig.getType(), aci, pni, password, encryptedDeviceName, deviceId,
                     ret.getAciIdentity(), ret.getPniIdentity(), registrationId, pniRegistrationId, profileKey,
                     Settings.DEFAULT);
+            account.getConfigurationStore().setReadReceipts(ret.isReadReceipts());
 
             ManagerImpl m = null;
             try {

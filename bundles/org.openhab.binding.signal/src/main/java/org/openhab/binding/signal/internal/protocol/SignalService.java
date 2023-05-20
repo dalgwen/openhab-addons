@@ -41,6 +41,7 @@ import org.asamk.signal.manager.api.MessageEnvelope;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotRegisteredException;
 import org.asamk.signal.manager.api.PinLockedException;
+import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.ReceiveConfig;
 import org.asamk.signal.manager.api.RecipientAddress;
 import org.asamk.signal.manager.api.RecipientIdentifier;
@@ -119,7 +120,7 @@ public class SignalService {
         this.verificationCode = verificationCode == null ? verificationCode
                 : verificationCode.isBlank() ? null : verificationCode;
         this.verificationCodeMethod = verificationCodeMethod == null ? RegistrationType.TextMessage
-                : RegistrationType.PhoneCall;
+                : verificationCodeMethod;
         this.deviceName = deviceName;
         this.provisionType = provisionType;
 
@@ -236,9 +237,17 @@ public class SignalService {
                             e.getMessage());
                 }
             } else {
-                registrationManager.register(this.verificationCodeMethod == RegistrationType.PhoneCall, this.captcha);
+                if (this.verificationCodeMethod == RegistrationType.PhoneCall) {
+                    registrationManager.register(false, this.captcha);
+                    Thread.sleep(62000);
+                    registrationManager.register(true, this.captcha);
+                } else {
+                    registrationManager.register(false, this.captcha);
+                }
                 throw new IncompleteRegistrationException(RegistrationState.VERIFICATION_CODE_NEEDED);
             }
+        } catch (RateLimitException e) {
+            throw new IncompleteRegistrationException(RegistrationState.RATE_LIMIT);
         } catch (CaptchaRequiredException e) {
             throw new IncompleteRegistrationException(RegistrationState.CAPTCHA_NEEDED);
         } catch (NonNormalizedPhoneNumberException e) {
@@ -246,6 +255,8 @@ public class SignalService {
         } catch (AuthorizationFailedException e) {
             throw new IncompleteRegistrationException(RegistrationState.VERIFICATION_CODE_NEEDED,
                     e.getMessage() + ". Incorrect code ? Delete it to request another one.");
+        } catch (InterruptedException e) {
+            throw new IncompleteRegistrationException(RegistrationState.RATE_LIMIT, "interrupted");
         }
     }
 
@@ -449,24 +460,26 @@ public class SignalService {
         }
     }
 
-    public void deleteAccount() throws IOException {
+    public synchronized void deleteAccount() throws IOException {
         logger.debug("Trying to remove signal account {}", phoneNumber);
 
         SignalAccountFiles signalAccountsFilesFinal = signalAccountsFiles;
         if (signalAccountsFilesFinal == null) {
             throw new IOException("Cannot delete account when files store is broken");
         }
-        try {
-            // unregister
-            Manager managerLocal = this.manager;
-            if (managerLocal == null) {
-                managerLocal = signalAccountsFilesFinal.initManager(this.phoneNumber);
+        if (signalAccountsFilesFinal.getAllLocalAccountNumbers().stream().anyMatch(n -> n.equals(this.phoneNumber))) {
+            try {
+                // unregister
+                Manager managerLocal = this.manager;
+                if (managerLocal == null) {
+                    managerLocal = signalAccountsFilesFinal.initManager(this.phoneNumber);
+                }
+                managerLocal.unregister();
+            } catch (Exception e) {
+                logger.warn("Cannot unregister signal number {}. Cause : {}", this.phoneNumber, e.getMessage());
             }
-            managerLocal.unregister();
-        } catch (Exception e) {
-            logger.warn("Cannot unregister signal number {}. Cause : {}", this.phoneNumber, e.getMessage());
+            stop();
+            signalAccountsFilesFinal.initRegistrationManager(this.phoneNumber).deleteLocalAccountData();
         }
-        stop();
-        signalAccountsFilesFinal.initRegistrationManager(this.phoneNumber).deleteLocalAccountData();
     }
 }
