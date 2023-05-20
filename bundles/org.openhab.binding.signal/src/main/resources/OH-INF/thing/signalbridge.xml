@@ -24,7 +24,7 @@
 				<default></default>
 			</parameter>
 			<parameter name="captcha" type="text" required="false">
-				<label>Google Captcha</label>
+				<label>Captcha</label>
 				<description>May be asked by Signal. See documentation to provide one.</description>
 				<default></default>
 			</parameter>
