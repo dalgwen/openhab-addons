@@ -232,9 +232,9 @@ public class SessionStore implements SignalServiceSessionStore {
             final List<Pair<Key, SessionRecord>> records;
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
-                records = Utils
-                        .executeQueryForStream(statement,
+                records = Utils.executeQueryForStream(statement,
                                 res -> new Pair<>(getKeyFromResultSet(res), getSessionRecordFromResultSet(res)))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toList());
             }
             for (final var record : records) {
@@ -257,9 +257,9 @@ public class SessionStore implements SignalServiceSessionStore {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
                 statement.setBytes(2, serviceId.toByteArray());
-                records = Utils
-                        .executeQueryForStream(statement,
+                records = Utils.executeQueryForStream(statement,
                                 res -> new Pair<>(getKeyFromResultSet(res), getSessionRecordFromResultSet(res)))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toList());
             }
             for (final var record : records) {

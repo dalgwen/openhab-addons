@@ -55,7 +55,7 @@ public class MessageCache {
         try {
             var cacheFile = getMessageCacheFile(recipientId, now, envelope.getTimestamp());
             MessageCacheUtils.storeEnvelope(envelope, cacheFile);
-            return new CachedMessage(cacheFile);
+            return new CachedMessage(cacheFile, envelope);
         } catch (IOException e) {
             logger.warn("Failed to store encrypted message in disk cache, ignoring: {}", e.getMessage());
             return null;
