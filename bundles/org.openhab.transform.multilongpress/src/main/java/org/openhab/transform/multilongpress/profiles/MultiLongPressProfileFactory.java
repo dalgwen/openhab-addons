@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -10,9 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.transform.rawrockermultilongpress.profiles;
-
-import static org.openhab.core.thing.profiles.SystemProfiles.DEFAULT;
+package org.openhab.transform.multilongpress.profiles;
 
 import java.util.Collection;
 import java.util.List;
@@ -22,7 +20,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.CoreItemFactory;
 import org.openhab.core.thing.Channel;
-import org.openhab.core.thing.DefaultSystemChannelTypeProvider;
 import org.openhab.core.thing.profiles.Profile;
 import org.openhab.core.thing.profiles.ProfileAdvisor;
 import org.openhab.core.thing.profiles.ProfileCallback;
@@ -39,73 +36,51 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * {@link ProfileFactory} that creates the transformation profile for the {@link RawRockerMultiLongPressProfile}.
+ * {@link ProfileFactory} that creates the transformation profile for the {@link MultiLongPressProfile}.
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
 @Component(service = { ProfileFactory.class, ProfileTypeProvider.class })
-public class RawRockerMultiLongPressProfileFactory implements ProfileFactory, ProfileTypeProvider, ProfileAdvisor {
+public class MultiLongPressProfileFactory implements ProfileFactory, ProfileTypeProvider, ProfileAdvisor {
 
     private ChannelTypeRegistry channelTypeRegistry;
 
     @Activate
-    public RawRockerMultiLongPressProfileFactory(final @Reference ChannelTypeRegistry channelTypeRegistry) {
+    public MultiLongPressProfileFactory(final @Reference ChannelTypeRegistry channelTypeRegistry) {
         this.channelTypeRegistry = channelTypeRegistry;
     }
 
     @Override
     public Collection<ProfileType> getProfileTypes(@Nullable Locale locale) {
         return List.of(ProfileTypeBuilder
-                .newTrigger(RawRockerMultiLongPressProfile.PROFILE_TYPE_UID, "Raw Rocker To Multi / Long Press String")
+                .newTrigger(MultiLongPressProfile.PROFILE_TYPE_UID, "Button Press to Multi / Long Press String")
                 .build());
     }
 
     @Override
     public @Nullable Profile createProfile(ProfileTypeUID profileTypeUID, ProfileCallback callback,
             ProfileContext profileContext) {
-        return new RawRockerMultiLongPressProfile(callback, profileContext);
+        return new MultiLongPressProfile(callback, profileContext);
     }
 
     @Override
     public Collection<ProfileTypeUID> getSupportedProfileTypeUIDs() {
-        return List.of(RawRockerMultiLongPressProfile.PROFILE_TYPE_UID);
+        return List.of(MultiLongPressProfile.PROFILE_TYPE_UID);
     }
 
     @Override
     public @Nullable ProfileTypeUID getSuggestedProfileTypeUID(@Nullable ChannelType channelType,
             @Nullable String itemType) {
-        if (channelType == null) {
+        if (channelType == null || !CoreItemFactory.STRING.equalsIgnoreCase(itemType)) {
             return null;
         }
-        switch (channelType.getKind()) {
-            case TRIGGER:
-                if (DefaultSystemChannelTypeProvider.SYSTEM_RAWROCKER.getUID().equals(channelType.getUID())) {
-                    if (CoreItemFactory.STRING.equalsIgnoreCase(itemType)) {
-                        return RawRockerMultiLongPressProfile.PROFILE_TYPE_UID;
-                    }
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported channel kind: " + channelType.getKind());
-        }
-        return null;
+        return MultiLongPressProfile.PROFILE_TYPE_UID;
     }
 
     @Override
     public @Nullable ProfileTypeUID getSuggestedProfileTypeUID(Channel channel, @Nullable String itemType) {
         ChannelType channelType = channelTypeRegistry.getChannelType(channel.getChannelTypeUID());
-        if (channelType == null) {
-            switch (channel.getKind()) {
-                case STATE:
-                    return DEFAULT;
-                case TRIGGER:
-                    return null;
-                default:
-                    throw new IllegalArgumentException("Unsupported channel kind: " + channel.getKind());
-            }
-        } else {
-            return getSuggestedProfileTypeUID(channelType, itemType);
-        }
+        return getSuggestedProfileTypeUID(channelType, itemType);
     }
 }

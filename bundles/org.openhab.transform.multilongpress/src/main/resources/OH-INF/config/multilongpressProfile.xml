@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config-description:config-descriptions
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0 https://openhab.org/schemas/config-description-1.0.0.xsd">
+
+	<config-description uri="profile:transform:multilongpress-to-string">
+		<parameter name="hasReleaseEvent" type="boolean" required="false">
+			<default>true</default>
+			<label>Released Event Capability</label>
+			<description>If your Thing has a 'release' event that you want to use for long press detection.</description>
+		</parameter>
+		<parameter name="button1" type="text" required="false">
+			<default>1</default>
+			<label>Button1 Name</label>
+			<description>Button1 name returned in the string sent to the item.</description>
+		</parameter>
+		<parameter name="button2" type="text" required="false">
+			<default>2</default>
+			<label>Button2 Name</label>
+			<description>Only for rocker channel with two buttons. Button2 name returned in the string sent to the item.</description>
+		</parameter>
+		<parameter name="maxRepetition" type="integer" required="false">
+			<default>-1</default>
+			<label>Maximum Repetition</label>
+			<description>This is the maximum number of repetition to do for a long press. Useful as a safeguard when the
+				'release' is not detected. -1 for no limit.</description>
+		</parameter>
+		<parameter name="pressedEventOrState" type="text" required="false">
+			<default></default>
+			<label>Pressed Event Or State</label>
+			<description>The profile will interpret this custom event/state as "Pressed". Use this if the event is not
+				automatically recognized.</description>
+		</parameter>
+		<parameter name="releasedEventOrState" type="text" required="false">
+			<default></default>
+			<label>Released Event Or State</label>
+			<description>The profile will interpret this custom event/state as "Released". Use this if the event is not
+				automatically recognized.</description>
+		</parameter>
+		<parameter name="delay" type="integer" required="false">
+			<default>500</default>
+			<label>Delay Between Events</label>
+			<description>Multi-press : for this profile to see a multi-press event, each new button press should occur within
+				this delay (ms). Long press : delay (ms) between two events sent to the item</description>
+		</parameter>
+	</config-description>
+</config-description:config-descriptions>

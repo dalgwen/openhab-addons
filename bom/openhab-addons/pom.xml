@@ -2093,7 +2093,7 @@
     </dependency>
 	<dependency>
       <groupId>org.openhab.addons.bundles</groupId>
-      <artifactId>org.openhab.transform.rawrockermultilongpress</artifactId>
+      <artifactId>org.openhab.transform.multilongpress</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
