@@ -11,9 +11,9 @@ export const useAssistantStore = defineStore("assistant", () => {
   // state
   const miniMode = ref(false);
   const userInteractionDone = ref(false);
-watch(mediaProvider, (value)=> miniMode.value = !!value);
-// component actions
-  async function startAssistant(id: string, token: string) {
+  watch(mediaProvider, (value) => miniMode.value = !!value);
+  // component actions
+  async function startAssistant(id: string, token: string | null) {
     userInteractionDone.value = true;
     await spotifyStore.activatePlayer();
     await ioStore.init(id, token);
@@ -25,11 +25,15 @@ watch(mediaProvider, (value)=> miniMode.value = !!value);
     ioStore.resetConnection(id);
   }
   function isAudioSupported() {
+    if (typeof AudioContext === "undefined") {
+      return false;
+    }
     const getUserMediaSupported =
-      window.navigator &&
-      window.navigator.mediaDevices &&
-      window.navigator.mediaDevices.getUserMedia;
-    return AudioContext && getUserMediaSupported;
+      !!(window.navigator &&
+        window.navigator.mediaDevices &&
+        window.navigator.mediaDevices.getUserMedia);
+    const workletSupported = "audioWorklet" in AudioContext.prototype;
+    return getUserMediaSupported && workletSupported;
   }
   return {
     miniMode,

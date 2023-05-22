@@ -1,5 +1,5 @@
 /**
- * Byte that indicates stream termination, (when allow after "4 bytes id" + "stream type byte" )
+ * Byte that indicates stream termination, (prefixed by "4 bytes id" + "stream type byte" )
  */
 export const SINK_TERMINATION_BYTE = "0";
 /**
@@ -31,9 +31,9 @@ export type RustpotterOptions = {
   bandPassLowCutoff: number
   bandPassHighCutoff: number
 };
-type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
+export type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
 type SpotifyTokenCmd = { token: string };
-type MediaCommandCmd = { type: 'play' } |
+export type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
 { type: 'stop' } |
 { type: 'next' } |

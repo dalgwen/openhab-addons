@@ -329,7 +329,9 @@ export default class IOWorker {
    * Resamples the audio when needed from stream sample rate to the audio context sample rate.
    */
   private async handleSinkAudioBuffer(buffer: ArrayBuffer) {
+    // First 4 bytes from each chunk contains the stream id
     const streamId = new Uint8Array(buffer.slice(0, 4)).join('-');
+    // Fifth byte from each chunk contains the stream type
     const streamType = new Uint8Array(buffer.slice(4, 5)).toString();
     let channels: number;
     switch (streamType) {
@@ -349,10 +351,8 @@ export default class IOWorker {
       const sendSinkData = (buffer: Float32Array) => {
         const resampledBuffer = sinkContext.resampler.resample(buffer);
         if (sinkContext.port) {
-          // send data over the sink message port
           sinkContext.port.postMessage(resampledBuffer);
         } else {
-          // cache this buffer, 
           sinkContext.buffersCache.push(resampledBuffer.slice());
         }
       };

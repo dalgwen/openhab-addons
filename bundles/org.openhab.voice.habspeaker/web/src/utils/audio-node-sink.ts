@@ -10,20 +10,21 @@ export class AudioNodeSink {
         this.gainNode = audioContext.createGain();
         this.gainNode.gain.value = (volume / 100);
     }
-    static setup(audioContext: AudioContext) {
+    static setupAudioElement(audioContext: AudioContext) {
         AudioNodeSink.destination = audioContext.createMediaStreamDestination();
         AudioNodeSink.audioElement = new Audio();
         AudioNodeSink.audioElement.srcObject = AudioNodeSink.destination.stream;
     }
     async start() {
-        if (!AudioNodeSink.destination || !AudioNodeSink.audioElement) {
-            throw new Error('Sink was not setup');
-        }
         AudioNodeSink.connectedNodes++;
         this.sinkProcessorNode.connect(this.gainNode);
-        this.gainNode.connect(AudioNodeSink.destination);
-        if (AudioNodeSink.connectedNodes === 1) {
-            await AudioNodeSink.audioElement.play();
+        if (!AudioNodeSink.destination || !AudioNodeSink.audioElement) {
+            this.gainNode.connect(this.audioContext.destination);
+        } else {
+            this.gainNode.connect(AudioNodeSink.destination);
+            if (AudioNodeSink.connectedNodes === 1) {
+                await AudioNodeSink.audioElement.play();
+            }
         }
     }
     getId() {
@@ -33,12 +34,11 @@ export class AudioNodeSink {
         this.gainNode.gain.setValueAtTime((value / 100), this.audioContext.currentTime);
     }
     close() {
-        if (!AudioNodeSink.destination || !AudioNodeSink.audioElement) {
-            throw new Error('Sink was not setup');
-        }
         AudioNodeSink.connectedNodes--;
-        if (AudioNodeSink.connectedNodes === 0) {
-            AudioNodeSink.audioElement.pause();
+        if (AudioNodeSink.audioElement) {
+            if (AudioNodeSink.connectedNodes === 0) {
+                AudioNodeSink.audioElement.pause();
+            }
         }
         this.sinkProcessorNode.disconnect();
         this.gainNode.disconnect();

@@ -13,13 +13,13 @@ export const useAuthStore = defineStore("auth", () => {
   const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getOHUrl });
   let persistentToken: string | null = null;
   function getAccessToken() {
-    return persistentToken ?? ohAuthHelper.getAccessToken() ?? '';
+    return persistentToken ?? ohAuthHelper.hasAccessToken() ? ohAuthHelper.getAccessToken() : null;
   }
   async function getUIConfig(): Promise<UIConfig> {
     const headers = {
       accept: "application/json",
     } as { [key: string]: string };
-    if (getAccessToken().length) { headers["Authorization"] = "Bearer " + getAccessToken(); }
+    if (getAccessToken()) { headers["Authorization"] = "Bearer " + getAccessToken(); }
     return (await axios.get<UIConfig>(`${await getOHUrl()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
   }
   function unauthorized() {
