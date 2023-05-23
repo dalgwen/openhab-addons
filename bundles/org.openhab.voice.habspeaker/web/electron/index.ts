@@ -22,7 +22,7 @@ const indexHtml = join(DIST, 'index.html');
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'HAB Speaker',
+    title: 'HABSpeaker',
     icon: join(DIST, 'favicon.svg'),
     webPreferences: {
       preload,

@@ -17,16 +17,16 @@ export default defineConfig(async ({ command, mode }) => {
   }
   switch (mode) {
     case "electron":
-      console.log(`Building ${envMode} HAB Speaker UI Electron bundle`);
+      console.log(`Building ${envMode} HABSpeaker UI Electron bundle`);
       const { rmSync } = require('node:fs');
       rmSync('dist-electron', { recursive: true, force: true });
       plugins.push(await getElectronPlugin());
       break;
     case "capacitor":
-      console.log(`Building ${envMode} HAB Speaker UI Capacitor bundle`);
+      console.log(`Building ${envMode} HABSpeaker UI Capacitor bundle`);
       break;
     case "pwa":
-      console.log(`Building ${envMode} HAB Speaker UI PWA bundle`);
+      console.log(`Building ${envMode} HABSpeaker UI PWA bundle`);
       baseUrl = "/habspeaker/";
       plugins.push(await getPWAPlugin());
       break;
@@ -64,7 +64,7 @@ async function getPWAPlugin() {
   return VitePWA({
     registerType: 'autoUpdate',
     manifest: {
-      name: "HAB Speaker",
+      name: "HABSpeaker",
       short_name: "HABSpeaker",
       description: "Dialog processing over WebSocket for openHAB",
       display: "fullscreen",

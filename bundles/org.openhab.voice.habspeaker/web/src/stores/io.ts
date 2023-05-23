@@ -8,7 +8,7 @@ import { platform } from "../platforms";
 import { IOMain, IOCallbacks } from "../utils/io-main";
 
 export const useIOStore = defineStore("io", () => {
-  let speakerLabel = ref("HAB Speaker");
+  let speakerLabel = ref("HABSpeaker");
   const { getOHUrl } = useSettingsStore();
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController } = storeToRefs(mediaSessionStore);

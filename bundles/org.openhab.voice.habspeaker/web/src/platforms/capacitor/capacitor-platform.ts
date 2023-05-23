@@ -66,7 +66,7 @@ class CapacitorPlatform extends WebPlatform implements Platform {
                 startMic();
             }
         } else {
-            await Dialog.alert({ message: "HAB Speaker requires audio permissions to work" });
+            await Dialog.alert({ message: "HABSpeaker requires audio permissions to work" });
             router.replace("/audio-error");
         }
     }

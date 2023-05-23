@@ -8,7 +8,7 @@ export async function getOhUrl() {
 export async function requestPermissions() {
   if (systemPreferences.getMediaAccessStatus("microphone") !== 'granted'
     && !await systemPreferences.askForMediaAccess("microphone")) {
-    console.error("HAB Speaker needs microphone access");
+    console.error("HABSpeaker needs microphone access");
     app.exit(1);
   }
 }

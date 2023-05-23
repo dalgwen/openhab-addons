@@ -34,8 +34,8 @@
       "dmg"
     ],
     "extendInfo": {
-        "NSMicrophoneUsageDescription": "HAB Speaker requires access to your microphone",
-        "NSCameraUsageDescription": "Please give HAB Speaker access to your camera",
+        "NSMicrophoneUsageDescription": "HABSpeaker requires access to your microphone",
+        "NSCameraUsageDescription": "Please give HABSpeaker access to your camera",
         "com.apple.security.device.audio-input": true,
         "com.apple.security.device.camera": true
       },
