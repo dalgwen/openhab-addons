@@ -6,7 +6,8 @@
 	<config-description uri="voice:habspeaker">
 		<parameter-group name="voice">
 			<label>Voice Control</label>
-			<description>Define the phrases you can use to interact with the speaker (leave empty to disable).</description>
+			<description>Define the phrases you can use to interact with the speaker (leave a command empty to disable it). The
+				symbol $* represents free captured text.</description>
 		</parameter-group>
 		<parameter-group name="media-providers">
 			<label>Media Providers</label>
@@ -61,13 +62,15 @@
 			<label>Previous Media Phrase</label>
 			<description>Phrase template to go to the previous media item.</description>
 		</parameter>
-		<parameter name="listenOnWebPhrase" type="text" groupName="voice">
-			<label>Listen on Web Phrase</label>
-			<description>Phrase to listen on web audio player (Example: 'tune $*').</description>
+		<parameter name="listenAudioPhrase" type="text" groupName="voice">
+			<label>Listen Audio Phrase</label>
+			<description>Phrase to listen audio (Example: 'tune $*'). Writes to the speaker 'video-search' channel, there is no
+				built-in media search.</description>
 		</parameter>
-		<parameter name="watchOnWebPhrase" type="text" groupName="voice">
-			<label>Watch on Web Phrase</label>
-			<description>Phrase to watch on web audio player (Example: 'watch channel $*').</description>
+		<parameter name="watchVideoPhrase" type="text" groupName="voice">
+			<label>Watch Video Phrase</label>
+			<description>Phrase to watch video (Example: 'watch video $*'). Writes to the speaker 'audio-search' channel, there
+				is no built-in media search.</description>
 		</parameter>
 		<parameter name="continueMediaOnPhrase" type="text" groupName="voice">
 			<label>Continue Media On Phrase</label>

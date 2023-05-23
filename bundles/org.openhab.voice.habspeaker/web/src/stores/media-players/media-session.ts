@@ -113,8 +113,8 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         stopMediaUpdateInterval();
         console.debug(`starting ${provider} media:`, media);
         switch (provider) {
-            case MediaProvider.WEB_AUDIO:
-            case MediaProvider.WEB_VIDEO:
+            case MediaProvider.AUDIO_PLAYER:
+            case MediaProvider.VIDEO_PLAYER:
             default:
                 console.error('unsupported media provider ', provider);
                 return;
@@ -175,8 +175,8 @@ export interface MediaSessionCtrl {
     getPlaybackState(): Promise<PlaybackState>;
 }
 export enum MediaProvider {
-    WEB_AUDIO = 'web-audio',
-    WEB_VIDEO = 'web-video',
+    AUDIO_PLAYER = 'audio-player',
+    VIDEO_PLAYER = 'video-player',
 }
 export enum PlaybackState {
     PLAYING = 'playing',

@@ -54,8 +54,10 @@ public class HABSpeakerConstants {
     public static final String MEDIA_PROGRESS_CHANNEL = "media-progress";
     public static final String MEDIA_CONTROL_CHANNEL = "media-control";
     public static final String MEDIA_VOLUME_CHANNEL = "media-volume";
-    public static final String WEB_AUDIO_CHANNEL = "web-audio";
-    public static final String WEB_VIDEO_CHANNEL = "web-video";
+    public static final String PLAY_AUDIO_CHANNEL = "play-audio";
+    public static final String PLAY_VIDEO_CHANNEL = "play-video";
+    public static final String AUDIO_SEARCH_CHANNEL = "audio-search";
+    public static final String VIDEO_SEARCH_CHANNEL = "video-search";
     public static final String SPOT_CHANNEL = "spot";
     public static final String DROP_IN_CHANNEL = "drop-in";
 }

@@ -27,7 +27,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioManager;
@@ -77,14 +76,13 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private @Nullable AudioStream dropInStream = null;
     private @Nullable Future<?> dropInStreamTask = null;
 
-    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, HttpClient httpClient,
-            BundleContext bundleContext, HABSpeakerConfigProvider configProvider, HABSpeakerIOManager ioManager) {
+    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext,
+            HABSpeakerConfigProvider configProvider, HABSpeakerIOManager ioManager) {
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.bundleContext = bundleContext;
         this.configProvider = configProvider;
-        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, ioManager, configProvider,
-                httpClient);
+        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, ioManager, configProvider);
     }
 
     @Override

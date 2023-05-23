@@ -198,8 +198,8 @@ public interface HABSpeakerIO {
      * Available media providers
      */
     enum MediaProvider {
-        WEB_VIDEO("web-video"),
-        WEB_AUDIO("web-audio");
+        VIDEO_PLAYER("video-player"),
+        AUDIO_PLAYER("audio-player");
 
         private final String name;
 
@@ -211,10 +211,10 @@ public interface HABSpeakerIO {
             switch (name) {
                 case "":
                     return null;
-                case "web-video":
-                    return WEB_VIDEO;
-                case "web-audio":
-                    return WEB_AUDIO;
+                case "video-player":
+                    return VIDEO_PLAYER;
+                case "audio-player":
+                    return AUDIO_PLAYER;
                 default:
                     throw new IllegalStateException("Unexpected value: " + name);
             }

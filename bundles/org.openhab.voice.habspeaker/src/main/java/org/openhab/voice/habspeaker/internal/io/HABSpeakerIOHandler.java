@@ -54,4 +54,18 @@ public interface HABSpeakerIOHandler {
      * @param volume the speaker media volume
      */
     void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume);
+
+    /**
+     * Writes to video-search channel.
+     *
+     * @param searchText the video search.
+     */
+    void updateVideoSearchChannel(String searchText);
+
+    /**
+     * Writes to music-search channel.
+     *
+     * @param searchText the video search.
+     */
+    void updateMusicSearchChannel(String searchText);
 }

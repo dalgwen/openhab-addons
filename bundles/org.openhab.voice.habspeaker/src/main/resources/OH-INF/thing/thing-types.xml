@@ -16,8 +16,10 @@
 			<channel id="media-progress" typeId="media-progress"/>
 			<channel id="media-control" typeId="system.media-control"/>
 			<channel id="media-volume" typeId="system.volume"/>
-			<channel id="web-audio" typeId="web-audio"/>
-			<channel id="web-video" typeId="web-video"/>
+			<channel id="play-audio" typeId="play-audio"/>
+			<channel id="play-video" typeId="play-video"/>
+			<channel id="audio-search" typeId="audio-search"/>
+			<channel id="video-search" typeId="video-search"/>
 		</channels>
 		<config-description>
 			<parameter-group name="audio">
@@ -124,12 +126,40 @@
 			</parameter>
 			<parameter name="location" type="text" groupName="voice">
 				<label>Speaker Location</label>
-				<description>Link this speaker to a location item.</description>
+				<description>Link this speaker to a location item. Allows to use the location label instead of the speaker label in
+					some voice commands.</description>
 				<filter>
 					<criteria name="type">Group</criteria>
 					<criteria name="tag">Location</criteria>
 				</filter>
 				<context>item</context>
+			</parameter>
+			<parameter name="listeningItem" type="text" groupName="voice">
+				<context>item</context>
+				<filter>
+					<criteria name="type">Switch</criteria>
+				</filter>
+				<label>Listening Switch</label>
+				<description>If provided, the item will be switched on during the period when the dialog processor has spotted the
+					keyword and is listening for commands.</description>
+			</parameter>
+			<parameter name="listenCommandItem" type="text" groupName="voice">
+				<context>item</context>
+				<filter>
+					<criteria name="type">Text</criteria>
+				</filter>
+				<label>Listen Media Item</label>
+				<description>Item used to write the searches from the 'listenAudioPhrase' voice command, so they can be handled on a
+					rule.</description>
+			</parameter>
+			<parameter name="watchCommandItem" type="text" groupName="voice">
+				<context>item</context>
+				<filter>
+					<criteria name="type">Text</criteria>
+				</filter>
+				<label>Watch Media Item</label>
+				<description>Item used to write the searches from 'watchVideoPhrase' voice command, so they can be handled on a
+					rule.</description>
 			</parameter>
 			<!-- Rustpotter Web config -->
 			<parameter name="rustpotterAvgThreshold" type="decimal" min="0" max="1" groupName="rustpotter_web">
@@ -241,14 +271,24 @@
 		<label>Media Progress</label>
 		<description>Played percentage for the media currently playing, allow seek</description>
 	</channel-type>
-	<channel-type id="web-audio">
+	<channel-type id="play-audio">
 		<item-type>String</item-type>
 		<label>Play Music by URL</label>
-		<description>Start playing a song by url using the browser player</description>
+		<description>Start playing a song by url using the device player</description>
 	</channel-type>
-	<channel-type id="web-video">
+	<channel-type id="play-video">
 		<item-type>String</item-type>
 		<label>Play Video by URL</label>
-		<description>Start playing a video by url using the browser player</description>
+		<description>Start playing a video by url using the device player</description>
+	</channel-type>
+	<channel-type id="audio-search">
+		<item-type>String</item-type>
+		<label>Play Music by URL</label>
+		<description>Used to write the searches from the 'listenAudioPhrase' voice command</description>
+	</channel-type>
+	<channel-type id="video-search">
+		<item-type>String</item-type>
+		<label>Play Video by URL</label>
+		<description>Used to write the searches from the 'watchVideoPhrase' voice command</description>
 	</channel-type>
 </thing:thing-descriptions>

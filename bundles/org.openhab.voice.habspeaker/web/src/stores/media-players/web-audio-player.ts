@@ -1,12 +1,12 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { MediaProvider, MediaSessionCtrl, PlaybackState, useMediaSessionStore } from "./media-session";
-export const useWebAudioPlayerStore = defineStore("web-audio", () => {
+export const useWebAudioPlayerStore = defineStore("audio-player", () => {
   const mediaSessionStore = useMediaSessionStore();
   const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
   var player = ref<HTMLAudioElement | null>(null);
   function registerMediaController(playerRef: HTMLAudioElement) {
-    const controller = mediaController.value = getMediaSessionCtrl(MediaProvider.WEB_AUDIO, playerRef, (state) => mediaState.value = state);
+    const controller = mediaController.value = getMediaSessionCtrl(MediaProvider.AUDIO_PLAYER, playerRef, (state) => mediaState.value = state);
     mediaSessionStore.getMediaVolume().then(level => controller.setVolume(level));
     player.value = playerRef;
   }

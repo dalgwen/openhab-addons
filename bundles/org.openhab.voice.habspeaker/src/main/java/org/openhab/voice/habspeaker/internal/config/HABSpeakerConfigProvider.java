@@ -22,21 +22,17 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.openhab.core.OpenHAB;
-import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigOptionProvider;
 import org.openhab.core.config.core.ConfigurableService;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.config.core.ParameterOption;
 import org.openhab.core.i18n.LocaleProvider;
-import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.voice.TTSService;
 import org.openhab.core.voice.Voice;
 import org.openhab.core.voice.VoiceManager;
@@ -69,8 +65,6 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     public static final String RUSTPOTTER_FOLDER = Path.of(KS_FOLDER, "rustpotter").toString();
     public static final String RUSTPOTTER_ADDON_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "rustpotter").toString();
     private static final String CREDENTIALS_FOLDER = Path.of(HABSPEAKER_FOLDER, "credentials").toString();
-    public static final Path WEB_VIDEO_MEDIA_PATH = Path.of(MEDIA_FOLDER, "web-video.json");
-    public static final Path WEB_AUDIO_MEDIA_PATH = Path.of(MEDIA_FOLDER, "web-audio.json");
     static {
         Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
         ensureDir("root", HABSPEAKER_FOLDER, logger);
@@ -83,20 +77,16 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     private final VoiceManager voiceManager;
     private final LocaleProvider localeProvider;
-    private final HttpClient httpClient;
     private final HABSpeakerVoiceConfigHelper voiceConfigHelper;
     private HABSpeakerConfig config = new HABSpeakerConfig();
-    private final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool("habspeaker");
     Set<HABSpeakerConfigProviderListener> listeners = new HashSet<>();
 
     @Activate
     public HABSpeakerConfigProvider(@Reference VoiceManager voiceManager, @Reference LocaleProvider localeProvider,
-            final @Reference HttpClientFactory httpClientFactory,
             @Reference HABSpeakerVoiceConfigHelper voiceConfigHelper) {
         this.voiceManager = voiceManager;
         this.localeProvider = localeProvider;
         this.voiceConfigHelper = voiceConfigHelper;
-        this.httpClient = httpClientFactory.getCommonHttpClient();
     }
 
     public HABSpeakerConfig getConfig() {

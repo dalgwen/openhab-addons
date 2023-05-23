@@ -240,18 +240,18 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         speakerIO.playerCommand((NextPreviousType) command);
                     }
                     break;
-                case WEB_AUDIO_CHANNEL:
+                case PLAY_AUDIO_CHANNEL:
                     if (command instanceof RefreshType) {
                         return;
                     } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.WEB_AUDIO, command.toFullString());
+                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.AUDIO_PLAYER, command.toFullString());
                     }
                     break;
-                case WEB_VIDEO_CHANNEL:
+                case PLAY_VIDEO_CHANNEL:
                     if (command instanceof RefreshType) {
                         return;
                     } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.WEB_VIDEO, command.toFullString());
+                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.VIDEO_PLAYER, command.toFullString());
                     }
                     break;
                 default:
@@ -295,19 +295,19 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         String audioMediaUrl = "";
         if (mediaState.provider != null && mediaState.mediaId != null) {
             switch (mediaState.provider) {
-                case WEB_VIDEO:
+                case VIDEO_PLAYER:
                     videoMediaUrl = mediaState.mediaId;
                     break;
-                case WEB_AUDIO:
+                case AUDIO_PLAYER:
                     audioMediaUrl = mediaState.mediaId;
                     break;
             }
         }
-        if (isLinked(WEB_VIDEO_CHANNEL)) {
-            updateState(WEB_VIDEO_CHANNEL, videoMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(videoMediaUrl));
+        if (isLinked(PLAY_VIDEO_CHANNEL)) {
+            updateState(PLAY_VIDEO_CHANNEL, videoMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(videoMediaUrl));
         }
-        if (isLinked(WEB_AUDIO_CHANNEL)) {
-            updateState(WEB_AUDIO_CHANNEL, audioMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(audioMediaUrl));
+        if (isLinked(PLAY_AUDIO_CHANNEL)) {
+            updateState(PLAY_AUDIO_CHANNEL, audioMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(audioMediaUrl));
         }
         if (isLinked(MEDIA_CURRENT_SECOND_CHANNEL)) {
             updateState(MEDIA_CURRENT_SECOND_CHANNEL, new DecimalType((Number) mediaState.currentSecond));
@@ -329,12 +329,26 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
     }
 
-    private void cleanChannels() {
-        if (isLinked(WEB_VIDEO_CHANNEL)) {
-            updateState(WEB_VIDEO_CHANNEL, UnDefType.NULL);
+    @Override
+    public void updateVideoSearchChannel(String searchText) {
+        if (isLinked(VIDEO_SEARCH_CHANNEL)) {
+            updateState(VIDEO_SEARCH_CHANNEL, new StringType(searchText));
         }
-        if (isLinked(WEB_AUDIO_CHANNEL)) {
-            updateState(WEB_AUDIO_CHANNEL, UnDefType.NULL);
+    }
+
+    @Override
+    public void updateMusicSearchChannel(String searchText) {
+        if (isLinked(AUDIO_SEARCH_CHANNEL)) {
+            updateState(AUDIO_SEARCH_CHANNEL, new StringType(searchText));
+        }
+    }
+
+    private void cleanChannels() {
+        if (isLinked(PLAY_VIDEO_CHANNEL)) {
+            updateState(PLAY_VIDEO_CHANNEL, UnDefType.NULL);
+        }
+        if (isLinked(PLAY_AUDIO_CHANNEL)) {
+            updateState(PLAY_AUDIO_CHANNEL, UnDefType.NULL);
         }
     }
 

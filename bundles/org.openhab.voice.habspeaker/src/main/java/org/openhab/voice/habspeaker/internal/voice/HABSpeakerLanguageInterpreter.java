@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
@@ -44,7 +43,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * The {@link HABSpeakerLanguageInterpreter} class defines the speaker Audio Sink
+ * The {@link HABSpeakerLanguageInterpreter} class defines built-in interpreter.
+ * The commands need to be configured thought the HABSpeaker service configuration.
+ *
+ * This interpreter is a speaker scoped interpreter, it will be prepended to the configured interpreted chain,
+ * this way its commands have priority over the other ones.
  *
  * @author Miguel Álvarez - Initial contribution
  */
@@ -54,14 +57,12 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     private final HABSpeakerIO speakerIO;
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
-    private final HttpClient httpClient;
 
     public HABSpeakerLanguageInterpreter(HABSpeakerIO speakerIO, HABSpeakerIOManager ioManager,
-            HABSpeakerConfigProvider configProvider, HttpClient httpClient) {
+            HABSpeakerConfigProvider configProvider) {
         this.speakerIO = speakerIO;
         this.ioManager = ioManager;
         this.configProvider = configProvider;
-        this.httpClient = httpClient;
     }
 
     @Override
@@ -172,23 +173,16 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     }
 
     private boolean interpretMediaSearch(HABSpeakerConfig config, String lowerText) {
-        String webAudioSearch = compareTemplateWithParameter(config.listenOnWebPhrase, lowerText);
-        if (!webAudioSearch.isBlank()) {
-            // assume a valid url
-            var localResult = searchMediaFile(WEB_AUDIO_MEDIA_PATH, webAudioSearch);
-            if (!localResult.isBlank()) {
-                listenOnWebPlayer(localResult);
-                return true;
-            }
+        String audioSearch = compareTemplateWithParameter(config.listenAudioPhrase, lowerText);
+        var speakerThing = speakerIO.getThingHandler();
+        if (!audioSearch.isBlank() && speakerThing != null) {
+            speakerThing.updateMusicSearchChannel(audioSearch);
+            return true;
         }
-        String webVideoSearch = compareTemplateWithParameter(config.watchOnWebPhrase, lowerText);
-        if (!webVideoSearch.isBlank()) {
-            // assume a valid url
-            var localResult = searchMediaFile(WEB_VIDEO_MEDIA_PATH, webVideoSearch);
-            if (!localResult.isBlank()) {
-                watchOnWebPlayer(localResult);
-                return true;
-            }
+        String webVideoSearch = compareTemplateWithParameter(config.watchVideoPhrase, lowerText);
+        if (!webVideoSearch.isBlank() && speakerThing != null) {
+            speakerThing.updateVideoSearchChannel(webVideoSearch);
+            return true;
         }
         return false;
     }
@@ -321,16 +315,6 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     @Override
     public Set<String> getSupportedGrammarFormats() {
         return Set.of();
-    }
-
-    private void listenOnWebPlayer(String url) {
-        speakerIO
-                .playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.WEB_AUDIO, url, null, 0, 0));
-    }
-
-    private void watchOnWebPlayer(String url) {
-        speakerIO
-                .playerStart(new HABSpeakerIO.StartMediaMessage(HABSpeakerIO.MediaProvider.WEB_VIDEO, url, null, 0, 0));
     }
 
     // Search media

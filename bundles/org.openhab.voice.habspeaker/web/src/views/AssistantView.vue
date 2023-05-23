@@ -51,8 +51,8 @@ platform.setup(startSpeaker)
     <div @click="startSpeaker()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
       <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
-      <WebAudioPlayer v-if="mediaProvider == MediaProvider.WEB_AUDIO"></WebAudioPlayer>
-      <WebVideoPlayer v-else-if="mediaProvider == MediaProvider.WEB_VIDEO"></WebVideoPlayer>
+      <WebAudioPlayer v-if="mediaProvider == MediaProvider.AUDIO_PLAYER"></WebAudioPlayer>
+      <WebVideoPlayer v-else-if="mediaProvider == MediaProvider.VIDEO_PLAYER"></WebVideoPlayer>
     </div>
   </main>
 </template>

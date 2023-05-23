@@ -103,16 +103,18 @@ Those are:
 
 ## Thing Channels
 
-| Channel ID           |  Type   | description                                                                                      |
-|----------------------|---------|--------------------------------------------------------------------------------------------------|
-| sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                                         |
-| spot                 | Switch  | Starts dialog processing on the speaker.                                                         |
-| drop-in              | String  | Starts an immediate call with other speaker (by id).                                             |
-| media-current-second | Number  | Current second for the media currently playing, allow seek.                                      |
-| media-total-seconds  | Number  | Total seconds for the media currently playing.                                                   |
-| media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.                                   |
-| web-audio            | String  | Start playing a song by url using the browser player.                                            |
-| web-video            | String  | Start playing a video by url using the browser player.                                           |
+| Channel ID           |  Type   | description                                                             |
+|----------------------|---------|-------------------------------------------------------------------------|
+| sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                |
+| spot                 | Switch  | Starts dialog processing on the speaker.                                |
+| drop-in              | String  | Starts an immediate call with other speaker (by id).                    |
+| media-current-second | Number  | Current second for the media currently playing, allow seek.             |
+| media-total-seconds  | Number  | Total seconds for the media currently playing.                          |
+| media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.          |
+| play-audio           | String  | Start playing a audio by url.                                           |
+| play-video           | String  | Start playing a video by url.                                           |
+| audio-search         | String  | Used to write the searches from the 'listenAudioPhrase' voice command.  |
+| video-search         | String  | Used to write the searches from the 'watchVideoPhrase' voice command.   |
 
 ## Thing Discovery
 
@@ -123,10 +125,10 @@ All the connected speakers can be automatically discovered using the main ui.
 * Remember to have installed and setup the default <b>speech-to-text, text-to-speech and interpreter</b> services using the main ui.
 * As most browsers requires user interaction to access its audio capabilities, you should click at the speaker panel at first. It will then ask for user permissions and show a loading animation until it's ready.
 * When the speaker is ready the registered sink and source will be visible in openHAB (audio settings section of the Main UI or though the console commands 'audio sinks' and 'audio sources').
-* The speaker icon circle displays an animation whenever it's waiting for you to talk.
-* The speaker icon dots part displays an animation while it's playing audio.
+* The main button circle displays pulse animation while the audio source is active.
+* The main button displays a speaker icon while the audio sink is active.
 * By clicking on the speaker icon a single shot audio dialog processing will start. It uses the registered audio components (sink/source) and the default processing services configured on the openHAB voice settings.
-* At this point you can discover the speaker using the main ui to add it as a thing in openHAB.
+* At this point you can discover the speaker using the main ui to add it as a thing in openHAB. (Path: /settings/things/add/habspeaker)
 
 ## Client keyword spotting
 
@@ -141,23 +143,11 @@ To run keyword spotting on the browser using rustpotter:
 
 For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
 
-## Media Providers
+## Media Playback
 
-The idea behind this is take advance of the browser media capabilities and the official frameworks from legit projects or companies to display media on the ui allowing it's state to be controlled from the thing channels or the configured speaker voice commands.
+Once the UI is discovered by openHAB you can play media on it controlling the web player through its channels.
 
-There are currently 2 media providers:
-
-### WebVideo 
-
-Uses a web video element to play the provided url.
-
-You can send a url using the associated channel.
-
-### WebAudio
-
-Uses a web audio element to play the configured url.
-
-You can send a url using the associated channel.
+Browsers don't all support the same audio/video formats.
 
 ### Setup
 

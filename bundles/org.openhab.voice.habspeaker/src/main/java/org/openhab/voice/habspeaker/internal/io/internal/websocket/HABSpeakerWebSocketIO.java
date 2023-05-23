@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
@@ -66,8 +65,8 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private @Nullable MediaState mediaState;
 
     public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
-            HttpClient httpClient, ScheduledExecutorService executor, HABSpeakerIOManager ioManager) {
-        super(servlet.audioManager, servlet.voiceManager, httpClient, servlet.bundleContext, configProvider, ioManager);
+            ScheduledExecutorService executor, HABSpeakerIOManager ioManager) {
+        super(servlet.audioManager, servlet.voiceManager, servlet.bundleContext, configProvider, ioManager);
         this.servlet = servlet;
         this.executor = executor;
     }

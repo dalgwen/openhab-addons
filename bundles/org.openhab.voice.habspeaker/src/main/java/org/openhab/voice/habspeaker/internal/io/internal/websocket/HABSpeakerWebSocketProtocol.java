@@ -27,7 +27,6 @@ import javax.servlet.ServletException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import org.openhab.core.audio.AudioManager;
@@ -65,11 +64,10 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     private final ScheduledFuture<?> pingTask;
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
-    private final HttpClient httpClient;
 
     public HABSpeakerWebSocketProtocol(HABSpeakerIOManager ioManager, HABSpeakerConfigProvider configProvider,
-            BundleContext bundleContext, HttpClient httpClient, HttpService httpService, AudioManager audioManager,
-            VoiceManager voiceManager, UserRegistry userRegistry, HABSpeakerSystemSecurityHelper apiSecurityHelper) {
+            BundleContext bundleContext, HttpService httpService, AudioManager audioManager, VoiceManager voiceManager,
+            UserRegistry userRegistry, HABSpeakerSystemSecurityHelper apiSecurityHelper) {
         this.ioManager = ioManager;
         this.configProvider = configProvider;
         this.bundleContext = bundleContext;
@@ -77,7 +75,6 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.userRegistry = userRegistry;
-        this.httpClient = httpClient;
         this.apiSecurityHelper = apiSecurityHelper;
         this.pingTask = executor.scheduleWithFixedDelay(this::pingHandlers, 60, 30, TimeUnit.SECONDS);
     }
@@ -147,8 +144,8 @@ public class HABSpeakerWebSocketProtocol extends WebSocketServlet implements HAB
     public void configure(@Nullable WebSocketServletFactory webSocketServletFactory) {
         if (webSocketServletFactory != null) {
             webSocketServletFactory.getPolicy().setIdleTimeout(60000);
-            webSocketServletFactory.setCreator((request, response) -> new HABSpeakerWebSocketIO(this, configProvider,
-                    httpClient, executor, ioManager));
+            webSocketServletFactory.setCreator(
+                    (request, response) -> new HABSpeakerWebSocketIO(this, configProvider, executor, ioManager));
         }
     }
 
