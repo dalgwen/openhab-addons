@@ -36,11 +36,6 @@ public interface HABSpeakerIOHandler {
     String getLocationLabel();
 
     /**
-     * @return Returns the spotify token or empty
-     */
-    String getSpotifyToken();
-
-    /**
      * Returns the speaker config
      */
     HABSpeakerThingConfig getSpeakerConfig();

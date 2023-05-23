@@ -66,16 +66,6 @@ Those are:
 * **Previous Media Phrase** - Phrase template to go to the previous media item.
 * **Listen on Web Phrase** - Phrase to listen a song on the current speaker (Example: 'play $*').
 * **Watch on Web Phrase** - Phrase to watch a video on the current speaker (Example: 'watch $*').
-* **Listen on Spotify Phrase** - Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').
-* **Watch on YouTube Phrase** - Phrase to watch a YouTube video on the current speaker (Example: 'watch $* on youtube').
-
-
-### Media Providers
-
-Configure required credentials for the supported media providers:
-
-* **Spotify Client Id** - Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify integration).
-* **Youtube API Key** -API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for the YouTube search functionality).
 
 ## Thing Configurations
 
@@ -92,7 +82,6 @@ Configure required credentials for the supported media providers:
 | screenSaverTime              | String  | device         | Seconds to activate screen saver (0 for disabled).                           |
 | dimScreen                    | Boolean | device         | Prevent device of going to sleep/block (not available on web).               |
 | keepAwake                    | Boolean | device         | Lower the screen brightness while the screen saver is enabled.               |
-| enableSpotify                | Boolean | device         | Enable spotify integration on this speaker.                                  |
 | stt                          | String  | voice          | The text-to-speech service to use, leave empty to use the default.           |
 | tts                          | String  | voice          | The speech-to-text service to use, leave empty to use the default.           |
 | voice                        | String  | voice          | The voice to use if no voice is specified, leave empty to use the default.   |
@@ -124,10 +113,6 @@ Configure required credentials for the supported media providers:
 | media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.                                   |
 | web-audio            | String  | Start playing a song by url using the browser player.                                            |
 | web-video            | String  | Start playing a video by url using the browser player.                                           |
-| youtube-id           | String  | Start playing a YouTube video (by id) (works for playlists adding the prefix 'playlist:').       |
-| youtube-search       | String  | Start playing a YouTube video.                                                                   |
-| spotify-id           | String  | Start playing in Spotify (by spotify uri).                                                       |
-| spotify-search       | String  | Start playing a Spotify song.                                                                    |
 
 ## Thing Discovery
 
@@ -160,9 +145,7 @@ For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
 
 The idea behind this is take advance of the browser media capabilities and the official frameworks from legit projects or companies to display media on the ui allowing it's state to be controlled from the thing channels or the configured speaker voice commands.
 
-Sources for each media providers can be locally configured in a json file containing an object where the keys are the human name of the source and the value the source id (url, youtube id, spotify uri...).
-
-There are currently 4 media providers:
+There are currently 2 media providers:
 
 ### WebVideo 
 
@@ -170,58 +153,11 @@ Uses a web video element to play the provided url.
 
 You can send a url using the associated channel.
 
-The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/web-audio.json'.
-
 ### WebAudio
 
 Uses a web audio element to play the configured url.
 
 You can send a url using the associated channel.
-
-The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/web-video.json'.
-
-### YouTube
-
-No YouTube code is loaded until you play a video. Uses the official YouTube iframe api.
-
-The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/youtube.json' or fallback to the YouTube search.
-
-For the YouTube search functionalities to work you need to have configured your api key for a Google Cloud project.
-You can check the first step on the 'Calling the API' section [here](https://developers.google.com/youtube/v3/docs#calling-the-api), then enable YouTube Data API with this link (with your project id) 'https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=$PROJECT_ID_HERE'.
-
-If the search returns a channel, its 'uploaded videos playlist' will be loaded on the iframe.
-
-Be aware that the YouTube data api have quotas. You can use the search around 100 times per day.
-
-### Spotify
-
-Requires a premium subscription.
-
-No Spotify code is loaded if you don't configure your spotify app client id. It make use of the official spotify web api.
-
-These are the required configuration steps:
-
-* You need to create an app in the spotify developers dashboard [here](https://developer.spotify.com/dashboard/login), when created add this allowed redirect url "$YOUR_OPENHAB_URL/rest/habspeaker/spotify/login/callback".
-* Then add the client id in the habspeaker general configuration **Settings / Other Services - HAB Speaker**.
-* Now navigate to "$YOUR_OPENHAB_URL/rest/habspeaker/spotify/login/callback" and you should be redirected to the spotify login.
-* If the login goes ok you will see a confirmation text on the top left of the page.
-
-After this setup any speaker you start will be exposed as a remote player to spotify using its configured label. (opened speakers need to be restarted)
-
-You can also control the player using the related voice commands, thing channels and the basic widget displayed on the HABSpeaker UI while playing.
-
-The voice search will look into the sources described in the '$OPENHAB_USERDATA/habspeaker/media/youtube.json' or fallback to the Spotify search.
-
-Note: spotify search just search by individual songs now, pending to improve.
-
-## Electron App
-
-The UI can be built as an electron application.
-
-The electron application avoid two limitations of the web version:
-
-* Do not requires https, it can be used over http.
-* Do not requires an initial user interaction to use audio.
 
 ### Setup
 
@@ -234,13 +170,7 @@ The app settings json file in the path '$HOME/.HABSpeaker/settings.json' will lo
 
 ```
 
-The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org/docs/configuration/apitokens.html). This token is not required if an implicit user role is granted, configurable in the OpenHAB 'Api Security'. 
-
-### Spotify Support
-
-The Spotify Web Sdk don't work on electron, so support is enabled thanks to the open source rust client [Librespot](https://github.com/librespot-org/librespot) (Requires a paid Spotify subscription).
-
-Librespot credentials are persisted on '$HOME/.Librespot'.
+The 'ohToken' should be a persistent [openHAB API token](https://www.openhab.org/docs/configuration/apitokens.html). This token is not required if an implicit user role is granted, configurable in the OpenHAB 'Api Security' settings.
 
 ### Supported Platforms
 

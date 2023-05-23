@@ -29,9 +29,6 @@ class PlatformAdapter {
         console.info(`main: running ${platform.getName()} setup`);
         return platform.setup(onReady);
     }
-    async getSpotifyCtrl() {
-        return (await getPlatform()).getSpotifyCtrl();
-    }
 
     async getUrlOpenHAB() {
         if (import.meta.env.VITE_DEV_SERVER_URL) {

@@ -1,4 +1,3 @@
-import axios from "axios";
 export class OHAuthHelper {
     accessToken = "";
     currentTokenExpireTime?: number;
@@ -39,21 +38,26 @@ export class OHAuthHelper {
             }
             if (this.currentTokenExpireTime == null || refreshNow) {
                 var redirectUri = this.getRedirectUri();
-                const payload = urlEncodeObject({
+                const body = urlEncodeObject({
                     grant_type: "refresh_token",
                     client_id: redirectUri,
                     redirect_uri: redirectUri,
                     refresh_token: refreshToken,
                 });
-                const resp = await axios.post(`${await this.getUrl()}/rest/auth/token`, payload, {
+                const response = await fetch(`${await this.getUrl()}/rest/auth/token`, {
+                    body,
                     headers: {
                         "content-type": "application/x-www-form-urlencoded",
                         accept: "application/json",
                     },
                 });
-                this.accessToken = resp.data.access_token;
-                this.setRefreshToken(resp.data.refresh_token);
-                this.currentTokenExpireTime = new Date().getTime() + resp.data.expires_in * 950;
+                if (!response.ok) {
+                    throw new Error(`Error response obtaining openHAB token ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                this.accessToken = data.access_token;
+                this.setRefreshToken(data.refresh_token);
+                this.currentTokenExpireTime = new Date().getTime() + data.expires_in * 950;
             }
             const result = { access_token: this.getAccessToken(), refresh_token: this.getRefreshToken() };
             if (callback) {
@@ -120,7 +124,7 @@ export class OHAuthHelper {
             }
             sessionStorage.removeItem('openhab.ui:codeVerifier');
             var redirectUri = this.getRedirectUri();
-            const payload = urlEncodeObject({
+            const body = urlEncodeObject({
                 'grant_type': 'authorization_code',
                 'client_id': redirectUri,
                 'redirect_uri': redirectUri,
@@ -128,15 +132,21 @@ export class OHAuthHelper {
                 'code_verifier': codeVerifier
             });
             this.clearAccessToken();
-            const resp = await axios.post(`${await this.getUrl()}/rest/auth/token?useCookie=${this.options.useCookie ?? false}`, payload, {
+
+            const response = await fetch(`${await this.getUrl()}/rest/auth/token?useCookie=${this.options.useCookie ?? false}`, {
+                body,
                 headers: {
                     "content-type": "application/x-www-form-urlencoded",
                     accept: "application/json",
                 },
             });
-            this.accessToken = resp.data.access_token;
-            this.setRefreshToken(resp.data.refresh_token);
-            this.currentTokenExpireTime = new Date().getTime() + resp.data.expires_in * 950;
+            if (!response.ok) {
+                throw new Error(`Error response obtaining openHAB token ${response.status}: ${response.statusText}`);
+            }
+            const data = await response.json();
+            this.accessToken = data.access_token;
+            this.setRefreshToken(data.refresh_token);
+            this.currentTokenExpireTime = new Date().getTime() + data.expires_in * 950;
             return true;
         }
         return false;

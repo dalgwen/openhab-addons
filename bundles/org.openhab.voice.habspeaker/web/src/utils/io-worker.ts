@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 
-import { ReentrantLock } from "reentrant-lock";
 import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
 import { createResampler, Resampler, ResamplerNoop } from "./resampler";
@@ -45,8 +44,6 @@ export default class IOWorker {
   sourceResampler: Resampler = new ResamplerNoop();
   /** Stores each sink context by its id */
   sinkContextStorage = new Map<string, SinkContext>();
-  /** Lock used to ensure sink data chunks are processed in order */
-  sinkLock = new ReentrantLock();
   /** Defines the resampler implementation to use */
   resamplerMode: string = "";
   /** Holds the openHAB server url */
@@ -211,12 +208,8 @@ export default class IOWorker {
           const mediaCommandData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.MEDIA_COMMAND, mediaCommandData);
           break;
-        case WebSocketOutCmd.SPOTIFY_TOKEN:
-          const spotifyTokenData = data as WebSocketOutCmdType<typeof command>;
-          this.postToMainThread(WorkerOutCmd.SPOTIFY_TOKEN, spotifyTokenData);
-          break;
         default:
-          throw new Error("Unknown command: " + data.cmd);
+          throw new Error("Unknown command " + data.cmd);
       }
     } catch (error) {
       console.error("Error handling command in worker: ", error);
@@ -272,9 +265,7 @@ export default class IOWorker {
           if (msg.data instanceof Blob) {
             // incoming audio
             const blob = msg.data;
-            this.sinkLock
-              .lock(() => blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer)))
-              .catch(err => console.error("worker: error on sink blob", err));
+            blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer));
             if ((import.meta as any).env.DEV) {
               console.debug("websocket => worker: Binary data");
             }

@@ -1,14 +1,11 @@
 import { defineStore } from "pinia";
-import axios, { AxiosError } from "axios";
 import { useIOStore } from "./io";
 import { useSettingsStore } from "./settings";
 import { OHAuthHelper } from "../utils/openhab-auth-helper";
-import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import router from "../router";
 import { platform } from "../platforms";
 export const useAuthStore = defineStore("auth", () => {
   const ioStore = useIOStore();
-  const spotifyStore = useSpotifyPlayerStore();
   const { getSpeakerId, getOHUrl, getOHToken } = useSettingsStore();
   const ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl: getOHUrl });
   let persistentToken: string | null = null;
@@ -20,7 +17,15 @@ export const useAuthStore = defineStore("auth", () => {
       accept: "application/json",
     } as { [key: string]: string };
     if (getAccessToken()) { headers["Authorization"] = "Bearer " + getAccessToken(); }
-    return (await axios.get<UIConfig>(`${await getOHUrl()}/rest/habspeaker/config/${await getSpeakerId()}`)).data;
+    const response = await fetch(`${await getOHUrl()}/rest/habspeaker/config/${await getSpeakerId()}`, { headers });
+    if (!response.ok) {
+      if(response.status === 401) {
+        throw new UnauthorizedError();
+      }else{
+        throw new Error(`Response failed with status ${response.status}: ${response.statusText}`);
+      }
+    }
+    return await response.json();
   }
   function unauthorized() {
     console.debug("Unauthorized, redirecting to login");
@@ -48,14 +53,12 @@ export const useAuthStore = defineStore("auth", () => {
   // check security and redirect to login
   (async function () {
     let requireCredentials = false;
-    let startSpotify = false;
     persistentToken = await getOHToken();
     try {
-      const { spotifyEnabled } = await getUIConfig();
+      await getUIConfig();
       requireCredentials = false;
-      startSpotify = spotifyEnabled;
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 401) {
+      if (error instanceof UnauthorizedError) {
         if (persistentToken != null) {
           return await router.replace("/unauthorized");
         }
@@ -70,13 +73,6 @@ export const useAuthStore = defineStore("auth", () => {
         return await router.replace("/unauthorized");
       }
       await authorize();
-      const { spotifyEnabled } = await getUIConfig();
-      startSpotify = spotifyEnabled;
-    }
-    if (startSpotify) {
-      spotifyStore.initSpotify()
-        .then(() => console.debug('Spotify initialized'))
-        .catch(err => console.error("Spotify error: ", err));
     }
   })().catch(err => {
     console.error("Auth error:", err);
@@ -84,7 +80,7 @@ export const useAuthStore = defineStore("auth", () => {
   return { getUIConfig, getAccessToken, authorize };
 });
 
+class UnauthorizedError extends Error { }
 type UIConfig = {
-  spotifyEnabled: boolean;
   label: string;
 };

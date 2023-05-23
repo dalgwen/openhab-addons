@@ -174,11 +174,6 @@ public interface HABSpeakerIO {
     void disconnect();
 
     /**
-     * Send a new spotify access token to the speaker
-     */
-    void updateSpotifyToken(String accessToken);
-
-    /**
      * Media playback states
      */
     enum PlaybackStates {
@@ -203,8 +198,6 @@ public interface HABSpeakerIO {
      * Available media providers
      */
     enum MediaProvider {
-        YOUTUBE("youtube"),
-        SPOTIFY("spotify"),
         WEB_VIDEO("web-video"),
         WEB_AUDIO("web-audio");
 
@@ -218,10 +211,6 @@ public interface HABSpeakerIO {
             switch (name) {
                 case "":
                     return null;
-                case "youtube":
-                    return YOUTUBE;
-                case "spotify":
-                    return SPOTIFY;
                 case "web-video":
                     return WEB_VIDEO;
                 case "web-audio":

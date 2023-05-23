@@ -1,10 +1,8 @@
 import { ref, Ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { useIOStore } from "../io";
-import { useSpotifyPlayerStore } from "./spotify-player";
 export const useMediaSessionStore = defineStore("mediaSession", () => {
     const ioStore = useIOStore();
-    const spotifyStore = useSpotifyPlayerStore();
     const mediaController: Ref<MediaSessionCtrl | undefined> = ref();
     const mediaState: Ref<PlaybackState> = ref(PlaybackState.STOPPED);
     const mediaProvider = ref("");
@@ -117,34 +115,6 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         switch (provider) {
             case MediaProvider.WEB_AUDIO:
             case MediaProvider.WEB_VIDEO:
-            case MediaProvider.YOUTUBE:
-                if (!!mediaController.value && !!mediaTarget.value && Object.entries(mediaProvider.value).every(e => media[e[0] as keyof MediaTarget] === e[1])) {
-                    // if media is the same we should force a reload
-                    const mediaCtrl = mediaController.value;
-                    mediaCtrl.seek(media.startSecond ?? 0)
-                        .then(() => mediaCtrl.play())
-                        .then(() => updateMediaState())
-                        .catch((err) => console.error("Error reloading media: ", err));
-                } else {
-                    // media providers impl should use this data on init and watch its changes.
-                    mediaTarget.value = media;
-                    updateProvider(provider);
-                }
-                break;
-            case 'spotify':
-                // spotify does not use this, so clean it
-                mediaTarget.value = undefined;
-                if (mediaProvider.value !== MediaProvider.SPOTIFY) {
-                    // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
-                    updateProvider("");
-                }
-                const spotifyUri = media.playlistId ?? media.mediaId;
-                if (spotifyUri) {
-                    spotifyStore.playUri(spotifyUri)
-                        .then(() => startMediaUpdateInterval())
-                        .catch((err) => console.error("Error playing spotify media: ", err));
-                }
-                break;
             default:
                 console.error('unsupported media provider ', provider);
                 return;
@@ -154,15 +124,6 @@ export const useMediaSessionStore = defineStore("mediaSession", () => {
         stopMediaUpdateInterval();
         console.debug(`claiming ${provider} media`);
         switch (provider) {
-            case 'spotify':
-                if (mediaProvider.value !== MediaProvider.SPOTIFY) {
-                    // if current media provider is not spotify unset it, spotify will set itself when the playback starts.
-                    updateProvider("");
-                }
-                spotifyStore.claimPlayback()
-                    .then(() => startMediaUpdateInterval())
-                    .catch((err) => console.error("Error playing spotify media: ", err));
-                break;
             default:
                 console.error('Media claim is not supported by provider ' + provider);
                 return;
@@ -214,8 +175,6 @@ export interface MediaSessionCtrl {
     getPlaybackState(): Promise<PlaybackState>;
 }
 export enum MediaProvider {
-    YOUTUBE = 'youtube',
-    SPOTIFY = 'spotify',
     WEB_AUDIO = 'web-audio',
     WEB_VIDEO = 'web-video',
 }

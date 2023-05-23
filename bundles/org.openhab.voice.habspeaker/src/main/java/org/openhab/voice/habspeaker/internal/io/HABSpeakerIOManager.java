@@ -125,11 +125,6 @@ public class HABSpeakerIOManager
     }
 
     @Override
-    public void onSpotifyTokenUpdate(String accessToken) {
-        speakerConnections.forEach(speakerIO -> speakerIO.updateSpotifyToken(accessToken));
-    }
-
-    @Override
     public void onGlobalConfigUpdate(HABSpeakerConfig config) {
         // TODO: disconnect speakers?
     }

@@ -31,8 +31,7 @@ export type RustpotterOptions = {
   bandPassLowCutoff: number
   bandPassHighCutoff: number
 };
-export type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, spotifyToken?: string, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
-type SpotifyTokenCmd = { token: string };
+export type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
 export type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
 { type: 'stop' } |
@@ -62,14 +61,12 @@ export enum WebSocketOutCmd {
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
-  SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 }
 
 
 export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocketOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
   T extends WebSocketOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WebSocketOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
-  T extends WebSocketOutCmd.SPOTIFY_TOKEN ? SpotifyTokenCmd :
   never;
 // Commands from main thread to worker.
 export enum WorkerInCmd {
@@ -104,13 +101,11 @@ export enum WorkerOutCmd {
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
-  SPOTIFY_TOKEN = "SPOTIFY_TOKEN"
 };
 export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
   T extends WorkerOutCmd.START_SINK ? { id: string, channels: number } :
   T extends WorkerOutCmd.STOP_SINK ? { id: string } :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
-  T extends WorkerOutCmd.SPOTIFY_TOKEN ? SpotifyTokenCmd :
   T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
   never;

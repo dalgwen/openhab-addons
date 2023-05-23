@@ -1,9 +1,7 @@
 import { ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { useScreenSaverStore } from "./screen-saver";
-import { useAuthStore } from "./auth";
 import { PlaybackState, useMediaSessionStore } from "./media-players/media-session";
-import { useSpotifyPlayerStore } from "./media-players/spotify-player";
 import { MediaStateCmd, WorkerOutCmd, WorkerOutCmdType } from "../utils/io-types";
 import { useSettingsStore } from "./settings";
 import { platform } from "../platforms";
@@ -12,9 +10,8 @@ import { IOMain, IOCallbacks } from "../utils/io-main";
 export const useIOStore = defineStore("io", () => {
   let speakerLabel = ref("HAB Speaker");
   const { getOHUrl } = useSettingsStore();
-  const spotifyStore = useSpotifyPlayerStore();
   const mediaSessionStore = useMediaSessionStore();
-  const { mediaState, mediaController } = storeToRefs(mediaSessionStore);
+  const { mediaController } = storeToRefs(mediaSessionStore);
   const { awakeScreenSaver, setScreenSaverTime, enableScreenDim } = useScreenSaverStore();
   // state
   let ioMain: IOMain | null = null;
@@ -39,23 +36,6 @@ export const useIOStore = defineStore("io", () => {
     if (!value) {
       mediaSessionStore.stopMedia();
     }
-    spotifyStore.isEnabled().then(spotifyEnabled => {
-      if (spotifyEnabled) {
-        if (value) {
-          spotifyStore.initPlayer(speakerLabel.value)
-            .then(() => spotifyStore.connect())
-            .then((connected) => console.debug("Spotify is connected: " + connected))
-            .catch((err) => console.error("Error connecting to spotify: ", err));
-        } else if (!value) {
-          spotifyStore.disconnect()
-            .then(() => console.debug("Spotify is disconnected"))
-            .catch(() => console.error("Error disconnecting from spotify"));
-        }
-      }
-    });
-  }
-  function updateSpotifyToken(token: string) {
-    spotifyStore.updateToken(token);
   }
   /**
    * 
@@ -127,15 +107,12 @@ export const useIOStore = defineStore("io", () => {
       setOnline(false);
     },
     onConfigured: (config) => {
-      const { screenSaverTime, dimScreen, keepAwake, spotifyToken } = config;
+      const { screenSaverTime, dimScreen, keepAwake } = config;
       if (screenSaverTime != null && !isNaN(screenSaverTime)) {
         setScreenSaverTime(screenSaverTime);
       }
       enableScreenDim(!!dimScreen);
       platform.keepDeviceAwake(!!keepAwake);
-      if (spotifyToken) {
-        updateSpotifyToken(spotifyToken);
-      }
     },
     onMediaCommand(command) {
       runMediaCommand(command).catch(err => console.error(err));

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { release } from 'node:os';
 import { join } from 'node:path';
-import { registerAPIHandlers, requestPermissions, getOhUrl } from './native-api';
+import { registerAPIHandlers, requestPermissions } from './native-api';
 const DIST = join(__dirname, './habspeaker');
 if (process.platform === 'win32') {
   // Disable GPU Acceleration for Windows 7

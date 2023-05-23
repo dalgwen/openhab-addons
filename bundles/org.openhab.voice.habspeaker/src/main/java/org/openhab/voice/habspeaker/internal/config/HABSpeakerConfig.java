@@ -45,14 +45,6 @@ public class HABSpeakerConfig {
      */
     public String watchOnWebPhrase = "";
     /**
-     * Phrase to listen on spotify
-     */
-    public String listenOnSpotifyPhrase = "";
-    /**
-     * Phrase to watch on YouTube
-     */
-    public String watchOnYouTubePhrase = "";
-    /**
      * Phrase to continue media on another speaker
      */
     public String continueMediaOnPhrase = "";
@@ -100,14 +92,4 @@ public class HABSpeakerConfig {
      * Volume step used by the increase/decrease media volume phrases
      */
     public int mediaVolumeStep;
-
-    // Credentials config
-    /**
-     * Spotify app client id
-     */
-    public String spotifyClientId = "";
-    /**
-     * Youtube app api key
-     */
-    public String youtubeAPIKey = "";
 }

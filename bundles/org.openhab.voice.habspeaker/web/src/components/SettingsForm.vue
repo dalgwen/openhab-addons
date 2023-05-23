@@ -3,7 +3,6 @@ import { platform } from "../platforms";
 import { ref } from "vue";
 import router from "../router";
 import { useSettingsStore } from "../stores/settings";
-import axios, { AxiosError } from "axios";
 const { setSpeakerSettings, getSpeakerId, getOHToken, getOHUrl } = useSettingsStore();
 const model = ref({
   speakerId: "",
@@ -72,7 +71,7 @@ async function start() {
   }
 }
 async function checkServerConnection(speakerId: string, ohUrl: string, ohToken: string): Promise<'ok' | 'require_auth' | 'bad'> {
-  if(import.meta.env.VITE_DEV_SERVER_URL) {
+  if (import.meta.env.VITE_DEV_SERVER_URL) {
     // in dev mode swap to server dev url
     ohUrl = import.meta.env.VITE_DEV_SERVER_URL;
   }
@@ -81,14 +80,16 @@ async function checkServerConnection(speakerId: string, ohUrl: string, ohToken: 
   } as { [key: string]: string };
   if (ohToken?.length) { headers["Authorization"] = "Bearer " + ohToken; }
   try {
-    (await axios.get<any>(`${ohUrl}/rest/habspeaker/config/${speakerId}`)).data;
-    return 'ok';
-  } catch (error) {
-    if (error instanceof AxiosError && error.response?.status === 401) {
+    const response = await fetch(`${ohUrl}/rest/habspeaker/config/${speakerId}`, {headers: headers});
+    if (response.ok) {
+      return 'ok';
+    } else if (response.status === 401) {
       return 'require_auth';
     }
-    return 'bad';
+  } catch (error) {
+    console.error(error);
   }
+  return 'bad';
 }
 </script>
 <template>
@@ -96,8 +97,8 @@ async function checkServerConnection(speakerId: string, ohUrl: string, ohToken: 
     <div class="form">
       <div class="form-group">
         <label for="id">Speaker Id</label>
-        <input type="text" id="id" class="form-control" v-model="model.speakerId"
-          placeholder="Identifier against openHAB" onkeydown="return /[0-9a-zA-Z\-\_]/i.test(event.key)" />
+        <input type="text" id="id" class="form-control" v-model="model.speakerId" placeholder="Identifier against openHAB"
+          onkeydown="return /[0-9a-zA-Z\-\_]/i.test(event.key)" />
       </div>
       <div v-if="displayURL" class="form-group">
         <label for="id">OpenHAB URL:</label>

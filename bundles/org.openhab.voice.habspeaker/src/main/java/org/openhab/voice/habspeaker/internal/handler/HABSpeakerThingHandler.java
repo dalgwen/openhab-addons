@@ -126,11 +126,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         return null;
     }
 
-    @Override
-    public String getSpotifyToken() {
-        return globalConfigProvider.getSpotifyToken();
-    }
-
     public void updateStatus() {
         var newStatus = speakerIO == null ? ThingStatus.OFFLINE : ThingStatus.ONLINE;
         if (newStatus == ThingStatus.OFFLINE && getThing().getStatus() == ThingStatus.ONLINE) {
@@ -245,34 +240,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                         speakerIO.playerCommand((NextPreviousType) command);
                     }
                     break;
-                case YOUTUBE_ID_CHANNEL:
-                    if (command instanceof RefreshType) {
-                        return;
-                    } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.YOUTUBE, command.toFullString());
-                    }
-                    break;
-                case YOUTUBE_SEARCH_CHANNEL:
-                    if (command instanceof RefreshType) {
-                        return;
-                    } else {
-                        speakerIO.getLanguageInterpreter().watchOnYouTube(command.toFullString());
-                    }
-                    break;
-                case SPOTIFY_ID_CHANNEL:
-                    if (command instanceof RefreshType) {
-                        return;
-                    } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.SPOTIFY, command.toFullString());
-                    }
-                    break;
-                case SPOTIFY_SEARCH_CHANNEL:
-                    if (command instanceof RefreshType) {
-                        return;
-                    } else {
-                        speakerIO.getLanguageInterpreter().listenTrackOnSpotify(command.toFullString());
-                    }
-                    break;
                 case WEB_AUDIO_CHANNEL:
                     if (command instanceof RefreshType) {
                         return;
@@ -324,18 +291,10 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
 
     @Override
     public void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume) {
-        String youtubeMediaId = "";
-        String spotifyMediaId = "";
         String videoMediaUrl = "";
         String audioMediaUrl = "";
         if (mediaState.provider != null && mediaState.mediaId != null) {
             switch (mediaState.provider) {
-                case YOUTUBE:
-                    youtubeMediaId = mediaState.mediaId;
-                    break;
-                case SPOTIFY:
-                    spotifyMediaId = mediaState.mediaId;
-                    break;
                 case WEB_VIDEO:
                     videoMediaUrl = mediaState.mediaId;
                     break;
@@ -343,12 +302,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                     audioMediaUrl = mediaState.mediaId;
                     break;
             }
-        }
-        if (isLinked(YOUTUBE_ID_CHANNEL)) {
-            updateState(YOUTUBE_ID_CHANNEL, youtubeMediaId.isEmpty() ? UnDefType.NULL : new StringType(youtubeMediaId));
-        }
-        if (isLinked(SPOTIFY_ID_CHANNEL)) {
-            updateState(SPOTIFY_ID_CHANNEL, spotifyMediaId.isEmpty() ? UnDefType.NULL : new StringType(spotifyMediaId));
         }
         if (isLinked(WEB_VIDEO_CHANNEL)) {
             updateState(WEB_VIDEO_CHANNEL, videoMediaUrl.isEmpty() ? UnDefType.NULL : new StringType(videoMediaUrl));
@@ -377,12 +330,6 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     }
 
     private void cleanChannels() {
-        if (isLinked(YOUTUBE_ID_CHANNEL)) {
-            updateState(YOUTUBE_ID_CHANNEL, UnDefType.NULL);
-        }
-        if (isLinked(SPOTIFY_ID_CHANNEL)) {
-            updateState(SPOTIFY_ID_CHANNEL, UnDefType.NULL);
-        }
         if (isLinked(WEB_VIDEO_CHANNEL)) {
             updateState(WEB_VIDEO_CHANNEL, UnDefType.NULL);
         }

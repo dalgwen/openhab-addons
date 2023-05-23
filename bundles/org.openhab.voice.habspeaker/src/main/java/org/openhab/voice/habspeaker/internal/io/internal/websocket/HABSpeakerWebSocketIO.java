@@ -193,13 +193,6 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     }
 
     @Override
-    public void updateSpotifyToken(String accessToken) {
-        var data = new HashMap<String, Object>();
-        data.put("token", accessToken);
-        sendClientCommand(WebsocketOutputCommand.SPOTIFY_TOKEN, data);
-    }
-
-    @Override
     public void spot() {
         onRemoteSpot();
     }
@@ -426,6 +419,5 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         STOP_LISTENING,
         SINK_VOLUME,
         MEDIA_COMMAND,
-        SPOTIFY_TOKEN,
     }
 }

@@ -1,11 +1,9 @@
 import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
-import { WebSpotifyCtrl } from "./web-spotify-ctrl";
 
 const storagePrefix = "habspeaker.ui:";
 const idLocalStorageKey = `${storagePrefix}id`;
 export class WebPlatform implements Platform {
     wakeLock?: WakeLockSentinel;
-    spotifyCtrl = new WebSpotifyCtrl();
     getName(): PlatformName {
         return 'web';
     }
@@ -53,9 +51,6 @@ export class WebPlatform implements Platform {
             port = `:${location.port}`
         }
         return `${location.protocol}//${location.hostname}${port}`
-    }
-    async getSpotifyCtrl() {
-        return this.spotifyCtrl;
     }
 }
 

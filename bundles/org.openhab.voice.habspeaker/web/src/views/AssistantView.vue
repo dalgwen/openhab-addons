@@ -6,8 +6,6 @@ import { useSettingsStore } from "../stores/settings";
 import { useIOStore } from "../stores/io";
 import router from "../router";
 import AssistantWidget from "../components/AssistantWidget.vue";
-import YoutubePlayer from "../components/media-players/YoutubePlayer.vue";
-import SpotifyPlayer from "../components/media-players/SpotifyPlayer.vue";
 import WebAudioPlayer from "../components/media-players/WebAudioPlayer.vue";
 import WebVideoPlayer from "../components/media-players/WebVideoPlayer.vue";
 import { MediaProvider, useMediaSessionStore } from "../stores/media-players/media-session";
@@ -53,9 +51,7 @@ platform.setup(startSpeaker)
     <div @click="startSpeaker()" class="container"
       :class="{clickable: !userInteractionDone,loading: userInteractionDone && !online, 'container-mini-mode': miniMode}">
       <AssistantWidget :class="{ 'speaker-btn-mini': miniMode }" />
-      <YoutubePlayer v-if="mediaProvider == MediaProvider.YOUTUBE"></YoutubePlayer>
-      <SpotifyPlayer v-else-if="mediaProvider == MediaProvider.SPOTIFY"></SpotifyPlayer>
-      <WebAudioPlayer v-else-if="mediaProvider == MediaProvider.WEB_AUDIO"></WebAudioPlayer>
+      <WebAudioPlayer v-if="mediaProvider == MediaProvider.WEB_AUDIO"></WebAudioPlayer>
       <WebVideoPlayer v-else-if="mediaProvider == MediaProvider.WEB_VIDEO"></WebVideoPlayer>
     </div>
   </main>

@@ -106,7 +106,6 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         initializedConfig.put("screenSaverTime", config.screenSaverTime);
         initializedConfig.put("dimScreen", config.dimScreen);
         initializedConfig.put("keepAwake", config.keepAwake);
-        initializedConfig.put("spotifyToken", config.enableSpotify ? handler.getSpotifyToken() : "");
         var label = handler.getLabel();
         if (label != null) {
             initializedConfig.put("label", label);

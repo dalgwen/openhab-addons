@@ -37,10 +37,6 @@ public class HABSpeakerThingConfig {
      * Prevent device from going to sleep/block while running the application.
      */
     public boolean keepAwake = false;
-    /**
-     * Enable spotify integration on this speaker.
-     */
-    public boolean enableSpotify = true;
     // Voice config
     /**
      * Custom tts service for this speaker

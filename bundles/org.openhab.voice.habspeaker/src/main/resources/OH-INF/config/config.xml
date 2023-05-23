@@ -69,14 +69,6 @@
 			<label>Watch on Web Phrase</label>
 			<description>Phrase to watch on web audio player (Example: 'watch channel $*').</description>
 		</parameter>
-		<parameter name="listenOnSpotifyPhrase" type="text" groupName="voice">
-			<label>Listen on Spotify Phrase</label>
-			<description>Phrase to listen a spotify song on the current speaker (Example: 'play $* on spotify').</description>
-		</parameter>
-		<parameter name="watchOnYouTubePhrase" type="text" groupName="voice">
-			<label>Watch on YouTube Phrase</label>
-			<description>Phrase to watch a YouTube video on the current speaker (Example: 'play $* on youtube').</description>
-		</parameter>
 		<parameter name="continueMediaOnPhrase" type="text" groupName="voice">
 			<label>Continue Media On Phrase</label>
 			<description>Phrase to continue media on another speaker (Example: 'continue on $*').</description>
@@ -84,16 +76,6 @@
 		<parameter name="claimMediaPhrase" type="text" groupName="voice">
 			<label>Claim Media Phrase</label>
 			<description>Phrase to continue media into the current speaker (Example: 'continue here').</description>
-		</parameter>
-		<parameter name="spotifyClientId" type="text" groupName="media-providers">
-			<label>Spotify Client Id</label>
-			<description>Client ID for a Spotify app. (Creating a Spotify app requires a paid account) (Required for Spotify
-				integration)</description>
-		</parameter>
-		<parameter name="youtubeAPIKey" type="text" groupName="media-providers">
-			<label>Youtube API Key</label>
-			<description>API key for a Google Cloud application with API 'YouTube Data API v3' enabled. (Required for YouTube
-				Search)</description>
 		</parameter>
 	</config-description>
 </config-description:config-descriptions>
