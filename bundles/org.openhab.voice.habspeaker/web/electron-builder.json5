@@ -10,16 +10,11 @@
     "output": "electron-release/${version}"
   },
   "asarUnpack": [
-    "librespot/*"
   ],
   "files": [
     {
       "from": "dist-electron",
       "to": ""
-    },
-    {
-      "from": "librespot",
-      "to": "librespot"
     },
     {
       "from": "dist",
