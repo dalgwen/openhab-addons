@@ -9,10 +9,10 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
-    implementation project(':capacitor-community-keep-awake')
-    implementation project(':capacitor-community-screen-brightness')
-    implementation project(':capacitor-dialog')
     implementation project(':capacitor-preferences')
+    implementation project(':capacitor-dialog')
+    implementation project(':capacitor-community-screen-brightness')
+    implementation project(':capacitor-community-keep-awake')
     implementation project(':capacitor-voice-recorder')
 
 }
