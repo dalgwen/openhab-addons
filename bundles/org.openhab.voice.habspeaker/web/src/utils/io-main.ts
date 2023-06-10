@@ -29,13 +29,12 @@ export class IOMain {
   private activeSinks = new Map<string, AudioSink>();
   private listening: boolean = false;
   private online: boolean = false;
-  private sinkVolume: number = 0;
+  private sinkVolume: number = 100;
   private remoteSpotMode: boolean = false;
   private listenPortACK?: number;
   private accessToken: string | null = null;
 
-  constructor(private ohUrl: string, private callbacks: IOCallbacks = {}) {
-  }
+  constructor(private ohUrl: string, private callbacks: IOCallbacks = {}) { }
 
   private startVoiceAudioContext() {
     if (!this.audioContext) {
