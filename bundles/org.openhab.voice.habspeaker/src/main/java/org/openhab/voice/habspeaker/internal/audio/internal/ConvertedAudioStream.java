@@ -16,6 +16,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.Objects;
 import javazoom.spi.mpeg.sampled.convert.MpegFormatConversionProvider;
 import javazoom.spi.mpeg.sampled.file.MpegAudioFileReader;
 
@@ -46,6 +47,7 @@ public class ConvertedAudioStream extends AudioStream {
     private final Logger logger = LoggerFactory.getLogger(ConvertedAudioStream.class);
 
     private final AudioFormat inAudioFormat;
+    private final javax.sound.sampled.AudioFormat inJAudioFormat;
     private final AudioFormat outAudioFormat;
     private final javax.sound.sampled.AudioFormat outJAudioFormat;
     private final AudioInputStream pcmNormalizedInputStream;
@@ -63,11 +65,19 @@ public class ConvertedAudioStream extends AudioStream {
             int targetChannels, boolean rawAudioInput)
             throws UnsupportedAudioFormatException, UnsupportedAudioFileException, IOException {
         this.inAudioFormat = audioFormat;
+        int inputBitDepth = Objects.requireNonNull(inAudioFormat.getBitDepth());
+        float inputSampleRate = Objects.requireNonNull(inAudioFormat.getFrequency());
+        int inputChannels = Objects.requireNonNull(inAudioFormat.getChannels());
+        boolean inputIsBigEndian = inAudioFormat.isBigEndian() != null
+                && Objects.requireNonNull(inAudioFormat.isBigEndian());
+        this.inJAudioFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
+                inputSampleRate, inputBitDepth, inputChannels, inputChannels * (inputBitDepth / 8), inputSampleRate,
+                inputIsBigEndian);
         this.outAudioFormat = new AudioFormat(this.inAudioFormat.getContainer(), this.inAudioFormat.getCodec(),
-                this.inAudioFormat.isBigEndian(), this.inAudioFormat.getBitDepth(), null, inAudioFormat.getFrequency(),
-                targetChannels);
+                inputIsBigEndian, inputBitDepth, null, targetSampleRate, targetChannels);
         this.outJAudioFormat = new javax.sound.sampled.AudioFormat(javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
-                targetSampleRate, 16, targetChannels, targetChannels * 2, targetSampleRate, false);
+                targetSampleRate, inputBitDepth, targetChannels, targetChannels * (inputBitDepth / 8), targetSampleRate,
+                inputIsBigEndian);
         if (innerInputStream instanceof FixedLengthAudioStream) {
             length = ((FixedLengthAudioStream) innerInputStream).length();
         }
@@ -146,7 +156,7 @@ public class ConvertedAudioStream extends AudioStream {
             if (!AudioFormat.WAV.isCompatible(inAudioFormat)) {
                 throw new UnsupportedAudioFormatException("Unsupported raw streaming", inAudioFormat);
             }
-            AudioInputStream audioInputStream = new AudioInputStream(innerInputStream, this.outJAudioFormat, length);
+            AudioInputStream audioInputStream = new AudioInputStream(innerInputStream, this.inJAudioFormat, length);
             if (length > 0) {
                 float durationInSeconds = getAudioDurationInSeconds(audioInputStream);
                 duration = Math.round(durationInSeconds * 1000);
