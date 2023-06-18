@@ -4,6 +4,7 @@ import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, 
 import { MessageACKManager } from "./message-ack-manager";
 import { createResampler, Resampler, ResamplerNoop } from "./resampler";
 import { CircularBufferExecutor } from "./circular-buffer";
+import { ReentrantLock } from "reentrant-lock";
 
 /** Size of the circular buffer used to ensure a constant chunk size */
 const SINK_CHUNK_SIZE = 4096;
@@ -44,6 +45,8 @@ export default class IOWorker {
   sourceResampler: Resampler = new ResamplerNoop();
   /** Stores each sink context by its id */
   sinkContextStorage = new Map<string, SinkContext>();
+  /** Lock used to ensure sink data chunks are processed in order */
+  sinkLock = new ReentrantLock();
   /** Defines the resampler implementation to use */
   resamplerMode: string = "";
   /** Holds the openHAB server url */
@@ -265,7 +268,9 @@ export default class IOWorker {
           if (msg.data instanceof Blob) {
             // incoming audio
             const blob = msg.data;
-            blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer));
+            this.sinkLock
+              .lock(() => blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer)))
+              .catch(err => console.error("worker: error on sink blob", err));
             if ((import.meta as any).env.DEV) {
               console.debug("websocket => worker: Binary data");
             }
