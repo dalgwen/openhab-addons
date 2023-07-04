@@ -1,10 +1,10 @@
 {
-  "name": "hab-speaker",
+  "name": "habspeaker",
   "author": {
     "name": "Miguel Álvarez Díez (GiviMAD)"
   },
   "description": "A web UI to consume OpenHAB's dialog processing capabilities",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "private": true,
   "scripts": {
     "dev": "vite --mode pwa",
