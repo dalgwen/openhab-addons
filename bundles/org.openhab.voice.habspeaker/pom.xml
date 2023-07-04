@@ -10,7 +10,7 @@
 
   <artifactId>org.openhab.voice.habspeaker</artifactId>
   <name>openHAB Add-ons :: Bundles :: Voice :: HABSpeaker</name>
-	<description>Web UI for dialog processing using your openHAB server</description>
+  <description>Web UI for dialog processing using your openHAB server</description>
   <dependencies>
     <dependency>
       <groupId>com.googlecode.soundlibs</groupId>
