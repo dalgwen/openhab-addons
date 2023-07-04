@@ -174,7 +174,7 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         if (id.isBlank()) {
             throw new IOException("Unable to register audio components");
         }
-        String label = "HAB Speaker (" + id + ")";
+        String label = "HABSpeaker (" + id + ")";
         var sinkStereo = false;
         @Nullable
         String listeningItem = null;

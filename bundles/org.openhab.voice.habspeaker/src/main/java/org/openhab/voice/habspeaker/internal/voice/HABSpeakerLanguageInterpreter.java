@@ -72,7 +72,7 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     @Override
     public String getLabel(@Nullable Locale locale) {
-        return "HAB Speaker Language Interpreter";
+        return "HABSpeaker Language Interpreter";
     }
 
     @Override

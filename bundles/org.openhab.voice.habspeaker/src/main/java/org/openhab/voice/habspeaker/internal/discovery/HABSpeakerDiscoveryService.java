@@ -62,7 +62,7 @@ public class HABSpeakerDiscoveryService extends AbstractDiscoveryService {
         properties.put(Thing.PROPERTY_SERIAL_NUMBER, id);
         thingDiscovered(DiscoveryResultBuilder.create(new ThingUID(SPEAKER_THING_TYPE, id))
                 .withTTL(DISCOVERY_RESULT_TTL_SEC).withRepresentationProperty(Thing.PROPERTY_SERIAL_NUMBER)
-                .withProperties(properties).withLabel("HAB Speaker (" + id + ")").build());
+                .withProperties(properties).withLabel("HABSpeaker (" + id + ")").build());
     }
 
     public void activate() {

@@ -108,7 +108,7 @@ public class HABSpeakerAudioSink implements AudioSink {
         try {
             if (audioStream instanceof HABSpeakerAudioSource.HABSpeakerAudioStream && isDirectStreamSupported(format)) {
                 // the ui expect a raw wav stream (no format header),
-                // we don't know this, so we restrict the direct stream to only hab speaker audio streams
+                // we don't know this, so we restrict the direct stream to only habspeaker audio streams
                 int channels = format.getChannels() != null ? format.getChannels() : 1;
                 var sampleRate = format.getFrequency();
                 StreamType type = channels == 1 ? StreamType.PCM16BitMono : StreamType.PCM16BitStereo;

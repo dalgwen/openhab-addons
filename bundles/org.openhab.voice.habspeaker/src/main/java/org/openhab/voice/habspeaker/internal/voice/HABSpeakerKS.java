@@ -67,7 +67,7 @@ public class HABSpeakerKS implements KSService {
 
     @Override
     public String getLabel(@Nullable Locale locale) {
-        return "HAB Speaker KS";
+        return "HABSpeaker KS";
     }
 
     @Override

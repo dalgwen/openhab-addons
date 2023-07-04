@@ -26,7 +26,7 @@ public class HABSpeakerConstants {
     /**
      * Service name
      */
-    public static final String SERVICE_NAME = "HAB Speaker";
+    public static final String SERVICE_NAME = "HABSpeaker";
 
     /**
      * Service id

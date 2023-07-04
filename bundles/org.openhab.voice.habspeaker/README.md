@@ -1,4 +1,4 @@
-# HAB Speaker
+# HABSpeaker
 
 <img src="https://i.imgur.com/k9ft6n9.gif" title="Hab Speaker Gif" width="500"/>
 
@@ -14,7 +14,7 @@
 
 ## Description
 
-HAB Speaker is a project designed to facilitate the use of the [openHAB](https://openhab.org) dialog processing capabilities.
+HABSpeaker is a project designed to facilitate the use of the [openHAB](https://openhab.org) dialog processing capabilities.
 
 Through a websocket connection this web interface registers a sink and source in your openHAB instance that can be used like any other ones.
 It also registers and persistent dialog processor in the server for those components.
@@ -27,7 +27,7 @@ Once installed the web client will be listed on right panel of the main ui (home
 
 ## Local Settings:
 
-HAB Speaker needs some local settings in order to work: 
+HABSpeaker needs some local settings in order to work: 
 
 * **SpeakerId** - This is the id that identifies your speaker against the server, will be part of the thing id.
 * **OH Url** - Your openHAB server url. (only displays on desktop/mobile)

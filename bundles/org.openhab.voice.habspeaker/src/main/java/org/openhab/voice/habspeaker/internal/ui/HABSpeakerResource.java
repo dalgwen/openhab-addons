@@ -83,7 +83,7 @@ public class HABSpeakerResource implements RESTResource {
         this.userRegistry = userRegistry;
         this.thingRegistry = thingRegistry;
         this.httpClient = httpClientFactory.getCommonHttpClient();
-        logger.debug("HAB Speaker Resource added at rest/{}", PATH_HABSPEAKER);
+        logger.debug("HABSpeaker Resource added at rest/{}", PATH_HABSPEAKER);
     }
 
     @GET
@@ -101,7 +101,7 @@ public class HABSpeakerResource implements RESTResource {
         }
         var config = configProvider.getConfig();
         Map<String, Object> configResp = new HashMap<>();
-        configResp.put("label", (label != null && !label.isBlank()) ? label : "HAB Speaker");
+        configResp.put("label", (label != null && !label.isBlank()) ? label : "HABSpeaker");
         return addAllowCorsHeaders(Response.ok(configResp)).build();
     }
 

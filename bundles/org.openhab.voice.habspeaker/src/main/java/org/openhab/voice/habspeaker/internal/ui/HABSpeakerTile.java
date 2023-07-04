@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The tile and resource registering for HAB Speaker
+ * The tile and resource registering for HABSpeaker
  *
  * @author Miguel Álvarez - Initial contribution
  */

@@ -5,7 +5,7 @@
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 	<!-- Sample Thing Type -->
 	<thing-type id="speaker">
-		<label>HAB Speaker Thing</label>
+		<label>HABSpeaker Thing</label>
 		<description>Represents a connected speaker</description>
 		<channels>
 			<channel id="sink-volume" typeId="system.volume"/>
