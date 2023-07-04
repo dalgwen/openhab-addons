@@ -43,7 +43,8 @@ When running as a mobile app these settings are stored on its shared preferences
 
 ## General Settings
 
-You can edit this settings for the service in the main ui **Settings / Other Services - HAB Speaker** there are different sections:
+You can edit these service options using the main ui by accessing the settings in the HABSpeaker addon page.
+There are different sections:
 
 ### Voice Control
 
