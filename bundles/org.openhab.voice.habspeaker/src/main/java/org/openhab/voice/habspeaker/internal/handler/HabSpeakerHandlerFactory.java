@@ -43,8 +43,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Miguel Álvarez - Initial contribution
  */
-@Component(service = ThingHandlerFactory.class, configurationPid = "binding.habspeaker", property = Constants.SERVICE_PID
-        + "=" + SERVICE_PID)
+@Component(service = ThingHandlerFactory.class, property = Constants.SERVICE_PID + "=" + SERVICE_PID)
 @NonNullByDefault
 public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements HABSpeakerIOProtocolListener {
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(SPEAKER_THING_TYPE);
