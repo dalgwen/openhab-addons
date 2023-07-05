@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -91,7 +91,6 @@ public class RadioThermostatConnector {
             public void onComplete(@Nullable Result result) {
                 if (result != null && !result.isFailed()) {
                     String response = getContentAsString();
-                    logger.debug("thermostatResponse = {}", response);
                     dispatchKeyValue(resource, response);
                 } else {
                     dispatchKeyValue(KEY_ERROR, "");
@@ -134,6 +133,7 @@ public class RadioThermostatConnector {
             request.header(HttpHeader.ACCEPT, "text/plain");
             request.header(HttpHeader.CONTENT_TYPE, "text/plain");
             request.content(new StringContentProvider(postJson), "application/json");
+            logger.trace("Sending POST request to '{}', data: {}", resource, postJson);
 
             ContentResponse contentResponse = request.send();
             int httpStatus = contentResponse.getStatus();
@@ -142,8 +142,9 @@ public class RadioThermostatConnector {
                 throw new RadioThermostatHttpException("Thermostat HTTP response code was: " + httpStatus);
             }
             output = contentResponse.getContentAsString();
+            logger.trace("Response: {}", output);
         } catch (RadioThermostatHttpException | InterruptedException | TimeoutException | ExecutionException e) {
-            logger.warn("Error executing thermostat command: {}, {}", postJson, e.getMessage());
+            logger.debug("Error executing thermostat command: {}, {}", postJson, e.getMessage());
         }
 
         return output;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -27,6 +27,7 @@ public class ApiHandlerConfiguration {
     public String clientId = "";
     public String clientSecret = "";
     public String webHookUrl = "";
+    public String webHookPostfix = "";
     public int reconnectInterval = 300;
 
     public ConfigurationLevel check(String refreshToken) {

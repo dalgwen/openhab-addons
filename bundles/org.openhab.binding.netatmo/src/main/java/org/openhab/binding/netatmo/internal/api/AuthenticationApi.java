@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -44,9 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class AuthenticationApi extends RestManager {
-    private static final UriBuilder OAUTH_BUILDER = getApiBaseBuilder().path(PATH_OAUTH);
-    private static final UriBuilder AUTH_BUILDER = OAUTH_BUILDER.clone().path(SUB_PATH_AUTHORIZE);
-    private static final URI TOKEN_URI = OAUTH_BUILDER.clone().path(SUB_PATH_TOKEN).build();
+    private static final URI TOKEN_URI = getApiBaseBuilder(PATH_OAUTH, SUB_PATH_TOKEN).build();
 
     private final Logger logger = LoggerFactory.getLogger(AuthenticationApi.class);
     private final ScheduledExecutorService scheduler;
@@ -70,6 +68,7 @@ public class AuthenticationApi extends RestManager {
             } else if (code != null && redirectUri != null) {
                 params.putAll(Map.of(REDIRECT_URI, redirectUri, CODE, code));
             }
+
             if (params.size() > 1) {
                 requestToken(credentials.clientId, credentials.clientSecret, params);
                 return;
@@ -96,7 +95,7 @@ public class AuthenticationApi extends RestManager {
         }, Math.round(response.getExpiresIn() * 0.9), TimeUnit.SECONDS));
 
         grantedScope = response.getScope();
-        authorization = "Bearer " + response.getAccessToken();
+        authorization = "Bearer %s".formatted(response.getAccessToken());
         apiBridge.storeRefreshToken(response.getRefreshToken());
     }
 
@@ -106,6 +105,7 @@ public class AuthenticationApi extends RestManager {
     }
 
     public void dispose() {
+        disconnect();
         refreshTokenJob.ifPresent(job -> job.cancel(true));
         refreshTokenJob = Optional.empty();
     }
@@ -123,7 +123,7 @@ public class AuthenticationApi extends RestManager {
     }
 
     public static UriBuilder getAuthorizationBuilder(String clientId) {
-        return AUTH_BUILDER.clone().queryParam(CLIENT_ID, clientId).queryParam(SCOPE, FeatureArea.ALL_SCOPES)
-                .queryParam(STATE, clientId);
+        return getApiBaseBuilder(PATH_OAUTH, SUB_PATH_AUTHORIZE).queryParam(CLIENT_ID, clientId)
+                .queryParam(SCOPE, FeatureArea.ALL_SCOPES).queryParam(STATE, clientId);
     }
 }

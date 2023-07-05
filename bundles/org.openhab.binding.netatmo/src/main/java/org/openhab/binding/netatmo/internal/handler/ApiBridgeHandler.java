@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -47,6 +47,7 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.util.InputStreamContentProvider;
+import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
@@ -170,7 +171,7 @@ public class ApiBridgeHandler extends BaseBridgeHandler {
                         SecurityApi securityApi = getRestManager(SecurityApi.class);
                         if (securityApi != null) {
                             WebhookServlet servlet = new WebhookServlet(this, httpService, deserializer, securityApi,
-                                    configuration.webHookUrl);
+                                    configuration.webHookUrl, configuration.webHookPostfix);
                             servlet.startListening();
                             this.webHookServlet = Optional.of(servlet);
                         }
@@ -284,6 +285,7 @@ public class ApiBridgeHandler extends BaseBridgeHandler {
                 try (InputStreamContentProvider inputStreamContentProvider = new InputStreamContentProvider(stream)) {
                     request.content(inputStreamContentProvider, contentType);
                 }
+                logger.trace(" -with payload : {} ", payload);
             }
 
             if (isLinked(requestCountChannelUID)) {
@@ -295,22 +297,25 @@ public class ApiBridgeHandler extends BaseBridgeHandler {
                 }
                 updateState(requestCountChannelUID, new DecimalType(requestsTimestamps.size()));
             }
+            logger.trace(" -with headers : {} ",
+                    String.join(", ", request.getHeaders().stream().map(HttpField::toString).toList()));
             ContentResponse response = request.send();
 
             Code statusCode = HttpStatus.getCode(response.getStatus());
             String responseBody = new String(response.getContent(), StandardCharsets.UTF_8);
-            logger.trace("executeUri returned : code {} body {}", statusCode, responseBody);
+            logger.trace(" -returned : code {} body {}", statusCode, responseBody);
 
-            if (statusCode != Code.OK) {
-                try {
-                    ApiError error = deserializer.deserialize(ApiError.class, responseBody);
-                    throw new NetatmoException(error);
-                } catch (NetatmoException e) {
-                    logger.debug("Error deserializing payload from error response", e);
-                    throw new NetatmoException(statusCode.getMessage());
-                }
+            if (statusCode == Code.OK) {
+                return deserializer.deserialize(clazz, responseBody);
             }
-            return deserializer.deserialize(clazz, responseBody);
+
+            NetatmoException exception;
+            try {
+                exception = new NetatmoException(deserializer.deserialize(ApiError.class, responseBody));
+            } catch (NetatmoException e) {
+                exception = new NetatmoException("Error deserializing error : %s".formatted(statusCode.getMessage()));
+            }
+            throw exception;
         } catch (NetatmoException e) {
             if (e.getStatusCode() == ServiceError.MAXIMUM_USAGE_REACHED) {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());

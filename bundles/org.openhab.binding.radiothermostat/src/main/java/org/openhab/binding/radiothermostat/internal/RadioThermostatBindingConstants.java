@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -50,6 +50,8 @@ public class RadioThermostatBindingConstants {
     public static final String HUMIDITY_RESOURCE = "tstat/humidity";
     public static final String REMOTE_TEMP_RESOURCE = "tstat/remote_temp";
     public static final String TIME_RESOURCE = "tstat/time";
+    public static final String HEAT_PROGRAM_RESOURCE = "tstat/program/heat";
+    public static final String COOL_PROGRAM_RESOURCE = "tstat/program/cool";
 
     // List of all Thing Type UIDs
     public static final ThingTypeUID THING_TYPE_RTHERM = new ThingTypeUID(BINDING_ID, "rtherm");
