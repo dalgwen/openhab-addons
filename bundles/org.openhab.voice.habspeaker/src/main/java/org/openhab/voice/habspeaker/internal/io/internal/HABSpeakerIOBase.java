@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2022 Contributors to the openHAB project
+ * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -27,7 +27,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.OpenHAB;
 import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.audio.AudioSink;
@@ -233,13 +232,9 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
         }
         var hsKS = new HABSpeakerKS(this, ks);
         this.ks = hsKS;
-        if (OpenHAB.getVersion().startsWith("3.")) {
-            voiceManager.startDialog(hsKS, stt, tts, voice, hlis, source, sink, null, keyword, listeningItem);
-        } else {
-            voiceManager.startDialog(voiceManager.getDialogContextBuilder().withSource(source).withSink(sink)
-                    .withKS(hsKS).withSTT(stt).withTTS(tts).withVoice(voice).withHLIs(hlis).withKeyword(keyword)
-                    .withListeningItem(listeningItem).build());
-        }
+        voiceManager.startDialog(voiceManager.getDialogContextBuilder().withSource(source).withSink(sink).withKS(hsKS)
+                .withSTT(stt).withTTS(tts).withVoice(voice).withHLIs(hlis).withKeyword(keyword)
+                .withListeningItem(listeningItem).build());
     }
 
     protected synchronized void unregisterSpeakerComponents(String id) {
