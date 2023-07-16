@@ -1,7 +1,15 @@
 package org.asamk.signal.manager.util;
 
+import org.asamk.signal.manager.api.Pair;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.fingerprint.Fingerprint;
+import org.signal.libsignal.protocol.fingerprint.NumericFingerprintGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.ServiceResponse;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,20 +28,10 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import org.asamk.signal.manager.api.Pair;
-import org.asamk.signal.manager.storage.recipients.RecipientAddress;
-import org.signal.libsignal.protocol.IdentityKey;
-import org.signal.libsignal.protocol.fingerprint.Fingerprint;
-import org.signal.libsignal.protocol.fingerprint.NumericFingerprintGenerator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.util.StreamDetails;
-
 public class Utils {
 
     private final static Logger logger = LoggerFactory.getLogger(Utils.class);
 
-    @SuppressWarnings("null")
     public static Pair<StreamDetails, Optional<String>> createStreamDetailsFromDataURI(final String dataURI) {
         final DataURI uri = DataURI.of(dataURI);
 
@@ -48,7 +46,6 @@ public class Utils {
         return new StreamDetails(stream, mime, size);
     }
 
-    @SuppressWarnings("null")
     public static Pair<StreamDetails, Optional<String>> createStreamDetails(final String value) throws IOException {
         try {
             return createStreamDetailsFromDataURI(value);
@@ -97,6 +94,10 @@ public class Utils {
 
     public static Locale getDefaultLocale(Locale fallback) {
         final var locale = Locale.getDefault();
+        if (locale == null) {
+            logger.debug("No default locale found, using fallback: {}", fallback);
+            return fallback;
+        }
         final var localeString = locale.getLanguage() + "-" + locale.getCountry();
         try {
             Locale.LanguageRange.parse(localeString);
@@ -112,15 +113,13 @@ public class Utils {
     public static <L, R, T> Stream<T> zip(Stream<L> leftStream, Stream<R> rightStream, BiFunction<L, R, T> combiner) {
         Spliterator<L> lefts = leftStream.spliterator();
         Spliterator<R> rights = rightStream.spliterator();
-        return StreamSupport
-                .stream(new Spliterators.AbstractSpliterator<>(Long.min(lefts.estimateSize(), rights.estimateSize()),
-                        lefts.characteristics() & rights.characteristics()) {
-                    @Override
-                    public boolean tryAdvance(Consumer<? super T> action) {
-                        return lefts.tryAdvance(
-                                left -> rights.tryAdvance(right -> action.accept(combiner.apply(left, right))));
-                    }
-                }, leftStream.isParallel() || rightStream.isParallel());
+        return StreamSupport.stream(new Spliterators.AbstractSpliterator<>(Long.min(lefts.estimateSize(),
+                rights.estimateSize()), lefts.characteristics() & rights.characteristics()) {
+            @Override
+            public boolean tryAdvance(Consumer<? super T> action) {
+                return lefts.tryAdvance(left -> rights.tryAdvance(right -> action.accept(combiner.apply(left, right))));
+            }
+        }, leftStream.isParallel() || rightStream.isParallel());
     }
 
     public static Map<String, String> getQueryMap(String query) {

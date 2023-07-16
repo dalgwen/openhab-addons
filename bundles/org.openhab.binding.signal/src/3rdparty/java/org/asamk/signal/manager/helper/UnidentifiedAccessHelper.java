@@ -1,11 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.api.PhoneNumberSharingMode;
 import org.asamk.signal.manager.storage.SignalAccount;
@@ -18,6 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccessPair;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 public class UnidentifiedAccessHelper {
 
@@ -44,7 +43,7 @@ public class UnidentifiedAccessHelper {
     }
 
     public List<Optional<UnidentifiedAccessPair>> getAccessFor(List<RecipientId> recipients) {
-        return recipients.stream().map(this::getAccessFor).collect(Collectors.toList());
+        return recipients.stream().map(this::getAccessFor).toList();
     }
 
     public Optional<UnidentifiedAccessPair> getAccessFor(RecipientId recipient) {
@@ -71,9 +70,8 @@ public class UnidentifiedAccessHelper {
         }
 
         try {
-            return Optional.of(new UnidentifiedAccessPair(
-                    new UnidentifiedAccess(recipientUnidentifiedAccessKey, senderCertificate),
-                    new UnidentifiedAccess(selfUnidentifiedAccessKey, senderCertificate)));
+            return Optional.of(new UnidentifiedAccessPair(new UnidentifiedAccess(recipientUnidentifiedAccessKey,
+                    senderCertificate), new UnidentifiedAccess(selfUnidentifiedAccessKey, senderCertificate)));
         } catch (InvalidCertificateException e) {
             return Optional.empty();
         }
@@ -88,8 +86,8 @@ public class UnidentifiedAccessHelper {
         }
 
         try {
-            return Optional.of(new UnidentifiedAccessPair(
-                    new UnidentifiedAccess(selfUnidentifiedAccessKey, selfUnidentifiedAccessCertificate),
+            return Optional.of(new UnidentifiedAccessPair(new UnidentifiedAccess(selfUnidentifiedAccessKey,
+                    selfUnidentifiedAccessCertificate),
                     new UnidentifiedAccess(selfUnidentifiedAccessKey, selfUnidentifiedAccessCertificate)));
         } catch (InvalidCertificateException e) {
             return Optional.empty();
@@ -98,9 +96,10 @@ public class UnidentifiedAccessHelper {
 
     private byte[] getSenderCertificateFor(final RecipientId recipientId) {
         final var sharingMode = account.getConfigurationStore().getPhoneNumberSharingMode();
-        if (sharingMode == null || sharingMode == PhoneNumberSharingMode.EVERYBODY
-                || (sharingMode == PhoneNumberSharingMode.CONTACTS
-                        && account.getContactStore().getContact(recipientId) != null)) {
+        if (sharingMode == null || sharingMode == PhoneNumberSharingMode.EVERYBODY || (
+                sharingMode == PhoneNumberSharingMode.CONTACTS
+                        && account.getContactStore().getContact(recipientId) != null
+        )) {
             logger.trace("Using normal sender certificate for message to {}", recipientId);
             return getSenderCertificate();
         } else {
@@ -110,8 +109,9 @@ public class UnidentifiedAccessHelper {
     }
 
     private byte[] getSenderCertificateForPhoneNumberPrivacy() {
-        if (privacySenderCertificate != null && System
-                .currentTimeMillis() < (privacySenderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER)) {
+        if (privacySenderCertificate != null && System.currentTimeMillis() < (
+                privacySenderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER
+        )) {
             return privacySenderCertificate.getSerialized();
         }
         try {
@@ -125,8 +125,9 @@ public class UnidentifiedAccessHelper {
     }
 
     private byte[] getSenderCertificate() {
-        if (senderCertificate != null
-                && System.currentTimeMillis() < (senderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER)) {
+        if (senderCertificate != null && System.currentTimeMillis() < (
+                senderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER
+        )) {
             return senderCertificate.getSerialized();
         }
         try {
@@ -140,7 +141,8 @@ public class UnidentifiedAccessHelper {
     }
 
     private byte[] getSelfUnidentifiedAccessKey(boolean noRefresh) {
-        var selfProfile = noRefresh ? account.getProfileStore().getProfile(account.getSelfRecipientId())
+        var selfProfile = noRefresh
+                ? account.getProfileStore().getProfile(account.getSelfRecipientId())
                 : context.getProfileHelper().getSelfProfile();
         if (selfProfile != null
                 && selfProfile.getUnidentifiedAccessMode() == Profile.UnidentifiedAccessMode.UNRESTRICTED) {
@@ -150,7 +152,8 @@ public class UnidentifiedAccessHelper {
     }
 
     private byte[] getTargetUnidentifiedAccessKey(RecipientId recipientId, boolean noRefresh) {
-        var targetProfile = noRefresh ? account.getProfileStore().getProfile(recipientId)
+        var targetProfile = noRefresh
+                ? account.getProfileStore().getProfile(recipientId)
                 : context.getProfileHelper().getRecipientProfile(recipientId);
         if (targetProfile == null) {
             return null;
@@ -160,8 +163,9 @@ public class UnidentifiedAccessHelper {
         return getTargetUnidentifiedAccessKey(targetProfile, theirProfileKey);
     }
 
-    private static byte[] getTargetUnidentifiedAccessKey(final Profile targetProfile,
-            final ProfileKey theirProfileKey) {
+    private static byte[] getTargetUnidentifiedAccessKey(
+            final Profile targetProfile, final ProfileKey theirProfileKey
+    ) {
         switch (targetProfile.getUnidentifiedAccessMode()) {
             case ENABLED:
                 if (theirProfileKey == null) {

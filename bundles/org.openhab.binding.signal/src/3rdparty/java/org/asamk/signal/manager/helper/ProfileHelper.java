@@ -1,17 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.groups.GroupNotFoundException;
@@ -41,6 +29,17 @@ import org.whispersystems.signalservice.api.push.exceptions.NotFoundException;
 import org.whispersystems.signalservice.api.push.exceptions.PushNetworkException;
 import org.whispersystems.signalservice.api.services.ProfileService;
 import org.whispersystems.signalservice.api.util.ExpiringProfileCredentialUtil;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Maybe;
@@ -75,9 +74,13 @@ public final class ProfileHelper {
         }
 
         final var selfRecipientId = account.getSelfRecipientId();
-        final var activeGroupIds = account.getGroupStore().getGroups().stream()
-                .filter(g -> g instanceof GroupInfoV2 && g.isMember(selfRecipientId)).map(g -> (GroupInfoV2) g)
-                .map(GroupInfoV2::getGroupId).collect(Collectors.toList());
+        final var activeGroupIds = account.getGroupStore()
+                .getGroups()
+                .stream()
+                .filter(g -> g instanceof GroupInfoV2 && g.isMember(selfRecipientId))
+                .map(g -> (GroupInfoV2) g)
+                .map(GroupInfoV2::getGroupId)
+                .toList();
         for (final var groupId : activeGroupIds) {
             try {
                 context.getGroupHelper().updateGroupProfileKey(groupId);
@@ -105,14 +108,13 @@ public final class ProfileHelper {
 
     public List<ExpiringProfileKeyCredential> getExpiringProfileKeyCredential(List<RecipientId> recipientIds) {
         final var profileFetches = Flowable.fromIterable(recipientIds)
-                .filter(recipientId -> !ExpiringProfileCredentialUtil
-                        .isValid(account.getProfileStore().getExpiringProfileKeyCredential(recipientId)))
+                .filter(recipientId -> !ExpiringProfileCredentialUtil.isValid(account.getProfileStore()
+                        .getExpiringProfileKeyCredential(recipientId)))
                 .map(recipientId -> retrieveProfile(recipientId,
                         SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL).onErrorComplete());
         Maybe.merge(profileFetches, 10).blockingSubscribe();
 
-        return recipientIds.stream().map(r -> account.getProfileStore().getExpiringProfileKeyCredential(r))
-                .collect(Collectors.toList());
+        return recipientIds.stream().map(r -> account.getProfileStore().getExpiringProfileKeyCredential(r)).toList();
     }
 
     public ExpiringProfileKeyCredential getExpiringProfileKeyCredential(RecipientId recipientId) {
@@ -132,19 +134,33 @@ public final class ProfileHelper {
     }
 
     /**
-     * @param givenName if null, the previous givenName will be kept
+     * @param givenName  if null, the previous givenName will be kept
      * @param familyName if null, the previous familyName will be kept
-     * @param about if null, the previous about text will be kept
+     * @param about      if null, the previous about text will be kept
      * @param aboutEmoji if null, the previous about emoji will be kept
-     * @param avatar if avatar is null the image from the local avatar store is used (if present),
+     * @param avatar     if avatar is null the image from the local avatar store is used (if present),
      */
-    public void setProfile(String givenName, final String familyName, String about, String aboutEmoji,
-            Optional<String> avatar, byte[] mobileCoinAddress) throws IOException {
+    public void setProfile(
+            String givenName,
+            final String familyName,
+            String about,
+            String aboutEmoji,
+            Optional<String> avatar,
+            byte[] mobileCoinAddress
+    ) throws IOException {
         setProfile(true, false, givenName, familyName, about, aboutEmoji, avatar, mobileCoinAddress);
     }
 
-    public void setProfile(boolean uploadProfile, boolean forceUploadAvatar, String givenName, final String familyName,
-            String about, String aboutEmoji, Optional<String> avatar, byte[] mobileCoinAddress) throws IOException {
+    public void setProfile(
+            boolean uploadProfile,
+            boolean forceUploadAvatar,
+            String givenName,
+            final String familyName,
+            String about,
+            String aboutEmoji,
+            Optional<String> avatar,
+            byte[] mobileCoinAddress
+    ) throws IOException {
         var profile = getSelfProfile();
         var builder = profile == null ? Profile.newBuilder() : Profile.newBuilder(profile);
         if (givenName != null) {
@@ -166,22 +182,27 @@ public final class ProfileHelper {
 
         if (uploadProfile) {
             final var streamDetails = avatar != null && avatar.isPresent()
-                    ? Utils.createStreamDetails(avatar.get()).first()
-                    : forceUploadAvatar && avatar == null
-                            ? context.getAvatarStore().retrieveProfileAvatar(account.getSelfRecipientAddress())
-                            : null;
+                    ? Utils.createStreamDetails(avatar.get())
+                    .first()
+                    : forceUploadAvatar && avatar == null ? context.getAvatarStore()
+                            .retrieveProfileAvatar(account.getSelfRecipientAddress()) : null;
             try (streamDetails) {
-                final var avatarUploadParams = streamDetails != null ? AvatarUploadParams.forAvatar(streamDetails)
+                final var avatarUploadParams = streamDetails != null
+                        ? AvatarUploadParams.forAvatar(streamDetails)
                         : avatar == null ? AvatarUploadParams.unchanged(true) : AvatarUploadParams.unchanged(false);
                 final var paymentsAddress = Optional.ofNullable(newProfile.getMobileCoinAddress())
                         .map(address -> PaymentUtils.signPaymentsAddress(address,
                                 account.getAciIdentityKeyPair().getPrivateKey()));
                 logger.debug("Uploading new profile");
-                final var avatarPath = dependencies.getAccountManager().setVersionedProfile(account.getAci(),
-                        account.getProfileKey(), newProfile.getInternalServiceName(),
-                        newProfile.getAbout() == null ? "" : newProfile.getAbout(),
-                        newProfile.getAboutEmoji() == null ? "" : newProfile.getAboutEmoji(), paymentsAddress,
-                        avatarUploadParams, List.of(/* TODO implement support for badges */));
+                final var avatarPath = dependencies.getAccountManager()
+                        .setVersionedProfile(account.getAci(),
+                                account.getProfileKey(),
+                                newProfile.getInternalServiceName(),
+                                newProfile.getAbout() == null ? "" : newProfile.getAbout(),
+                                newProfile.getAboutEmoji() == null ? "" : newProfile.getAboutEmoji(),
+                                paymentsAddress,
+                                avatarUploadParams,
+                                List.of(/* TODO implement support for badges */));
                 if (!avatarUploadParams.keepTheSame) {
                     builder.withAvatarUrlPath(avatarPath.orElse(null));
                 }
@@ -192,10 +213,9 @@ public final class ProfileHelper {
         if (avatar != null) {
             if (avatar.isPresent()) {
                 final var streamDetails = Utils.createStreamDetails(avatar.get()).first();
-
-                context.getAvatarStore().storeProfileAvatar(account.getSelfRecipientAddress(),
-                        outputStream -> IOUtils.copyStream(streamDetails.getStream(), outputStream));
-
+                context.getAvatarStore()
+                        .storeProfileAvatar(account.getSelfRecipientAddress(),
+                                outputStream -> IOUtils.copyStream(streamDetails.getStream(), outputStream));
             } else {
                 context.getAvatarStore().deleteProfileAvatar(account.getSelfRecipientAddress());
             }
@@ -211,11 +231,11 @@ public final class ProfileHelper {
         final var profileStore = account.getProfileStore();
         final var profileFetches = Flowable.fromIterable(recipientIds)
                 .filter(recipientId -> force || isProfileRefreshRequired(profileStore.getProfile(recipientId)))
-                .map(recipientId -> retrieveProfile(recipientId, SignalServiceProfile.RequestType.PROFILE)
-                        .onErrorComplete());
+                .map(recipientId -> retrieveProfile(recipientId,
+                        SignalServiceProfile.RequestType.PROFILE).onErrorComplete());
         Maybe.merge(profileFetches, 10).blockingSubscribe();
 
-        return recipientIds.stream().map(profileStore::getProfile).collect(Collectors.toList());
+        return recipientIds.stream().map(profileStore::getProfile).toList();
     }
 
     private Profile getRecipientProfile(RecipientId recipientId, boolean force) {
@@ -243,27 +263,29 @@ public final class ProfileHelper {
         return now - profile.getLastUpdateTimestamp() >= 6 * 60 * 60 * 1000;
     }
 
-    private Profile decryptProfileAndDownloadAvatar(final RecipientId recipientId, final ProfileKey profileKey,
-            final SignalServiceProfile encryptedProfile) {
+    private Profile decryptProfileAndDownloadAvatar(
+            final RecipientId recipientId, final ProfileKey profileKey, final SignalServiceProfile encryptedProfile
+    ) {
         final var avatarPath = encryptedProfile.getAvatar();
         downloadProfileAvatar(recipientId, avatarPath, profileKey);
 
         return ProfileUtils.decryptProfile(profileKey, encryptedProfile);
     }
 
-    public void downloadProfileAvatar(final RecipientId recipientId, final String avatarPath,
-            final ProfileKey profileKey) {
+    public void downloadProfileAvatar(
+            final RecipientId recipientId, final String avatarPath, final ProfileKey profileKey
+    ) {
         var profile = account.getProfileStore().getProfile(recipientId);
         if (profile == null || !Objects.equals(avatarPath, profile.getAvatarUrlPath())) {
             logger.trace("Downloading profile avatar for {}", recipientId);
             downloadProfileAvatar(account.getRecipientAddressResolver().resolveRecipientAddress(recipientId),
-                    avatarPath, profileKey);
+                    avatarPath,
+                    profileKey);
             var builder = profile == null ? Profile.newBuilder() : Profile.newBuilder(profile);
             account.getProfileStore().storeProfile(recipientId, builder.withAvatarUrlPath(avatarPath).build());
         }
     }
 
-    @SuppressWarnings("null")
     private ProfileAndCredential blockingGetProfile(Single<ProfileAndCredential> profile) throws IOException {
         try {
             return profile.blockingGet();
@@ -278,20 +300,23 @@ public final class ProfileHelper {
         }
     }
 
-    private Single<ProfileAndCredential> retrieveProfile(RecipientId recipientId,
-            SignalServiceProfile.RequestType requestType) {
+    private Single<ProfileAndCredential> retrieveProfile(
+            RecipientId recipientId, SignalServiceProfile.RequestType requestType
+    ) {
         var unidentifiedAccess = getUnidentifiedAccess(recipientId);
         var profileKey = Optional.ofNullable(account.getProfileStore().getProfileKey(recipientId));
 
-        logger.trace("Retrieving profile for {} {}", recipientId,
+        logger.trace("Retrieving profile for {} {}",
+                recipientId,
                 profileKey.isPresent() ? "with profile key" : "without profile key");
         final var address = context.getRecipientHelper().resolveSignalServiceAddress(recipientId);
         return retrieveProfile(address, profileKey, unidentifiedAccess, requestType).doOnSuccess(p -> {
             logger.trace("Got new profile for {}", recipientId);
             final var encryptedProfile = p.getProfile();
 
-            if (requestType == SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL || !ExpiringProfileCredentialUtil
-                    .isValid(account.getProfileStore().getExpiringProfileKeyCredential(recipientId))) {
+            if (requestType == SignalServiceProfile.RequestType.PROFILE_AND_CREDENTIAL
+                    || !ExpiringProfileCredentialUtil.isValid(account.getProfileStore()
+                    .getExpiringProfileKeyCredential(recipientId))) {
                 logger.trace("Storing profile credential");
                 final var profileKeyCredential = p.getExpiringProfileKeyCredential().orElse(null);
                 account.getProfileStore().storeExpiringProfileKeyCredential(recipientId, profileKeyCredential);
@@ -306,10 +331,12 @@ public final class ProfileHelper {
             }
 
             if (newProfile == null) {
-                newProfile = (profile == null ? Profile.newBuilder() : Profile.newBuilder(profile))
-                        .withLastUpdateTimestamp(System.currentTimeMillis())
+                newProfile = (
+                        profile == null ? Profile.newBuilder() : Profile.newBuilder(profile)
+                ).withLastUpdateTimestamp(System.currentTimeMillis())
                         .withUnidentifiedAccessMode(ProfileUtils.getUnidentifiedAccessMode(encryptedProfile, null))
-                        .withCapabilities(ProfileUtils.getCapabilities(encryptedProfile)).build();
+                        .withCapabilities(ProfileUtils.getCapabilities(encryptedProfile))
+                        .build();
             }
 
             try {
@@ -328,17 +355,23 @@ public final class ProfileHelper {
         }).doOnError(e -> {
             logger.warn("Failed to retrieve profile, ignoring: {}", e.getMessage());
             final var profile = account.getProfileStore().getProfile(recipientId);
-            final var newProfile = (profile == null ? Profile.newBuilder() : Profile.newBuilder(profile))
-                    .withLastUpdateTimestamp(System.currentTimeMillis())
-                    .withUnidentifiedAccessMode(Profile.UnidentifiedAccessMode.UNKNOWN).withCapabilities(Set.of())
+            final var newProfile = (
+                    profile == null ? Profile.newBuilder() : Profile.newBuilder(profile)
+            ).withLastUpdateTimestamp(System.currentTimeMillis())
+                    .withUnidentifiedAccessMode(Profile.UnidentifiedAccessMode.UNKNOWN)
+                    .withCapabilities(Set.of())
                     .build();
 
             account.getProfileStore().storeProfile(recipientId, newProfile);
         });
     }
 
-    private Single<ProfileAndCredential> retrieveProfile(SignalServiceAddress address, Optional<ProfileKey> profileKey,
-            Optional<UnidentifiedAccess> unidentifiedAccess, SignalServiceProfile.RequestType requestType) {
+    private Single<ProfileAndCredential> retrieveProfile(
+            SignalServiceAddress address,
+            Optional<ProfileKey> profileKey,
+            Optional<UnidentifiedAccess> unidentifiedAccess,
+            SignalServiceProfile.RequestType requestType
+    ) {
         final var profileService = dependencies.getProfileService();
         final var locale = Utils.getDefaultLocale(Locale.US);
 
@@ -349,13 +382,16 @@ public final class ProfileHelper {
             } else if (processor.notFound()) {
                 throw new NotFoundException("Profile not found");
             } else {
-                throw pair.getExecutionError().or(pair::getApplicationError)
+                throw pair.getExecutionError()
+                        .or(pair::getApplicationError)
                         .orElseThrow(() -> new IOException("Unknown error while retrieving profile"));
             }
         });
     }
 
-    private void downloadProfileAvatar(RecipientAddress address, String avatarPath, ProfileKey profileKey) {
+    private void downloadProfileAvatar(
+            RecipientAddress address, String avatarPath, ProfileKey profileKey
+    ) {
         if (avatarPath == null) {
             try {
                 context.getAvatarStore().deleteProfileAvatar(address);
@@ -366,25 +402,31 @@ public final class ProfileHelper {
         }
 
         try {
-            context.getAvatarStore().storeProfileAvatar(address,
-                    outputStream -> retrieveProfileAvatar(avatarPath, profileKey, outputStream));
+            context.getAvatarStore()
+                    .storeProfileAvatar(address,
+                            outputStream -> retrieveProfileAvatar(avatarPath, profileKey, outputStream));
         } catch (Throwable e) {
             logger.warn("Failed to download profile avatar, ignoring: {}", e.getMessage());
         }
     }
 
-    private void retrieveProfileAvatar(String avatarPath, ProfileKey profileKey, OutputStream outputStream)
-            throws IOException {
+    private void retrieveProfileAvatar(
+            String avatarPath, ProfileKey profileKey, OutputStream outputStream
+    ) throws IOException {
         var tmpFile = IOUtils.createTempFile();
-        try (var input = dependencies.getMessageReceiver().retrieveProfileAvatar(avatarPath, tmpFile, profileKey,
-                ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE)) {
+        try (var input = dependencies.getMessageReceiver()
+                .retrieveProfileAvatar(avatarPath,
+                        tmpFile,
+                        profileKey,
+                        ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE)) {
             // Use larger buffer size to prevent AssertionError: Need: 12272 but only have: 8192 ...
             IOUtils.copyStream(input, outputStream, (int) ServiceConfig.AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE);
         } finally {
             try {
                 Files.delete(tmpFile.toPath());
             } catch (IOException e) {
-                logger.warn("Failed to delete received profile avatar temp file “{}”, ignoring: {}", tmpFile,
+                logger.warn("Failed to delete received profile avatar temp file “{}”, ignoring: {}",
+                        tmpFile,
                         e.getMessage());
             }
         }
