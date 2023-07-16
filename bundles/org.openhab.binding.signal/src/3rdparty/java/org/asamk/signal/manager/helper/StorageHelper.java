@@ -1,13 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.api.PhoneNumberSharingMode;
 import org.asamk.signal.manager.api.TrustLevel;
@@ -29,6 +21,14 @@ import org.whispersystems.signalservice.api.storage.SignalStorageRecord;
 import org.whispersystems.signalservice.api.storage.StorageId;
 import org.whispersystems.signalservice.internal.storage.protos.AccountRecord;
 import org.whispersystems.signalservice.internal.storage.protos.ManifestRecord;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class StorageHelper {
 
@@ -55,8 +55,8 @@ public class StorageHelper {
         logger.debug("Reading data from remote storage");
         Optional<SignalStorageManifest> manifest;
         try {
-            manifest = dependencies.getAccountManager().getStorageManifestIfDifferentVersion(storageKey,
-                    account.getStorageManifestVersion());
+            manifest = dependencies.getAccountManager()
+                    .getStorageManifestIfDifferentVersion(storageKey, account.getStorageManifestVersion());
         } catch (InvalidKeyException e) {
             logger.warn("Manifest couldn't be decrypted, ignoring.");
             return;
@@ -68,7 +68,10 @@ public class StorageHelper {
         }
 
         logger.trace("Remote storage manifest has {} records", manifest.get().getStorageIds().size());
-        final var storageIds = manifest.get().getStorageIds().stream().filter(id -> !id.isUnknown())
+        final var storageIds = manifest.get()
+                .getStorageIds()
+                .stream()
+                .filter(id -> !id.isUnknown())
                 .collect(Collectors.toSet());
 
         Optional<SignalStorageManifest> localManifest = account.getStorageManifest();
@@ -115,12 +118,19 @@ public class StorageHelper {
         final var archived = contact != null && contact.isArchived();
         final var contactGivenName = contact == null ? null : contact.getGivenName();
         final var contactFamilyName = contact == null ? null : contact.getFamilyName();
-        if (blocked != contactRecord.isBlocked() || profileShared != contactRecord.isProfileSharingEnabled()
+        if (blocked != contactRecord.isBlocked()
+                || profileShared != contactRecord.isProfileSharingEnabled()
                 || archived != contactRecord.isArchived()
-                || (contactRecord.getSystemGivenName().isPresent()
-                        && !contactRecord.getSystemGivenName().get().equals(contactGivenName))
-                || (contactRecord.getSystemFamilyName().isPresent()
-                        && !contactRecord.getSystemFamilyName().get().equals(contactFamilyName))) {
+                || (
+                contactRecord.getSystemGivenName().isPresent() && !contactRecord.getSystemGivenName()
+                        .get()
+                        .equals(contactGivenName)
+        )
+                || (
+                contactRecord.getSystemFamilyName().isPresent() && !contactRecord.getSystemFamilyName()
+                        .get()
+                        .equals(contactFamilyName)
+        )) {
             logger.debug("Storing new or updated contact {}", recipientId);
             final var contactBuilder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
             final var newContact = contactBuilder.withBlocked(contactRecord.isBlocked())
@@ -136,13 +146,19 @@ public class StorageHelper {
         final var profile = account.getProfileStore().getProfile(recipientId);
         final var profileGivenName = profile == null ? null : profile.getGivenName();
         final var profileFamilyName = profile == null ? null : profile.getFamilyName();
-        if ((contactRecord.getProfileGivenName().isPresent()
-                && !contactRecord.getProfileGivenName().get().equals(profileGivenName))
-                || (contactRecord.getProfileFamilyName().isPresent()
-                        && !contactRecord.getProfileFamilyName().get().equals(profileFamilyName))) {
+        if ((
+                contactRecord.getProfileGivenName().isPresent() && !contactRecord.getProfileGivenName()
+                        .get()
+                        .equals(profileGivenName)
+        ) || (
+                contactRecord.getProfileFamilyName().isPresent() && !contactRecord.getProfileFamilyName()
+                        .get()
+                        .equals(profileFamilyName)
+        )) {
             final var profileBuilder = profile == null ? Profile.newBuilder() : Profile.newBuilder(profile);
             final var newProfile = profileBuilder.withGivenName(contactRecord.getProfileGivenName().orElse(null))
-                    .withFamilyName(contactRecord.getProfileFamilyName().orElse(null)).build();
+                    .withFamilyName(contactRecord.getProfileFamilyName().orElse(null))
+                    .build();
             account.getProfileStore().storeProfile(recipientId, newProfile);
         }
         if (contactRecord.getProfileKey().isPresent()) {
@@ -240,19 +256,12 @@ public class StorageHelper {
                 .setUnidentifiedDeliveryIndicators(accountRecord.isSealedSenderIndicatorsEnabled());
         account.getConfigurationStore().setLinkPreviews(accountRecord.isLinkPreviewsEnabled());
         if (accountRecord.getPhoneNumberSharingMode() != AccountRecord.PhoneNumberSharingMode.UNRECOGNIZED) {
-            PhoneNumberSharingMode pnsm;
-            switch (accountRecord.getPhoneNumberSharingMode()) {
-                case EVERYBODY:
-                    pnsm = PhoneNumberSharingMode.EVERYBODY;
-                    break;
-                case NOBODY:
-                    pnsm = PhoneNumberSharingMode.NOBODY;
-                    break;
-                default:
-                    pnsm = PhoneNumberSharingMode.CONTACTS;
-                    break;
-            }
-            account.getConfigurationStore().setPhoneNumberSharingMode(pnsm);
+            account.getConfigurationStore()
+                    .setPhoneNumberSharingMode(switch (accountRecord.getPhoneNumberSharingMode()) {
+                        case EVERYBODY -> PhoneNumberSharingMode.EVERYBODY;
+                        case NOBODY -> PhoneNumberSharingMode.NOBODY;
+                        default -> PhoneNumberSharingMode.CONTACTS;
+                    });
         }
         account.getConfigurationStore().setPhoneNumberUnlisted(accountRecord.isPhoneNumberUnlisted());
         account.setUsername(accountRecord.getUsername());
@@ -272,16 +281,22 @@ public class StorageHelper {
             }
         }
 
-        context.getProfileHelper().setProfile(false, false, accountRecord.getGivenName().orElse(null),
-                accountRecord.getFamilyName().orElse(null), null, null, null, null);
+        context.getProfileHelper()
+                .setProfile(false,
+                        false,
+                        accountRecord.getGivenName().orElse(null),
+                        accountRecord.getFamilyName().orElse(null),
+                        null,
+                        null,
+                        null,
+                        null);
     }
 
-    @SuppressWarnings("unused")
     private SignalStorageRecord getSignalStorageRecord(final StorageId accountId) throws IOException {
         List<SignalStorageRecord> records;
         try {
-            records = dependencies.getAccountManager().readStorageRecords(account.getStorageKey(),
-                    Collections.singletonList(accountId));
+            records = dependencies.getAccountManager()
+                    .readStorageRecords(account.getStorageKey(), Collections.singletonList(accountId));
         } catch (InvalidKeyException e) {
             logger.warn("Failed to read storage records, ignoring.");
             return null;
@@ -289,12 +304,11 @@ public class StorageHelper {
         return records.size() > 0 ? records.get(0) : null;
     }
 
-    private List<SignalStorageRecord> getSignalStorageRecords(final Collection<StorageId> storageIds)
-            throws IOException {
+    private List<SignalStorageRecord> getSignalStorageRecords(final Collection<StorageId> storageIds) throws IOException {
         List<SignalStorageRecord> records;
         try {
-            records = dependencies.getAccountManager().readStorageRecords(account.getStorageKey(),
-                    new ArrayList<>(storageIds));
+            records = dependencies.getAccountManager()
+                    .readStorageRecords(account.getStorageKey(), new ArrayList<>(storageIds));
         } catch (InvalidKeyException e) {
             logger.warn("Failed to read storage records, ignoring.");
             return List.of();
