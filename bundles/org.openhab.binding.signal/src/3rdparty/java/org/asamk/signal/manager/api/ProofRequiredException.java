@@ -6,7 +6,6 @@ import java.util.stream.Collectors;
 /**
  * Thrown when rate-limited by the server and proof of humanity is required to continue messaging.
  */
-@SuppressWarnings("serial")
 public class ProofRequiredException extends Exception {
 
     private final String token;
@@ -36,13 +35,10 @@ public class ProofRequiredException extends Exception {
         PUSH_CHALLENGE;
 
         static Option from(org.whispersystems.signalservice.api.push.exceptions.ProofRequiredException.Option option) {
-            switch (option) {
-                case RECAPTCHA:
-                    return RECAPTCHA;
-                case PUSH_CHALLENGE:
-                default:
-                    return PUSH_CHALLENGE;
-            }
+            return switch (option) {
+                case RECAPTCHA -> RECAPTCHA;
+                case PUSH_CHALLENGE -> PUSH_CHALLENGE;
+            };
         }
     }
 }
