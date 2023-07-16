@@ -1,5 +1,17 @@
 package org.asamk.signal.manager.storage.senderKeys;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.helper.RecipientAddressResolver;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
@@ -9,27 +21,12 @@ import org.signal.libsignal.protocol.groups.state.SenderKeyRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 public class LegacySenderKeyRecordStore {
 
     private final static Logger logger = LoggerFactory.getLogger(LegacySenderKeyRecordStore.class);
 
-    public static void migrate(
-            final File senderKeysPath,
-            final RecipientResolver resolver,
-            final RecipientAddressResolver addressResolver,
-            final SenderKeyStore senderKeyStore
-    ) {
+    public static void migrate(final File senderKeysPath, final RecipientResolver resolver,
+            final RecipientAddressResolver addressResolver, final SenderKeyStore senderKeyStore) {
         final var files = senderKeysPath.listFiles();
         if (files == null) {
             return;
@@ -71,18 +68,15 @@ public class LegacySenderKeyRecordStore {
     final static Pattern senderKeyFileNamePattern = Pattern.compile("(\\d+)_(\\d+)_([\\da-z\\-]+)");
 
     private static List<Key> parseFileNames(final File[] files, final RecipientResolver resolver) {
-        return Arrays.stream(files)
-                .map(f -> senderKeyFileNamePattern.matcher(f.getName()))
-                .filter(Matcher::matches)
+        return Arrays.stream(files).map(f -> senderKeyFileNamePattern.matcher(f.getName())).filter(Matcher::matches)
                 .map(matcher -> {
                     final var recipientId = resolver.resolveRecipient(Long.parseLong(matcher.group(1)));
                     if (recipientId == null) {
-                        return null;
+                        return Optional.<Key>empty();
                     }
-                    return new Key(recipientId, Integer.parseInt(matcher.group(2)), UUID.fromString(matcher.group(3)));
-                })
-                .filter(Objects::nonNull)
-                .toList();
+                    return Optional.of(new Key(recipientId, Integer.parseInt(matcher.group(2)),
+                            UUID.fromString(matcher.group(3))));
+                }).map(Optional::get).filter(Objects::nonNull).toList();
     }
 
     private static File getSenderKeyFile(Key key, final File senderKeysPath) {
@@ -103,5 +97,6 @@ public class LegacySenderKeyRecordStore {
         }
     }
 
-    record Key(RecipientId recipientId, int deviceId, UUID distributionId) {}
+    record Key(RecipientId recipientId, int deviceId, UUID distributionId) {
+    }
 }
