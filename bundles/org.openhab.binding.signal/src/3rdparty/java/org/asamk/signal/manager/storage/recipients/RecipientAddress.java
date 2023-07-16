@@ -1,104 +1,91 @@
 package org.asamk.signal.manager.storage.recipients;
 
-import java.util.Optional;
-
 import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Optional;
 
-public class RecipientAddress {
+public record RecipientAddress(
+        Optional<ServiceId> serviceId, Optional<PNI> pni, Optional<String> number, Optional<String> username
+) {
 
-    private final Optional<ServiceId> serviceId;
-    private final Optional<PNI> pni;
-    private final Optional<String> number;
-    private final Optional<String> username;
-
-    public RecipientAddress(@JsonProperty("serviceId") Optional<ServiceId> serviceId,
-            @JsonProperty("pni") Optional<PNI> pni, @JsonProperty("number") Optional<String> number,
-            @JsonProperty("username") Optional<String> username) {
-        super();
-        Optional<PNI> _pni = pni;
-        Optional<ServiceId> _serviceId = serviceId;
-        if (_serviceId.isPresent() && _serviceId.get().isUnknown()) {
-            _serviceId = Optional.empty();
+    /**
+     * Construct a RecipientAddress.
+     *
+     * @param serviceId The ACI or PNI of the user, if available.
+     * @param number    The phone number of the user, if available.
+     */
+    public RecipientAddress {
+        if (serviceId.isPresent() && serviceId.get().isUnknown()) {
+            serviceId = Optional.empty();
         }
-        if (_pni.isPresent() && _pni.get().isUnknown()) {
-            _pni = Optional.empty();
+        if (pni.isPresent() && pni.get().isUnknown()) {
+            pni = Optional.empty();
         }
-        if (_serviceId.isEmpty() && _pni.isPresent()) {
-            _serviceId = Optional.of(_pni.get());
+        if (serviceId.isEmpty() && pni.isPresent()) {
+            serviceId = Optional.of(pni.get());
         }
-        if (_serviceId.isPresent() && _serviceId.get() instanceof PNI) {
-            PNI sPNI = (PNI) serviceId.get();
-            if (_pni.isPresent() && !sPNI.equals(_pni.get())) {
+        if (serviceId.isPresent() && serviceId.get() instanceof PNI sPNI) {
+            if (pni.isPresent() && !sPNI.equals(pni.get())) {
                 throw new AssertionError("Must not have two different PNIs!");
             }
-            if (_pni.isEmpty()) {
-                _pni = Optional.of(sPNI);
+            if (pni.isEmpty()) {
+                pni = Optional.of(sPNI);
             }
         }
-        if (_serviceId.isEmpty() && number.isEmpty()) {
+        if (serviceId.isEmpty() && number.isEmpty()) {
             throw new AssertionError("Must have either a ServiceId or E164 number!");
         }
-        
-        this.serviceId = _serviceId;
-        this.pni = _pni;
-        this.number = number;
-        this.username = username;        
     }
 
-    public RecipientAddress(@JsonProperty("serviceId") Optional<ServiceId> serviceId,
-            @JsonProperty("number") Optional<String> number) {
+    public RecipientAddress(Optional<ServiceId> serviceId, Optional<String> number) {
         this(serviceId, Optional.empty(), number, Optional.empty());
     }
 
-    public RecipientAddress(@JsonProperty("serviceId") ServiceId serviceId, @JsonProperty("e164") String e164) {
+    public RecipientAddress(ServiceId serviceId, String e164) {
         this(Optional.ofNullable(serviceId), Optional.empty(), Optional.ofNullable(e164), Optional.empty());
     }
 
-    public RecipientAddress(@JsonProperty("serviceId") ServiceId serviceId, @JsonProperty("pni") PNI pni,
-            @JsonProperty("e164") String e164) {
+    public RecipientAddress(ServiceId serviceId, PNI pni, String e164) {
         this(Optional.ofNullable(serviceId), Optional.ofNullable(pni), Optional.ofNullable(e164), Optional.empty());
     }
 
-    public RecipientAddress(@JsonProperty("serviceId") ServiceId serviceId, @JsonProperty("pni") PNI pni,
-            @JsonProperty("e164") String e164, @JsonProperty("username") String username) {
-        this(Optional.ofNullable(serviceId), Optional.ofNullable(pni), Optional.ofNullable(e164),
+    public RecipientAddress(ServiceId serviceId, PNI pni, String e164, String username) {
+        this(Optional.ofNullable(serviceId),
+                Optional.ofNullable(pni),
+                Optional.ofNullable(e164),
                 Optional.ofNullable(username));
     }
 
-    public RecipientAddress(@JsonProperty("address") SignalServiceAddress address) {
+    public RecipientAddress(SignalServiceAddress address) {
         this(Optional.of(address.getServiceId()), Optional.empty(), address.getNumber(), Optional.empty());
     }
 
-    public RecipientAddress(@JsonProperty("address") org.asamk.signal.manager.api.RecipientAddress address) {
+    public RecipientAddress(org.asamk.signal.manager.api.RecipientAddress address) {
         this(address.uuid().map(ServiceId::from), Optional.empty(), address.number(), address.username());
     }
 
-    public RecipientAddress(@JsonProperty("serviceId") ServiceId serviceId) {
+    public RecipientAddress(ServiceId serviceId) {
         this(Optional.of(serviceId), Optional.empty());
     }
 
     public RecipientAddress withIdentifiersFrom(RecipientAddress address) {
-        return new RecipientAddress(
-                (this.serviceId.isEmpty() || this.isServiceIdPNI() || this.serviceId.equals(address.pni))
-                        && !address.isServiceIdPNI() ? address.serviceId : this.serviceId,
-                address.pni.or(this::pni), address.number.or(this::number), address.username.or(this::username));
+        return new RecipientAddress((
+                this.serviceId.isEmpty() || this.isServiceIdPNI() || this.serviceId.equals(address.pni)
+        ) && !address.isServiceIdPNI() ? address.serviceId : this.serviceId,
+                address.pni.or(this::pni),
+                address.number.or(this::number),
+                address.username.or(this::username));
     }
 
     public RecipientAddress removeIdentifiersFrom(RecipientAddress address) {
-        return new RecipientAddress(
-                address.serviceId.equals(this.serviceId) || address.pni.equals(this.serviceId) ? Optional.empty()
-                        : this.serviceId,
+        return new RecipientAddress(address.serviceId.equals(this.serviceId) || address.pni.equals(this.serviceId)
+                ? Optional.empty()
+                : this.serviceId,
                 address.pni.equals(this.pni) || address.serviceId.equals(this.pni) ? Optional.empty() : this.pni,
                 address.number.equals(this.number) ? Optional.empty() : this.number,
                 address.username.equals(this.username) ? Optional.empty() : this.username);
-    }
-
-    public Optional<ServiceId> serviceId() {
-        return serviceId;
     }
 
     public String getIdentifier() {
@@ -123,14 +110,23 @@ public class RecipientAddress {
 
     public boolean matches(RecipientAddress other) {
         return (serviceId.isPresent() && other.serviceId.isPresent() && serviceId.get().equals(other.serviceId.get()))
-                || (pni.isPresent() && other.serviceId.isPresent() && pni.get().equals(other.serviceId.get()))
-                || (serviceId.isPresent() && other.pni.isPresent() && serviceId.get().equals(other.pni.get()))
-                || (pni.isPresent() && other.pni.isPresent() && pni.get().equals(other.pni.get()))
-                || (number.isPresent() && other.number.isPresent() && number.get().equals(other.number.get()));
+                || (
+                pni.isPresent() && other.serviceId.isPresent() && pni.get().equals(other.serviceId.get())
+        )
+                || (
+                serviceId.isPresent() && other.pni.isPresent() && serviceId.get().equals(other.pni.get())
+        )
+                || (
+                pni.isPresent() && other.pni.isPresent() && pni.get().equals(other.pni.get())
+        )
+                || (
+                number.isPresent() && other.number.isPresent() && number.get().equals(other.number.get())
+        );
     }
 
     public boolean hasSingleIdentifier() {
-        final var identifiersCount = serviceId().map(s -> 1).orElse(0) + number().map(s -> 1).orElse(0)
+        final var identifiersCount = serviceId().map(s -> 1).orElse(0)
+                + number().map(s -> 1).orElse(0)
                 + username().map(s -> 1).orElse(0);
         return identifiersCount == 1;
     }
@@ -177,18 +173,8 @@ public class RecipientAddress {
     }
 
     public org.asamk.signal.manager.api.RecipientAddress toApiRecipientAddress() {
-        return new org.asamk.signal.manager.api.RecipientAddress(serviceId.map(ServiceId::uuid), number, username);
-    }
-
-    public Optional<PNI> pni() {
-        return pni;
-    }
-
-    public Optional<String> number() {
-        return number;
-    }
-
-    public Optional<String> username() {
-        return username;
+        return new org.asamk.signal.manager.api.RecipientAddress(serviceId().map(ServiceId::uuid),
+                number(),
+                username());
     }
 }

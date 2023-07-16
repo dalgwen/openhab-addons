@@ -1,8 +1,5 @@
 package org.asamk.signal.manager.storage.groups;
 
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.groups.GroupIdV2;
 import org.asamk.signal.manager.groups.GroupInviteLinkUrl;
 import org.asamk.signal.manager.groups.GroupPermission;
@@ -16,6 +13,9 @@ import org.signal.storageservice.protos.groups.local.EnabledState;
 import org.whispersystems.signalservice.api.push.DistributionId;
 import org.whispersystems.signalservice.api.push.ServiceId;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 public final class GroupInfoV2 extends GroupInfo {
 
     private final GroupIdV2 groupId;
@@ -27,17 +27,24 @@ public final class GroupInfoV2 extends GroupInfo {
 
     private final RecipientResolver recipientResolver;
 
-    public GroupInfoV2(final GroupIdV2 groupId, final GroupMasterKey masterKey,
-            final RecipientResolver recipientResolver) {
+    public GroupInfoV2(
+            final GroupIdV2 groupId, final GroupMasterKey masterKey, final RecipientResolver recipientResolver
+    ) {
         this.groupId = groupId;
         this.masterKey = masterKey;
         this.distributionId = DistributionId.create();
         this.recipientResolver = recipientResolver;
     }
 
-    public GroupInfoV2(final GroupIdV2 groupId, final GroupMasterKey masterKey, final DecryptedGroup group,
-            final DistributionId distributionId, final boolean blocked, final boolean permissionDenied,
-            final RecipientResolver recipientResolver) {
+    public GroupInfoV2(
+            final GroupIdV2 groupId,
+            final GroupMasterKey masterKey,
+            final DecryptedGroup group,
+            final DistributionId distributionId,
+            final boolean blocked,
+            final boolean permissionDenied,
+            final RecipientResolver recipientResolver
+    ) {
         this.groupId = groupId;
         this.masterKey = masterKey;
         this.group = group;
@@ -56,7 +63,6 @@ public final class GroupInfoV2 extends GroupInfo {
         return masterKey;
     }
 
-    @Override
     public DistributionId getDistributionId() {
         return distributionId;
     }
@@ -90,10 +96,11 @@ public final class GroupInfoV2 extends GroupInfo {
 
     @Override
     public GroupInviteLinkUrl getGroupInviteLink() {
-        if (this.group == null || this.group.getInviteLinkPassword().isEmpty()
-                || (this.group.getAccessControl().getAddFromInviteLink() != AccessControl.AccessRequired.ANY
-                        && this.group.getAccessControl()
-                                .getAddFromInviteLink() != AccessControl.AccessRequired.ADMINISTRATOR)) {
+        if (this.group == null || this.group.getInviteLinkPassword().isEmpty() || (
+                this.group.getAccessControl().getAddFromInviteLink() != AccessControl.AccessRequired.ANY
+                        && this.group.getAccessControl().getAddFromInviteLink()
+                        != AccessControl.AccessRequired.ADMINISTRATOR
+        )) {
             return null;
         }
 
@@ -105,8 +112,11 @@ public final class GroupInfoV2 extends GroupInfo {
         if (this.group == null) {
             return Set.of();
         }
-        return group.getMembersList().stream().map(m -> ServiceId.fromByteString(m.getUuid()))
-                .map(recipientResolver::resolveRecipient).collect(Collectors.toSet());
+        return group.getMembersList()
+                .stream()
+                .map(m -> ServiceId.fromByteString(m.getUuid()))
+                .map(recipientResolver::resolveRecipient)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -114,8 +124,11 @@ public final class GroupInfoV2 extends GroupInfo {
         if (this.group == null) {
             return Set.of();
         }
-        return group.getBannedMembersList().stream().map(m -> ServiceId.fromByteString(m.getUuid()))
-                .map(recipientResolver::resolveRecipient).collect(Collectors.toSet());
+        return group.getBannedMembersList()
+                .stream()
+                .map(m -> ServiceId.fromByteString(m.getUuid()))
+                .map(recipientResolver::resolveRecipient)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -123,8 +136,11 @@ public final class GroupInfoV2 extends GroupInfo {
         if (this.group == null) {
             return Set.of();
         }
-        return group.getPendingMembersList().stream().map(m -> ServiceId.fromByteString(m.getUuid()))
-                .map(recipientResolver::resolveRecipient).collect(Collectors.toSet());
+        return group.getPendingMembersList()
+                .stream()
+                .map(m -> ServiceId.fromByteString(m.getUuid()))
+                .map(recipientResolver::resolveRecipient)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -132,8 +148,11 @@ public final class GroupInfoV2 extends GroupInfo {
         if (this.group == null) {
             return Set.of();
         }
-        return group.getRequestingMembersList().stream().map(m -> ServiceId.fromByteString(m.getUuid()))
-                .map(recipientResolver::resolveRecipient).collect(Collectors.toSet());
+        return group.getRequestingMembersList()
+                .stream()
+                .map(m -> ServiceId.fromByteString(m.getUuid()))
+                .map(recipientResolver::resolveRecipient)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -141,8 +160,11 @@ public final class GroupInfoV2 extends GroupInfo {
         if (this.group == null) {
             return Set.of();
         }
-        return group.getMembersList().stream().filter(m -> m.getRole() == Member.Role.ADMINISTRATOR)
-                .map(m -> ServiceId.fromByteString(m.getUuid())).map(recipientResolver::resolveRecipient)
+        return group.getMembersList()
+                .stream()
+                .filter(m -> m.getRole() == Member.Role.ADMINISTRATOR)
+                .map(m -> ServiceId.fromByteString(m.getUuid()))
+                .map(recipientResolver::resolveRecipient)
                 .collect(Collectors.toSet());
     }
 
@@ -202,11 +224,9 @@ public final class GroupInfoV2 extends GroupInfo {
     }
 
     private static GroupPermission toGroupPermission(final AccessControl.AccessRequired permission) {
-        switch (permission) {
-            case ADMINISTRATOR:
-                return GroupPermission.ONLY_ADMINS;
-            default:
-                return GroupPermission.EVERY_MEMBER;
-        }
+        return switch (permission) {
+            case ADMINISTRATOR -> GroupPermission.ONLY_ADMINS;
+            default -> GroupPermission.EVERY_MEMBER;
+        };
     }
 }

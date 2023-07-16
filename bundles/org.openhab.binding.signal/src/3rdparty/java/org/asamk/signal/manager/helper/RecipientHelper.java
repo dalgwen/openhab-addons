@@ -1,13 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.api.RecipientIdentifier;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
@@ -25,7 +17,13 @@ import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.services.CdsiV2Service;
 import org.whispersystems.util.Base64UrlSafe;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 public class RecipientHelper {
 
@@ -71,8 +69,7 @@ public class RecipientHelper {
         return account.getRecipientResolver().resolveRecipient(address);
     }
 
-    public Set<RecipientId> resolveRecipients(Collection<RecipientIdentifier.Single> recipients)
-            throws UnregisteredRecipientException {
+    public Set<RecipientId> resolveRecipients(Collection<RecipientIdentifier.Single> recipients) throws UnregisteredRecipientException {
         final var recipientIds = new HashSet<RecipientId>(recipients.size());
         for (var number : recipients) {
             final var recipientId = resolveRecipient(number);
@@ -81,13 +78,10 @@ public class RecipientHelper {
         return recipientIds;
     }
 
-    public RecipientId resolveRecipient(final RecipientIdentifier.Single recipient)
-            throws UnregisteredRecipientException {
-        if (recipient instanceof RecipientIdentifier.Uuid) {
-            RecipientIdentifier.Uuid uuidRecipient = (RecipientIdentifier.Uuid) recipient;
+    public RecipientId resolveRecipient(final RecipientIdentifier.Single recipient) throws UnregisteredRecipientException {
+        if (recipient instanceof RecipientIdentifier.Uuid uuidRecipient) {
             return account.getRecipientResolver().resolveRecipient(ServiceId.from(uuidRecipient.uuid()));
-        } else if (recipient instanceof RecipientIdentifier.Number) {
-            RecipientIdentifier.Number numberRecipient = (RecipientIdentifier.Number) recipient;
+        } else if (recipient instanceof RecipientIdentifier.Number numberRecipient) {
             final var number = numberRecipient.number();
             return account.getRecipientStore().resolveRecipientByNumber(number, () -> {
                 try {
@@ -96,8 +90,7 @@ public class RecipientHelper {
                     return null;
                 }
             });
-        } else if (recipient instanceof RecipientIdentifier.Username) {
-            RecipientIdentifier.Username usernameRecipient = (RecipientIdentifier.Username) recipient;
+        } else if (recipient instanceof RecipientIdentifier.Username usernameRecipient) {
             final var username = usernameRecipient.username();
             return account.getRecipientStore().resolveRecipientByUsername(username, () -> {
                 try {
@@ -118,8 +111,7 @@ public class RecipientHelper {
         }
     }
 
-    public RecipientId refreshRegisteredUser(RecipientId recipientId)
-            throws IOException, UnregisteredRecipientException {
+    public RecipientId refreshRegisteredUser(RecipientId recipientId) throws IOException, UnregisteredRecipientException {
         final var address = resolveSignalServiceAddress(recipientId);
         if (address.getNumber().isEmpty()) {
             return recipientId;
@@ -134,14 +126,13 @@ public class RecipientHelper {
         Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, true);
 
         // Store numbers as recipients, so we have the number/uuid association
-        registeredUsers.forEach((number, u) -> account.getRecipientTrustedResolver().resolveRecipientTrusted(u.aci,
-                u.pni, Optional.of(number)));
+        registeredUsers.forEach((number, u) -> account.getRecipientTrustedResolver()
+                .resolveRecipientTrusted(u.aci, u.pni, Optional.of(number)));
 
         return registeredUsers;
     }
 
-    private ServiceId getRegisteredUserByNumber(final String number)
-            throws IOException, UnregisteredRecipientException {
+    private ServiceId getRegisteredUserByNumber(final String number) throws IOException, UnregisteredRecipientException {
         final Map<String, RegisteredUser> aciMap;
         try {
             aciMap = getRegisteredUsers(Set.of(number));
@@ -155,61 +146,51 @@ public class RecipientHelper {
         return user.getServiceId();
     }
 
-    private Map<String, RegisteredUser> getRegisteredUsersV2(final Set<String> numbers, boolean useCompat)
-            throws IOException {
+    private Map<String, RegisteredUser> getRegisteredUsersV2(
+            final Set<String> numbers, boolean useCompat
+    ) throws IOException {
         // Only partial refresh is implemented here
         final CdsiV2Service.Response response;
         try {
-            response = dependencies.getAccountManager().getRegisteredUsersWithCdsi(Set.of(), numbers,
-                    account.getRecipientStore().getServiceIdToProfileKeyMap(), useCompat, Optional.empty(),
-                    serviceEnvironmentConfig.getCdsiMrenclave(), token -> {
-                        // Not storing for partial refresh
-                    });
+            response = dependencies.getAccountManager()
+                    .getRegisteredUsersWithCdsi(Set.of(),
+                            numbers,
+                            account.getRecipientStore().getServiceIdToProfileKeyMap(),
+                            useCompat,
+                            Optional.empty(),
+                            serviceEnvironmentConfig.getCdsiMrenclave(),
+                            token -> {
+                                // Not storing for partial refresh
+                            });
         } catch (NumberFormatException e) {
             throw new IOException(e);
         }
         logger.debug("CDSI request successful, quota used by this request: {}", response.getQuotaUsedDebugOnly());
 
         final var registeredUsers = new HashMap<String, RegisteredUser>();
-        response.getResults().forEach((key, value) -> registeredUsers.put(key,
-                new RegisteredUser(value.getAci(), Optional.of(value.getPni()))));
+        response.getResults()
+                .forEach((key, value) -> registeredUsers.put(key,
+                        new RegisteredUser(value.getAci(), Optional.of(value.getPni()))));
         return registeredUsers;
     }
 
-    @SuppressWarnings("unused")
     private ACI getRegisteredUserByUsername(String username) throws IOException, BaseUsernameException {
         return dependencies.getAccountManager()
                 .getAciByUsernameHash(Base64UrlSafe.encodeBytesWithoutPadding(Username.hash(username)));
     }
 
-    public static class RegisteredUser {
-        private final Optional<ACI> aci;
-        private final Optional<PNI> pni;
+    public record RegisteredUser(Optional<ACI> aci, Optional<PNI> pni) {
 
-        public RegisteredUser(@JsonProperty("aci") Optional<ACI> aci, @JsonProperty("pni") Optional<PNI> pni) {
-            super();
-            Optional<PNI> _pni = pni;
-            Optional<ACI> _aci = aci;
-            _aci = _aci.isPresent() && _aci.get().isUnknown() ? Optional.empty() : _aci;
-            _pni = _pni.isPresent() && _pni.get().isUnknown() ? Optional.empty() : _pni;
-            if (_aci.isEmpty() && _pni.isEmpty()) {
+        public RegisteredUser {
+            aci = aci.isPresent() && aci.get().isUnknown() ? Optional.empty() : aci;
+            pni = pni.isPresent() && pni.get().isUnknown() ? Optional.empty() : pni;
+            if (aci.isEmpty() && pni.isEmpty()) {
                 throw new AssertionError("Must have either a ACI or PNI!");
             }
-
-            this.aci = _aci;
-            this.pni = _pni;
         }
 
         public ServiceId getServiceId() {
             return aci.map(a -> (ServiceId) a).or(this::pni).orElse(null);
-        }
-
-        public Optional<ACI> aci() {
-            return aci;
-        }
-
-        public Optional<PNI> pni() {
-            return pni;
         }
     }
 }

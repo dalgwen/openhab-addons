@@ -1,8 +1,5 @@
 package org.asamk.signal.manager.storage.configuration;
 
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import org.asamk.signal.manager.api.PhoneNumberSharingMode;
 
 public class ConfigurationStore {
@@ -85,54 +82,22 @@ public class ConfigurationStore {
     }
 
     private Storage toStorage() {
-        return new Storage(readReceipts, unidentifiedDeliveryIndicators, typingIndicators, linkPreviews,
-                phoneNumberUnlisted, phoneNumberSharingMode);
+        return new Storage(readReceipts,
+                unidentifiedDeliveryIndicators,
+                typingIndicators,
+                linkPreviews,
+                phoneNumberUnlisted,
+                phoneNumberSharingMode);
     }
 
-    public static class Storage {
-        private final Boolean readReceipts;
-        private final Boolean unidentifiedDeliveryIndicators;
-        private final Boolean typingIndicators;
-        private final Boolean linkPreviews;
-        private final Boolean phoneNumberUnlisted;
-        private final PhoneNumberSharingMode phoneNumberSharingMode;
-
-        public Storage(@JsonProperty("readReceipts") Boolean readReceipts, @JsonProperty("unidentifiedDeliveryIndicators") Boolean unidentifiedDeliveryIndicators, @JsonProperty("typingIndicators") Boolean typingIndicators,
-                @JsonProperty("linkPreviews") Boolean linkPreviews, @JsonProperty("phoneNumberUnlisted") Boolean phoneNumberUnlisted, @JsonProperty("phoneNumberSharingMode") PhoneNumberSharingMode phoneNumberSharingMode) {
-            super();
-            this.readReceipts = readReceipts;
-            this.unidentifiedDeliveryIndicators = unidentifiedDeliveryIndicators;
-            this.typingIndicators = typingIndicators;
-            this.linkPreviews = linkPreviews;
-            this.phoneNumberUnlisted = phoneNumberUnlisted;
-            this.phoneNumberSharingMode = phoneNumberSharingMode;
-        }
-
-        public Boolean readReceipts() {
-            return readReceipts;
-        }
-
-        public Boolean unidentifiedDeliveryIndicators() {
-            return unidentifiedDeliveryIndicators;
-        }
-
-        public Boolean typingIndicators() {
-            return typingIndicators;
-        }
-
-        public Boolean linkPreviews() {
-            return linkPreviews;
-        }
-
-        public Boolean phoneNumberUnlisted() {
-            return phoneNumberUnlisted;
-        }
-
-        public PhoneNumberSharingMode phoneNumberSharingMode() {
-            return phoneNumberSharingMode;
-        }
-
-    }
+    public record Storage(
+            Boolean readReceipts,
+            Boolean unidentifiedDeliveryIndicators,
+            Boolean typingIndicators,
+            Boolean linkPreviews,
+            Boolean phoneNumberUnlisted,
+            PhoneNumberSharingMode phoneNumberSharingMode
+    ) {}
 
     public interface Saver {
 

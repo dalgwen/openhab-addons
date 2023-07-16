@@ -1,16 +1,6 @@
 package org.asamk.signal.manager.api;
 
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-public class Color {
-
-    private final int color;
-
-    public Color(@JsonProperty("color") int color) {
-        super();
-        this.color = color;
-    }
+public record Color(int color) {
 
     public int alpha() {
         return color >>> 24;
@@ -30,9 +20,5 @@ public class Color {
 
     public String toHexColor() {
         return String.format("#%08x", color);
-    }
-
-    public int color() {
-        return color;
     }
 }

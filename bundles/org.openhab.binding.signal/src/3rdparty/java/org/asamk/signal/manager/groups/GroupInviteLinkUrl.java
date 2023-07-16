@@ -1,8 +1,6 @@
 package org.asamk.signal.manager.groups;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import com.google.protobuf.ByteString;
 
 import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.groups.GroupMasterKey;
@@ -10,7 +8,9 @@ import org.signal.storageservice.protos.groups.GroupInviteLink;
 import org.signal.storageservice.protos.groups.local.DecryptedGroup;
 import org.whispersystems.util.Base64UrlSafe;
 
-import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 public final class GroupInviteLinkUrl {
 
@@ -30,8 +30,7 @@ public final class GroupInviteLinkUrl {
      * @return null iff not a group url.
      * @throws InvalidGroupLinkException If group url, but cannot be parsed.
      */
-    public static GroupInviteLinkUrl fromUri(String urlString)
-            throws InvalidGroupLinkException, UnknownGroupLinkVersionException {
+    public static GroupInviteLinkUrl fromUri(String urlString) throws InvalidGroupLinkException, UnknownGroupLinkVersionException {
         var uri = getGroupUrl(urlString);
 
         if (uri == null) {
@@ -53,17 +52,16 @@ public final class GroupInviteLinkUrl {
             var groupInviteLink = GroupInviteLink.parseFrom(bytes);
 
             switch (groupInviteLink.getContentsCase()) {
-                case V1CONTENTS: {
+                case V1CONTENTS -> {
                     var groupInviteLinkContentsV1 = groupInviteLink.getV1Contents();
-                    var groupMasterKey = new GroupMasterKey(
-                            groupInviteLinkContentsV1.getGroupMasterKey().toByteArray());
-                    var password = GroupLinkPassword
-                            .fromBytes(groupInviteLinkContentsV1.getInviteLinkPassword().toByteArray());
+                    var groupMasterKey = new GroupMasterKey(groupInviteLinkContentsV1.getGroupMasterKey()
+                            .toByteArray());
+                    var password = GroupLinkPassword.fromBytes(groupInviteLinkContentsV1.getInviteLinkPassword()
+                            .toByteArray());
 
                     return new GroupInviteLinkUrl(groupMasterKey, password);
                 }
-                default:
-                    throw new UnknownGroupLinkVersionException("Url contains no known group link content");
+                default -> throw new UnknownGroupLinkVersionException("Url contains no known group link content");
             }
         } catch (InvalidInputException | IOException e) {
             throw new InvalidGroupLinkException(e);
@@ -119,8 +117,6 @@ public final class GroupInviteLinkUrl {
 
     public final static class InvalidGroupLinkException extends Exception {
 
-        private static final long serialVersionUID = -12791937886020006L;
-
         public InvalidGroupLinkException(String message) {
             super(message);
         }
@@ -130,7 +126,6 @@ public final class GroupInviteLinkUrl {
         }
     }
 
-    @SuppressWarnings("serial")
     public final static class UnknownGroupLinkVersionException extends Exception {
 
         public UnknownGroupLinkVersionException(String message) {
