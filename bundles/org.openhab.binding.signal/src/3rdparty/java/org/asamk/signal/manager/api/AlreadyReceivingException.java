@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-@SuppressWarnings("serial")
 public class AlreadyReceivingException extends Exception {
 
     public AlreadyReceivingException(String message) {

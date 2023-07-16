@@ -1,18 +1,5 @@
 package org.asamk.signal.manager.storage.senderKeys;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.helper.RecipientAddressResolver;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
@@ -22,14 +9,27 @@ import org.signal.libsignal.protocol.groups.state.SenderKeyRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LegacySenderKeyRecordStore {
 
     private final static Logger logger = LoggerFactory.getLogger(LegacySenderKeyRecordStore.class);
 
-    public static void migrate(final File senderKeysPath, final RecipientResolver resolver,
-            final RecipientAddressResolver addressResolver, final SenderKeyStore senderKeyStore) {
+    public static void migrate(
+            final File senderKeysPath,
+            final RecipientResolver resolver,
+            final RecipientAddressResolver addressResolver,
+            final SenderKeyStore senderKeyStore
+    ) {
         final var files = senderKeysPath.listFiles();
         if (files == null) {
             return;
@@ -42,7 +42,7 @@ public class LegacySenderKeyRecordStore {
                 return null;
             }
             return new Pair<>(new SenderKeyRecordStore.Key(serviceId.get(), key.deviceId, key.distributionId), record);
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+        }).filter(Objects::nonNull).toList();
 
         senderKeyStore.addLegacySenderKeys(senderKeys);
         deleteAllSenderKeys(senderKeysPath);
@@ -71,19 +71,23 @@ public class LegacySenderKeyRecordStore {
     final static Pattern senderKeyFileNamePattern = Pattern.compile("(\\d+)_(\\d+)_([\\da-z\\-]+)");
 
     private static List<Key> parseFileNames(final File[] files, final RecipientResolver resolver) {
-        return Arrays.stream(files).map(f -> senderKeyFileNamePattern.matcher(f.getName())).filter(Matcher::matches)
+        return Arrays.stream(files)
+                .map(f -> senderKeyFileNamePattern.matcher(f.getName()))
+                .filter(Matcher::matches)
                 .map(matcher -> {
                     final var recipientId = resolver.resolveRecipient(Long.parseLong(matcher.group(1)));
                     if (recipientId == null) {
-                        return Optional.<Key> empty();
+                        return null;
                     }
-                    return Optional.of(new Key(recipientId, Integer.parseInt(matcher.group(2)),
-                            UUID.fromString(matcher.group(3))));
-                }).map(Optional::get).filter(Objects::nonNull).collect(Collectors.toList());
+                    return new Key(recipientId, Integer.parseInt(matcher.group(2)), UUID.fromString(matcher.group(3)));
+                })
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private static File getSenderKeyFile(Key key, final File senderKeysPath) {
-        return new File(senderKeysPath, key.recipientId.id + "_" + key.deviceId + "_" + key.distributionId.toString());
+        return new File(senderKeysPath,
+                key.recipientId().id() + "_" + key.deviceId() + "_" + key.distributionId().toString());
     }
 
     private static SenderKeyRecord loadSenderKeyLocked(final Key key, final File senderKeysPath) {
@@ -99,18 +103,5 @@ public class LegacySenderKeyRecordStore {
         }
     }
 
-    static class Key {
-        RecipientId recipientId;
-        int deviceId;
-        UUID distributionId;
-
-        public Key(@JsonProperty("recipientId") RecipientId recipientId, @JsonProperty("deviceId") int deviceId,
-                @JsonProperty("distributionId") UUID distributionId) {
-            super();
-            this.recipientId = recipientId;
-            this.deviceId = deviceId;
-            this.distributionId = distributionId;
-        }
-
-    }
+    record Key(RecipientId recipientId, int deviceId, UUID distributionId) {}
 }

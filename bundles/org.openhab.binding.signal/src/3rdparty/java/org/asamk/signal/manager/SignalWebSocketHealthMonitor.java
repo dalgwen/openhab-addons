@@ -1,8 +1,5 @@
 package org.asamk.signal.manager;
 
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalWebSocket;
@@ -11,6 +8,9 @@ import org.whispersystems.signalservice.api.util.SleepTimer;
 import org.whispersystems.signalservice.api.websocket.HealthMonitor;
 import org.whispersystems.signalservice.api.websocket.WebSocketConnectionState;
 import org.whispersystems.signalservice.internal.websocket.WebSocketConnection;
+
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
@@ -25,8 +25,7 @@ final class SignalWebSocketHealthMonitor implements HealthMonitor {
 
     private final static Logger logger = LoggerFactory.getLogger(SignalWebSocketHealthMonitor.class);
 
-    private static final long KEEP_ALIVE_SEND_CADENCE = TimeUnit.SECONDS
-            .toMillis(WebSocketConnection.KEEPALIVE_TIMEOUT_SECONDS);
+    private static final long KEEP_ALIVE_SEND_CADENCE = TimeUnit.SECONDS.toMillis(WebSocketConnection.KEEPALIVE_TIMEOUT_SECONDS);
     private static final long MAX_TIME_SINCE_SUCCESSFUL_KEEP_ALIVE = KEEP_ALIVE_SEND_CADENCE * 3;
 
     private SignalWebSocket signalWebSocket;
@@ -47,28 +46,26 @@ final class SignalWebSocketHealthMonitor implements HealthMonitor {
 
         this.signalWebSocket = signalWebSocket;
 
-        // noinspection ResultOfMethodCallIgnored
-        signalWebSocket.getWebSocketState().subscribeOn(Schedulers.computation()).observeOn(Schedulers.computation())
-                .distinctUntilChanged().subscribe(s -> onStateChange(s, identified));
+        //noinspection ResultOfMethodCallIgnored
+        signalWebSocket.getWebSocketState()
+                .subscribeOn(Schedulers.computation())
+                .observeOn(Schedulers.computation())
+                .distinctUntilChanged()
+                .subscribe(s -> onStateChange(s, identified));
 
-        // noinspection ResultOfMethodCallIgnored
-        signalWebSocket.getUnidentifiedWebSocketState().subscribeOn(Schedulers.computation())
-                .observeOn(Schedulers.computation()).distinctUntilChanged()
+        //noinspection ResultOfMethodCallIgnored
+        signalWebSocket.getUnidentifiedWebSocketState()
+                .subscribeOn(Schedulers.computation())
+                .observeOn(Schedulers.computation())
+                .distinctUntilChanged()
                 .subscribe(s -> onStateChange(s, unidentified));
     }
 
-    @SuppressWarnings("incomplete-switch")
     private synchronized void onStateChange(WebSocketConnectionState connectionState, HealthState healthState) {
         switch (connectionState) {
-            case CONNECTED:
-                logger.debug("WebSocket is now connected");
-                break;
-            case AUTHENTICATION_FAILED:
-                logger.debug("WebSocket authentication failed");
-                break;
-            case FAILED:
-                logger.debug("WebSocket connection failed");
-                break;
+            case CONNECTED -> logger.debug("WebSocket is now connected");
+            case AUTHENTICATION_FAILED -> logger.debug("WebSocket authentication failed");
+            case FAILED -> logger.debug("WebSocket connection failed");
         }
 
         healthState.needsKeepAlive = connectionState == WebSocketConnectionState.CONNECTED;
@@ -119,11 +116,10 @@ final class SignalWebSocketHealthMonitor implements HealthMonitor {
      * Sends periodic heartbeats/keep-alives over both WebSockets to prevent connection timeouts. If
      * either WebSocket fails 3 times to get a return heartbeat both are forced to be recreated.
      */
-    public class KeepAliveSender extends Thread {
+    private class KeepAliveSender extends Thread {
 
         private volatile boolean shouldKeepRunning = true;
 
-        @Override
         public void run() {
             identified.lastKeepAliveReceived = System.currentTimeMillis();
             unidentified.lastKeepAliveReceived = System.currentTimeMillis();
@@ -138,8 +134,11 @@ final class SignalWebSocketHealthMonitor implements HealthMonitor {
 
                         if (identified.lastKeepAliveReceived < keepAliveRequiredSinceTime
                                 || unidentified.lastKeepAliveReceived < keepAliveRequiredSinceTime) {
-                            logger.warn("Missed keep alives, identified last: " + identified.lastKeepAliveReceived
-                                    + " unidentified last: " + unidentified.lastKeepAliveReceived + " needed by: "
+                            logger.warn("Missed keep alives, identified last: "
+                                    + identified.lastKeepAliveReceived
+                                    + " unidentified last: "
+                                    + unidentified.lastKeepAliveReceived
+                                    + " needed by: "
                                     + keepAliveRequiredSinceTime);
                             signalWebSocket.forceNewWebSockets();
                             signalWebSocket.connect();

@@ -4,8 +4,8 @@ import java.util.Objects;
 
 public final class RecipientId {
 
-    public long id;
-    public final RecipientStore recipientStore;
+    private long id;
+    private final RecipientStore recipientStore;
 
     RecipientId(long id, final RecipientStore recipientStore) {
         this.id = id;
@@ -24,12 +24,8 @@ public final class RecipientId {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == this) {
-            return true;
-        }
-        if (obj == null || obj.getClass() != this.getClass()) {
-            return false;
-        }
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (RecipientId) obj;
         return this.id() == that.id();
     }

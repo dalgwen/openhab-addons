@@ -1,7 +1,12 @@
 package org.asamk.signal.manager.storage.senderKeys;
 
-
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.asamk.signal.manager.helper.RecipientAddressResolver;
+import org.asamk.signal.manager.storage.Utils;
+import org.asamk.signal.manager.storage.recipients.RecipientResolver;
+import org.asamk.signal.manager.storage.senderKeys.SenderKeySharedStore.SenderKeySharedEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.push.DistributionId;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,20 +17,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.asamk.signal.manager.helper.RecipientAddressResolver;
-import org.asamk.signal.manager.storage.Utils;
-import org.asamk.signal.manager.storage.recipients.RecipientResolver;
-import org.asamk.signal.manager.storage.senderKeys.SenderKeySharedStore.SenderKeySharedEntry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.push.DistributionId;
-
 public class LegacySenderKeySharedStore {
 
     private final static Logger logger = LoggerFactory.getLogger(LegacySenderKeySharedStore.class);
 
-    public static void migrate(final File file, final RecipientResolver resolver,
-            final RecipientAddressResolver addressResolver, final SenderKeyStore senderKeyStore) {
+    public static void migrate(
+            final File file,
+            final RecipientResolver resolver,
+            final RecipientAddressResolver addressResolver,
+            final SenderKeyStore senderKeyStore
+    ) {
         final var objectMapper = Utils.createStorageObjectMapper();
         try (var inputStream = new FileInputStream(file)) {
             final var storage = objectMapper.readValue(inputStream, Storage.class);
@@ -60,41 +61,8 @@ public class LegacySenderKeySharedStore {
         }
     }
 
-    public static class Storage {
-        private final List<SharedSenderKey> sharedSenderKeys;
+    private record Storage(List<SharedSenderKey> sharedSenderKeys) {
 
-        public Storage(@JsonProperty("sharedSenderKeys") List<SharedSenderKey> sharedSenderKeys) {
-            super();
-            this.sharedSenderKeys = sharedSenderKeys;
-        }
-
-        public static class SharedSenderKey {
-            private final long recipientId;
-            private final int deviceId;
-            private final String distributionId;
-
-            public SharedSenderKey(@JsonProperty("recipientId") long recipientId, @JsonProperty("deviceId") int deviceId, @JsonProperty("distributionId") String distributionId) {
-                super();
-                this.recipientId = recipientId;
-                this.deviceId = deviceId;
-                this.distributionId = distributionId;
-            }
-
-            public long recipientId() {
-                return recipientId;
-            }
-
-            public int deviceId() {
-                return deviceId;
-            }
-
-            public String distributionId() {
-                return distributionId;
-            }
-        }
-
-        public List<SharedSenderKey> sharedSenderKeys() {
-            return sharedSenderKeys;
-        }
+        private record SharedSenderKey(long recipientId, int deviceId, String distributionId) {}
     }
 }

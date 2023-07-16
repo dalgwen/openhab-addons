@@ -1,9 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.SignalDependencies;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.StickerPackId;
@@ -15,12 +11,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.internal.util.Hex;
 
+import java.io.IOException;
+import java.util.HashSet;
+
 public class StickerHelper {
 
     private final static Logger logger = LoggerFactory.getLogger(StickerHelper.class);
 
     private final Context context;
-    @SuppressWarnings("unused")
     private final SignalAccount account;
     private final SignalDependencies dependencies;
 
@@ -30,8 +28,9 @@ public class StickerHelper {
         this.context = context;
     }
 
-    public JsonStickerPack getOrRetrieveStickerPack(StickerPackId packId, byte[] packKey)
-            throws InvalidStickerException {
+    public JsonStickerPack getOrRetrieveStickerPack(
+            StickerPackId packId, byte[] packKey
+    ) throws InvalidStickerException {
         if (!context.getStickerPackStore().existsStickerPack(packId)) {
             try {
                 retrieveStickerPack(packId, packKey);
@@ -70,11 +69,18 @@ public class StickerHelper {
         final var jsonManifest = new JsonStickerPack(manifest.getTitle().orElse(null),
                 manifest.getAuthor().orElse(null),
                 manifest.getCover()
-                        .map(c -> new JsonStickerPack.JsonSticker(c.getId(), c.getEmoji(), String.valueOf(c.getId()),
+                        .map(c -> new JsonStickerPack.JsonSticker(c.getId(),
+                                c.getEmoji(),
+                                String.valueOf(c.getId()),
                                 c.getContentType()))
                         .orElse(null),
-                manifest.getStickers().stream().map(c -> new JsonStickerPack.JsonSticker(c.getId(), c.getEmoji(),
-                        String.valueOf(c.getId()), c.getContentType())).collect(Collectors.toList()));
+                manifest.getStickers()
+                        .stream()
+                        .map(c -> new JsonStickerPack.JsonSticker(c.getId(),
+                                c.getEmoji(),
+                                String.valueOf(c.getId()),
+                                c.getContentType()))
+                        .toList());
         context.getStickerPackStore().storeManifest(packId, jsonManifest);
     }
 }

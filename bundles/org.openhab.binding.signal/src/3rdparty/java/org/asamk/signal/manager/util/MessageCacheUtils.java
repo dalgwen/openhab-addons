@@ -1,5 +1,12 @@
 package org.asamk.signal.manager.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
+import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.util.UuidUtil;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -7,13 +14,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Optional;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
-import org.whispersystems.signalservice.api.push.ServiceId;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.api.util.UuidUtil;
 
 public class MessageCacheUtils {
 
@@ -83,8 +83,8 @@ public class MessageCacheUtils {
             if (version >= 8) {
                 updatedPni = in.readUTF();
             }
-            @SuppressWarnings("null")
-            Optional<SignalServiceAddress> addressOptional = sourceServiceId == null ? Optional.empty()
+            Optional<SignalServiceAddress> addressOptional = sourceServiceId == null
+                    ? Optional.empty()
                     : Optional.of(new SignalServiceAddress(sourceServiceId, source));
             return new SignalServiceEnvelope(type,
                     addressOptional,

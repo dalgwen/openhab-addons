@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-@SuppressWarnings("serial")
 public class UnregisteredRecipientException extends Exception {
 
     private final RecipientAddress sender;

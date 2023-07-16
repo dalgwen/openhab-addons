@@ -1,20 +1,18 @@
 package org.asamk.signal.manager.api;
 
-import java.util.UUID;
-
 import org.asamk.signal.manager.groups.GroupId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.UUID;
 
-public interface RecipientIdentifier {
+public sealed interface RecipientIdentifier {
 
     String getIdentifier();
 
-    static class NoteToSelf implements RecipientIdentifier {
+    record NoteToSelf() implements RecipientIdentifier {
 
         public static final NoteToSelf INSTANCE = new NoteToSelf();
 
@@ -24,7 +22,7 @@ public interface RecipientIdentifier {
         }
     }
 
-    interface Single extends RecipientIdentifier {
+    sealed interface Single extends RecipientIdentifier {
 
         static Single fromString(String identifier, String localNumber) throws InvalidNumberException {
             try {
@@ -61,13 +59,7 @@ public interface RecipientIdentifier {
         RecipientAddress toPartialRecipientAddress();
     }
 
-    public static class Uuid implements Single {
-        private final UUID uuid;
-
-        public Uuid(@JsonProperty("uuid") UUID uuid) {
-            super();
-            this.uuid = uuid;
-        }
+    record Uuid(UUID uuid) implements Single {
 
         @Override
         public String getIdentifier() {
@@ -78,19 +70,9 @@ public interface RecipientIdentifier {
         public RecipientAddress toPartialRecipientAddress() {
             return new RecipientAddress(uuid);
         }
-
-        public UUID uuid() {
-            return uuid;
-        }
     }
 
-    public static class Number implements Single {
-        private final String number;
-
-        public Number(@JsonProperty("number") String number) {
-            super();
-            this.number = number;
-        }
+    record Number(String number) implements Single {
 
         @Override
         public String getIdentifier() {
@@ -101,19 +83,9 @@ public interface RecipientIdentifier {
         public RecipientAddress toPartialRecipientAddress() {
             return new RecipientAddress(null, number);
         }
-
-        public String number() {
-            return number;
-        }
     }
 
-    public static class Username implements Single {
-
-        private final String username;
-
-        public Username(String username) {
-            this.username = username;
-        }
+    record Username(String username) implements Single {
 
         @Override
         public String getIdentifier() {
@@ -124,27 +96,13 @@ public interface RecipientIdentifier {
         public RecipientAddress toPartialRecipientAddress() {
             return new RecipientAddress(null, null, username);
         }
-
-        public String username() {
-            return username;
-        }
     }
 
-    public static class Group implements RecipientIdentifier {
-        private final GroupId groupId;
-
-        public Group(@JsonProperty("groupId") GroupId groupId) {
-            super();
-            this.groupId = groupId;
-        }
+    record Group(GroupId groupId) implements RecipientIdentifier {
 
         @Override
         public String getIdentifier() {
             return groupId.toBase64();
-        }
-
-        public GroupId groupId() {
-            return groupId;
         }
     }
 }

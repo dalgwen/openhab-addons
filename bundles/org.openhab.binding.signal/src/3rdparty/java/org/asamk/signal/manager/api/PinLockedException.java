@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-@SuppressWarnings("serial")
 public class PinLockedException extends Exception {
 
     private final long timeRemaining;

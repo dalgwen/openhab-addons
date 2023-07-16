@@ -1,5 +1,8 @@
 package org.asamk.signal.manager;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -11,10 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 class MultiAccountManagerImpl implements MultiAccountManager {
 
@@ -35,7 +34,7 @@ class MultiAccountManagerImpl implements MultiAccountManager {
     @Override
     public List<String> getAccountNumbers() {
         synchronized (managers) {
-            return managers.stream().map(Manager::getSelfNumber).collect(Collectors.toList());
+            return managers.stream().map(Manager::getSelfNumber).toList();
         }
     }
 

@@ -1,8 +1,6 @@
 package org.asamk.signal.manager.util;
 
-import java.io.IOException;
-import java.util.Base64;
-import java.util.HashSet;
+import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.storage.recipients.Profile;
@@ -17,13 +15,17 @@ import org.whispersystems.signalservice.api.crypto.ProfileCipher;
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 
-import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
+import java.util.Base64;
+import java.util.HashSet;
 
 public class ProfileUtils {
 
     private final static Logger logger = LoggerFactory.getLogger(ProfileUtils.class);
 
-    public static Profile decryptProfile(final ProfileKey profileKey, final SignalServiceProfile encryptedProfile) {
+    public static Profile decryptProfile(
+            final ProfileKey profileKey, final SignalServiceProfile encryptedProfile
+    ) {
         var profileCipher = new ProfileCipher(profileKey);
         IdentityKey identityKey = null;
         try {
@@ -38,20 +40,28 @@ public class ProfileUtils {
             var aboutEmoji = trimZeros(decrypt(encryptedProfile.getAboutEmoji(), profileCipher));
 
             final var nameParts = splitName(name);
-            return new Profile(System.currentTimeMillis(), nameParts.first(), nameParts.second(), about, aboutEmoji,
+            return new Profile(System.currentTimeMillis(),
+                    nameParts.first(),
+                    nameParts.second(),
+                    about,
+                    aboutEmoji,
                     encryptedProfile.getAvatar(),
-                    identityKey == null || encryptedProfile.getPaymentAddress() == null ? null
-                            : decryptAndVerifyMobileCoinAddress(encryptedProfile.getPaymentAddress(), profileCipher,
+                    identityKey == null || encryptedProfile.getPaymentAddress() == null
+                            ? null
+                            : decryptAndVerifyMobileCoinAddress(encryptedProfile.getPaymentAddress(),
+                                    profileCipher,
                                     identityKey.getPublicKey()),
-                    getUnidentifiedAccessMode(encryptedProfile, profileCipher), getCapabilities(encryptedProfile));
+                    getUnidentifiedAccessMode(encryptedProfile, profileCipher),
+                    getCapabilities(encryptedProfile));
         } catch (InvalidCiphertextException e) {
             logger.debug("Failed to decrypt profile for {}", encryptedProfile.getServiceId(), e);
             return null;
         }
     }
 
-    public static Profile.UnidentifiedAccessMode getUnidentifiedAccessMode(final SignalServiceProfile encryptedProfile,
-            final ProfileCipher profileCipher) {
+    public static Profile.UnidentifiedAccessMode getUnidentifiedAccessMode(
+            final SignalServiceProfile encryptedProfile, final ProfileCipher profileCipher
+    ) {
         if (encryptedProfile.isUnrestrictedUnidentifiedAccess()) {
             return Profile.UnidentifiedAccessMode.UNRESTRICTED;
         }
@@ -84,18 +94,21 @@ public class ProfileUtils {
         return capabilities;
     }
 
-    private static String decrypt(final String encryptedName, final ProfileCipher profileCipher)
-            throws InvalidCiphertextException {
+    private static String decrypt(
+            final String encryptedName, final ProfileCipher profileCipher
+    ) throws InvalidCiphertextException {
         try {
-            return encryptedName == null ? null
+            return encryptedName == null
+                    ? null
                     : new String(profileCipher.decrypt(Base64.getDecoder().decode(encryptedName)));
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
-    private static byte[] decryptAndVerifyMobileCoinAddress(final byte[] encryptedPaymentAddress,
-            final ProfileCipher profileCipher, final ECPublicKey publicKey) throws InvalidCiphertextException {
+    private static byte[] decryptAndVerifyMobileCoinAddress(
+            final byte[] encryptedPaymentAddress, final ProfileCipher profileCipher, final ECPublicKey publicKey
+    ) throws InvalidCiphertextException {
         byte[] decrypted;
         try {
             decrypted = profileCipher.decryptWithLength(encryptedPaymentAddress);
@@ -121,14 +134,11 @@ public class ProfileUtils {
         }
         String[] parts = name.split("\0");
 
-        switch (parts.length) {
-            case 0:
-                return new Pair<>(null, null);
-            case 1:
-                return new Pair<>(parts[0], null);
-            default:
-                return new Pair<>(parts[0], parts[1]);
-        }
+        return switch (parts.length) {
+            case 0 -> new Pair<>(null, null);
+            case 1 -> new Pair<>(parts[0], null);
+            default -> new Pair<>(parts[0], parts[1]);
+        };
     }
 
     static String trimZeros(String str) {

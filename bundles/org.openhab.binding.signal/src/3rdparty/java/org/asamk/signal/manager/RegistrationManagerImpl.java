@@ -16,10 +16,6 @@
  */
 package org.asamk.signal.manager;
 
-import java.io.IOException;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
@@ -46,6 +42,9 @@ import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedExcep
 import org.whispersystems.signalservice.internal.push.VerifyAccountResponse;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 
+import java.io.IOException;
+import java.util.function.Consumer;
+
 class RegistrationManagerImpl implements RegistrationManager {
 
     private final static Logger logger = LoggerFactory.getLogger(RegistrationManagerImpl.class);
@@ -60,9 +59,14 @@ class RegistrationManagerImpl implements RegistrationManager {
     private final PinHelper pinHelper;
     private final AccountFileUpdater accountFileUpdater;
 
-    RegistrationManagerImpl(SignalAccount account, PathConfig pathConfig,
-            ServiceEnvironmentConfig serviceEnvironmentConfig, String userAgent, Consumer<Manager> newManagerListener,
-            AccountFileUpdater accountFileUpdater) {
+    RegistrationManagerImpl(
+            SignalAccount account,
+            PathConfig pathConfig,
+            ServiceEnvironmentConfig serviceEnvironmentConfig,
+            String userAgent,
+            Consumer<Manager> newManagerListener,
+            AccountFileUpdater accountFileUpdater
+    ) {
         this.account = account;
         this.pathConfig = pathConfig;
         this.accountFileUpdater = accountFileUpdater;
@@ -72,8 +76,7 @@ class RegistrationManagerImpl implements RegistrationManager {
 
         GroupsV2Operations groupsV2Operations;
         try {
-            groupsV2Operations = new GroupsV2Operations(
-                    ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration()),
+            groupsV2Operations = new GroupsV2Operations(ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration()),
                     ServiceConfig.GROUP_MAX_SIZE);
         } catch (Throwable ignored) {
             groupsV2Operations = null;
@@ -82,15 +85,22 @@ class RegistrationManagerImpl implements RegistrationManager {
                 new DynamicCredentialsProvider(
                         // Using empty UUID, because registering doesn't work otherwise
                         null, null, account.getNumber(), account.getPassword(), SignalServiceAddress.DEFAULT_DEVICE_ID),
-                userAgent, groupsV2Operations, ServiceConfig.AUTOMATIC_NETWORK_RETRY);
+                userAgent,
+                groupsV2Operations,
+                ServiceConfig.AUTOMATIC_NETWORK_RETRY);
         final var keyBackupService = accountManager.getKeyBackupService(ServiceConfig.getIasKeyStore(),
                 serviceEnvironmentConfig.getKeyBackupConfig().getEnclaveName(),
                 serviceEnvironmentConfig.getKeyBackupConfig().getServiceId(),
-                serviceEnvironmentConfig.getKeyBackupConfig().getMrenclave(), 10);
-        final var fallbackKeyBackupServices = serviceEnvironmentConfig.getFallbackKeyBackupConfigs().stream()
+                serviceEnvironmentConfig.getKeyBackupConfig().getMrenclave(),
+                10);
+        final var fallbackKeyBackupServices = serviceEnvironmentConfig.getFallbackKeyBackupConfigs()
+                .stream()
                 .map(config -> accountManager.getKeyBackupService(ServiceConfig.getIasKeyStore(),
-                        config.getEnclaveName(), config.getServiceId(), config.getMrenclave(), 10))
-                .collect(Collectors.toList());
+                        config.getEnclaveName(),
+                        config.getServiceId(),
+                        config.getMrenclave(),
+                        10))
+                .toList();
         this.pinHelper = new PinHelper(keyBackupService, fallbackKeyBackupServices);
     }
 
@@ -120,7 +130,6 @@ class RegistrationManagerImpl implements RegistrationManager {
     public void verifyAccount(
             String verificationCode, String pin
     ) throws IOException, PinLockedException, IncorrectPinException {
-        String _pin = pin;
         var sessionId = account.getSessionId(account.getNumber());
         final var result = NumberVerificationUtils.verifyNumber(sessionId,
                 verificationCode,
@@ -130,13 +139,13 @@ class RegistrationManagerImpl implements RegistrationManager {
         final var response = result.first();
         final var masterKey = result.second();
         if (masterKey == null) {
-            _pin = null;
+            pin = null;
         }
 
-        // accountManager.setGcmId(Optional.of(GoogleCloudMessaging.getInstance(this).register(REGISTRATION_ID)));
+        //accountManager.setGcmId(Optional.of(GoogleCloudMessaging.getInstance(this).register(REGISTRATION_ID)));
         final var aci = ACI.parseOrNull(response.getUuid());
         final var pni = PNI.parseOrNull(response.getPni());
-        account.finishRegistration(aci, pni, masterKey, _pin);
+        account.finishRegistration(aci, pni, masterKey, pin);
         accountFileUpdater.updateAccountIdentifiers(account.getNumber(), aci);
 
         ManagerImpl m = null;
@@ -195,7 +204,10 @@ class RegistrationManagerImpl implements RegistrationManager {
             account.setRegistered(true);
             logger.info("Reactivated existing account, verify is not necessary.");
             if (newManagerListener != null) {
-                final var m = new ManagerImpl(account, pathConfig, accountFileUpdater, serviceEnvironmentConfig,
+                final var m = new ManagerImpl(account,
+                        pathConfig,
+                        accountFileUpdater,
+                        serviceEnvironmentConfig,
                         userAgent);
                 account = null;
                 newManagerListener.accept(m);

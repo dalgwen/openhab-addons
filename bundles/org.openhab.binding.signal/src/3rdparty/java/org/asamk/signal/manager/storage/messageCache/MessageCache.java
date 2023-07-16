@@ -1,20 +1,19 @@
 package org.asamk.signal.manager.storage.messageCache;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.asamk.signal.manager.util.IOUtils;
 import org.asamk.signal.manager.util.MessageCacheUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public class MessageCache {
 
@@ -46,7 +45,7 @@ public class MessageCache {
                 return Stream.empty();
             }
             return Arrays.stream(files).filter(File::isFile);
-        }).map(CachedMessage::new).collect(Collectors.toList());
+        }).map(CachedMessage::new).toList();
     }
 
     public CachedMessage cacheMessage(SignalServiceEnvelope envelope, RecipientId recipientId) {
