@@ -4,7 +4,7 @@ import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.storage.accounts.AccountsStore;
 import org.whispersystems.signalservice.api.push.ACI;
 
-public class AccountFileUpdaterImpl implements AccountFileUpdater {
+class AccountFileUpdaterImpl implements AccountFileUpdater {
 
     private final AccountsStore accountsStore;
     private final String accountPath;

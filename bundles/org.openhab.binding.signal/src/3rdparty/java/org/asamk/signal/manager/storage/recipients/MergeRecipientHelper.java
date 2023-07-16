@@ -1,21 +1,22 @@
 package org.asamk.signal.manager.storage.recipients;
 
+import org.asamk.signal.manager.api.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.asamk.signal.manager.api.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class MergeRecipientHelper {
 
     private final static Logger logger = LoggerFactory.getLogger(MergeRecipientHelper.class);
 
-    static Pair<RecipientId, List<RecipientId>> resolveRecipientTrustedLocked(Store store, RecipientAddress address)
-            throws SQLException {
+    static Pair<RecipientId, List<RecipientId>> resolveRecipientTrustedLocked(
+            Store store, RecipientAddress address
+    ) throws SQLException {
         // address has serviceId and number, optionally also pni
 
         final var recipients = store.findAllByAddress(address);
@@ -31,11 +32,15 @@ public class MergeRecipientHelper {
                 return new Pair<>(recipient.id(), List.of());
             }
 
-            if (recipient.address().serviceId().isEmpty()
-                    || (recipient.address().serviceId().equals(address.serviceId()))
-                    || (recipient.address().pni().isPresent() && recipient.address().pni().equals(address.serviceId()))
-                    || (recipient.address().serviceId().equals(address.pni()))
-                    || (address.pni().isPresent() && address.pni().equals(recipient.address().pni()))) {
+            if (recipient.address().serviceId().isEmpty() || (
+                    recipient.address().serviceId().equals(address.serviceId())
+            ) || (
+                    recipient.address().pni().isPresent() && recipient.address().pni().equals(address.serviceId())
+            ) || (
+                    recipient.address().serviceId().equals(address.pni())
+            ) || (
+                    address.pni().isPresent() && address.pni().equals(recipient.address().pni())
+            )) {
                 logger.debug("Got existing recipient {}, updating with high trust address", recipient.id());
                 store.updateRecipientAddress(recipient.id(), recipient.address().withIdentifiersFrom(address));
                 return new Pair<>(recipient.id(), List.of());
@@ -49,13 +54,15 @@ public class MergeRecipientHelper {
             return new Pair<>(store.addNewRecipient(address), List.of());
         }
 
-        var resultingRecipient = recipients.stream().filter(r -> r.address().serviceId().equals(address.serviceId())
-                || r.address().pni().equals(address.serviceId())).findFirst();
+        var resultingRecipient = recipients.stream()
+                .filter(r -> r.address().serviceId().equals(address.serviceId()) || r.address()
+                        .pni()
+                        .equals(address.serviceId()))
+                .findFirst();
         if (resultingRecipient.isEmpty() && address.pni().isPresent()) {
-            resultingRecipient = recipients.stream()
-                    .filter(r -> r.address().serviceId().equals(address.pni())
-                            || (address.serviceId().equals(address.pni()) && r.address().pni().equals(address.pni())))
-                    .findFirst();
+            resultingRecipient = recipients.stream().filter(r -> r.address().serviceId().equals(address.pni()) || (
+                    address.serviceId().equals(address.pni()) && r.address().pni().equals(address.pni())
+            )).findFirst();
         }
 
         final Set<RecipientWithAddress> remainingRecipients;
@@ -84,7 +91,8 @@ public class MergeRecipientHelper {
         }
 
         logger.debug("Got separate recipients for high trust identifiers {}, need to merge ({}) and strip ({})",
-                address, recipientsToBeMerged.stream().map(r -> r.id().toString()).collect(Collectors.joining(", ")),
+                address,
+                recipientsToBeMerged.stream().map(r -> r.id().toString()).collect(Collectors.joining(", ")),
                 recipientsToBeStripped.stream().map(r -> r.id().toString()).collect(Collectors.joining(", ")));
 
         RecipientAddress finalAddress = resultingRecipient.map(RecipientWithAddress::address).orElse(null);
@@ -107,8 +115,9 @@ public class MergeRecipientHelper {
         }
 
         // Create fixed RecipientIds that won't update its id after merged
-        final var toBeMergedRecipientIds = recipientsToBeMerged.stream().map(r -> new RecipientId(r.id().id(), null))
-                .collect(Collectors.toList());
+        final var toBeMergedRecipientIds = recipientsToBeMerged.stream()
+                .map(r -> new RecipientId(r.id().id(), null))
+                .toList();
 
         if (resultingRecipient.isPresent()) {
             store.updateRecipientAddress(resultingRecipient.get().id(), finalAddress);
