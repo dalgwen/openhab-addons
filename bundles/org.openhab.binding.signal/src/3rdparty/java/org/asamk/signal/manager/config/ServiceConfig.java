@@ -1,16 +1,16 @@
 package org.asamk.signal.manager.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.account.AccountAttributes;
+import org.whispersystems.signalservice.api.push.TrustStore;
+
 import java.io.IOException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.account.AccountAttributes;
-import org.whispersystems.signalservice.api.push.TrustStore;
 
 import okhttp3.Interceptor;
 
@@ -75,27 +75,29 @@ public class ServiceConfig {
         return iasKeyStore;
     }
 
-    public static ServiceEnvironmentConfig getServiceEnvironmentConfig(ServiceEnvironment serviceEnvironment,
-            String userAgent) {
-        final Interceptor userAgentInterceptor = chain -> chain
-                .proceed(chain.request().newBuilder().header("User-Agent", userAgent).build());
+    public static ServiceEnvironmentConfig getServiceEnvironmentConfig(
+            ServiceEnvironment serviceEnvironment, String userAgent
+    ) {
+        final Interceptor userAgentInterceptor = chain -> chain.proceed(chain.request()
+                .newBuilder()
+                .header("User-Agent", userAgent)
+                .build());
 
         final var interceptors = List.of(userAgentInterceptor);
 
-        switch (serviceEnvironment) {
-            case LIVE:
-            default:
-                return new ServiceEnvironmentConfig(serviceEnvironment,
-                        LiveConfig.createDefaultServiceConfiguration(interceptors),
-                        LiveConfig.getUnidentifiedSenderTrustRoot(), LiveConfig.createKeyBackupConfig(),
-                        LiveConfig.createFallbackKeyBackupConfigs(),
-                        LiveConfig.getCdsiMrenclave());
-            case STAGING:
-                return new ServiceEnvironmentConfig(serviceEnvironment,
-                        StagingConfig.createDefaultServiceConfiguration(interceptors),
-                        StagingConfig.getUnidentifiedSenderTrustRoot(), StagingConfig.createKeyBackupConfig(),
-                        StagingConfig.createFallbackKeyBackupConfigs(),
-                        StagingConfig.getCdsiMrenclave());
-        }
+        return switch (serviceEnvironment) {
+            case LIVE -> new ServiceEnvironmentConfig(serviceEnvironment,
+                    LiveConfig.createDefaultServiceConfiguration(interceptors),
+                    LiveConfig.getUnidentifiedSenderTrustRoot(),
+                    LiveConfig.createKeyBackupConfig(),
+                    LiveConfig.createFallbackKeyBackupConfigs(),
+                    LiveConfig.getCdsiMrenclave());
+            case STAGING -> new ServiceEnvironmentConfig(serviceEnvironment,
+                    StagingConfig.createDefaultServiceConfiguration(interceptors),
+                    StagingConfig.getUnidentifiedSenderTrustRoot(),
+                    StagingConfig.createKeyBackupConfig(),
+                    StagingConfig.createFallbackKeyBackupConfigs(),
+                    StagingConfig.getCdsiMrenclave());
+        };
     }
 }

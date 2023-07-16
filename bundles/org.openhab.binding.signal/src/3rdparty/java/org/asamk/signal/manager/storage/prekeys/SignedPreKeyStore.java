@@ -1,13 +1,5 @@
 package org.asamk.signal.manager.storage.prekeys;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.storage.Database;
 import org.asamk.signal.manager.storage.Utils;
 import org.signal.libsignal.protocol.InvalidKeyException;
@@ -18,6 +10,13 @@ import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.ServiceIdType;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 
 public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.SignedPreKeyStore {
 
@@ -30,16 +29,18 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
     public static void createSql(Connection connection) throws SQLException {
         // When modifying the CREATE statement here, also add a migration in AccountDatabase.java
         try (final var statement = connection.createStatement()) {
-            statement.executeUpdate("                    CREATE TABLE signed_pre_key (\n"
-                    + "                      _id INTEGER PRIMARY KEY,\n"
-                    + "                      account_id_type INTEGER NOT NULL,\n"
-                    + "                      key_id INTEGER NOT NULL,\n"
-                    + "                      public_key BLOB NOT NULL,\n"
-                    + "                      private_key BLOB NOT NULL,\n"
-                    + "                      signature BLOB NOT NULL,\n"
-                    + "                      timestamp INTEGER DEFAULT 0,\n"
-                    + "                      UNIQUE(account_id_type, key_id)\n" + "                    ) STRICT;\n"
-                    + "");
+            statement.executeUpdate("""
+                                    CREATE TABLE signed_pre_key (
+                                      _id INTEGER PRIMARY KEY,
+                                      account_id_type INTEGER NOT NULL,
+                                      key_id INTEGER NOT NULL,
+                                      public_key BLOB NOT NULL,
+                                      private_key BLOB NOT NULL,
+                                      signature BLOB NOT NULL,
+                                      timestamp INTEGER DEFAULT 0,
+                                      UNIQUE(account_id_type, key_id)
+                                    ) STRICT;
+                                    """);
         }
     }
 
@@ -59,15 +60,19 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
 
     @Override
     public List<SignedPreKeyRecord> loadSignedPreKeys() {
-        final var sql = String.format(
-                "                SELECT p.key_id, p.public_key, p.private_key, p.signature, p.timestamp\n"
-                        + "                FROM %s p\n" + "                WHERE p.account_id_type = ?\n" + "",
-                TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                SELECT p.key_id, p.public_key, p.private_key, p.signature, p.timestamp
+                FROM %s p
+                WHERE p.account_id_type = ?
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
                 return Utils.executeQueryForStream(statement, this::getSignedPreKeyRecordFromResultSet)
-                        .filter(Objects::nonNull).collect(Collectors.toList());
+                        .filter(Objects::nonNull)
+                        .toList();
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed read from signed_pre_key store", e);
@@ -76,10 +81,12 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
 
     @Override
     public void storeSignedPreKey(int signedPreKeyId, SignedPreKeyRecord record) {
-        final var sql = String.format(
-                "                INSERT INTO %s (account_id_type, key_id, public_key, private_key, signature, timestamp)\n"
-                        + "                VALUES (?, ?, ?, ?, ?, ?)\n",
-                TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                INSERT INTO %s (account_id_type, key_id, public_key, private_key, signature, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
@@ -103,8 +110,12 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
 
     @Override
     public void removeSignedPreKey(int signedPreKeyId) {
-        final var sql = String.format("                DELETE FROM %s AS p\n"
-                + "                WHERE p.account_id_type = ? AND p.key_id = ?\n", TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                DELETE FROM %s AS p
+                WHERE p.account_id_type = ? AND p.key_id = ?
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
@@ -117,9 +128,12 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
     }
 
     public void removeAllSignedPreKeys() {
-        final var sql = String.format(
-                "                DELETE FROM %s AS p\n" + "                WHERE p.account_id_type = ?\n",
-                TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                DELETE FROM %s AS p
+                WHERE p.account_id_type = ?
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);
@@ -133,14 +147,15 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
     void addLegacySignedPreKeys(final Collection<SignedPreKeyRecord> signedPreKeys) {
         logger.debug("Migrating legacy signedPreKeys to database");
         long start = System.nanoTime();
-        final var sql = String.format(
-                "                INSERT INTO %s (account_id_type, key_id, public_key, private_key, signature, timestamp)\n"
-                        + "                VALUES (?, ?, ?, ?, ?, ?)\n",
-                TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                INSERT INTO %s (account_id_type, key_id, public_key, private_key, signature, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             connection.setAutoCommit(false);
-            final var deleteSql = String.format("DELETE FROM %s AS p WHERE p.account_id_type = ?",
-                    TABLE_SIGNED_PRE_KEY);
+            final var deleteSql = "DELETE FROM %s AS p WHERE p.account_id_type = ?".formatted(TABLE_SIGNED_PRE_KEY);
             try (final var statement = connection.prepareStatement(deleteSql)) {
                 statement.setInt(1, accountIdType);
                 statement.executeUpdate();
@@ -165,10 +180,13 @@ public class SignedPreKeyStore implements org.signal.libsignal.protocol.state.Si
     }
 
     private SignedPreKeyRecord getSignedPreKey(int signedPreKeyId) {
-        final var sql = String
-                .format("                SELECT p.key_id, p.public_key, p.private_key, p.signature, p.timestamp\n"
-                        + "                FROM %s p\n"
-                        + "                WHERE p.account_id_type = ? AND p.key_id = ?\n", TABLE_SIGNED_PRE_KEY);
+        final var sql = (
+                """
+                SELECT p.key_id, p.public_key, p.private_key, p.signature, p.timestamp
+                FROM %s p
+                WHERE p.account_id_type = ? AND p.key_id = ?
+                """
+        ).formatted(TABLE_SIGNED_PRE_KEY);
         try (final var connection = database.getConnection()) {
             try (final var statement = connection.prepareStatement(sql)) {
                 statement.setInt(1, accountIdType);

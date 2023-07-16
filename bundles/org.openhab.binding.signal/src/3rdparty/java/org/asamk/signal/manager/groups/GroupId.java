@@ -3,7 +3,7 @@ package org.asamk.signal.manager.groups;
 import java.util.Arrays;
 import java.util.Base64;
 
-public abstract class GroupId {
+public abstract sealed class GroupId permits GroupIdV1, GroupIdV2 {
 
     private final byte[] id;
 
@@ -47,12 +47,8 @@ public abstract class GroupId {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
 
         final var groupId = (GroupId) o;
 

@@ -1,10 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.util.PinHashing;
@@ -20,6 +15,10 @@ import org.whispersystems.signalservice.internal.contacts.crypto.Unauthenticated
 import org.whispersystems.signalservice.internal.contacts.entities.TokenResponse;
 import org.whispersystems.signalservice.internal.push.LockedException;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.stream.Stream;
+
 public class PinHelper {
 
     private final static Logger logger = LoggerFactory.getLogger(PinHelper.class);
@@ -27,13 +26,16 @@ public class PinHelper {
     private final KeyBackupService keyBackupService;
     private final Collection<KeyBackupService> fallbackKeyBackupServices;
 
-    public PinHelper(final KeyBackupService keyBackupService,
-            final Collection<KeyBackupService> fallbackKeyBackupServices) {
+    public PinHelper(
+            final KeyBackupService keyBackupService, final Collection<KeyBackupService> fallbackKeyBackupServices
+    ) {
         this.keyBackupService = keyBackupService;
         this.fallbackKeyBackupServices = fallbackKeyBackupServices;
     }
 
-    public void setRegistrationLockPin(String pin, MasterKey masterKey) throws IOException {
+    public void setRegistrationLockPin(
+            String pin, MasterKey masterKey
+    ) throws IOException {
         final var pinChangeSession = keyBackupService.newPinChangeSession();
         final var hashedPin = PinHashing.hashPin(pin, pinChangeSession);
 
@@ -68,7 +70,9 @@ public class PinHelper {
         }
     }
 
-    public KbsPinData getRegistrationLockData(String pin, LockedException e) throws IOException, IncorrectPinException {
+    public KbsPinData getRegistrationLockData(
+            String pin, LockedException e
+    ) throws IOException, IncorrectPinException {
         var basicStorageCredentials = e.getBasicStorageCredentials();
         if (basicStorageCredentials == null) {
             return null;
@@ -83,8 +87,9 @@ public class PinHelper {
         }
     }
 
-    private KbsPinData getRegistrationLockData(String pin, String basicStorageCredentials)
-            throws IOException, KeyBackupSystemNoDataException, KeyBackupServicePinException {
+    private KbsPinData getRegistrationLockData(
+            String pin, String basicStorageCredentials
+    ) throws IOException, KeyBackupSystemNoDataException, KeyBackupServicePinException {
         var tokenResponsePair = getTokenResponse(basicStorageCredentials);
         final var tokenResponse = tokenResponsePair.first();
         final var keyBackupService = tokenResponsePair.second();
@@ -98,7 +103,7 @@ public class PinHelper {
 
     private Pair<TokenResponse, KeyBackupService> getTokenResponse(String basicStorageCredentials) throws IOException {
         final var keyBackupServices = Stream.concat(Stream.of(keyBackupService), fallbackKeyBackupServices.stream())
-                .collect(Collectors.toList());
+                .toList();
         for (final var keyBackupService : keyBackupServices) {
             var tokenResponse = keyBackupService.getToken(basicStorageCredentials);
             if (tokenResponse != null && tokenResponse.getTries() > 0) {
@@ -108,12 +113,13 @@ public class PinHelper {
         throw new IOException("KBS Account locked, maximum pin attempts reached.");
     }
 
-    private KbsPinData restoreMasterKey(String pin, String basicStorageCredentials, TokenResponse tokenResponse,
-            final KeyBackupService keyBackupService)
-            throws IOException, KeyBackupSystemNoDataException, KeyBackupServicePinException {
-        if (pin == null) {
-            return null;
-        }
+    private KbsPinData restoreMasterKey(
+            String pin,
+            String basicStorageCredentials,
+            TokenResponse tokenResponse,
+            final KeyBackupService keyBackupService
+    ) throws IOException, KeyBackupSystemNoDataException, KeyBackupServicePinException {
+        if (pin == null) return null;
 
         if (basicStorageCredentials == null) {
             throw new AssertionError("Cannot restore KBS key, no storage credentials supplied");

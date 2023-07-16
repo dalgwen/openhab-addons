@@ -1,27 +1,7 @@
 package org.asamk.signal.manager.storage;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.Channels;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.file.Files;
-import java.security.SecureRandom;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Supplier;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.asamk.signal.manager.Settings;
 import org.asamk.signal.manager.api.Pair;
@@ -95,8 +75,28 @@ import org.whispersystems.signalservice.api.storage.StorageKey;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.file.Files;
+import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.asamk.signal.manager.config.ServiceConfig.getCapabilities;
 
@@ -175,8 +175,9 @@ public class SignalAccount implements Closeable {
         this.lock = lock;
     }
 
-    public static SignalAccount load(File dataPath, String accountPath, boolean waitForLock,
-            final Settings settings) throws IOException {
+    public static SignalAccount load(
+            File dataPath, String accountPath, boolean waitForLock, final Settings settings
+    ) throws IOException {
         logger.trace("Opening account file");
         final var fileName = getFileName(dataPath, accountPath);
         final var pair = openFileChannel(fileName, waitForLock);
@@ -195,10 +196,18 @@ public class SignalAccount implements Closeable {
         }
     }
 
-    public static SignalAccount create(File dataPath, String accountPath, String number,
-            ServiceEnvironment serviceEnvironment, IdentityKeyPair aciIdentityKey, IdentityKeyPair pniIdentityKey,
-            int registrationId, int pniRegistrationId, ProfileKey profileKey, final Settings settings)
-            throws IOException {
+    public static SignalAccount create(
+            File dataPath,
+            String accountPath,
+            String number,
+            ServiceEnvironment serviceEnvironment,
+            IdentityKeyPair aciIdentityKey,
+            IdentityKeyPair pniIdentityKey,
+            int registrationId,
+            int pniRegistrationId,
+            ProfileKey profileKey,
+            final Settings settings
+    ) throws IOException {
         IOUtils.createPrivateDirectories(dataPath);
         var fileName = getFileName(dataPath, accountPath);
         if (!fileName.exists()) {
@@ -230,21 +239,53 @@ public class SignalAccount implements Closeable {
         return signalAccount;
     }
 
-    public static SignalAccount createOrUpdateLinkedAccount(File dataPath, String accountPath, String number,
-            ServiceEnvironment serviceEnvironment, ACI aci, PNI pni, String password, String encryptedDeviceName,
-            int deviceId, IdentityKeyPair aciIdentityKey, IdentityKeyPair pniIdentityKey, int registrationId,
-            int pniRegistrationId, ProfileKey profileKey, final Settings settings) throws IOException {
+    public static SignalAccount createOrUpdateLinkedAccount(
+            File dataPath,
+            String accountPath,
+            String number,
+            ServiceEnvironment serviceEnvironment,
+            ACI aci,
+            PNI pni,
+            String password,
+            String encryptedDeviceName,
+            int deviceId,
+            IdentityKeyPair aciIdentityKey,
+            IdentityKeyPair pniIdentityKey,
+            int registrationId,
+            int pniRegistrationId,
+            ProfileKey profileKey,
+            final Settings settings
+    ) throws IOException {
         IOUtils.createPrivateDirectories(dataPath);
         var fileName = getFileName(dataPath, accountPath);
         if (!fileName.exists()) {
-            return createLinkedAccount(dataPath, accountPath, number, serviceEnvironment, aci, pni, password,
-                    encryptedDeviceName, deviceId, aciIdentityKey, pniIdentityKey, registrationId, pniRegistrationId,
-                    profileKey, settings);
+            return createLinkedAccount(dataPath,
+                    accountPath,
+                    number,
+                    serviceEnvironment,
+                    aci,
+                    pni,
+                    password,
+                    encryptedDeviceName,
+                    deviceId,
+                    aciIdentityKey,
+                    pniIdentityKey,
+                    registrationId,
+                    pniRegistrationId,
+                    profileKey,
+                    settings);
         }
 
         final var signalAccount = load(dataPath, accountPath, true, settings);
-        signalAccount.setProvisioningData(number, aci, pni, password, encryptedDeviceName, deviceId, aciIdentityKey,
-                pniIdentityKey, profileKey);
+        signalAccount.setProvisioningData(number,
+                aci,
+                pni,
+                password,
+                encryptedDeviceName,
+                deviceId,
+                aciIdentityKey,
+                pniIdentityKey,
+                profileKey);
         signalAccount.getRecipientTrustedResolver()
                 .resolveSelfRecipientTrusted(signalAccount.getSelfRecipientAddress());
         signalAccount.getAciSessionStore().archiveAllSessions();
@@ -268,10 +309,23 @@ public class SignalAccount implements Closeable {
         save();
     }
 
-    private static SignalAccount createLinkedAccount(File dataPath, String accountPath, String number,
-            ServiceEnvironment serviceEnvironment, ACI aci, PNI pni, String password, String encryptedDeviceName,
-            int deviceId, IdentityKeyPair aciIdentityKey, IdentityKeyPair pniIdentityKey, int registrationId,
-            int pniRegistrationId, ProfileKey profileKey, final Settings settings) throws IOException {
+    private static SignalAccount createLinkedAccount(
+            File dataPath,
+            String accountPath,
+            String number,
+            ServiceEnvironment serviceEnvironment,
+            ACI aci,
+            PNI pni,
+            String password,
+            String encryptedDeviceName,
+            int deviceId,
+            IdentityKeyPair aciIdentityKey,
+            IdentityKeyPair pniIdentityKey,
+            int registrationId,
+            int pniRegistrationId,
+            ProfileKey profileKey,
+            final Settings settings
+    ) throws IOException {
         var fileName = getFileName(dataPath, accountPath);
         IOUtils.createPrivateFile(fileName);
 
@@ -284,8 +338,15 @@ public class SignalAccount implements Closeable {
         signalAccount.localRegistrationId = registrationId;
         signalAccount.localPniRegistrationId = pniRegistrationId;
         signalAccount.settings = settings;
-        signalAccount.setProvisioningData(number, aci, pni, password, encryptedDeviceName, deviceId, aciIdentityKey,
-                pniIdentityKey, profileKey);
+        signalAccount.setProvisioningData(number,
+                aci,
+                pni,
+                password,
+                encryptedDeviceName,
+                deviceId,
+                aciIdentityKey,
+                pniIdentityKey,
+                profileKey);
 
         signalAccount.configurationStore = new ConfigurationStore(signalAccount::saveConfigurationStore);
 
@@ -299,9 +360,17 @@ public class SignalAccount implements Closeable {
         return signalAccount;
     }
 
-    private void setProvisioningData(final String number, final ACI aci, final PNI pni, final String password,
-            final String encryptedDeviceName, final int deviceId, final IdentityKeyPair aciIdentity,
-            final IdentityKeyPair pniIdentity, final ProfileKey profileKey) {
+    private void setProvisioningData(
+            final String number,
+            final ACI aci,
+            final PNI pni,
+            final String password,
+            final String encryptedDeviceName,
+            final int deviceId,
+            final IdentityKeyPair aciIdentity,
+            final IdentityKeyPair pniIdentity,
+            final ProfileKey profileKey
+    ) {
         this.number = number;
         this.aci = aci;
         this.pni = pni;
@@ -344,8 +413,9 @@ public class SignalAccount implements Closeable {
         }
     }
 
-    private void mergeRecipients(final Connection connection, RecipientId recipientId,
-            RecipientId toBeMergedRecipientId) throws SQLException {
+    private void mergeRecipients(
+            final Connection connection, RecipientId recipientId, RecipientId toBeMergedRecipientId
+    ) throws SQLException {
         getMessageCache().mergeRecipients(recipientId, toBeMergedRecipientId);
         getGroupStore().mergeRecipients(connection, recipientId, toBeMergedRecipientId);
     }
@@ -437,8 +507,9 @@ public class SignalAccount implements Closeable {
         return !(!f.exists() || f.isDirectory());
     }
 
-    @SuppressWarnings("null")
-    private void load(File dataPath, String accountPath, final Settings settings) throws IOException {
+    private void load(
+            File dataPath, String accountPath, final Settings settings
+    ) throws IOException {
         this.dataPath = dataPath;
         this.accountPath = accountPath;
         this.settings = settings;
@@ -455,8 +526,8 @@ public class SignalAccount implements Closeable {
             if (accountVersion > CURRENT_STORAGE_VERSION) {
                 throw new IOException("Config file was created by a more recent version: " + accountVersion);
             } else if (accountVersion < MINIMUM_STORAGE_VERSION) {
-                throw new IOException(
-                        "Config file was created by a no longer supported older version: " + accountVersion);
+                throw new IOException("Config file was created by a no longer supported older version: "
+                        + accountVersion);
             }
             previousStorageVersion = accountVersion;
             if (accountVersion < CURRENT_STORAGE_VERSION) {
@@ -565,7 +636,8 @@ public class SignalAccount implements Closeable {
                 profileKey = new ProfileKey(Base64.getDecoder().decode(rootNode.get("profileKey").asText()));
             } catch (InvalidInputException e) {
                 throw new IOException(
-                        "Config file contains an invalid profileKey, needs to be base64 encoded array of 32 bytes", e);
+                        "Config file contains an invalid profileKey, needs to be base64 encoded array of 32 bytes",
+                        e);
             }
         }
 
@@ -603,19 +675,23 @@ public class SignalAccount implements Closeable {
         }
         final var legacySessionsPath = getSessionsPath(dataPath, accountPath);
         if (legacySessionsPath.exists()) {
-            LegacySessionStore.migrate(legacySessionsPath, getRecipientResolver(), getRecipientAddressResolver(),
+            LegacySessionStore.migrate(legacySessionsPath,
+                    getRecipientResolver(),
+                    getRecipientAddressResolver(),
                     getAciSessionStore());
             migratedLegacyConfig = true;
         }
         final var legacyIdentitiesPath = getIdentitiesPath(dataPath, accountPath);
         if (legacyIdentitiesPath.exists()) {
-            LegacyIdentityKeyStore.migrate(legacyIdentitiesPath, getRecipientResolver(), getRecipientAddressResolver(),
+            LegacyIdentityKeyStore.migrate(legacyIdentitiesPath,
+                    getRecipientResolver(),
+                    getRecipientAddressResolver(),
                     getIdentityKeyStore());
             migratedLegacyConfig = true;
         }
         final var legacySignalProtocolStore = rootNode.hasNonNull("axolotlStore")
                 ? jsonProcessor.convertValue(Utils.getNotNullNode(rootNode, "axolotlStore"),
-                        LegacyJsonSignalProtocolStore.class)
+                LegacyJsonSignalProtocolStore.class)
                 : null;
         if (legacySignalProtocolStore != null && legacySignalProtocolStore.getLegacyIdentityKeyStore() != null) {
             aciIdentityKeyPair = legacySignalProtocolStore.getLegacyIdentityKeyStore().getIdentityKeyPair();
@@ -630,21 +706,27 @@ public class SignalAccount implements Closeable {
 
         final var legacySenderKeysPath = getSenderKeysPath(dataPath, accountPath);
         if (legacySenderKeysPath.exists()) {
-            LegacySenderKeyRecordStore.migrate(legacySenderKeysPath, getRecipientResolver(),
-                    getRecipientAddressResolver(), getSenderKeyStore());
+            LegacySenderKeyRecordStore.migrate(legacySenderKeysPath,
+                    getRecipientResolver(),
+                    getRecipientAddressResolver(),
+                    getSenderKeyStore());
             migratedLegacyConfig = true;
         }
         final var legacySenderKeysSharedPath = getSharedSenderKeysFile(dataPath, accountPath);
         if (legacySenderKeysSharedPath.exists()) {
-            LegacySenderKeySharedStore.migrate(legacySenderKeysSharedPath, getRecipientResolver(),
-                    getRecipientAddressResolver(), getSenderKeyStore());
+            LegacySenderKeySharedStore.migrate(legacySenderKeysSharedPath,
+                    getRecipientResolver(),
+                    getRecipientAddressResolver(),
+                    getSenderKeyStore());
             migratedLegacyConfig = true;
         }
         if (rootNode.hasNonNull("groupStore")) {
             final var groupStoreStorage = jsonProcessor.convertValue(rootNode.get("groupStore"),
                     LegacyGroupStore.Storage.class);
-            LegacyGroupStore.migrate(groupStoreStorage, getGroupCachePath(dataPath, accountPath),
-                    getRecipientResolver(), getGroupStore());
+            LegacyGroupStore.migrate(groupStoreStorage,
+                    getGroupCachePath(dataPath, accountPath),
+                    getRecipientResolver(),
+                    getGroupStore());
             migratedLegacyConfig = true;
         }
 
@@ -671,9 +753,9 @@ public class SignalAccount implements Closeable {
         }
     }
 
-    @SuppressWarnings("null")
-    private boolean loadLegacyStores(final JsonNode rootNode,
-            final LegacyJsonSignalProtocolStore legacySignalProtocolStore) {
+    private boolean loadLegacyStores(
+            final JsonNode rootNode, final LegacyJsonSignalProtocolStore legacySignalProtocolStore
+    ) {
         var migrated = false;
         var legacyRecipientStoreNode = rootNode.get("recipientStore");
         if (legacyRecipientStoreNode != null) {
@@ -716,9 +798,8 @@ public class SignalAccount implements Closeable {
             logger.debug("Migrating legacy session store.");
             for (var session : legacySignalProtocolStore.getLegacySessionStore().getSessions()) {
                 try {
-                    getAciSessionStore().storeSession(
-                            new SignalProtocolAddress(session.address.getIdentifier(), session.deviceId),
-                            new SessionRecord(session.sessionRecord));
+                    getAciSessionStore().storeSession(new SignalProtocolAddress(session.address.getIdentifier(),
+                            session.deviceId), new SessionRecord(session.sessionRecord));
                 } catch (Exception e) {
                     logger.warn("Failed to migrate session, ignoring", e);
                 }
@@ -734,7 +815,8 @@ public class SignalAccount implements Closeable {
                 }
                 final var serviceId = identity.getAddress().serviceId().get();
                 getIdentityKeyStore().saveIdentity(serviceId, identity.getIdentityKey());
-                getIdentityKeyStore().setIdentityTrustLevel(serviceId, identity.getIdentityKey(),
+                getIdentityKeyStore().setIdentityTrustLevel(serviceId,
+                        identity.getIdentityKey(),
                         identity.getTrustLevel());
             }
             migrated = true;
@@ -746,8 +828,14 @@ public class SignalAccount implements Closeable {
             final var contactStore = jsonProcessor.convertValue(contactStoreNode, LegacyJsonContactsStore.class);
             for (var contact : contactStore.getContacts()) {
                 final var recipientId = getRecipientStore().resolveRecipientTrusted(contact.getAddress());
-                getContactStore().storeContact(recipientId, new Contact(contact.name, null, contact.color,
-                        contact.messageExpirationTime, contact.blocked, contact.archived, false));
+                getContactStore().storeContact(recipientId,
+                        new Contact(contact.name,
+                                null,
+                                contact.color,
+                                contact.messageExpirationTime,
+                                contact.blocked,
+                                contact.archived,
+                                false));
 
                 // Store profile keys only in profile store
                 var profileKeyString = contact.profileKey;
@@ -783,10 +871,17 @@ public class SignalAccount implements Closeable {
                             capabilities.add(Profile.Capability.storage);
                         }
                     }
-                    final var newProfile = new Profile(profileEntry.getLastUpdateTimestamp(), profile.getGivenName(),
-                            profile.getFamilyName(), profile.getAbout(), profile.getAboutEmoji(), null, null,
-                            profile.isUnrestrictedUnidentifiedAccess() ? Profile.UnidentifiedAccessMode.UNRESTRICTED
-                                    : profile.getUnidentifiedAccess() != null ? Profile.UnidentifiedAccessMode.ENABLED
+                    final var newProfile = new Profile(profileEntry.getLastUpdateTimestamp(),
+                            profile.getGivenName(),
+                            profile.getFamilyName(),
+                            profile.getAbout(),
+                            profile.getAboutEmoji(),
+                            null,
+                            null,
+                            profile.isUnrestrictedUnidentifiedAccess()
+                                    ? Profile.UnidentifiedAccessMode.UNRESTRICTED
+                                    : profile.getUnidentifiedAccess() != null
+                                            ? Profile.UnidentifiedAccessMode.ENABLED
                                             : Profile.UnidentifiedAccessMode.DISABLED,
                             capabilities);
                     getProfileStore().storeProfile(recipientId, newProfile);
@@ -811,8 +906,10 @@ public class SignalAccount implements Closeable {
                         final var recipientId = getRecipientResolver().resolveRecipient(thread.id);
                         var contact = getContactStore().getContact(recipientId);
                         if (contact != null) {
-                            getContactStore().storeContact(recipientId, Contact.newBuilder(contact)
-                                    .withMessageExpirationTime(thread.messageExpirationTime).build());
+                            getContactStore().storeContact(recipientId,
+                                    Contact.newBuilder(contact)
+                                            .withMessageExpirationTime(thread.messageExpirationTime)
+                                            .build());
                         }
                     } else {
                         var groupInfo = getGroupStore().getGroup(GroupId.fromBase64(thread.id));
@@ -839,27 +936,33 @@ public class SignalAccount implements Closeable {
     private void save() {
         synchronized (fileChannel) {
             var rootNode = jsonProcessor.createObjectNode();
-            rootNode.put("version", CURRENT_STORAGE_VERSION).put("username", number)
+            rootNode.put("version", CURRENT_STORAGE_VERSION)
+                    .put("username", number)
                     .put("serviceEnvironment", serviceEnvironment == null ? null : serviceEnvironment.name())
                     .put("usernameIdentifier", username)
                     .put("uuid", aci == null ? null : aci.toString())
                     .put("pni", pni == null ? null : pni.toString())
                     .put("sessionId", sessionId)
                     .put("sessionNumber", sessionNumber)
-                    .put("deviceName", encryptedDeviceName).put("deviceId", deviceId)
-                    .put("isMultiDevice", isMultiDevice).put("lastReceiveTimestamp", lastReceiveTimestamp)
-                    .put("password", password).put("registrationId", localRegistrationId)
+                    .put("deviceName", encryptedDeviceName)
+                    .put("deviceId", deviceId)
+                    .put("isMultiDevice", isMultiDevice)
+                    .put("lastReceiveTimestamp", lastReceiveTimestamp)
+                    .put("password", password)
+                    .put("registrationId", localRegistrationId)
                     .put("pniRegistrationId", localPniRegistrationId)
                     .put("identityPrivateKey",
                             Base64.getEncoder().encodeToString(aciIdentityKeyPair.getPrivateKey().serialize()))
                     .put("identityKey",
                             Base64.getEncoder().encodeToString(aciIdentityKeyPair.getPublicKey().serialize()))
                     .put("pniIdentityPrivateKey",
-                            pniIdentityKeyPair == null ? null
+                            pniIdentityKeyPair == null
+                                    ? null
                                     : Base64.getEncoder()
                                             .encodeToString(pniIdentityKeyPair.getPrivateKey().serialize()))
                     .put("pniIdentityKey",
-                            pniIdentityKeyPair == null ? null
+                            pniIdentityKeyPair == null
+                                    ? null
                                     : Base64.getEncoder().encodeToString(pniIdentityKeyPair.getPublicKey().serialize()))
                     .put("registrationLockPin", registrationLockPin)
                     .put("pinMasterKey",
@@ -867,11 +970,14 @@ public class SignalAccount implements Closeable {
                     .put("storageKey",
                             storageKey == null ? null : Base64.getEncoder().encodeToString(storageKey.serialize()))
                     .put("storageManifestVersion", storageManifestVersion == -1 ? null : storageManifestVersion)
-                    .put("preKeyIdOffset", aciPreKeyIdOffset).put("nextSignedPreKeyId", aciNextSignedPreKeyId)
-                    .put("pniPreKeyIdOffset", pniPreKeyIdOffset).put("pniNextSignedPreKeyId", pniNextSignedPreKeyId)
+                    .put("preKeyIdOffset", aciPreKeyIdOffset)
+                    .put("nextSignedPreKeyId", aciNextSignedPreKeyId)
+                    .put("pniPreKeyIdOffset", pniPreKeyIdOffset)
+                    .put("pniNextSignedPreKeyId", pniNextSignedPreKeyId)
                     .put("profileKey",
                             profileKey == null ? null : Base64.getEncoder().encodeToString(profileKey.serialize()))
-                    .put("registered", registered).putPOJO("configurationStore", configurationStoreStorage);
+                    .put("registered", registered)
+                    .putPOJO("configurationStore", configurationStoreStorage);
             try {
                 try (var output = new ByteArrayOutputStream()) {
                     // Write to memory first to prevent corrupting the file in case of serialization errors
@@ -888,7 +994,6 @@ public class SignalAccount implements Closeable {
         }
     }
 
-    @SuppressWarnings("resource")
     private static Pair<FileChannel, FileLock> openFileChannel(File fileName, boolean waitForLock) throws IOException {
         var fileChannel = new RandomAccessFile(fileName, "rw").getChannel();
         try {
@@ -1019,14 +1124,22 @@ public class SignalAccount implements Closeable {
 
     private SignalServiceAccountDataStore getAciSignalServiceAccountDataStore() {
         return getOrCreate(() -> aciSignalProtocolStore,
-                () -> aciSignalProtocolStore = new SignalProtocolStore(getAciPreKeyStore(), getAciSignedPreKeyStore(),
-                        getAciSessionStore(), getAciIdentityKeyStore(), getSenderKeyStore(), this::isMultiDevice));
+                () -> aciSignalProtocolStore = new SignalProtocolStore(getAciPreKeyStore(),
+                        getAciSignedPreKeyStore(),
+                        getAciSessionStore(),
+                        getAciIdentityKeyStore(),
+                        getSenderKeyStore(),
+                        this::isMultiDevice));
     }
 
     private SignalServiceAccountDataStore getPniSignalServiceAccountDataStore() {
         return getOrCreate(() -> pniSignalProtocolStore,
-                () -> pniSignalProtocolStore = new SignalProtocolStore(getPniPreKeyStore(), getPniSignedPreKeyStore(),
-                        getPniSessionStore(), getPniIdentityKeyStore(), getSenderKeyStore(), this::isMultiDevice));
+                () -> pniSignalProtocolStore = new SignalProtocolStore(getPniPreKeyStore(),
+                        getPniSignedPreKeyStore(),
+                        getPniSessionStore(),
+                        getPniIdentityKeyStore(),
+                        getSenderKeyStore(),
+                        this::isMultiDevice));
     }
 
     private PreKeyStore getAciPreKeyStore() {
@@ -1066,19 +1179,25 @@ public class SignalAccount implements Closeable {
 
     public SignalIdentityKeyStore getAciIdentityKeyStore() {
         return getOrCreate(() -> aciIdentityKeyStore,
-                () -> aciIdentityKeyStore = new SignalIdentityKeyStore(getRecipientResolver(), () -> aciIdentityKeyPair,
-                        localRegistrationId, getIdentityKeyStore()));
+                () -> aciIdentityKeyStore = new SignalIdentityKeyStore(getRecipientResolver(),
+                        () -> aciIdentityKeyPair,
+                        localRegistrationId,
+                        getIdentityKeyStore()));
     }
 
     public SignalIdentityKeyStore getPniIdentityKeyStore() {
         return getOrCreate(() -> pniIdentityKeyStore,
-                () -> pniIdentityKeyStore = new SignalIdentityKeyStore(getRecipientResolver(), () -> pniIdentityKeyPair,
-                        localRegistrationId, getIdentityKeyStore()));
+                () -> pniIdentityKeyStore = new SignalIdentityKeyStore(getRecipientResolver(),
+                        () -> pniIdentityKeyPair,
+                        localRegistrationId,
+                        getIdentityKeyStore()));
     }
 
     public GroupStore getGroupStore() {
-        return getOrCreate(() -> groupStore, () -> groupStore = new GroupStore(getAccountDatabase(),
-                getRecipientResolver(), getRecipientIdCreator()));
+        return getOrCreate(() -> groupStore,
+                () -> groupStore = new GroupStore(getAccountDatabase(),
+                        getRecipientResolver(),
+                        getRecipientIdCreator()));
     }
 
     public ContactsStore getContactStore() {
@@ -1102,8 +1221,10 @@ public class SignalAccount implements Closeable {
     }
 
     public RecipientStore getRecipientStore() {
-        return getOrCreate(() -> recipientStore, () -> recipientStore = new RecipientStore(this::mergeRecipients,
-                this::getSelfRecipientAddress, getAccountDatabase()));
+        return getOrCreate(() -> recipientStore,
+                () -> recipientStore = new RecipientStore(this::mergeRecipients,
+                        this::getSelfRecipientAddress,
+                        getAccountDatabase()));
     }
 
     public ProfileStore getProfileStore() {
@@ -1247,8 +1368,12 @@ public class SignalAccount implements Closeable {
         save();
     }
 
-    public void setPni(final PNI updatedPni, final IdentityKeyPair pniIdentityKeyPair,
-            final SignedPreKeyRecord pniSignedPreKey, final int localPniRegistrationId) {
+    public void setPni(
+            final PNI updatedPni,
+            final IdentityKeyPair pniIdentityKeyPair,
+            final SignedPreKeyRecord pniSignedPreKey,
+            final int localPniRegistrationId
+    ) {
         setPni(updatedPni);
 
         setPniIdentityKeyPair(pniIdentityKeyPair);
@@ -1541,7 +1666,7 @@ public class SignalAccount implements Closeable {
         close();
         try (final var files = Files.walk(getUserPath(dataPath, accountPath).toPath())
                 .sorted(Comparator.reverseOrder())) {
-            for (final var file = files.iterator(); file.hasNext();) {
+            for (final var file = files.iterator(); file.hasNext(); ) {
                 Files.delete(file.next());
             }
         }

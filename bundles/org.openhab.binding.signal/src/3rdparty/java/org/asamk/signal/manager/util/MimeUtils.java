@@ -31,52 +31,21 @@ public class MimeUtils {
     }
 
     public static Optional<String> guessExtensionFromMimeType(String mimeType) {
-
-        String mime;
-        switch (mimeType) {
-            case "application/vnd.android.package-archive":
-                mime = "apk";
-                break;
-            case "application/json":
-                mime = "json";
-                break;
-            case "image/png":
-                mime = "png";
-                break;
-            case "image/jpeg":
-                mime = "jpg";
-                break;
-            case "image/heic":
-                mime = "heic";
-                break;
-            case "image/heif":
-                mime = "heif";
-                break;
-            case "image/webp":
-                mime = "webp";
-                break;
-            case "image/gif":
-                mime = "gif";
-                break;
-            case "audio/aac":
-                mime = "aac";
-                break;
-            case "video/mp4":
-                mime = "mp4";
-                break;
-            case "text/x-vcard":
-                mime = "vcf";
-                break;
-            case PLAIN_TEXT:
-            case LONG_TEXT:
-                mime = "txt";
-                break;
-            case OCTET_STREAM:
-                mime = "bin";
-            default:
-                mime = null;
-        }
-
-        return Optional.ofNullable(mime);
+        return Optional.ofNullable(switch (mimeType) {
+            case "application/vnd.android.package-archive" -> "apk";
+            case "application/json" -> "json";
+            case "image/png" -> "png";
+            case "image/jpeg" -> "jpg";
+            case "image/heic" -> "heic";
+            case "image/heif" -> "heif";
+            case "image/webp" -> "webp";
+            case "image/gif" -> "gif";
+            case "audio/aac" -> "aac";
+            case "video/mp4" -> "mp4";
+            case "text/x-vcard" -> "vcf";
+            case PLAIN_TEXT, LONG_TEXT -> "txt";
+            case OCTET_STREAM -> "bin";
+            default -> null;
+        });
     }
 }

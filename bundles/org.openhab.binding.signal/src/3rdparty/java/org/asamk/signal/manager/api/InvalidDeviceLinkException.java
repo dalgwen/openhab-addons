@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-@SuppressWarnings("serial")
 public class InvalidDeviceLinkException extends Exception {
 
     public InvalidDeviceLinkException(final String message) {

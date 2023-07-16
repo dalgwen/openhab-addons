@@ -7,12 +7,9 @@ public enum TypingAction {
     STOP;
 
     public SignalServiceTypingMessage.Action toSignalService() {
-        switch (this) {
-            case START:
-                return SignalServiceTypingMessage.Action.STARTED;
-            case STOP:
-                return SignalServiceTypingMessage.Action.STOPPED;
-        }
-        return null;
+        return switch (this) {
+            case START -> SignalServiceTypingMessage.Action.STARTED;
+            case STOP -> SignalServiceTypingMessage.Action.STOPPED;
+        };
     }
 }

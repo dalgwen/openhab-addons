@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-@SuppressWarnings("serial")
 public class IncorrectPinException extends Exception {
 
     private final int triesRemaining;

@@ -1,17 +1,16 @@
 package org.asamk.signal.manager.storage.prekeys;
 
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.state.PreKeyRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import org.signal.libsignal.protocol.InvalidMessageException;
-import org.signal.libsignal.protocol.state.PreKeyRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class LegacyPreKeyStore {
 
@@ -23,8 +22,10 @@ public class LegacyPreKeyStore {
         if (files == null) {
             return;
         }
-        final var preKeyRecords = Arrays.stream(files).filter(f -> preKeyFileNamePattern.matcher(f.getName()).matches())
-                .map(LegacyPreKeyStore::loadPreKeyRecord).collect(Collectors.toList());
+        final var preKeyRecords = Arrays.stream(files)
+                .filter(f -> preKeyFileNamePattern.matcher(f.getName()).matches())
+                .map(LegacyPreKeyStore::loadPreKeyRecord)
+                .toList();
         preKeyStore.addLegacyPreKeys(preKeyRecords);
         removeAllPreKeys(preKeysPath);
     }
