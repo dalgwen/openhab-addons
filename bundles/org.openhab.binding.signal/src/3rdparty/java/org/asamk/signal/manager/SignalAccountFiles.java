@@ -1,12 +1,5 @@
 package org.asamk.signal.manager;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Objects;
-import java.util.Set;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-
 import org.asamk.signal.manager.api.AccountCheckException;
 import org.asamk.signal.manager.api.NotRegisteredException;
 import org.asamk.signal.manager.config.ServiceConfig;
@@ -20,6 +13,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Consumer;
+
 public class SignalAccountFiles {
 
     private static final Logger logger = LoggerFactory.getLogger(MultiAccountManager.class);
@@ -31,8 +30,12 @@ public class SignalAccountFiles {
     private final Settings settings;
     private final AccountsStore accountsStore;
 
-    public SignalAccountFiles(final File settingsPath, final ServiceEnvironment serviceEnvironment,
-            final String userAgent, final Settings settings) throws IOException {
+    public SignalAccountFiles(
+            final File settingsPath,
+            final ServiceEnvironment serviceEnvironment,
+            final String userAgent,
+            final Settings settings
+    ) throws IOException {
         this.pathConfig = PathConfig.createDefault(settingsPath);
         this.serviceEnvironment = serviceEnvironment;
         this.serviceEnvironmentConfig = ServiceConfig.getServiceEnvironmentConfig(this.serviceEnvironment, userAgent);
@@ -51,10 +54,6 @@ public class SignalAccountFiles {
         });
     }
 
-    public AccountsStore getAccountStore() {
-        return accountsStore;
-    }
-
     public Set<String> getAllLocalAccountNumbers() throws IOException {
         return accountsStore.getAllNumbers();
     }
@@ -70,7 +69,7 @@ public class SignalAccountFiles {
                 logger.error("Failed to load {}: {} ({})", a.number(), e.getMessage(), e.getClass().getSimpleName());
                 throw e;
             }
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+        }).filter(Objects::nonNull).toList();
 
         return new MultiAccountManagerImpl(managers, this);
     }
@@ -80,8 +79,9 @@ public class SignalAccountFiles {
         return this.initManager(number, accountPath);
     }
 
-    private Manager initManager(String number, String accountPath)
-            throws IOException, NotRegisteredException, AccountCheckException {
+    private Manager initManager(
+            String number, String accountPath
+    ) throws IOException, NotRegisteredException, AccountCheckException {
         if (accountPath == null) {
             throw new NotRegisteredException();
         }
@@ -106,8 +106,11 @@ public class SignalAccountFiles {
 
         account.initDatabase();
 
-        final var manager = new ManagerImpl(account, pathConfig, new AccountFileUpdaterImpl(accountsStore, accountPath),
-                serviceEnvironmentConfig, userAgent);
+        final var manager = new ManagerImpl(account,
+                pathConfig,
+                new AccountFileUpdaterImpl(accountsStore, accountPath),
+                serviceEnvironmentConfig,
+                userAgent);
 
         try {
             manager.checkAccountState();
@@ -132,7 +135,10 @@ public class SignalAccountFiles {
     }
 
     public ProvisioningManager initProvisioningManager(Consumer<Manager> newManagerListener) {
-        return new ProvisioningManagerImpl(pathConfig, serviceEnvironmentConfig, userAgent, newManagerListener,
+        return new ProvisioningManagerImpl(pathConfig,
+                serviceEnvironmentConfig,
+                userAgent,
+                newManagerListener,
                 accountsStore);
     }
 
@@ -140,8 +146,9 @@ public class SignalAccountFiles {
         return initRegistrationManager(number, null);
     }
 
-    public RegistrationManager initRegistrationManager(String number, Consumer<Manager> newManagerListener)
-            throws IOException {
+    public RegistrationManager initRegistrationManager(
+            String number, Consumer<Manager> newManagerListener
+    ) throws IOException {
         final var accountPath = accountsStore.getPathByNumber(number);
         if (accountPath == null || !SignalAccount.accountFileExists(pathConfig.dataPath(), accountPath)) {
             final var newAccountPath = accountPath == null ? accountsStore.addAccount(number, null) : accountPath;
@@ -151,11 +158,23 @@ public class SignalAccountFiles {
             var pniRegistrationId = KeyHelper.generateRegistrationId(false);
 
             var profileKey = KeyUtils.createProfileKey();
-            var account = SignalAccount.create(pathConfig.dataPath(), newAccountPath, number, serviceEnvironment,
-                    aciIdentityKey, pniIdentityKey, registrationId, pniRegistrationId, profileKey, settings);
+            var account = SignalAccount.create(pathConfig.dataPath(),
+                    newAccountPath,
+                    number,
+                    serviceEnvironment,
+                    aciIdentityKey,
+                    pniIdentityKey,
+                    registrationId,
+                    pniRegistrationId,
+                    profileKey,
+                    settings);
 
-            return new RegistrationManagerImpl(account, pathConfig, serviceEnvironmentConfig, userAgent,
-                    newManagerListener, new AccountFileUpdaterImpl(accountsStore, newAccountPath));
+            return new RegistrationManagerImpl(account,
+                    pathConfig,
+                    serviceEnvironmentConfig,
+                    userAgent,
+                    newManagerListener,
+                    new AccountFileUpdaterImpl(accountsStore, newAccountPath));
         }
 
         var account = SignalAccount.load(pathConfig.dataPath(), accountPath, true, settings);
@@ -164,7 +183,11 @@ public class SignalAccountFiles {
             throw new IOException("Number in account file doesn't match expected number: " + account.getNumber());
         }
 
-        return new RegistrationManagerImpl(account, pathConfig, serviceEnvironmentConfig, userAgent, newManagerListener,
+        return new RegistrationManagerImpl(account,
+                pathConfig,
+                serviceEnvironmentConfig,
+                userAgent,
+                newManagerListener,
                 new AccountFileUpdaterImpl(accountsStore, accountPath));
     }
 }
