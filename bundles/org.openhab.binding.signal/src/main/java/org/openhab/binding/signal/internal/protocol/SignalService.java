@@ -306,8 +306,8 @@ public class SignalService {
             logger.warn("Cannot send message to {}, cause {}", address, e.getMessage());
             return new DeliveryReport(DeliveryStatus.FAILED, address);
         }
-        if (sendResults.getResults() != null && !sendResults.getResults().values().isEmpty()) {
-            List<SendMessageResult> resultsForRecipient = sendResults.getResults().get(recipient);
+        if (sendResults.results() != null && !sendResults.results().values().isEmpty()) {
+            List<SendMessageResult> resultsForRecipient = sendResults.results().get(recipient);
             if (resultsForRecipient != null) {
                 SendMessageResult result = resultsForRecipient.get(0);
                 if (!result.isSuccess()) {
@@ -401,12 +401,12 @@ public class SignalService {
 
         private void handleMessageInternal(@Nullable MessageEnvelope envelope, @Nullable Throwable exception) {
             if (envelope != null) {
-                RecipientAddress source = envelope.getSourceAddress().orElse(null);
+                RecipientAddress source = envelope.sourceAddress().orElse(null);
 
-                if (envelope.getData().isPresent()) {
-                    MessageEnvelope.Data message = envelope.getData().get();
-                    if (message.getBody().isPresent()) {
-                        messageListener.messageReceived(source, message.getBody().get());
+                if (envelope.data().isPresent()) {
+                    MessageEnvelope.Data message = envelope.data().get();
+                    if (message.body().isPresent()) {
+                        messageListener.messageReceived(source, message.body().get());
                     } else {
                         logger.debug("empty message from {}",
                                 source != null ? source.getLegacyIdentifier() : "unknown");
@@ -416,21 +416,21 @@ public class SignalService {
                     // final var groupContext = message.groupContext().get();
                     // printGroupInfo(writer.indentedWriter(), groupContext.getId());
                     // }
-                } else if (envelope.getSync().isPresent() && envelope.getSync().get().sent().isPresent()
-                        && envelope.getSync().get().sent().get().destination().isPresent() && envelope.getSync().get()
-                                .sent().get().destination().get().getLegacyIdentifier().equals(phoneNumber)) {
+                } else if (envelope.sync().isPresent() && envelope.sync().get().sent().isPresent()
+                        && envelope.sync().get().sent().get().destination().isPresent() && envelope.sync().get().sent()
+                                .get().destination().get().getLegacyIdentifier().equals(phoneNumber)) {
                     // message from the account to the account, handles this like a standard message
-                    MessageEnvelope.Data message = envelope.getSync().get().sent().get().message().get();
-                    if (message.getBody().isPresent()) {
-                        messageListener.messageReceived(envelope.getSync().get().sent().get().destination().get(),
-                                message.getBody().get());
+                    MessageEnvelope.Data message = envelope.sync().get().sent().get().message().get();
+                    if (message.body().isPresent()) {
+                        messageListener.messageReceived(envelope.sync().get().sent().get().destination().get(),
+                                message.body().get());
                     } else {
                         logger.debug("empty message from {}",
                                 source != null ? source.getLegacyIdentifier() : "unknown");
                     }
                 }
-                if (envelope.getReceipt().isPresent() && source != null) {
-                    MessageEnvelope.Receipt receiptMessage = envelope.getReceipt().get();
+                if (envelope.receipt().isPresent() && source != null) {
+                    MessageEnvelope.Receipt receiptMessage = envelope.receipt().get();
                     DeliveryStatus status;
                     switch (receiptMessage.type()) {
                         case DELIVERY:
