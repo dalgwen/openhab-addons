@@ -33,12 +33,15 @@ import org.asamk.signal.manager.api.AccountCheckException;
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
 import org.asamk.signal.manager.api.CaptchaRequiredException;
+import org.asamk.signal.manager.api.GroupNotFoundException;
+import org.asamk.signal.manager.api.GroupSendingNotAllowedException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.InvalidNumberException;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.Message;
 import org.asamk.signal.manager.api.MessageEnvelope;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
+import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotRegisteredException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
@@ -48,14 +51,11 @@ import org.asamk.signal.manager.api.RecipientIdentifier;
 import org.asamk.signal.manager.api.RecipientIdentifier.Single;
 import org.asamk.signal.manager.api.SendMessageResult;
 import org.asamk.signal.manager.api.SendMessageResults;
+import org.asamk.signal.manager.api.ServiceEnvironment;
+import org.asamk.signal.manager.api.TrustNewIdentity;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.api.UserAlreadyExistsException;
-import org.asamk.signal.manager.config.ServiceEnvironment;
-import org.asamk.signal.manager.groups.GroupNotFoundException;
-import org.asamk.signal.manager.groups.GroupSendingNotAllowedException;
-import org.asamk.signal.manager.groups.NotAGroupMemberException;
-import org.asamk.signal.manager.storage.identities.TrustNewIdentity;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -299,7 +299,7 @@ public class SignalService {
             sendResults = managerFinal
                     .sendMessage(
                             new Message(message, attachments, Collections.emptyList(), Optional.empty(),
-                                    Optional.empty(), Collections.emptyList(), Optional.empty()),
+                                    Optional.empty(), Collections.emptyList(), Optional.empty(), List.of()),
                             Collections.singleton(recipient));
         } catch (IOException | AttachmentInvalidException | NotAGroupMemberException | GroupNotFoundException
                 | GroupSendingNotAllowedException | UnregisteredRecipientException | InvalidStickerException e) {
