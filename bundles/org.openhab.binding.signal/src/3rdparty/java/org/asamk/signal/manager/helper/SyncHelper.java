@@ -1,12 +1,10 @@
 package org.asamk.signal.manager.helper;
 
-import com.google.protobuf.ByteString;
-
+import org.asamk.signal.manager.api.Contact;
+import org.asamk.signal.manager.api.GroupId;
 import org.asamk.signal.manager.api.TrustLevel;
-import org.asamk.signal.manager.groups.GroupId;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.groups.GroupInfoV1;
-import org.asamk.signal.manager.storage.recipients.Contact;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
 import org.asamk.signal.manager.util.AttachmentUtils;
 import org.asamk.signal.manager.util.IOUtils;
@@ -231,15 +229,6 @@ public class SyncHelper {
                 Optional.ofNullable(config.getTypingIndicators()),
                 Optional.ofNullable(config.getLinkPreviews()));
         context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forConfiguration(configurationMessage));
-    }
-
-    public void sendPniIdentity() {
-        final var pniIdentityKeyPair = account.getPniIdentityKeyPair();
-        var pniIdentity = SignalServiceProtos.SyncMessage.PniIdentity.newBuilder()
-                .setPrivateKey(ByteString.copyFrom(pniIdentityKeyPair.getPrivateKey().serialize()))
-                .setPublicKey(ByteString.copyFrom(pniIdentityKeyPair.getPublicKey().serialize()))
-                .build();
-        context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forPniIdentity(pniIdentity));
     }
 
     public void handleSyncDeviceGroups(final InputStream input) {
