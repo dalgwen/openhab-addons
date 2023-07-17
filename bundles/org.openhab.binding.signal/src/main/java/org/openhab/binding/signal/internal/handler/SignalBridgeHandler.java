@@ -251,7 +251,6 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
      * @param image The image to sent. Use a scheme at the beginning (either file:, http:, base64
      */
     public DeliveryReport sendImage(String recipient, String image, @Nullable String text) {
-
         logger.debug("Sending photo message to {}", recipient);
         SignalService signalServiceFinal = signalService;
 
