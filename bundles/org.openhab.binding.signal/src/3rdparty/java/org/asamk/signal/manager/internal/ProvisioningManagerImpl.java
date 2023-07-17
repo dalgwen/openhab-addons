@@ -14,8 +14,12 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.asamk.signal.manager;
+package org.asamk.signal.manager.internal;
 
+import org.asamk.signal.manager.Manager;
+import org.asamk.signal.manager.ProvisioningManager;
+import org.asamk.signal.manager.Settings;
+import org.asamk.signal.manager.api.DeviceLinkUrl;
 import org.asamk.signal.manager.api.UserAlreadyExistsException;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
@@ -43,7 +47,7 @@ import java.util.function.Consumer;
 
 import static org.asamk.signal.manager.config.ServiceConfig.getCapabilities;
 
-class ProvisioningManagerImpl implements ProvisioningManager {
+public class ProvisioningManagerImpl implements ProvisioningManager {
 
     private final static Logger logger = LoggerFactory.getLogger(ProvisioningManagerImpl.class);
 
@@ -59,7 +63,7 @@ class ProvisioningManagerImpl implements ProvisioningManager {
     private final int pniRegistrationId;
     private final String password;
 
-    ProvisioningManagerImpl(
+    public ProvisioningManagerImpl(
             PathConfig pathConfig,
             ServiceEnvironmentConfig serviceEnvironmentConfig,
             String userAgent,
@@ -94,7 +98,7 @@ class ProvisioningManagerImpl implements ProvisioningManager {
     public URI getDeviceLinkUri() throws TimeoutException, IOException {
         var deviceUuid = accountManager.getNewDeviceUuid();
 
-        return new DeviceLinkInfo(deviceUuid, tempIdentityKey.getPublicKey().getPublicKey()).createDeviceLinkUri();
+        return new DeviceLinkUrl(deviceUuid, tempIdentityKey.getPublicKey().getPublicKey()).createDeviceLinkUri();
     }
 
     @Override

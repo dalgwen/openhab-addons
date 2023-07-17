@@ -14,8 +14,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.asamk.signal.manager;
+package org.asamk.signal.manager.internal;
 
+import org.asamk.signal.manager.Manager;
+import org.asamk.signal.manager.RegistrationManager;
 import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
@@ -39,13 +41,14 @@ import org.whispersystems.signalservice.api.push.ACI;
 import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedException;
+import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
 import org.whispersystems.signalservice.internal.push.VerifyAccountResponse;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 
 import java.io.IOException;
 import java.util.function.Consumer;
 
-class RegistrationManagerImpl implements RegistrationManager {
+public class RegistrationManagerImpl implements RegistrationManager {
 
     private final static Logger logger = LoggerFactory.getLogger(RegistrationManagerImpl.class);
 
@@ -59,7 +62,7 @@ class RegistrationManagerImpl implements RegistrationManager {
     private final PinHelper pinHelper;
     private final AccountFileUpdater accountFileUpdater;
 
-    RegistrationManagerImpl(
+    public RegistrationManagerImpl(
             SignalAccount account,
             PathConfig pathConfig,
             ServiceEnvironmentConfig serviceEnvironmentConfig,
@@ -114,16 +117,21 @@ class RegistrationManagerImpl implements RegistrationManager {
             throw new IOException("Account is registered in another environment: " + account.getServiceEnvironment());
         }
 
-        if (account.getAci() != null && attemptReactivateAccount()) {
-            return;
-        }
+        try {
+            if (account.getAci() != null && attemptReactivateAccount()) {
+                return;
+            }
 
-        String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
-                account.getSessionId(account.getNumber()),
-                id -> account.setSessionId(account.getNumber(), id),
-                voiceVerification,
-                captcha);
-        NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
+            String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
+                    account.getSessionId(account.getNumber()),
+                    id -> account.setSessionId(account.getNumber(), id),
+                    voiceVerification,
+                    captcha);
+            NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
+        } catch (DeprecatedVersionException e) {
+            logger.debug("Signal-Server returned deprecated version exception", e);
+            throw e;
+        }
     }
 
     @Override

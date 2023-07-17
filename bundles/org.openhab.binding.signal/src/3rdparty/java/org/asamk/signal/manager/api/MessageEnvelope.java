@@ -1,6 +1,5 @@
 package org.asamk.signal.manager.api;
 
-import org.asamk.signal.manager.groups.GroupId;
 import org.asamk.signal.manager.groups.GroupUtils;
 import org.asamk.signal.manager.helper.RecipientAddressResolver;
 import org.asamk.signal.manager.storage.recipients.RecipientResolver;
@@ -515,32 +514,6 @@ public record MessageEnvelope(
             }
         }
 
-        public record TextStyle(Style style, int start, int length) {
-
-            public enum Style {
-                NONE,
-                BOLD,
-                ITALIC,
-                SPOILER,
-                STRIKETHROUGH,
-                MONOSPACE;
-
-                static Style from(BodyRange.Style style) {
-                    return switch (style) {
-                        case NONE -> NONE;
-                        case BOLD -> BOLD;
-                        case ITALIC -> ITALIC;
-                        case SPOILER -> SPOILER;
-                        case STRIKETHROUGH -> STRIKETHROUGH;
-                        case MONOSPACE -> MONOSPACE;
-                    };
-                }
-            }
-
-            static TextStyle from(BodyRange bodyRange) {
-                return new TextStyle(Style.from(bodyRange.getStyle()), bodyRange.getStart(), bodyRange.getLength());
-            }
-        }
     }
 
     public record Edit(long targetSentTimestamp, Data dataMessage) {
