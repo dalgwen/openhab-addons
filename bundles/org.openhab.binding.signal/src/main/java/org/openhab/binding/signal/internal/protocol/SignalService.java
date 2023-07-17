@@ -80,14 +80,14 @@ public class SignalService {
     private static final int MAX_BACKOFF_COUNTER = 9;
     private static final String USER_AGENT = "Signal-Android/5.51.7 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
-    private static final ServiceEnvironment serviceEnvironment = ServiceEnvironment.LIVE;
+    private static final ServiceEnvironment SERVICE_ENVIRONMENT = ServiceEnvironment.LIVE;
 
     {
         // Security.insertProviderAt(new SecurityProvider(), 1);
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    private static final Settings settings = new Settings(TrustNewIdentity.ALWAYS, false);
+    private static final Settings SETTINGS = new Settings(TrustNewIdentity.ALWAYS, false);
 
     private final String phoneNumber;
     private final String deviceName;
@@ -128,7 +128,7 @@ public class SignalService {
         try {
             if (signalAccountsFiles == null) {
                 signalAccountsFiles = new SignalAccountFiles(new File(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY),
-                        serviceEnvironment, USER_AGENT, settings);
+                        SERVICE_ENVIRONMENT, USER_AGENT, SETTINGS);
             }
         } finally {
             initializeLock.unlock();
