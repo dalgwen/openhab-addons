@@ -16,6 +16,7 @@ import java.util.Base64;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
@@ -28,6 +29,7 @@ import org.eclipse.jetty.http.HttpMethod;
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
+@NonNullByDefault
 public class AttachmentUtils {
 
     private static String createDataUriFromData(byte[] data, String mimeType) {
@@ -39,11 +41,7 @@ public class AttachmentUtils {
 
     public static String createAttachmentFromHttp(HttpClient httpClient, String httpUrl)
             throws AttachmentCreationException {
-        HttpClient client = httpClient;
-        if (client == null) {
-            throw new AttachmentCreationException("Cannot get http client !");
-        }
-        Request request = client.newRequest(httpUrl).method(HttpMethod.GET).idleTimeout(5, TimeUnit.SECONDS);
+        Request request = httpClient.newRequest(httpUrl).method(HttpMethod.GET).idleTimeout(5, TimeUnit.SECONDS);
         try {
             FutureResponseListener listener = new FutureResponseListener(request, 10 * 1024 * 1024);
             request.send(listener);

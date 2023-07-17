@@ -71,7 +71,6 @@ public class SignalActions implements ThingActions {
             @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
             @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
             @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
-
         if (recipient != null && !recipient.isEmpty() && image != null) {
             handler.sendImage(recipient, image, text);
         } else {
