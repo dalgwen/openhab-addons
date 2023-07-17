@@ -1,5 +1,7 @@
 package org.asamk.signal.manager.storage.recipients;
 
+import org.asamk.signal.manager.api.Contact;
+import org.asamk.signal.manager.api.Profile;
 import org.asamk.signal.manager.storage.Utils;
 import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.profiles.ExpiringProfileKeyCredential;
@@ -98,9 +100,9 @@ public class LegacyRecipientStore2 {
         }
     }
 
-    private record Storage(List<Recipient> recipients, long lastId) {
+    public record Storage(List<Recipient> recipients, long lastId) {
 
-        private record Recipient(
+        public record Recipient(
                 long id,
                 String number,
                 String uuid,
@@ -110,7 +112,7 @@ public class LegacyRecipientStore2 {
                 Profile profile
         ) {
 
-            private record Contact(
+            public record Contact(
                     String name,
                     String color,
                     int messageExpirationTime,
@@ -119,7 +121,7 @@ public class LegacyRecipientStore2 {
                     boolean profileSharingEnabled
             ) {}
 
-            private record Profile(
+            public record Profile(
                     long lastUpdateTimestamp,
                     String givenName,
                     String familyName,

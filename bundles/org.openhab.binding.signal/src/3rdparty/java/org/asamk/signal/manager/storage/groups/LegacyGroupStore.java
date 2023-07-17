@@ -7,9 +7,9 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
-import org.asamk.signal.manager.groups.GroupId;
-import org.asamk.signal.manager.groups.GroupIdV1;
-import org.asamk.signal.manager.groups.GroupIdV2;
+import org.asamk.signal.manager.api.GroupId;
+import org.asamk.signal.manager.api.GroupIdV1;
+import org.asamk.signal.manager.api.GroupIdV2;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
 import org.asamk.signal.manager.storage.recipients.RecipientResolver;
 import org.signal.libsignal.zkgroup.InvalidInputException;
@@ -129,7 +129,7 @@ public class LegacyGroupStore {
 
     public record Storage(@JsonDeserialize(using = GroupsDeserializer.class) List<Record> groups) {
 
-        private record GroupV1(
+        public record GroupV1(
                 String groupId,
                 String expectedV2Id,
                 String name,
@@ -140,9 +140,9 @@ public class LegacyGroupStore {
                 @JsonDeserialize(using = MembersDeserializer.class) List<Member> members
         ) {
 
-            private record Member(Long recipientId, String uuid, String number) {}
+            public record Member(Long recipientId, String uuid, String number) {}
 
-            private record JsonRecipientAddress(String uuid, String number) {}
+            public record JsonRecipientAddress(String uuid, String number) {}
 
             private static class MembersDeserializer extends JsonDeserializer<List<Member>> {
 
@@ -168,7 +168,7 @@ public class LegacyGroupStore {
             }
         }
 
-        private record GroupV2(
+        public record GroupV2(
                 String groupId,
                 String masterKey,
                 String distributionId,

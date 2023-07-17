@@ -1,6 +1,8 @@
 package org.asamk.signal.manager.storage.recipients;
 
+import org.asamk.signal.manager.api.Contact;
 import org.asamk.signal.manager.api.Pair;
+import org.asamk.signal.manager.api.Profile;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
 import org.asamk.signal.manager.storage.Database;
 import org.asamk.signal.manager.storage.Utils;
@@ -213,6 +215,16 @@ public class RecipientStore implements RecipientIdCreator, RecipientResolver, Re
             return resolveRecipient(serviceId);
         }
         return byNumber.get().id();
+    }
+
+    public Optional<RecipientId> resolveRecipientByNumberOptional(final String number) {
+        final Optional<RecipientWithAddress> byNumber;
+        try (final var connection = database.getConnection()) {
+            byNumber = findByNumber(connection, number);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from recipient store", e);
+        }
+        return byNumber.map(RecipientWithAddress::id);
     }
 
     public RecipientId resolveRecipientByUsername(
