@@ -24,19 +24,25 @@ import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 @NonNullByDefault
 public interface HABSpeakerIOHandler {
     /**
+     * Get speaker label
+     * 
      * @return the label to use for the audio components
      */
     @Nullable
     String getLabel();
 
     /**
+     * Get speaker localtion label
+     * 
      * @return the label of the linked location if any
      */
     @Nullable
     String getLocationLabel();
 
     /**
-     * Returns the speaker config
+     * Get the speaker config
+     * 
+     * @return the speaker config
      */
     HABSpeakerThingConfig getSpeakerConfig();
 
@@ -53,7 +59,7 @@ public interface HABSpeakerIOHandler {
      * @param mediaState the speaker media state
      * @param volume the speaker media volume
      */
-    void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume);
+    void onMediaStateUpdate(HABSpeakerIOClient.MediaState mediaState, int volume);
 
     /**
      * Writes to video-search channel.

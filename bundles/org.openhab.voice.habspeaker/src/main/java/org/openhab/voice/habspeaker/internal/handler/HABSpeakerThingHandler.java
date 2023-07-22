@@ -34,9 +34,8 @@ import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.UnDefType;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
@@ -52,19 +51,16 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeakerIOHandler {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
     private final HABSpeakerIOManager ioManager;
-    private final HABSpeakerConfigProvider globalConfigProvider;
     private final ItemRegistry itemRegistry;
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
-    private @Nullable HABSpeakerIO speakerIO;
+    private @Nullable HABSpeakerIOClient speakerIO;
     private @Nullable Integer sinkVolume;
     private @Nullable Integer mediaVolume;
 
-    public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry, HABSpeakerIOManager ioManager,
-            HABSpeakerConfigProvider configProvider) {
+    public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry, HABSpeakerIOManager ioManager) {
         super(thing);
         this.ioManager = ioManager;
         this.itemRegistry = itemRegistry;
-        this.globalConfigProvider = configProvider;
     }
 
     @Override
@@ -76,7 +72,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
     }
 
-    public void setSpeakerIO(@Nullable HABSpeakerIO speakerIO) {
+    public void setSpeakerIO(@Nullable HABSpeakerIOClient speakerIO) {
         this.speakerIO = speakerIO;
         if (speakerIO != null) {
             speakerIO.setThingHandler(this);
@@ -244,14 +240,14 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                     if (command instanceof RefreshType) {
                         return;
                     } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.AUDIO_PLAYER, command.toFullString());
+                        playMedia(speakerIO, HABSpeakerIOClient.MediaProvider.AUDIO_PLAYER, command.toFullString());
                     }
                     break;
                 case PLAY_VIDEO_CHANNEL:
                     if (command instanceof RefreshType) {
                         return;
                     } else {
-                        playMedia(speakerIO, HABSpeakerIO.MediaProvider.VIDEO_PLAYER, command.toFullString());
+                        playMedia(speakerIO, HABSpeakerIOClient.MediaProvider.VIDEO_PLAYER, command.toFullString());
                     }
                     break;
                 default:
@@ -262,15 +258,15 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
     }
 
-    private void playMedia(HABSpeakerIO speakerIO, HABSpeakerIO.MediaProvider provider, String id) {
+    private void playMedia(HABSpeakerIOClient speakerIO, HABSpeakerIOClient.MediaProvider provider, String id) {
         if (id.isBlank() || "NULL".equals(id)) {
             speakerIO.playerStop();
         } else {
             if (id.startsWith("playlist:")) {
                 var playlistId = id.replace("playlist:", "");
-                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(provider, null, playlistId, 0, 0));
+                speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, null, playlistId, 0, 0));
             } else {
-                speakerIO.playerStart(new HABSpeakerIO.StartMediaMessage(provider, id, null, 0, 0));
+                speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, id, null, 0, 0));
             }
         }
     }
@@ -290,7 +286,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     }
 
     @Override
-    public void onMediaStateUpdate(HABSpeakerIO.MediaState mediaState, int volume) {
+    public void onMediaStateUpdate(HABSpeakerIOClient.MediaState mediaState, int volume) {
         String videoMediaUrl = "";
         String audioMediaUrl = "";
         if (mediaState.provider != null && mediaState.mediaId != null) {
@@ -321,7 +317,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
         if (isLinked(MEDIA_CONTROL_CHANNEL)) {
             updateState(MEDIA_CONTROL_CHANNEL,
-                    mediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING ? PlayPauseType.PLAY
+                    mediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING ? PlayPauseType.PLAY
                             : PlayPauseType.PAUSE);
         }
         if (isLinked(MEDIA_VOLUME_CHANNEL)) {

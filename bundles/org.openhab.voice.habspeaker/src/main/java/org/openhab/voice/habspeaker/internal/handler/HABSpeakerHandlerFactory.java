@@ -12,7 +12,8 @@
  */
 package org.openhab.voice.habspeaker.internal.handler;
 
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.*;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_PID;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPEAKER_THING_TYPE;
 
 import java.util.Map;
 import java.util.Set;
@@ -26,40 +27,37 @@ import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOProtocolListener;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HabSpeakerHandlerFactory} is responsible for creating things and thing
+ * The {@link HABSpeakerHandlerFactory} is responsible for creating things and thing
  * handlers.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @Component(service = ThingHandlerFactory.class, property = Constants.SERVICE_PID + "=" + SERVICE_PID)
 @NonNullByDefault
-public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements HABSpeakerIOProtocolListener {
+public class HABSpeakerHandlerFactory extends BaseThingHandlerFactory implements HABSpeakerIOListener {
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(SPEAKER_THING_TYPE);
-    private final Logger logger = LoggerFactory.getLogger(HabSpeakerHandlerFactory.class);
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerHandlerFactory.class);
     private final Map<String, HABSpeakerThingHandler> speakerHandlers = new ConcurrentHashMap<>();
     private final HABSpeakerIOManager ioManager;
-    private final HABSpeakerConfigProvider configProvider;
     private final ItemRegistry itemRegistry;
 
     @Activate
-    public HabSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager, @Reference ItemRegistry itemRegistry,
-            @Reference HABSpeakerConfigProvider configProvider) {
-        ioManager.setProtocolListener(this);
+    public HABSpeakerHandlerFactory(@Reference HABSpeakerIOManager ioManager, @Reference ItemRegistry itemRegistry) {
+        ioManager.setConnectionListener(this);
         this.ioManager = ioManager;
         this.itemRegistry = itemRegistry;
-        this.configProvider = configProvider;
     }
 
     @Override
@@ -71,7 +69,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
-            var handler = new HABSpeakerThingHandler(thing, itemRegistry, ioManager, configProvider);
+            var handler = new HABSpeakerThingHandler(thing, itemRegistry, ioManager);
             var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
             handler.setSpeakerIO(speakerIO);
             speakerHandlers.put(handler.getSpeakerId(), handler);
@@ -86,7 +84,7 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     }
 
     @Override
-    public void onConnected(HABSpeakerIO speaker) {
+    public void onConnected(HABSpeakerIOClient speaker) {
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("connecting speaker {} handler", speaker.getId());
@@ -96,12 +94,18 @@ public class HabSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     }
 
     @Override
-    public void onDisconnected(HABSpeakerIO speaker) {
+    public void onDisconnected(HABSpeakerIOClient speaker) {
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("disconnecting speaker {} handler", speaker.getId());
             handler.setSpeakerIO(null);
             handler.updateStatus();
         }
+    }
+
+    @Deactivate
+    public void deactivate() {
+        ioManager.setConnectionListener(null);
+        ioManager.dispose();
     }
 }

@@ -12,117 +12,43 @@
  */
 package org.openhab.voice.habspeaker.internal.io;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.AudioManager;
-import org.openhab.core.auth.UserRegistry;
-import org.openhab.core.voice.VoiceManager;
-import org.openhab.voice.habspeaker.internal.auth.HABSpeakerSystemSecurityHelper;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
-import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.internal.websocket.HABSpeakerWebSocketProtocol;
-import org.osgi.framework.BundleContext;
-import org.osgi.service.component.annotations.Activate;
-import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.http.HttpService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerIOManager} manages the {@link HABSpeakerIOProtocol} implementations and the active speaker
- * connections
+ * The {@link HABSpeakerIOManager} interface represents the speaker connection manager.
  *
  * @author Miguel Álvarez - Initial contribution
  */
-@Component(service = HABSpeakerIOManager.class)
 @NonNullByDefault
-public class HABSpeakerIOManager
-        implements HABSpeakerIOProtocolListener, HABSpeakerConfigProvider.HABSpeakerConfigProviderListener {
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOManager.class);
-    private final List<HABSpeakerWebSocketProtocol> ioProtocols;
-    private final Set<HABSpeakerIO> speakerConnections = Collections.synchronizedSet(new HashSet<>());
-    private final HABSpeakerConfigProvider configProvider;
-    private @Nullable HABSpeakerIOProtocolListener protocolListener = null;
+public interface HABSpeakerIOManager {
+    /**
+     * Get speaker connection by id.
+     * 
+     * @param id the speaker identifier
+     * @return active speaker connection if any
+     */
+    @Nullable
+    HABSpeakerIOClient getSpeakerConnection(String id);
 
-    @Activate
-    public HABSpeakerIOManager(BundleContext bundleContext, final @Reference HttpService httpService,
-            final @Reference AudioManager audioManager, final @Reference VoiceManager voiceManager,
-            final @Reference UserRegistry userRegistry, final @Reference HABSpeakerConfigProvider configProvider,
-            final @Reference HABSpeakerSystemSecurityHelper apiSecurityHelper) {
-        this.configProvider = configProvider;
-        this.ioProtocols = List.of(new HABSpeakerWebSocketProtocol(this, configProvider, bundleContext, httpService,
-                audioManager, voiceManager, userRegistry, apiSecurityHelper));
-        configProvider.addListener(this);
-    }
+    /**
+     * Get active speaker connections
+     * 
+     * @return list of active speaker connections
+     */
+    List<HABSpeakerIOClient> getSpeakerConnections();
 
-    public List<HABSpeakerIO> getSpeakerConnections() {
-        synchronized (speakerConnections) {
-            return new ArrayList<>(speakerConnections);
-        }
-    }
+    /**
+     * Sets the active connection listener
+     * 
+     * @param connectionListener the connection observer
+     */
+    void setConnectionListener(@Nullable HABSpeakerIOListener connectionListener);
 
-    public @Nullable HABSpeakerIO getSpeakerConnection(String id) {
-        synchronized (speakerConnections) {
-            return speakerConnections.stream()
-                    .filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id)).findAny().orElse(null);
-        }
-    }
-
-    public void setProtocolListener(HABSpeakerIOProtocolListener protocolListener) {
-        this.protocolListener = protocolListener;
-    }
-
-    @Activate
-    public synchronized void activate() {
-        logger.debug("Registering protocols");
-        ioProtocols.forEach(HABSpeakerIOProtocol::register);
-    }
-
-    @Deactivate
-    public synchronized void dispose() {
-        logger.debug("Unregistering protocols");
-        configProvider.removeListener(this);
-        ioProtocols.forEach(HABSpeakerIOProtocol::unregister);
-    }
-
-    @Override
-    public void onConnected(HABSpeakerIO speaker) throws IllegalStateException {
-        logger.debug("connecting speakers {}", speakerConnections.size());
-        synchronized (speakerConnections) {
-            if (getSpeakerConnection(speaker.getId()) != null) {
-                throw new IllegalStateException("Another speaker with the same id is already connected");
-            }
-            speakerConnections.add(speaker);
-            var protocolListener = this.protocolListener;
-            if (protocolListener != null) {
-                protocolListener.onConnected(speaker);
-            }
-        }
-    }
-
-    @Override
-    public void onDisconnected(HABSpeakerIO speaker) {
-        logger.debug("speaker disconnected '{}'", speaker.getId());
-        synchronized (speakerConnections) {
-            speakerConnections.remove(speaker);
-            logger.debug("connected speakers {}", speakerConnections.size());
-            var protocolListener = this.protocolListener;
-            if (protocolListener != null) {
-                protocolListener.onDisconnected(speaker);
-            }
-        }
-    }
-
-    @Override
-    public void onGlobalConfigUpdate(HABSpeakerConfig config) {
-        // TODO: disconnect speakers?
-    }
+    /**
+     * Dispose manager and close all active connections
+     */
+    void dispose();
 }

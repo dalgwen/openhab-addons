@@ -15,13 +15,23 @@ package org.openhab.voice.habspeaker.internal.io;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link HABSpeakerIOProtocolListener} represents a listener for the speaker connection events.
+ * The {@link HABSpeakerIOListener} observes the active speaker connection.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public interface HABSpeakerIOProtocolListener {
-    void onConnected(HABSpeakerIO speaker) throws IllegalStateException;
+public interface HABSpeakerIOListener {
+    /**
+     * Called on speaker connection
+     * 
+     * @param speaker active speaker connection
+     */
+    void onConnected(HABSpeakerIOClient speaker);
 
-    void onDisconnected(HABSpeakerIO speaker);
+    /**
+     * Called on speaker disconnection
+     * 
+     * @param speaker inactive speaker connection
+     */
+    void onDisconnected(HABSpeakerIOClient speaker);
 }

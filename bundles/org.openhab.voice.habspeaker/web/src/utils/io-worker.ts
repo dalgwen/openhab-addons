@@ -231,13 +231,12 @@ export default class IOWorker {
       retryRef = setTimeout(this.connectWebSocket.bind(this), 10000);
     };
     let wsRef = this.socket;
-    const wsProtocols = ['habspeaker'];
+    let query = "";
     if (this.token.length) {
-      // send the token info as an alternative protocol
-      wsProtocols.push(`oh_token-${this.token}`);
+      query = `?accessToken=${this.token}`
     }
     try {
-      wsRef = this.socket = new WebSocket(`${this.ohUrl}/habspeaker/ws`, wsProtocols);
+      wsRef = this.socket = new WebSocket(`${this.ohUrl}/ws/habspeaker${query}`);
     } catch (error) {
       console.error(error);
       return retry();

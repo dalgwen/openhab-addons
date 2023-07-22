@@ -29,7 +29,7 @@ import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
 import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 
 /**
  * The {@link HABSpeakerAudioSource} class defines the speaker Audio Source
@@ -41,11 +41,11 @@ public class HABSpeakerAudioSource implements AudioSource {
     private final Set<AudioFormat> supportedFormats = new HashSet<>();
     private final String sourceId;
     private final String sourceLabel;
-    private final HABSpeakerIO speakerIO;
+    private final HABSpeakerIOClient speakerIO;
     private final long streamSampleRate;
     private final AudioFormat internalStreamFormat;
 
-    public HABSpeakerAudioSource(String id, String label, HABSpeakerIO speakerIO, long streamSampleRate) {
+    public HABSpeakerAudioSource(String id, String label, HABSpeakerIOClient speakerIO, long streamSampleRate) {
         this.sourceId = id;
         this.sourceLabel = label;
         this.speakerIO = speakerIO;

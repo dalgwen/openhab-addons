@@ -94,7 +94,8 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     }
 
     /**
-     *
+     * Get default voice service
+     * 
      * @return the keyword configured in "System Settings/Voice"
      */
     public String getSystemKeyword() {

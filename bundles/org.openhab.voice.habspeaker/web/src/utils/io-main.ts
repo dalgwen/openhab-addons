@@ -332,12 +332,15 @@ export class IOMain {
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(() => {
       if (this.audioSource?.isSuspended()) {
-        this.audioSource.resume();
+        this.audioSource
+          .resume()
+          .catch(err => console.error("Unable to resume audio context", err))
       }
     }, 10000);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && this.audioSource?.isSuspended()) {
-        this.audioSource.resume();
+        this.audioSource.resume()
+          .catch(err => console.error("Unable to resume audio context", err))
       }
     });
     return new Promise((resolve, reject) => {

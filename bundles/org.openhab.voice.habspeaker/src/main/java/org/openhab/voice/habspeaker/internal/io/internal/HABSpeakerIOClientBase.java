@@ -16,35 +16,22 @@ import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_
 import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.AudioException;
-import org.openhab.core.audio.AudioManager;
-import org.openhab.core.audio.AudioSink;
-import org.openhab.core.audio.AudioSource;
-import org.openhab.core.audio.AudioStream;
+import org.openhab.core.audio.*;
 import org.openhab.core.common.ThreadPoolManager;
-import org.openhab.core.voice.KSService;
-import org.openhab.core.voice.STTService;
-import org.openhab.core.voice.TTSService;
-import org.openhab.core.voice.Voice;
-import org.openhab.core.voice.VoiceManager;
+import org.openhab.core.voice.*;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 import org.osgi.framework.BundleContext;
@@ -53,13 +40,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerIOBase} represents a speaker active connection.
+ * The {@link HABSpeakerIOClientBase} represents a speaker active connection.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public abstract class HABSpeakerIOBase implements HABSpeakerIO {
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOBase.class);
+public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerIOClientBase.class);
     private final AudioManager audioManager;
     private final VoiceManager voiceManager;
     private final BundleContext bundleContext;
@@ -71,17 +58,17 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     private @Nullable HABSpeakerKS ks = null;
     protected final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool("habspeaker");
     protected final Map<String, ServiceRegistration<?>> audioComponentRegistrations = new ConcurrentHashMap<>();
-    private @Nullable HABSpeakerIO dropInSpeakerIO = null;
+    private @Nullable HABSpeakerIOClient dropInSpeakerIO = null;
     private @Nullable AudioStream dropInStream = null;
     private @Nullable Future<?> dropInStreamTask = null;
 
-    public HABSpeakerIOBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext,
-            HABSpeakerConfigProvider configProvider, HABSpeakerIOManager ioManager) {
+    public HABSpeakerIOClientBase(AudioManager audioManager, VoiceManager voiceManager, BundleContext bundleContext,
+            HABSpeakerConfigProvider configProvider, HABSpeakerWebSocketManager wsAdapter) {
         this.audioManager = audioManager;
         this.voiceManager = voiceManager;
         this.bundleContext = bundleContext;
         this.configProvider = configProvider;
-        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, ioManager, configProvider);
+        this.speakerLanguageInterpreter = new HABSpeakerLanguageInterpreter(this, wsAdapter, configProvider);
     }
 
     @Override
@@ -261,12 +248,12 @@ public abstract class HABSpeakerIOBase implements HABSpeakerIO {
     }
 
     @Override
-    public @Nullable HABSpeakerIO getDropIn() {
+    public @Nullable HABSpeakerIOClient getDropIn() {
         return dropInSpeakerIO;
     }
 
     @Override
-    public synchronized void dropIn(@Nullable HABSpeakerIO speakerIO) {
+    public synchronized void dropIn(@Nullable HABSpeakerIOClient speakerIO) {
         if (speakerIO == null) {
             stopDropIn();
             return;

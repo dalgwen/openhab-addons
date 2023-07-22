@@ -24,7 +24,7 @@ import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.DiscoveryService;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingUID;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -42,20 +42,20 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerDiscoveryService extends AbstractDiscoveryService {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerDiscoveryService.class);
     private static final long DISCOVERY_RESULT_TTL_SEC = 300;
-    private final HABSpeakerIOManager ioManager;
+    private final HABSpeakerIOManager wsAdapter;
 
     @Activate
-    public HABSpeakerDiscoveryService(@Reference HABSpeakerIOManager ioManager) throws IllegalArgumentException {
-        super(Set.of(SPEAKER_THING_TYPE), 60);
-        this.ioManager = ioManager;
+    public HABSpeakerDiscoveryService(@Reference HABSpeakerIOManager wsAdapter) throws IllegalArgumentException {
+        super(Set.of(SPEAKER_THING_TYPE), 10);
+        this.wsAdapter = wsAdapter;
     }
 
     @Override
     protected void startScan() {
-        ioManager.getSpeakerConnections().forEach(this::discoverDevice);
+        wsAdapter.getSpeakerConnections().forEach(this::discoverDevice);
     }
 
-    public void discoverDevice(HABSpeakerIO speaker) {
+    public void discoverDevice(HABSpeakerIOClient speaker) {
         var id = speaker.getId();
         logger.debug("Speaker {} discovered", id);
         Map<String, Object> properties = new HashMap<>();

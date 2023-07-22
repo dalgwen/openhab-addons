@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.io.internal.websocket;
+package org.openhab.voice.habspeaker.internal.io.internal;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -32,8 +32,6 @@ import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
-import org.openhab.voice.habspeaker.internal.io.internal.HABSpeakerIOBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,13 +40,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * The {@link HABSpeakerWebSocketIO} class controls an individual WebSocket client connection
+ * The {@link HABSpeakerWebSocketClient} class controls an individual WebSocket client connection
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocketListener {
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketIO.class);
+public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements WebSocketListener {
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketClient.class);
     private static final TypeReference<HashMap<String, Object>> WEBSOCKET_MAPPER_TYPE_REF = new TypeReference<>() {
     };
     private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
@@ -56,7 +54,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private String id = "";
     private volatile @Nullable Session session;
     private @Nullable RemoteEndpoint remote;
-    private final HABSpeakerWebSocketProtocol servlet;
+    private final HABSpeakerWebSocketManager wsAdapter;
     private final ScheduledExecutorService executor;
     private @Nullable ScheduledFuture<?> scheduledDisconnection;
     private int sinkVolume;
@@ -64,10 +62,10 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
     private long streamSampleRate;
     private @Nullable MediaState mediaState;
 
-    public HABSpeakerWebSocketIO(HABSpeakerWebSocketProtocol servlet, HABSpeakerConfigProvider configProvider,
-            ScheduledExecutorService executor, HABSpeakerIOManager ioManager) {
-        super(servlet.audioManager, servlet.voiceManager, servlet.bundleContext, configProvider, ioManager);
-        this.servlet = servlet;
+    public HABSpeakerWebSocketClient(HABSpeakerWebSocketManager wsAdapter, HABSpeakerConfigProvider configProvider,
+            ScheduledExecutorService executor) {
+        super(wsAdapter.audioManager, wsAdapter.voiceManager, wsAdapter.bundleContext, configProvider, wsAdapter);
+        this.wsAdapter = wsAdapter;
         this.executor = executor;
     }
 
@@ -83,17 +81,17 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                         scheduledDisconnection.cancel(true);
                     }
                     id = (String) data.getOrDefault("id", "");
-                    servlet.addHandler(this);
+                    wsAdapter.addHandler(this);
                     thingHandler = getThingHandler();
                     if (thingHandler != null) {
                         if (thingHandler.getSpeakerConfig().sampleRate != -1L) {
                             streamSampleRate = thingHandler.getSpeakerConfig().sampleRate;
                         }
-                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.CONFIGURE,
+                        sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.CONFIGURE,
                                 getSpeakerConfigMessage(thingHandler));
                     } else {
                         registerSpeakerComponents(id, streamSampleRate, null);
-                        sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
+                        sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.INITIALIZED);
                     }
                     break;
                 case CONFIGURED:
@@ -101,7 +99,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
                         throw new IOException("configured command send by unregistered speaker");
                     }
                     registerSpeakerComponents(id, streamSampleRate, thingHandler);
-                    sendClientCommand(HABSpeakerWebSocketIO.WebsocketOutputCommand.INITIALIZED);
+                    sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.INITIALIZED);
                     break;
                 case ON_SPOT:
                     onRemoteSpot();
@@ -350,7 +348,7 @@ public class HABSpeakerWebSocketIO extends HABSpeakerIOBase implements WebSocket
         this.session = null;
         this.remote = null;
         logger.debug("Session closed with code {}: {}", statusCode, reason);
-        servlet.removeHandler(this);
+        wsAdapter.removeHandler(this);
         stopDropIn();
         unregisterSpeakerComponents(id);
     }

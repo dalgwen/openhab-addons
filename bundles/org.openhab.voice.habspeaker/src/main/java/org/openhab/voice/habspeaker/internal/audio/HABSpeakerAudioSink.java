@@ -36,7 +36,7 @@ import org.openhab.core.audio.UnsupportedAudioFormatException;
 import org.openhab.core.audio.UnsupportedAudioStreamException;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,12 +63,12 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     private final String sinkId;
     private final String sinkLabel;
-    private final HABSpeakerIO speakerIO;
+    private final HABSpeakerIOClient speakerIO;
     private final int channelNumber;
     private final long clientSampleRate;
     private final AudioFormat internalStreamFormat;
 
-    public HABSpeakerAudioSink(String id, String label, HABSpeakerIO speakerIO, int channelNumber,
+    public HABSpeakerAudioSink(String id, String label, HABSpeakerIOClient speakerIO, int channelNumber,
             long clientSampleRate) {
         this.sinkId = id;
         this.sinkLabel = label;
@@ -213,10 +213,10 @@ public class HABSpeakerAudioSink implements AudioSink {
 
     private static class HABSpeakerAudioOutputStream extends OutputStream {
         private final byte[] id;
-        private final HABSpeakerIO speakerIO;
+        private final HABSpeakerIOClient speakerIO;
         private boolean closed = false;
 
-        public HABSpeakerAudioOutputStream(HABSpeakerIO speakerIO, StreamType streamFormat) {
+        public HABSpeakerAudioOutputStream(HABSpeakerIOClient speakerIO, StreamType streamFormat) {
             this.speakerIO = speakerIO;
             this.id = generateId(streamFormat);
         }

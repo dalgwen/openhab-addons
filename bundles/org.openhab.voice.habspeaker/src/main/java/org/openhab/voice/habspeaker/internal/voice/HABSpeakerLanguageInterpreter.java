@@ -12,8 +12,6 @@
  */
 package org.openhab.voice.habspeaker.internal.voice;
 
-import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.*;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -34,7 +32,7 @@ import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.core.voice.text.InterpretationException;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfig;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIO;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,11 +52,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @NonNullByDefault
 public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerLanguageInterpreter.class);
-    private final HABSpeakerIO speakerIO;
+    private final HABSpeakerIOClient speakerIO;
     private final HABSpeakerIOManager ioManager;
     private final HABSpeakerConfigProvider configProvider;
 
-    public HABSpeakerLanguageInterpreter(HABSpeakerIO speakerIO, HABSpeakerIOManager ioManager,
+    public HABSpeakerLanguageInterpreter(HABSpeakerIOClient speakerIO, HABSpeakerIOManager ioManager,
             HABSpeakerConfigProvider configProvider) {
         this.speakerIO = speakerIO;
         this.ioManager = ioManager;
@@ -121,9 +119,9 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
 
     private boolean interpretMediaControl(HABSpeakerConfig config, String lowerText) {
         @Nullable
-        HABSpeakerIO commandTarget = speakerIO;
+        HABSpeakerIOClient commandTarget = speakerIO;
         var mediaState = speakerIO.getMediaState();
-        if (mediaState == null || mediaState.playbackState == HABSpeakerIO.PlaybackStates.STOPPED) {
+        if (mediaState == null || mediaState.playbackState == HABSpeakerIOClient.PlaybackStates.STOPPED) {
             // try target another connected speaker how is playing media
             logger.debug("Speaker not playing media, looking for another");
             commandTarget = ioManager.getSpeakerConnections().stream().filter(filterSpeakerNotStopped())
@@ -253,28 +251,29 @@ public class HABSpeakerLanguageInterpreter implements HumanLanguageInterpreter {
         return false;
     }
 
-    private Predicate<HABSpeakerIO> filterSpeakerNotStopped() {
+    private Predicate<HABSpeakerIOClient> filterSpeakerNotStopped() {
         return io -> {
             var mediaState = io.getMediaState();
-            return mediaState != null && (mediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING
-                    || mediaState.playbackState == HABSpeakerIO.PlaybackStates.PAUSED);
+            return mediaState != null && (mediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING
+                    || mediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PAUSED);
         };
     }
 
-    private Comparator<HABSpeakerIO> sortPlayingFirst() {
+    private Comparator<HABSpeakerIOClient> sortPlayingFirst() {
         return (a, b) -> {
             var aMediaState = a.getMediaState();
             var bMediaState = b.getMediaState();
             if (aMediaState != null && bMediaState != null
-                    && aMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING
-                    && bMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING) {
+                    && aMediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING
+                    && bMediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING) {
                 return 0;
             }
-            return aMediaState != null && aMediaState.playbackState == HABSpeakerIO.PlaybackStates.PLAYING ? 1 : -1;
+            return aMediaState != null && aMediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING ? 1
+                    : -1;
         };
     }
 
-    private Predicate<HABSpeakerIO> filterTargetSpeaker(String speakerName) {
+    private Predicate<HABSpeakerIOClient> filterTargetSpeaker(String speakerName) {
         return io -> {
             var handler = io.getThingHandler();
             if (handler == null) {

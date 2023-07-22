@@ -22,14 +22,15 @@ import org.openhab.core.library.types.RewindFastforwardType;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 
 /**
- * The {@link HABSpeakerIO} represents a speaker active connection.
+ * The {@link HABSpeakerIOClient} represents a speaker active connection.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public interface HABSpeakerIO {
+public interface HABSpeakerIOClient {
     /**
-     *
+     * Get the speaker identifier
+     * 
      * @return the speaker id
      */
     String getId();
@@ -115,13 +116,13 @@ public interface HABSpeakerIO {
     /**
      * Starts/stops communication with another speaker
      */
-    void dropIn(@Nullable HABSpeakerIO anotherSpeakerIO) throws IllegalStateException;
+    void dropIn(@Nullable HABSpeakerIOClient anotherSpeakerIO) throws IllegalStateException;
 
     /**
      * Get current drop-in speaker
      */
     @Nullable
-    HABSpeakerIO getDropIn();
+    HABSpeakerIOClient getDropIn();
 
     /**
      * Get language interpreter linked to the speaker
