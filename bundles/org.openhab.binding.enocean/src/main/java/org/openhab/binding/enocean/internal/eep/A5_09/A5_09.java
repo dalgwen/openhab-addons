@@ -16,9 +16,8 @@ import static org.openhab.binding.enocean.internal.EnOceanBindingConstants.*;
 
 import java.util.function.Function;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.openhab.binding.enocean.internal.eep.Base._4BSMessage;
 import org.openhab.binding.enocean.internal.eep.EEPHelper;
+import org.openhab.binding.enocean.internal.eep.Base._4BSMessage;
 import org.openhab.binding.enocean.internal.messages.ERP1Message;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
@@ -31,7 +30,6 @@ import org.openhab.core.types.UnDefType;
  *
  * @author Zhivka Dimova - Initial contribution
  */
-@NonNullByDefault
 public abstract class A5_09 extends _4BSMessage {
 
     public A5_09(ERP1Message packet) {
@@ -56,7 +54,7 @@ public abstract class A5_09 extends _4BSMessage {
     }
 
     protected int getUnscaledCOValue() {
-        return getDB2Value();
+        return getDB_2Value();
     }
 
     // CO2
@@ -77,7 +75,7 @@ public abstract class A5_09 extends _4BSMessage {
     }
 
     protected int getUnscaledCO2Value() {
-        return getDB2Value();
+        return getDB_2Value();
     }
 
     // Temperature
@@ -98,7 +96,7 @@ public abstract class A5_09 extends _4BSMessage {
     }
 
     protected int getUnscaledTemperatureValue() {
-        return getDB1Value();
+        return getDB_1Value();
     }
 
     // Humidity
@@ -119,7 +117,7 @@ public abstract class A5_09 extends _4BSMessage {
     }
 
     protected int getUnscaledHumidityValue() {
-        return getDB3Value();
+        return getDB_3Value();
     }
 
     // Battery
@@ -140,7 +138,7 @@ public abstract class A5_09 extends _4BSMessage {
     }
 
     private int getUnscaledBatteryVoltageValue() {
-        return getDB3Value();
+        return getDB_3Value();
     }
 
     @Override

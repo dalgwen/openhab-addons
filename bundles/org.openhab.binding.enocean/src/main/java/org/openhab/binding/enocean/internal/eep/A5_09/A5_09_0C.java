@@ -12,11 +12,10 @@
  */
 package org.openhab.binding.enocean.internal.eep.A5_09;
 
-import static org.openhab.binding.enocean.internal.EnOceanBindingConstants.*;
+import static org.openhab.binding.enocean.internal.EnOceanBindingConstants.CHANNEL_VOC;
 
 import java.util.function.Function;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.enocean.internal.messages.ERP1Message;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.QuantityType;
@@ -27,7 +26,6 @@ import org.openhab.core.types.State;
  *
  * @author Zhivka Dimova - Initial contribution
  */
-@NonNullByDefault
 public class A5_09_0C extends A5_09_05 {
 
     public A5_09_0C(ERP1Message packet) {
@@ -54,7 +52,7 @@ public class A5_09_0C extends A5_09_05 {
 
         if (CHANNEL_VOC.equals(channelId)) {
             double scaledVOC = getUnscaledVOCValue() * getScalingFactor();
-            if (getBit(getDB0(), 2)) {
+            if (getBit(getDB_0(), 2)) {
                 return new QuantityType<>(scaledVOC, Units.MICROGRAM_PER_CUBICMETRE);
             }
             return new QuantityType<>(scaledVOC, Units.PARTS_PER_BILLION);

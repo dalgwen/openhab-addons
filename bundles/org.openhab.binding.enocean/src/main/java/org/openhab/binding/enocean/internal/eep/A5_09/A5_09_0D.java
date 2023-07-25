@@ -12,11 +12,10 @@
  */
 package org.openhab.binding.enocean.internal.eep.A5_09;
 
-import static org.openhab.binding.enocean.internal.EnOceanBindingConstants.*;
+import static org.openhab.binding.enocean.internal.EnOceanBindingConstants.CHANNEL_TVOC;
 
 import java.util.function.Function;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.enocean.internal.eep.EEPHelper;
 import org.openhab.binding.enocean.internal.messages.ERP1Message;
 import org.openhab.core.config.core.Configuration;
@@ -27,7 +26,6 @@ import org.openhab.core.types.State;
  *
  * @author Zhivka Dimova - Initial contribution
  */
-@NonNullByDefault
 public class A5_09_0D extends A5_09 {
 
     public A5_09_0D(ERP1Message packet) {
@@ -44,7 +42,7 @@ public class A5_09_0D extends A5_09 {
             Function<String, State> getCurrentStateFunc, Configuration config) {
 
         if (CHANNEL_TVOC.equals(channelId)) {
-            return EEPHelper.calculateState(getDB2Value(), 0, 100, 0, 200, Units.PERCENT);
+            return EEPHelper.calculateState(getDB_2Value(), 0, 100, 0, 200, Units.PERCENT);
         }
 
         return super.convertToStateImpl(channelId, channelTypeId, getCurrentStateFunc, config);
