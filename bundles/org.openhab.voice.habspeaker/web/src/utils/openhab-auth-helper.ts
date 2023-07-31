@@ -46,6 +46,7 @@ export class OHAuthHelper {
                 });
                 const response = await fetch(`${await this.getUrl()}/rest/auth/token`, {
                     body,
+                    method: 'POST',
                     headers: {
                         "content-type": "application/x-www-form-urlencoded",
                         accept: "application/json",
@@ -134,6 +135,7 @@ export class OHAuthHelper {
             this.clearAccessToken();
 
             const response = await fetch(`${await this.getUrl()}/rest/auth/token?useCookie=${this.options.useCookie ?? false}`, {
+                method: 'POST',
                 body,
                 headers: {
                     "content-type": "application/x-www-form-urlencoded",
