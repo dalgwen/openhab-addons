@@ -13,11 +13,15 @@
 
 package org.openhab.automation.javascripting.internal;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.openhab.automation.javascripting.annotations.Library;
 import org.openhab.automation.javascripting.scriptsupport.Script;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 
@@ -27,41 +31,42 @@ import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 
 public class BulkBindingStrategy implements BindingStrategy {
 
+    private static Logger logger = LoggerFactory.getLogger(BulkBindingStrategy.class);
+
     @Override
     public void associateBindings(Class<?> compiledClass, Object compiledInstance, Map<String, Object> mergedBindings) {
-        Method m;
-        try {
-            if (compiledInstance instanceof Script) {
-                m = compiledClass.getMethod("setBindings", Map.class);
+        if (compiledInstance instanceof Script script) {
+            script.setBindings(mergedBindings);
+            script.makeShortcuts();
+        }
 
-                m.invoke(compiledInstance, mergedBindings);
+        // create, bind data into libraries and inject libraries into script
+        for (Field field : compiledClass.getDeclaredFields()) {
+            if (field.isAnnotationPresent(Library.class)) {
+                try {
+                    Object libraryInstance = field.getType().getDeclaredConstructor().newInstance();
+                    if (libraryInstance instanceof Script scriptLibrary) {
+                        scriptLibrary.setBindings(mergedBindings);
+                        scriptLibrary.makeShortcuts();
+                    }
+                    field.setAccessible(true);
+                    field.set(compiledInstance, libraryInstance);
+                } catch (InstantiationException | InvocationTargetException | NoSuchMethodException | SecurityException
+                        | IllegalArgumentException | IllegalAccessException e) {
+                    logger.error("Cannot inject library into {}", field.getName(), e);
+                }
             }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
     }
 
     @Override
     public Map<String, Object> retrieveBindings(Class<?> compiledClass, Object compiledInstance) {
-        Method m;
-
         Map<String, Object> bindings = null;
-
-        try {
-            if (compiledInstance instanceof Script) {
-
-                m = compiledClass.getMethod("getBindings");
-
-                Object o = m.invoke(compiledInstance);
-
-                bindings = (Map<String, Object>) o;
-            } else {
-                bindings = new HashMap<String, Object>();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        if (compiledInstance instanceof Script script) {
+            bindings = script.getBindings();
+        } else {
+            bindings = new HashMap<String, Object>();
         }
-
         return bindings;
     }
 }

@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Base Class for all Java Scripts
- * 
+ *
  * @author Jürgen Weber - Initial contribution
  */
 
@@ -216,8 +216,6 @@ public abstract class Script {
         }
 
         public void invoke(ThingActions thingActions, String method, Object... params) {
-            Object o;
-
             Class<?>[] paramClasses = new Class<?>[params.length];
 
             for (int i = 0; i < params.length; i++) {
@@ -226,7 +224,7 @@ public abstract class Script {
             try {
 
                 Method m = thingActions.getClass().getMethod(method, paramClasses);
-                o = m.invoke(thingActions, params);
+                m.invoke(thingActions, params);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -240,6 +238,23 @@ public abstract class Script {
     public Object eval() throws Exception {
 
         logger.trace("eval()");
+
+        try {
+
+            Object result;
+
+            result = onLoad();
+            parseAnnotations();
+
+            return result;
+
+        } catch (Exception e) {
+            logger.error("Script eval", e);
+            throw e;
+        }
+    }
+
+    public void makeShortcuts() {
 
         Object se = bindings.get("se");
 
@@ -268,20 +283,6 @@ public abstract class Script {
         // input is set for transformations
 
         input = bindings.get("input");
-
-        try {
-
-            Object result;
-
-            result = onLoad();
-            parseAnnotations();
-
-            return result;
-
-        } catch (Exception e) {
-            logger.error("Script eval", e);
-            throw e;
-        }
     }
 
     /*
@@ -299,7 +300,9 @@ public abstract class Script {
     }
 
     // to be implemented by the concrete script class
-    protected abstract Object onLoad();
+    protected Object onLoad() {
+        return null;
+    }
 
     private void parseAnnotations() throws Exception {
         new RuleAnnotationParser(this).parse();

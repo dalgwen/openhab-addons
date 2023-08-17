@@ -15,6 +15,7 @@ package org.openhab.automation.javascripting.internal;
 
 import javax.script.ScriptException;
 
+import org.openhab.automation.javascripting.annotations.Library;
 import org.openhab.automation.javascripting.scriptsupport.Script;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +46,7 @@ public class EntryExecutionStrategyFactory implements ExecutionStrategyFactory {
                         Script script = (Script) instance;
 
                         retval = script.eval();
-                    } else {
+                    } else if (!instance.getClass().isAnnotationPresent(Library.class)) {
                         throw new ScriptException(String.format("cannot execute: %s not instance of %s",
                                 instance.getClass().getSimpleName(), Script.class.getName()));
                     }
