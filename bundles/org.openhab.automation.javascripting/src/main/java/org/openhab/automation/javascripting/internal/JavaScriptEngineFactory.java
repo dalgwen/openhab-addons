@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
+import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
 
 /**
@@ -46,6 +47,8 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory {
     BundleWiring bundleWiring;
 
     private ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory javaScriptEngineFactory;
+
+    private CompilationStrategy compilationStrategy = new IncludeLibraryCompilationStrategy();
 
     private PackageResourceListingStrategy osgiPackageResourceListingStrategy;
 
@@ -84,6 +87,8 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory {
             engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
 
             engine.setBindingStrategy(new BulkBindingStrategy());
+
+            engine.setCompilationSrategy(compilationStrategy);
 
             engine.setCompilationOptions(Arrays.asList("-g"));
 

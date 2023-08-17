@@ -110,113 +110,81 @@ public class RuleAnnotationParser {
             Annotation[] as = m.getDeclaredAnnotations();
             for (Annotation a : as) {
 
-                if (a instanceof CronTrigger) {
-                    CronTrigger trigger = (CronTrigger) a;
-
-                    createCronTrigger(triggerList, trigger);
+                if (a instanceof CronTrigger cronTrigger) {
+                    createCronTrigger(triggerList, cronTrigger);
                 }
 
-                if (a instanceof CronTriggers) {
-                    CronTriggers cronTriggers = (CronTriggers) a;
-
+                if (a instanceof CronTriggers cronTriggers) {
                     for (CronTrigger trigger : cronTriggers.value()) {
                         createCronTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof SystemTrigger) {
-                    SystemTrigger trigger = (SystemTrigger) a;
-
+                if (a instanceof SystemTrigger trigger) {
                     createSystemTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof SystemTriggers) {
-                    SystemTriggers triggers = (SystemTriggers) a;
-
+                if (a instanceof SystemTriggers triggers) {
                     for (SystemTrigger trigger : triggers.value()) {
                         createSystemTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ItemStateChangeTrigger) {
-                    ItemStateChangeTrigger trigger = (ItemStateChangeTrigger) a;
-
+                if (a instanceof ItemStateChangeTrigger trigger) {
                     createItemStateChangeTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ItemStateChangeTriggers) {
-                    ItemStateChangeTriggers triggers = (ItemStateChangeTriggers) a;
-
+                if (a instanceof ItemStateChangeTriggers triggers) {
                     for (ItemStateChangeTrigger trigger : triggers.value()) {
                         createItemStateChangeTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ItemStateUpdateTrigger) {
-                    ItemStateUpdateTrigger trigger = (ItemStateUpdateTrigger) a;
-
+                if (a instanceof ItemStateUpdateTrigger trigger) {
                     createItemStateUpdateTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ItemStateUpdateTriggers) {
-                    ItemStateUpdateTriggers triggers = (ItemStateUpdateTriggers) a;
-
+                if (a instanceof ItemStateUpdateTriggers triggers) {
                     for (ItemStateUpdateTrigger trigger : triggers.value()) {
                         createItemStateUpdateTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ThingStateUpdateTrigger) {
-                    ThingStateUpdateTrigger trigger = (ThingStateUpdateTrigger) a;
-
+                if (a instanceof ThingStateUpdateTrigger trigger) {
                     createThingStateUpdateTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ThingStateUpdateTriggers) {
-                    ThingStateUpdateTriggers triggers = (ThingStateUpdateTriggers) a;
-
+                if (a instanceof ThingStateUpdateTriggers triggers) {
                     for (ThingStateUpdateTrigger trigger : triggers.value()) {
                         createThingStateUpdateTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ThingStateChangeTrigger) {
-                    ThingStateChangeTrigger trigger = (ThingStateChangeTrigger) a;
-
+                if (a instanceof ThingStateChangeTrigger trigger) {
                     createThingStateChangeTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ThingStateChangeTriggers) {
-                    ThingStateChangeTriggers triggers = (ThingStateChangeTriggers) a;
-
+                if (a instanceof ThingStateChangeTriggers triggers) {
                     for (ThingStateChangeTrigger trigger : triggers.value()) {
                         createThingStateChangeTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ItemCommandTrigger) {
-                    ItemCommandTrigger trigger = (ItemCommandTrigger) a;
-
+                if (a instanceof ItemCommandTrigger trigger) {
                     createItemCommandTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ItemCommandTriggers) {
-                    ItemCommandTriggers triggers = (ItemCommandTriggers) a;
-
+                if (a instanceof ItemCommandTriggers triggers) {
                     for (ItemCommandTrigger trigger : triggers.value()) {
                         createItemCommandTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ChannelEventTrigger) {
-                    ChannelEventTrigger trigger = (ChannelEventTrigger) a;
-
+                if (a instanceof ChannelEventTrigger trigger) {
                     createChannelEventTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ChannelEventTriggers) {
-                    ChannelEventTriggers triggers = (ChannelEventTriggers) a;
-
+                if (a instanceof ChannelEventTriggers triggers) {
                     for (ChannelEventTrigger trigger : triggers.value()) {
                         createChannelEventTrigger(triggerList, trigger);
                     }
