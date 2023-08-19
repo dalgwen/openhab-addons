@@ -1,5 +1,3 @@
-package org.openhab.automation.javascripting.internal;
-
 /**
  * Copyright (c) 2010-2023 Contributors to the openHAB project
  *
@@ -12,6 +10,8 @@ package org.openhab.automation.javascripting.internal;
  *
  * SPDX-License-Identifier: EPL-2.0
  */
+package org.openhab.automation.javascripting.internal;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +44,9 @@ public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
 
     @Override
     public void compilationResult(Class<?> clazz) {
-        if (clazz.isAnnotationPresent(Library.class)) {
-            previousFileObject.put(clazz.getSimpleName(), currentJavaFileObject);
+        JavaFileObject currentJavaFileObjectLocal = currentJavaFileObject;
+        if (clazz.isAnnotationPresent(Library.class) && currentJavaFileObjectLocal != null) {
+            previousFileObject.put(clazz.getSimpleName(), currentJavaFileObjectLocal);
         }
     }
 }

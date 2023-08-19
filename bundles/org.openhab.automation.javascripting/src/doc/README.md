@@ -25,10 +25,12 @@ It makes heavy use of Eric Obermühlner's Java JSR 223 ScriptEngine [java-script
 * When the openHAB ScriptFileWatcher detects a new .java File in conf/automation/jsr223 
   it is loaded, compiled into memory and its onLoad() method is executed.
   Then it is parsed for @Rule annotations and the rules are activated.
+  
+* You can use a raw script with no "boilerplate" code and direct instructions by NOT specifiying a class in your script (not putting a `public class` declaration). Your script will automatically be wrapped in a Class and an onLoad method. You obviously cannot declare any method within this raw script (because it is itself contained in the onLoad method), but you can use import or package declarations (they will be extracted and put in the  start of the resulting script).
 
-* Java script classes do not see other script classes. Each one has its own ClassLoader. This is an consequence of the way openHAB JSR223 and the Java ScriptEngine work, each script is loaded separately and so has its own memory classloader.
+* Java script classes do not see other script classes. Each one has its own ClassLoader. This is a consequence of the way openHAB JSR223 and the Java ScriptEngine works, each script is loaded separately and so has its own memory ClassLoader. You can use the Library annotation to circumvent this limitation : each script will still have its own ClassLoader, but all @Library annotated classes will also be compiled with each of them.
 
-* you can use libraries if you package them as [OSGI bundles](#library-code).
+* you can also use libraries if you package them as [OSGI bundles](#library-code).
 
 * you can use openHAB classes from the packages listed in [bnd.bnd](bnd.bnd).
 
@@ -49,13 +51,10 @@ start openHAB with start_debug.sh and remote debug from Eclipse, stop at breakpo
 
 (they are all in src/script/java)
 
-A Java class is loaded, compiled into memory and its onLoad() method executed. A Python or JS Script is
-evalated during load, this is simulated with the onLoad() method. So, rules can be defined programmatically
-in onLoad().
+A Java class is loaded, compiled into memory and its onLoad() method executed.
+A Java script will not work as a Python or JS Script (which is evaluated during load). For java this is simulated with the onLoad() method. So, rules can be defined programmatically in onLoad().
 
-Or, you can annotate public instance variables of type SimpleRule. See the FileWriteRule sample.
-
-You can also directly annotate methods of the Script. See the CronRule sample.
+Or, you can annotate public instance variables of type SimpleRule. See the FileWriteRule sample. You can also directly annotate methods of the Script. See the CronRule sample.
 
 # Project for Scripts
 
@@ -76,9 +75,21 @@ mvn  -DskipChecks clean install
 
 # Library Code 
 
+${H2} 1st method : Bundle
+
 Java Rules has `DynamicImport-Package: *` so it can access code in other bundles. 
 
 Bundle your code as OSGI bundle as in this sample: https://github.com/weberjn/org.openhab.automation.javascripting.ext 
+
+${H2} 2nd method : Library annotation
+
+You can also annotate a class with `@org.openhab.automation.javascripting.annotations.Library`. By doing so, the class will be available to all your other java scripts. The library class can still extends the `Script` base class to access its facilities.
+
+You then can access it statically, or you can inject it in your script by using the same annotation on a class member.
+
+Be aware that library instance are not shared between scripts. If you want to share data you should find another way.
+Pay attention to the script load order : a library class must be loaded before being used in another class.
+
 
 # Building the Addon
 
@@ -114,6 +125,7 @@ ${H2} ItemChanged Rule
 ```java
 #include("src/script/java/ItemChangedRule.java")
 ```
+
 ${H2} Transformation Script in Java
 
 a sitemap referencing a transformation in Java
@@ -145,6 +157,7 @@ ${H2} Transformations
 ```java
 #include("src/script/java/Transformations.java")
 ```
+
 ${H2} Persistence
 
 ```java
@@ -156,6 +169,7 @@ ${H2} Write to a File
 ```java
 #include("src/script/java/FileWriteRule.java")
 ```
+
 Set a new temperature
 
 ```Shell
@@ -169,7 +183,7 @@ $ cat /tmp/Morning_Temperature.txt
 
 ${H2} Json Rule
 
-This rule is triggered bei either of two items, creates a Json String from their states and sends it to a third item 
+This rule is triggered by either of two items, creates a Json String from their states and sends it to a third item 
 (which should be linked to an MQTT command topic, on which a Python script could listen and feed an e-paper display).
 
 ```java
@@ -181,7 +195,7 @@ openhab> openhab:update  OutsideTemperature 27
 Update has been sent successfully.
 openhab> openhab:status EPaper_Screen_Json
 {"screenobjects":[{"x":10,"y":0,"text":"@ 2023-06-04 20:07:42","type":"text"},{"x":10,"y":30,"text":"Temp Outside: 27.0","type":"text"}]}
-```  
+```
   
 ${H2} Groovy Port
 
@@ -190,5 +204,29 @@ It does not use syntactic sugar of the Script base class, only pure openHAB JSR 
 
 ```java
 #include("src/script/java/GroovyPort.java")
+```
+
+${H2} Library example
+
+Define a library class :
+
+```java
+#include("src/script/java/MyLib.java")
+```
+
+Use it in another script, either in a static way or with an injection :
+
+```java
+#include("src/script/java/UseLib.java")
+```
+
+${H2} Raw script
+
+You can use a raw script to avoid writing boilerplate code.
+Within it, you can use import, package declaration.
+You can return a value (optional).
+
+```java
+#include("src/script/java/RawScript.jav")
 ```
 

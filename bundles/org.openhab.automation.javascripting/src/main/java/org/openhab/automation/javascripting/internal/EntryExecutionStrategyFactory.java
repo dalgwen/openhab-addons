@@ -15,10 +15,10 @@ package org.openhab.automation.javascripting.internal;
 
 import javax.script.ScriptException;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.javascripting.annotations.Library;
 import org.openhab.automation.javascripting.scriptsupport.Script;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
@@ -26,31 +26,27 @@ import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
 /**
  * @author Jürgen Weber - Initial contribution
  */
-
+@NonNullByDefault
 public class EntryExecutionStrategyFactory implements ExecutionStrategyFactory {
 
-    private static Logger logger = LoggerFactory.getLogger(EntryExecutionStrategyFactory.class);
-
     @Override
-    public ExecutionStrategy create(Class<?> clazz) throws ScriptException {
+    public ExecutionStrategy create(@Nullable Class<?> clazz) throws ScriptException {
 
         return new ExecutionStrategy() {
 
             @Override
-            public Object execute(Object instance) throws ScriptException {
-
-                Object retval = null;
-
+            public @Nullable Object execute(@Nullable Object instance) throws ScriptException {
                 try {
                     if (instance instanceof Script) {
                         Script script = (Script) instance;
-
-                        retval = script.eval();
-                    } else if (!instance.getClass().isAnnotationPresent(Library.class)) {
-                        throw new ScriptException(String.format("cannot execute: %s not instance of %s",
-                                instance.getClass().getSimpleName(), Script.class.getName()));
+                        return script.eval();
+                    } else if (instance != null && instance.getClass().isAnnotationPresent(Library.class)) {
+                        return null;
+                    } else {
+                        String simpleName = instance == null ? "unknown" : instance.getClass().getSimpleName();
+                        throw new ScriptException(String.format("cannot execute: %s not instance of %s", simpleName,
+                                Script.class.getName()));
                     }
-                    return retval;
 
                 } catch (Exception e) {
                     throw new ScriptException(e);
