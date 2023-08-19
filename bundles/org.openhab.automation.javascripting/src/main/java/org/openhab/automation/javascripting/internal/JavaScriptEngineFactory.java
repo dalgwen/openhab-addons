@@ -88,7 +88,9 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory {
 
             engine.setBindingStrategy(new BulkBindingStrategy());
 
-            engine.setCompilationSrategy(compilationStrategy);
+            engine.setCompilationStrategy(compilationStrategy);
+
+            engine.setScriptInterceptorStrategy(new ScriptWrappingStategy());
 
             engine.setCompilationOptions(Arrays.asList("-g"));
 

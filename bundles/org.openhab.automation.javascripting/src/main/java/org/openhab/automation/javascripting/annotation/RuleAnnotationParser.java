@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.javascripting.annotations.ChannelEventTrigger;
 import org.openhab.automation.javascripting.annotations.ChannelEventTriggers;
 import org.openhab.automation.javascripting.annotations.CronTrigger;
@@ -48,7 +49,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Jürgen Weber - Initial contribution
  */
-
+@NonNullByDefault
 public class RuleAnnotationParser {
 
     private static Logger logger = LoggerFactory.getLogger(RuleAnnotationParser.class);

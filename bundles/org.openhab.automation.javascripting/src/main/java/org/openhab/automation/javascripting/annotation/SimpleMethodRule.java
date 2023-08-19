@@ -18,7 +18,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.javascripting.scriptsupport.Script;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
-
+@NonNullByDefault
 public class SimpleMethodRule extends SimpleRule {
 
     private static Logger logger = LoggerFactory.getLogger(SimpleMethodRule.class);
@@ -52,7 +52,7 @@ public class SimpleMethodRule extends SimpleRule {
     }
 
     @Override
-    public @NonNull Object execute(@NonNull Action module, @NonNull Map<@NonNull String, ?> inputs) {
+    public Object execute(Action module, Map<String, ?> inputs) {
         Object returnObject = null;
         try {
             returnObject = method.invoke(script, inputs);
