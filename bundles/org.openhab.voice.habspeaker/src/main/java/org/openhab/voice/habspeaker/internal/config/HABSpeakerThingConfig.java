@@ -108,13 +108,18 @@ public class HABSpeakerThingConfig {
     public String rustpotterScoreMode = "max";
 
     /**
+     * Rustpotter web vad mode.
+     */
+    public @Nullable String rustpotterVADMode = null;
+
+    /**
      * Rustpotter web comparator reference.
      */
-    public float rustpotterComparatorRef;
+    public float rustpotterScoreRef;
     /**
      * Rustpotter web comparator band size.
      */
-    public int rustpotterComparatorBandSize;
+    public int rustpotterBandSize;
     /**
      * Rustpotter web gain-normalizer enabled.
      */

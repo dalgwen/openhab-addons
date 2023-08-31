@@ -91,9 +91,10 @@ Those are:
 | listeningItem                | String  | voice          | If provided, the item will be switched on during the voice recognition.      |
 | rustpotterAvgThreshold       | Decimal | rustpotter_web | Spot average threshold (0 for disabled) (only for rustpotter web ks).        |
 | rustpotterThreshold          | Decimal | rustpotter_web | Spot detection threshold (only for rustpotter web ks).                       |
-| rustpotterScoreMode          | Number  | rustpotter_web | Min detection scores (only for rustpotter web ks).                           |
-| rustpotterComparatorRef      | Decimal | rustpotter_web | Comparator reference (only for rustpotter web ks) (Advanced).                |
-| rustpotterComparatorBandSize | Number  | rustpotter_web | Comparator band size (only for rustpotter web ks). (Advanced).               |
+| rustpotterScoreMode          | String  | rustpotter_web | Min detection scores (only for rustpotter web ks).                           |
+| rustpotterVADMode            | String  | rustpotter_web | Enables a basic VAD detector (only for rustpotter web ks).                   |
+| rustpotterScoreRef           | Decimal | rustpotter_web | Score reference (only for rustpotter web ks) (Advanced).                     |
+| rustpotterBandSize           | Number  | rustpotter_web | Band size (only for rustpotter web ks). (Advanced).                          |
 | rustpotterGainNormalizer     | Boolean | rustpotter_web | Enabled the gain-normalizer filter (only for rustpotter web ks).             |
 | rustpotterMinGain            | Decimal | rustpotter_web | Min gain applied by the gain-normalizer filter (only for rustpotter web ks). |
 | rustpotterMaxGain            | Decimal | rustpotter_web | Max gain applied by the gain-normalizer filter (only for rustpotter web ks). |

@@ -118,13 +118,14 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                     spotConfig.put("threshold", config.rustpotterThreshold);
                     spotConfig.put("minScores", config.rustpotterMinScores);
                     spotConfig.put("scoreMode", config.rustpotterScoreMode);
+                    spotConfig.put("vadMode", config.rustpotterVADMode);
                     spotConfig.put("minGain", config.rustpotterMinGain);
                     spotConfig.put("maxGain", config.rustpotterMaxGain);
                     spotConfig.put("bandPassEnabled", config.rustpotterBandPass);
                     spotConfig.put("bandPassLowCutoff", config.rustpotterLowCutoff);
                     spotConfig.put("bandPassHighCutoff", config.rustpotterHighCutoff);
-                    spotConfig.put("comparatorBandSize", config.rustpotterComparatorBandSize);
-                    spotConfig.put("comparatorRef", config.rustpotterComparatorRef);
+                    spotConfig.put("bandSize", config.rustpotterBandSize);
+                    spotConfig.put("scoreRef", config.rustpotterScoreRef);
                     spotConfig.put("gainNormalizerEnabled", config.rustpotterGainNormalizer);
                     if (config.rustpotterGainRef != null) {
                         spotConfig.put("gainRef", config.rustpotterGainRef);
