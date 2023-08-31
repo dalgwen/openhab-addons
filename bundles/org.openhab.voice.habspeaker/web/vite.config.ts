@@ -45,7 +45,7 @@ export default defineConfig(async ({ command, mode }) => {
     server: {
       port: 5173,
       proxy: {
-        "/habspeaker/ws": {
+        "/ws/habspeaker": {
           target: OH_PROXY_URL.replace("http:", "ws:").replace("https:", "wss:"),
           ws: true,
         },
