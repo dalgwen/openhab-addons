@@ -12,7 +12,18 @@
  */
 package org.openhab.voice.habspeaker.internal.handler;
 
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.*;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.AUDIO_SEARCH_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.DROP_IN_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CONTROL_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CURRENT_SECOND_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_PROGRESS_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_TOTAL_SECONDS_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_AUDIO_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_VIDEO_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPOT_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.VIDEO_SEARCH_CHANNEL;
 
 import java.util.Map;
 

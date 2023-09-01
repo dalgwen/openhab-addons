@@ -12,13 +12,17 @@
  */
 package org.openhab.voice.habspeaker.internal.config;
 
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.*;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_CATEGORY;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_NAME;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_PID;
 
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -60,46 +64,28 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     protected static final String SPEAKER_CONFIG_URI = "thing-type:habspeaker:speaker";
     public static final String RUSTPOTTER_WEB_KS_ID = "habspeaker::rustpotter_web::ks";
     public static final String HABSPEAKER_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "habspeaker").toString();
-    private static final String MEDIA_FOLDER = Path.of(HABSPEAKER_FOLDER, "media").toString();
-    private static final String KS_FOLDER = Path.of(HABSPEAKER_FOLDER, "ks").toString();
-    public static final String RUSTPOTTER_FOLDER = Path.of(KS_FOLDER, "rustpotter").toString();
-    public static final String RUSTPOTTER_ADDON_FOLDER = Path.of(OpenHAB.getUserDataFolder(), "rustpotter").toString();
-    private static final String CREDENTIALS_FOLDER = Path.of(HABSPEAKER_FOLDER, "credentials").toString();
+    public static final String RUSTPOTTER_FOLDER = Path.of(HABSPEAKER_FOLDER, "rustpotter").toString();
+
     static {
         Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
         ensureDir("root", HABSPEAKER_FOLDER, logger);
-        ensureDir("media", MEDIA_FOLDER, logger);
-        ensureDir("ks", KS_FOLDER, logger);
         ensureDir("rustpotter", RUSTPOTTER_FOLDER, logger);
-        ensureDir("credentials", CREDENTIALS_FOLDER, logger);
     }
 
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerConfigProvider.class);
     private final VoiceManager voiceManager;
     private final LocaleProvider localeProvider;
-    private final HABSpeakerVoiceConfigHelper voiceConfigHelper;
     private HABSpeakerConfig config = new HABSpeakerConfig();
     Set<HABSpeakerConfigProviderListener> listeners = new HashSet<>();
 
     @Activate
-    public HABSpeakerConfigProvider(@Reference VoiceManager voiceManager, @Reference LocaleProvider localeProvider,
-            @Reference HABSpeakerVoiceConfigHelper voiceConfigHelper) {
+    public HABSpeakerConfigProvider(@Reference VoiceManager voiceManager, @Reference LocaleProvider localeProvider) {
         this.voiceManager = voiceManager;
         this.localeProvider = localeProvider;
-        this.voiceConfigHelper = voiceConfigHelper;
     }
 
     public HABSpeakerConfig getConfig() {
         return config;
-    }
-
-    /**
-     * Get default voice service
-     * 
-     * @return the keyword configured in "System Settings/Voice"
-     */
-    public String getSystemKeyword() {
-        return voiceConfigHelper.getKeyword();
     }
 
     @Activate
@@ -148,6 +134,8 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
                                     String.format("%s - %s - %s", getVoiceTTS(v).getLabel(nullSafeLocale),
                                             v.getLocale().getDisplayName(nullSafeLocale), v.getLabel())))
                             .collect(Collectors.toList());
+                case "rustpotterWakeword":
+                    return getAvailableRustpotterFiles();
             }
         }
         return null;
@@ -169,8 +157,25 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
     public void deactivate() {
     }
 
-    public interface HABSpeakerConfigProviderListener {
+    private List<ParameterOption> getAvailableRustpotterFiles() {
+        var folderFile = Path.of(RUSTPOTTER_FOLDER).toFile();
+        var files = folderFile.listFiles();
+        if (!folderFile.exists() || !folderFile.isDirectory() || files == null) {
+            return List.of();
+        }
+        String modelExtension = ".rpw";
+        return Stream.of(files).filter(file -> !file.isDirectory() && file.getName().endsWith(modelExtension))
+                .map(file -> {
+                    String fileName = file.getName();
+                    String optionName = file.getName() //
+                            .substring(0, fileName.length() - modelExtension.length()) //
+                            .replace("_", " ");
+                    return new ParameterOption(fileName, optionName);
+                }).sorted((opt1, opt2) -> opt1.getLabel().compareToIgnoreCase(opt2.getLabel()))
+                .collect(Collectors.toList());
+    }
 
+    public interface HABSpeakerConfigProviderListener {
         void onGlobalConfigUpdate(HABSpeakerConfig config);
     }
 

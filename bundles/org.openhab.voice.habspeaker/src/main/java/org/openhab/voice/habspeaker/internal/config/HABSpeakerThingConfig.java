@@ -89,6 +89,10 @@ public class HABSpeakerThingConfig {
     public String clientResampleMode = "wasm_sinc_medium_quality";
     // Rustpotter web config
     /**
+     * Rustpotter web wakeword file
+     */
+    public String rustpotterWakeword = "";
+    /**
      * Rustpotter web threshold
      */
     public float rustpotterThreshold = 0.5f;

@@ -12,8 +12,6 @@
  */
 package org.openhab.voice.habspeaker.internal.ui;
 
-import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -113,15 +111,15 @@ public class HABSpeakerResource implements RESTResource {
             @ApiResponse(responseCode = "200", description = "Model file bytes"),
             @ApiResponse(responseCode = "404", description = "Not Found") })
     public Response getRustpotterModel(@PathParam("model_name") String modelName) {
-        String fileName = modelName + ".rpw";
+        String suffix = ".rpw";
+        String fileName = modelName;
+        if (!fileName.endsWith(suffix)) {
+            fileName = fileName + suffix;
+        }
         var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
         if (!modelFile.exists()) {
-            // fallback to rustpotter add-on dir
-            modelFile = java.nio.file.Path.of(RUSTPOTTER_ADDON_FOLDER, fileName).toFile();
-            if (!modelFile.exists()) {
-                return Response.status(Response.Status.NOT_FOUND).entity("Entity model not found: " + modelName)
-                        .build();
-            }
+            return Response.status(Response.Status.NOT_FOUND)//
+                    .entity("Wakeword file not found: " + modelName).build();
         }
         return addAllowCorsHeaders(Response.ok(modelFile, MediaType.APPLICATION_OCTET_STREAM)).build();
     }

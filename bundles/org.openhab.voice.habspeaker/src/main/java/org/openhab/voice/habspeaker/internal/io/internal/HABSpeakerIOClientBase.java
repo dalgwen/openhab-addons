@@ -13,19 +13,27 @@
 package org.openhab.voice.habspeaker.internal.io.internal;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
-import static org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider.RUSTPOTTER_ADDON_FOLDER;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.*;
+import org.openhab.core.audio.AudioException;
+import org.openhab.core.audio.AudioManager;
+import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
+import org.openhab.core.audio.AudioStream;
 import org.openhab.core.common.ThreadPoolManager;
-import org.openhab.core.voice.*;
+import org.openhab.core.voice.KSService;
+import org.openhab.core.voice.VoiceManager;
 import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
@@ -98,22 +106,14 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         var spotMode = SpotMode.NONE;
         if (!config.ks.isBlank()) {
             if (config.ks.equals(HABSpeakerConfigProvider.RUSTPOTTER_WEB_KS_ID)) {
-                var modelName = configProvider.getSystemKeyword();
-                if (!config.keyword.isBlank()) {
-                    var customModelName = config.keyword.toLowerCase();
-                    if (validateKeyword(customModelName)) {
-                        modelName = customModelName;
-                    } else {
-                        logger.warn("Missing rustpotter model for custom keyword '{}'", config.keyword);
-                    }
-                }
-                logger.debug("Using rustpotter web with keyword '{}'", modelName);
-                if (modelName.isBlank()) {
-                    logger.warn("Missing rustpotter keyword, keyword spotting disabled");
-                } else if (validateKeyword(modelName)) {
+                String wakewordFileName = config.rustpotterWakeword.toLowerCase();
+                if (wakewordFileName.isBlank()) {
+                    logger.warn("Missing rustpotter wakeword file, keyword spotting disabled");
+                } else if (validateRustpotterWakeword(wakewordFileName)) {
+                    logger.debug("Using rustpotter web with keyword '{}'", wakewordFileName);
                     spotMode = SpotMode.RUSTPOTTER_WEB;
                     var spotConfig = new HashMap<String, Object>();
-                    spotConfig.put("keyword", modelName);
+                    spotConfig.put("keyword", wakewordFileName);
                     spotConfig.put("averagedThreshold", config.rustpotterAvgThreshold);
                     spotConfig.put("threshold", config.rustpotterThreshold);
                     spotConfig.put("minScores", config.rustpotterMinScores);
@@ -132,7 +132,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                     }
                     initializedConfig.put("spotConfig", spotConfig);
                 } else {
-                    logger.warn("Missing rustpotter model for '{}', keyword spotting disabled", modelName);
+                    logger.warn("Missing rustpotter wakeword file '{}', keyword spotting disabled", wakewordFileName);
                 }
             } else if (voiceManager.getKS(config.ks) != null) {
                 serverSpotting = true;
@@ -145,14 +145,13 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         return initializedConfig;
     }
 
-    private boolean validateKeyword(String modelName) {
-        String fileName = modelName.replaceAll("\\s", "_") + ".rpw";
-        var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
-        if (modelFile.exists()) {
-            return true;
+    private boolean validateRustpotterWakeword(String modelName) {
+        String suffix = ".rpw";
+        String fileName = modelName;
+        if (!fileName.endsWith(suffix)) {
+            fileName = fileName + suffix;
         }
-        // fallback to rustpotter add-on dir
-        modelFile = java.nio.file.Path.of(RUSTPOTTER_ADDON_FOLDER, fileName).toFile();
+        var modelFile = java.nio.file.Path.of(HABSpeakerConfigProvider.RUSTPOTTER_FOLDER, fileName).toFile();
         return modelFile.exists();
     }
 
@@ -183,46 +182,45 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1, clientSampleRate);
         registerAudioComponent(sink);
         // init dialog
-        STTService stt = null;
-        TTSService tts = null;
-        Voice voice = null;
-        KSService ks = null;
-        String keyword = configProvider.getSystemKeyword();
         var defaultHLI = voiceManager.getHLI();
         List<HumanLanguageInterpreter> defaultHlis = defaultHLI == null ? List.of(speakerLanguageInterpreter)
                 : List.of(speakerLanguageInterpreter, defaultHLI);
         List<HumanLanguageInterpreter> hlis = defaultHlis;
+        @Nullable
+        KSService ks = voiceManager.getKS();
+        var dCBuilder = voiceManager.getDialogContextBuilder();
+        dCBuilder.withSource(source).withSink(sink).withListeningItem(listeningItem);
         if (thingHandler != null) {
             var speakerConfig = thingHandler.getSpeakerConfig();
             if (!speakerConfig.stt.isBlank()) {
-                stt = voiceManager.getSTT(speakerConfig.stt);
+                dCBuilder.withSTT(voiceManager.getSTT(speakerConfig.stt));
             }
             if (!speakerConfig.tts.isBlank()) {
-                tts = voiceManager.getTTS(speakerConfig.tts);
+                dCBuilder.withTTS(voiceManager.getTTS(speakerConfig.tts));
             }
             if (!speakerConfig.voice.isBlank()) {
-                voice = voiceManager.getAllVoices().stream().filter(v -> v.getUID().equals(speakerConfig.voice))
-                        .findAny().orElse(null);
+                dCBuilder.withVoice(voiceManager.getAllVoices().stream()//
+                        .filter(v -> v.getUID().equals(speakerConfig.voice))//
+                        .findAny().orElse(null));
             }
-            hlis = voiceManager.getHLIsByIds(speakerConfig.hlis);
-            if (!hlis.isEmpty()) {
+            var interpreters = voiceManager.getHLIsByIds(speakerConfig.hlis);
+            if (!interpreters.isEmpty()) {
                 ArrayList<HumanLanguageInterpreter> finalInterpreters = new ArrayList<>();
                 finalInterpreters.add(speakerLanguageInterpreter);
-                finalInterpreters.addAll(hlis);
+                finalInterpreters.addAll(interpreters);
                 hlis = finalInterpreters;
             }
             if (!speakerConfig.keyword.isBlank()) {
-                keyword = speakerConfig.keyword;
+                dCBuilder.withKeyword(speakerConfig.keyword);
             }
             if (!speakerConfig.ks.isBlank()) {
                 ks = voiceManager.getKS(speakerConfig.ks);
             }
         }
-        var hsKS = new HABSpeakerKS(this, ks);
-        this.ks = hsKS;
-        voiceManager.startDialog(voiceManager.getDialogContextBuilder().withSource(source).withSink(sink).withKS(hsKS)
-                .withSTT(stt).withTTS(tts).withVoice(voice).withHLIs(hlis).withKeyword(keyword)
-                .withListeningItem(listeningItem).build());
+        this.ks = new HABSpeakerKS(this, ks);
+        voiceManager.startDialog(dCBuilder.withKS(this.ks)//
+                .withHLIs(hlis)//
+                .build());
     }
 
     protected synchronized void unregisterSpeakerComponents(String id) {

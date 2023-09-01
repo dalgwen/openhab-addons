@@ -36,7 +36,7 @@
 			</parameter-group>
 			<parameter-group name="rustpotter_web">
 				<label>Rustpotter Web</label>
-				<description>Options for the client keyword spotter Rustpotter.</description>
+				<description>Browser keyword spotting options.</description>
 			</parameter-group>
 			<!-- Audio config -->
 			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
@@ -162,10 +162,15 @@
 					rule.</description>
 			</parameter>
 			<!-- Rustpotter Web config -->
+			<parameter name="rustpotterWakeword" type="text" groupName="rustpotter_web">
+				<label>Wakeword File</label>
+				<description>Rustpotter wakeword file.</description>
+			</parameter>
 			<parameter name="rustpotterAvgThreshold" type="decimal" min="0" max="1" groupName="rustpotter_web">
 				<label>Averaged threshold</label>
 				<description>Spot average threshold (0 for disabled)</description>
-				<default>0.2</default>
+				<default>0</default>
+				<advanced>true</advanced>
 			</parameter>
 			<parameter name="rustpotterThreshold" type="decimal" min="0" max="1" groupName="rustpotter_web">
 				<label>Threshold</label>
@@ -174,8 +179,9 @@
 			</parameter>
 			<parameter name="rustpotterScoreMode" type="text" groupName="rustpotter_web">
 				<label>Score Mode</label>
-				<description>Indicates how to calculate the final score.</description>
+				<description>Indicates how to calculate the final score. (Not applies to trained models)</description>
 				<default>max</default>
+				<advanced>true</advanced>
 				<options>
 					<option value="average">Average</option>
 					<option value="max">Max</option>
@@ -196,6 +202,7 @@
 					<option value="medium">Medium</option>
 					<option value="hard">Hard</option>
 				</options>
+				<advanced>true</advanced>
 			</parameter>
 			<parameter name="rustpotterMinScores" type="integer" groupName="rustpotter_web">
 				<label>Min Scores</label>
@@ -210,14 +217,15 @@
 			</parameter>
 			<parameter name="rustpotterBandSize" type="integer" groupName="rustpotter_web">
 				<label>Band Size</label>
-				<description>Configures the band-size for the comparator used to match the wakeword references.</description>
+				<description>Configures the band-size for the comparator. (Not applies to trained models)</description>
 				<default>5</default>
 				<advanced>true</advanced>
 			</parameter>
 			<parameter name="rustpotterGainNormalizer" type="boolean" groupName="rustpotter_web">
 				<label>Gain Normalizer</label>
-				<description> Enables an audio filter that intent to approximate the volume of the stream to a reference level (RMS
-					of the samples is used as volume measure).</description>
+				<description> Enables an audio filter that approximates the volume of the stream to a reference level (RMS
+					of the
+					samples is used as volume measure).</description>
 				<default>false</default>
 			</parameter>
 			<parameter name="rustpotterMinGain" type="decimal" min="0.1" max="1" step="0.1" groupName="rustpotter_web">
@@ -239,16 +247,19 @@
 				<label>Band Pass</label>
 				<description>Enables an audio filter that attenuates frequencies outside the low cutoff and high cutoff range.</description>
 				<default>false</default>
+				<advanced>true</advanced>
 			</parameter>
 			<parameter name="rustpotterLowCutoff" type="decimal" min="0" groupName="rustpotter_web">
 				<label>Low Cutoff</label>
 				<description>Low cutoff for the band-pass filter.</description>
 				<default>80</default>
+				<advanced>true</advanced>
 			</parameter>
 			<parameter name="rustpotterHighCutoff" type="decimal" min="0" groupName="rustpotter_web">
 				<label>High Cutoff</label>
 				<description>High cutoff for the band-pass filter.</description>
 				<default>400</default>
+				<advanced>true</advanced>
 			</parameter>
 		</config-description>
 	</thing-type>

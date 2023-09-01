@@ -132,18 +132,16 @@ All the connected speakers can be automatically discovered using the main ui.
 * By clicking on the speaker icon a single shot audio dialog processing will start. It uses the registered audio components (sink/source) and the default processing services configured on the openHAB voice settings.
 * At this point you can discover the speaker using the main ui to add it as a thing in openHAB. (Path: /settings/things/add/habspeaker)
 
-## Client keyword spotting
+## Browser keyword spotting
 
 ### Rustpotter
 
-Note: Uses rustpotter v2.x.x not compatible with 1.x.x model files.
+Note: Uses rustpotter v3.x.x not compatible with 1.x.x model files.
 
 To run keyword spotting on the browser using rustpotter:
 
 * Select 'Rustpotter Web' as 'Keyword Spotter' in the thing configuration 'Voice' section (when configuring in file, set ks thing config to 'habspeaker::rustpotter_web::ks').
-* The rustpotter model for the configured magic word should be available under '$OPENHAB_USERDATA/habspeaker/ks/rustpotter' or '$OPENHAB_USERDATA/rustpotter'.
-
-For the keyword 'Hey openhab' the model should be named 'hey_openhab.rpw'.
+* The rustpotter wakeword file should be available under '$OPENHAB_USERDATA/habspeaker/rustpotter' and configured in the "Rustpotter Web" config section of the habspeaker thing in openHAB.
 
 ## Media Playback
 
