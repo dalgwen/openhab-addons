@@ -3,7 +3,7 @@ import { AudioSource } from "./audio-source";
 import { WorkerInCmd, RustpotterOptions, MediaStateCmd, WorkerOutCmd, WorkerOutCmdType, ConfigureSpeakerCmd, MediaCommandCmd } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
 import audioPortWorklet from "./audio-source-worklet.ts?sharedworker&url";
-import { RustpotterService } from "rustpotter-worklet";
+import { RustpotterConfig, RustpotterService, ScoreMode, VADMode } from "rustpotter-worklet";
 
 export interface IOCallbacks {
   onConnected?: () => void;
@@ -17,24 +17,24 @@ export interface IOCallbacks {
 }
 
 export class IOMain {
+  private online: boolean = false;
+  private accessToken: string | null = null;
   private messageACKs = new MessageACKManager("main");
-
+  // audio source
   private audioContext: AudioContext | null = null;
   private audioSource: AudioSource | null = null;
   private worker: Worker | null = null;
   private micStreaming = false;
-
-  private localKsProcessorNode: AudioNode | null = null;
-  private stopLocalKsProcessorNode: (() => void) | null = null;
-
-  private activeSinks = new Map<string, AudioSink>();
   private listening: boolean = false;
-  private online: boolean = false;
-  private sinkVolume: number = 100;
-  private remoteSpotMode: boolean = false;
   private listenPortACK?: number;
-  private accessToken: string | null = null;
+  // audio sink
+  private activeSinks = new Map<string, AudioSink>();
+  private sinkVolume: number = 100;
+  // keyword spotting
+  private serverSpotting: boolean = false;
   private rustpotter: RustpotterService | null = null;
+  private currentWakeword: string | null = null;
+  private rustpotterAudioNode: AudioNode | null = null;
 
   constructor(private ohUrl: string, private callbacks: IOCallbacks = {}) { }
 
@@ -51,7 +51,12 @@ export class IOMain {
     }
     return this.audioContext;
   }
-
+  private getAudioSource(): AudioSource {
+    if (!this.audioSource) {
+      throw new Error('AudioSource not initialized');
+    }
+    return this.audioSource;
+  }
   /**
    * Returns a processor node that sends data through the websocket 
   */
@@ -64,60 +69,51 @@ export class IOMain {
     await this.messageACKs.awaitACK(this.listenPortACK);
     return _webSocketWorkletNode as AudioNode;
   }
-  /**
-   * Returns a processor node that spots for the keyword
-   */
-  private async initLocalRustpotterProcessor(keyword: string, options: RustpotterOptions) {
-    console.debug("main: starting local keyword spotting using rustpotter");
-    const { RustpotterService, ScoreMode, VADMode } = await import("rustpotter-worklet");
-    const wasmModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter_wasm_bg.wasm', import.meta.url);
-    const workletModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter-worklet.js', import.meta.url);
-    const workerModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter-worker.js', import.meta.url);
-    const scoreMode = (ScoreMode[options.scoreMode as any] as any) ?? ScoreMode.max;
-    const vadMode = options.vadMode ? (VADMode[options.vadMode as any] as any) ?? null : null;
-    const sampleRate = this.getVoiceAudioContext().sampleRate;
-    const rustpotter = this.rustpotter = await RustpotterService.new({
-      workletPath: workletModuleUrl.href,
-      workerPath: workerModuleUrl.href,
-      wasmPath: wasmModuleUrl.href,
-      averagedThreshold: options.averagedThreshold,
-      threshold: options.threshold,
-      minScores: options.minScores,
-      minGain: options.minGain,
-      maxGain: options.maxGain,
-      bandPassEnabled: options.bandPassEnabled,
-      bandPassLowCutoff: options.bandPassLowCutoff,
-      bandPassHighCutoff: options.bandPassHighCutoff,
-      bandSize: options.bandSize,
-      scoreRef: options.scoreRef,
-      gainNormalizerEnabled: options.gainNormalizerEnabled,
-      gainRef: options.gainRef,
-      scoreMode,
-      sampleRate,
-      vadMode,
-    });
-    rustpotter.onDetection(detection => {
-      console.debug('main: keyword spotted', detection);
-      this.sendSpot();
-    });
-    if (this.stopLocalKsProcessorNode) {
-      this.stopLocalKsProcessorNode();
+  private async setupRustpotter(wakeword: string, options: RustpotterOptions): Promise<RustpotterService> {
+    if (!this.rustpotter) {
+      console.debug("main: starting rustpotter");
+      const wasmModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter_wasm_bg.wasm', import.meta.url);
+      const workletModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter-worklet.js', import.meta.url);
+      const workerModuleUrl = new URL('../../node_modules/rustpotter-worklet/dist/rustpotter-worker.js', import.meta.url);
+      const sampleRate = this.getVoiceAudioContext().sampleRate;
+      this.rustpotter = await RustpotterService.new(
+        sampleRate,
+        {
+          workletPath: workletModuleUrl.href,
+          workerPath: workerModuleUrl.href,
+          wasmPath: wasmModuleUrl.href,
+        },
+        this.getRustpotterConfig(options),
+      );
+      this.rustpotter.onDetection(detection => {
+        console.debug('main: wakeword detected', detection);
+        this.sendSpot();
+      });
+    } else {
+      console.debug("main: rustpotter already started, updating config");
+      await this.rustpotter.updateConfig(this.getRustpotterConfig(options))
     }
-    this.stopLocalKsProcessorNode = async () => {
-      console.debug("main: stopping local keyword spotting");
-      try {
-        await rustpotter.disposeProcessorNode();
-      } catch (error) {
-        console.warn(error)
+    if (wakeword !== this.currentWakeword) {
+      console.debug(`main: downloading and adding rustpotter wakeword '${wakeword}'`);
+      let headers: HeadersInit = {};
+      if (this.accessToken?.length) {
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
-    };
-    const node = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
-    let headers: HeadersInit = {};
-    if (this.accessToken?.length) {
-      headers["Authorization"] = `Bearer ${this.accessToken}`;
+      await this.rustpotter.removeWakeword("w");
+      await this.rustpotter.addWakewordByPath("w", `${await this.ohUrl}/rest/habspeaker/rustpotter/${encodeURIComponent(wakeword)}`, headers);
+      this.currentWakeword = wakeword;
+    } else {
+      console.debug("main: rustpotter wakeword already loaded");
     }
-    await rustpotter.addWakewordByPath(`${await this.ohUrl}/rest/habspeaker/rustpotter/${keyword.replaceAll(" ", "_")}`, headers);
-    return node;
+    return this.rustpotter;
+  }
+  private async teardownRustpotter() {
+    if (this.rustpotter) {
+      console.debug("main: teardown rustpotter service");
+      await this.rustpotter.close();
+      this.rustpotter = null;
+      this.currentWakeword = null;
+    }
   }
   private postToWorker(cmd: string, args: { [key: string]: any } = {}) {
     try {
@@ -158,10 +154,10 @@ export class IOMain {
         console.warn("main: start microphone audio aborted");
         return;
       }
-      if (this.localKsProcessorNode) {
-        processors.unshift(this.localKsProcessorNode)
+      if (this.rustpotterAudioNode) {
+        processors.unshift(this.rustpotterAudioNode)
       }
-      this.audioSource?.start(...processors).catch((err) => console.error(err));
+      this.getAudioSource().start(...processors).catch((err) => console.error(err));
     } else {
       console.warn("main: trying to start microphone streaming but it's already started!");
     }
@@ -170,10 +166,11 @@ export class IOMain {
     if (this.micStreaming) {
       console.debug("stopping microphone audio streaming");
       this.micStreaming = false;
-      const processors: AudioNode[] = this.localKsProcessorNode ? [this.localKsProcessorNode] : [];
-      if (processors.length > 0) {
-        this.audioSource?.start(...processors).catch((err) => console.error(err));
+      if (this.rustpotterAudioNode) {
+        // keep keyword spotting node connected
+        this.audioSource?.start(this.rustpotterAudioNode).catch((err) => console.error(err));
       } else {
+        // stop audio node
         this.audioSource?.stop();
       }
     } else {
@@ -182,12 +179,9 @@ export class IOMain {
   };
   private async killMicProcessors() {
     this.audioSource?.stop();
-    if (this.localKsProcessorNode) {
-      this.localKsProcessorNode = null;
-      this.stopLocalKsProcessorNode?.();
-      this.stopLocalKsProcessorNode = null;
-      this.rustpotter?.close();
-      this.rustpotter = null;
+    if (this.rustpotterAudioNode) {
+      this.rustpotterAudioNode = null;
+      await this.rustpotter?.disposeProcessorNode();
     }
   };
 
@@ -201,17 +195,20 @@ export class IOMain {
           if (speakerConfig.sinkVolume != null) {
             this.sinkVolume = speakerConfig.sinkVolume;
           }
-          this.remoteSpotMode = false;
+          this.serverSpotting = false;
           switch (speakerConfig.spotMode) {
             case "server":
-              this.remoteSpotMode = true;
+              await this.teardownRustpotter();
+              this.serverSpotting = true;
               break;
             case "rustpotter_web":
               if (speakerConfig.spotConfig?.keyword) {
                 try {
-                  const ksAudioProcessor = await this.initLocalRustpotterProcessor(speakerConfig.spotConfig.keyword, { ...speakerConfig.spotConfig });
-                  this.localKsProcessorNode = ksAudioProcessor;
-                  await this.audioSource?.start(this.localKsProcessorNode);
+                  const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.keyword, speakerConfig.spotConfig);
+                  console.debug("main: creating rustpotter audio worklet");
+                  this.rustpotterAudioNode = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
+                  console.debug("main: connecting rustpotter audio worklet");
+                  await this.audioSource?.start(this.rustpotterAudioNode);
                 } catch (error) {
                   console.error("Unable to start local ks processor", error);
                 }
@@ -221,6 +218,7 @@ export class IOMain {
               break;
             case "none":
             default:
+              await this.teardownRustpotter();
               break;
           }
           this.callbacks.onConfigured?.(speakerConfig);
@@ -234,14 +232,14 @@ export class IOMain {
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
         this.callbacks.onConnected?.();
-        if (this.remoteSpotMode) {
+        if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
           this.startMicStreaming();
         }
         break;
       case WorkerOutCmd.OFFLINE:
         this.sinkVolume = 0;
-        this.remoteSpotMode = false;
+        this.serverSpotting = false;
         this.killMicProcessors();
         if (this.listening) {
           this.listening = false;
@@ -292,7 +290,7 @@ export class IOMain {
           this.listening = true;
           this.callbacks.onStartListening?.();
         }
-        if (!this.remoteSpotMode) {
+        if (!this.serverSpotting) {
           this.startMicStreaming();
         }
         break;
@@ -305,7 +303,7 @@ export class IOMain {
           this.listening = false;
           this.callbacks.onStopListening?.();
         }
-        if (!this.remoteSpotMode) {
+        if (!this.serverSpotting) {
           this.stopMicStreaming();
         }
         break;
@@ -327,6 +325,26 @@ export class IOMain {
       default:
         console.error(`main: Unknown worker command ${command}`);
     }
+  }
+  private getRustpotterConfig(options: RustpotterOptions): RustpotterConfig {
+    const scoreMode = (ScoreMode[options.scoreMode as any] as any) ?? ScoreMode.max;
+    const vadMode = !!(options.vadMode?.length) ? (VADMode[options.vadMode as any] as any) ?? null : null;
+    return {
+      averagedThreshold: options.averagedThreshold,
+      threshold: options.threshold,
+      minScores: options.minScores,
+      minGain: options.minGain,
+      maxGain: options.maxGain,
+      bandPassEnabled: options.bandPassEnabled,
+      bandPassLowCutoff: options.bandPassLowCutoff,
+      bandPassHighCutoff: options.bandPassHighCutoff,
+      bandSize: options.bandSize,
+      scoreRef: options.scoreRef,
+      gainNormalizerEnabled: options.gainNormalizerEnabled,
+      gainRef: options.gainRef,
+      scoreMode,
+      vadMode,
+    };
   }
   public async initialize(speakerId: string, token: string | null) {
     this.startVoiceAudioContext();

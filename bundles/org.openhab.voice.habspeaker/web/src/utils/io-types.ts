@@ -16,8 +16,8 @@ export enum StreamType {
 export type MediaStateCmd = { totalSeconds: number, currentSecond: number, state: string, volume: number, provider: string, id: string, playlistId?: string, playlistIndex?: number };
 type SetVolumeCmd = { value: number };
 export type RustpotterOptions = {
-  keyword?: string
-  threshold?: number
+  keyword: string
+  threshold: number
   averagedThreshold: number
   scoreRef: number
   bandSize: number

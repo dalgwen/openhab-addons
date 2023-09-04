@@ -112,7 +112,7 @@ public class HABSpeakerConfigProvider implements ConfigOptionProvider {
                             .collect(Collectors.toList());
                 case "ks":
                     var clientKsServices = Stream
-                            .of(new ParameterOption(RUSTPOTTER_WEB_KS_ID, "Rustpotter Web (Client Spotter)"));
+                            .of(new ParameterOption(RUSTPOTTER_WEB_KS_ID, "Rustpotter Web (Runs on browser)"));
                     var serverKsServices = voiceManager.getKSs().stream()
                             .sorted((ks1, ks2) -> ks1.getLabel(locale).compareToIgnoreCase(ks2.getLabel(locale)))
                             .map(ks -> new ParameterOption(ks.getId(), ks.getLabel(locale)));
