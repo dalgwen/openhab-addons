@@ -333,6 +333,7 @@ export class IOMain {
       averagedThreshold: options.averagedThreshold,
       threshold: options.threshold,
       minScores: options.minScores,
+      eager: options.eager,
       minGain: options.minGain,
       maxGain: options.maxGain,
       bandPassEnabled: options.bandPassEnabled,

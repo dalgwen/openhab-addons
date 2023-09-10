@@ -117,6 +117,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                     spotConfig.put("averagedThreshold", config.rustpotterAvgThreshold);
                     spotConfig.put("threshold", config.rustpotterThreshold);
                     spotConfig.put("minScores", config.rustpotterMinScores);
+                    spotConfig.put("eager", config.rustpotterEager);
                     spotConfig.put("scoreMode", config.rustpotterScoreMode);
                     spotConfig.put("vadMode", config.rustpotterVADMode);
                     spotConfig.put("minGain", config.rustpotterMinGain);

@@ -209,6 +209,11 @@
 				<description>Minimum number of positive scores to consider a partial detection as a detection.</description>
 				<default>5</default>
 			</parameter>
+			<parameter name="rustpotterEager" type="boolean" groupName="rustpotter_web">
+				<label>Eager</label>
+				<description>Emit detection on min scores.</description>
+				<default>false</default>
+			</parameter>
 			<parameter name="rustpotterScoreRef" type="decimal" min="0" max="1" step="0.01" groupName="rustpotter_web">
 				<label>Score Ref</label>
 				<description>Configures the reference used to express the score as a value in range 0 - 1.</description>

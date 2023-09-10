@@ -22,6 +22,7 @@ export type RustpotterOptions = {
   scoreRef: number
   bandSize: number
   minScores: number
+  eager: boolean
   scoreMode: string
   vadMode: string
   gainNormalizerEnabled: boolean

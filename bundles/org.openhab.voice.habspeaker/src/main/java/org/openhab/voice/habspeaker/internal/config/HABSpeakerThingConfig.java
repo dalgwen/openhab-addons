@@ -107,6 +107,11 @@ public class HABSpeakerThingConfig {
     public int rustpotterMinScores = 5;
 
     /**
+     * Rustpotter web eager.
+     */
+    public boolean rustpotterEager = false;
+
+    /**
      * Rustpotter web score mode.
      */
     public String rustpotterScoreMode = "max";
