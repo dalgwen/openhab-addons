@@ -1,19 +1,19 @@
 :root {
-  --vt-c-white: #fff;
-  --vt-c-black: #181818;
-  --vt-c-openhab-red: #e64a19;
-  --vt-c-openhab-grey: #474747;
+  --hs-white: #fff;
+  --hs-black: #181818;
+  --oh-red: #e64a19;
+  --oh-grey: #474747;
 }
 
 /* semantic color variables for this project */
 :root {
-  --color-assistant: var(--vt-c-openhab-red);
-  --color-microphone: var(--vt-c-openhab-grey);
-  --color-internal-background: var(--vt-c-openhab-grey);
-  --color-background: var(--vt-c-black);
-  --color-text: var(--vt-c-openhab-grey);
-  --color-alert-text: var(--vt-c-white);
-  --color-form-label: var(--vt-c-white);
+  --color-assistant: var(--oh-red);
+  --color-microphone: var(--oh-grey);
+  --color-internal-background: var(--oh-grey);
+  --color-background: var(--hs-black);
+  --color-text: var(--oh-grey);
+  --color-alert-text: var(--hs-white);
+  --color-form-label: var(--hs-white);
 }
 
 *,
