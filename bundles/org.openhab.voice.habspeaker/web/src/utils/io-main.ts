@@ -5,13 +5,13 @@ import { MessageACKManager } from "./message-ack-manager";
 import audioPortWorklet from "./audio-source-worklet.ts?sharedworker&url";
 import { RustpotterConfig, RustpotterService, ScoreMode, VADMode } from "rustpotter-worklet";
 
-export interface IOCallbacks {
-  onConnected?: () => void;
-  onDisconnected?: () => void;
-  onStartListening?: () => void;
-  onStopListening?: () => void;
-  onStartSpeaking?: () => void;
-  onStopSpeaking?: () => void;
+export interface IOEventListeners {
+  onConnected?: (io: IOMain) => void;
+  onDisconnected?: (io: IOMain) => void;
+  onStartListening?: (io: IOMain) => void;
+  onStopListening?: (io: IOMain) => void;
+  onStartSpeaking?: (io: IOMain) => void;
+  onStopSpeaking?: (io: IOMain) => void;
   onConfigured?: (config: ConfigureSpeakerCmd) => void;
   onMediaCommand?: (mediaCmd: MediaCommandCmd) => void;
 }
@@ -36,8 +36,16 @@ export class IOMain {
   private currentWakeword: string | null = null;
   private rustpotterAudioNode: AudioNode | null = null;
 
-  constructor(private ohUrl: string, private callbacks: IOCallbacks = {}) { }
-
+  constructor(private ohUrl: string, private callbacks: IOEventListeners = {}) { }
+  public isOnline() {
+    return this.online;
+  }
+  public isListening() {
+    return this.listening;
+  }
+  public isSpeaking() {
+    return this.listening;
+  }
   private startVoiceAudioContext() {
     if (!this.audioContext) {
       let options: AudioContextOptions = {};
@@ -231,7 +239,7 @@ export class IOMain {
         break;
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
-        this.callbacks.onConnected?.();
+        this.callbacks.onConnected?.(this);
         if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
           this.startMicStreaming();
@@ -243,11 +251,11 @@ export class IOMain {
         this.killMicProcessors();
         if (this.listening) {
           this.listening = false;
-          this.callbacks.onStopListening?.();
+          this.callbacks.onStopListening?.(this);
         }
         if (this.online) {
           this.online = false;
-          this.callbacks.onDisconnected?.();
+          this.callbacks.onDisconnected?.(this);
         }
         if (this.listenPortACK) {
           this.messageACKs.abortACK(this.listenPortACK);
@@ -263,7 +271,7 @@ export class IOMain {
         const startSpeaking = this.activeSinks.size === 1;
         sink.start().then(() => {
           if (startSpeaking) {
-            this.callbacks.onStartSpeaking?.();
+            this.callbacks.onStartSpeaking?.(this);
           }
         }).catch(err => console.error(err));
         break;
@@ -275,7 +283,7 @@ export class IOMain {
           this.activeSinks.delete(stopSinkCmd.id);
           activeSink.close();
           if (this.activeSinks.size === 0) {
-            this.callbacks.onStopSpeaking?.();
+            this.callbacks.onStopSpeaking?.(this);
           }
         } else {
           console.error("main: unable to stop sink, not found ", stopSinkCmd.id);
@@ -288,7 +296,7 @@ export class IOMain {
         }
         if (!this.listening) {
           this.listening = true;
-          this.callbacks.onStartListening?.();
+          this.callbacks.onStartListening?.(this);
         }
         if (!this.serverSpotting) {
           this.startMicStreaming();
@@ -301,7 +309,7 @@ export class IOMain {
         }
         if (this.listening) {
           this.listening = false;
-          this.callbacks.onStopListening?.();
+          this.callbacks.onStopListening?.(this);
         }
         if (!this.serverSpotting) {
           this.stopMicStreaming();

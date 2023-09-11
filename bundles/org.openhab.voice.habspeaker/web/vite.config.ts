@@ -1,5 +1,4 @@
 import { defineConfig, PluginOption } from "vite";
-import vue from "@vitejs/plugin-vue";
 import ConditionalCompile from "vite-plugin-conditional-compiler";
 const pkg = require('./package.json');
 let isDevelopment = false;
@@ -8,7 +7,7 @@ let isProduction = false;
 export default defineConfig(async ({ command, mode }) => {
   isDevelopment = command == "serve" || process.env.NODE_ENV === "development"
   isProduction = !isDevelopment;
-  const plugins: PluginOption[] = [ConditionalCompile(), vue()];
+  const plugins: PluginOption[] = [ConditionalCompile()];
   let baseUrl: string | undefined;
   const envMode = isProduction ? 'production' : 'development';
   const OH_PROXY_URL = process.env.OH_PROXY ?? "http://127.0.0.1:8080";

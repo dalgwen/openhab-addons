@@ -24,20 +24,19 @@ class PlatformAdapter {
     async dimDeviceScreen(value: boolean) {
         (await getPlatform()).dimDeviceScreen(value);
     }
-    async setup(onReady: () => void) {
+    async setup(onReady: () => Promise<void>) {
         const platform = await getPlatform();
         console.info(`main: running ${platform.getName()} setup`);
         return platform.setup(onReady);
     }
-
     async getUrlOpenHAB() {
         if (import.meta.env.VITE_DEV_SERVER_URL) {
             return import.meta.env.VITE_DEV_SERVER_URL;
         }
         return (await getPlatform()).getUrlOpenHAB();
     }
-    async shouldRedirectToLogin() {
-        return (await getPlatform()).shouldRedirectToLogin();
+    async isServerTokenNeeded() {
+        return (await getPlatform()).isServerTokenNeeded();
     }
     async getSpeakerId() {
         return (await getPlatform()).getSpeakerId();

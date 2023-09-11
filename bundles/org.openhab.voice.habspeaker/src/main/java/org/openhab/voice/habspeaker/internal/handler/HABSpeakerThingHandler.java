@@ -273,12 +273,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         if (id.isBlank() || "NULL".equals(id)) {
             speakerIO.playerStop();
         } else {
-            if (id.startsWith("playlist:")) {
-                var playlistId = id.replace("playlist:", "");
-                speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, null, playlistId, 0, 0));
-            } else {
-                speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, id, null, 0, 0));
-            }
+            speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, id, 0));
         }
     }
 

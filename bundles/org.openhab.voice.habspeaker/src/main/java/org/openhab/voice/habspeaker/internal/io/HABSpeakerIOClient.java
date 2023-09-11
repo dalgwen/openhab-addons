@@ -255,19 +255,14 @@ public interface HABSpeakerIOClient {
         public final MediaProvider provider;
         @Nullable
         public final String mediaId;
-        @Nullable
-        public final String playlistId;
-        public final int playlistIndex;
         public final long currentSecond;
         public final long totalSeconds;
         public final PlaybackStates playbackState;
 
-        public MediaState(@Nullable MediaProvider provider, String mediaId, @Nullable String playlistId,
-                int playlistIndex, long currentSecond, long totalSeconds, PlaybackStates playbackState) {
+        public MediaState(@Nullable MediaProvider provider, String mediaId, long currentSecond, long totalSeconds,
+                PlaybackStates playbackState) {
             this.provider = provider;
             this.mediaId = mediaId;
-            this.playlistId = playlistId;
-            this.playlistIndex = playlistIndex;
             this.currentSecond = currentSecond;
             this.totalSeconds = totalSeconds;
             this.playbackState = playbackState;
@@ -279,21 +274,15 @@ public interface HABSpeakerIOClient {
      */
     class StartMediaMessage {
         public final MediaProvider provider;
-        @Nullable
         public final String mediaId;
-        @Nullable
-        public final String playlistId;
-        public final int playlistIndex;
         public final long startSecond;
 
-        public StartMediaMessage(MediaProvider provider, @Nullable String mediaId, @Nullable String playlistId,
-                int playlistIndex, long startSecond) throws IllegalStateException {
+        public StartMediaMessage(MediaProvider provider, String mediaId, long startSecond)
+                throws IllegalStateException {
             this.provider = provider;
             this.mediaId = mediaId;
-            this.playlistId = playlistId;
-            this.playlistIndex = playlistIndex;
             this.startSecond = startSecond;
-            if (mediaId == null && playlistId == null) {
+            if (mediaId == null) {
                 throw new IllegalStateException("Missing media info");
             }
         }

@@ -1,15 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /> 
-    <title>HABSpeaker</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>HABSpeaker</title>
+</head>
+
+<body>
+  <div id="app_root" class="app">
+    <header>
+      <div class="title">
+        <span>HABSpeaker</span>
+      </div>
+    </header>
+    <div class="main">
+      <button id="speaker_widget" class="speaker-widget" disabled>
+        <div id="speaker_widget_ring" class="speaker-widget-ring"></div>
+        <i id="speaker_icon" class="speaker-icon"></i>
+      </button>
+    </div>
+    <div class="logo-container">
+      <img id="oh-logo" alt="openHAB logo" class="logo" src="/src/assets/openhab-logo.svg" width="125" height="48" />
+    </div>
+  </div>
+  <template id="screen_saver_template">
+    <div class="screen-saver">
+      <img id="screen_saver_logo" alt="openHAB logo" src="/src/assets/openhab-logo.svg" width="125" height="48"
+        ref="logo" unselectable="on" />
+    </div>
+  </template>
+
+  <template id="local_config_template">
+    <div id="config_form_container" class="config-form-container">
+      <div class="config-form-shadow"></div>
+      <form class="config-form">
+        <p id="config_form_msg"></p>
+        <label for="speaker-id">Speaker Id:</label><br>
+        <input type="text" id="speaker-id" name="speaker-id" placeholder="Identifier against openHAB" required pattern="([A-z0-9]){2,}"><br>
+        <div id="form_server_options">
+          <label for="oh-url">OpenHAB URL:</label><br>
+          <input type="url" id="oh-url" name="oh-url" placeholder="Your personal openHAB URL" required><br>
+          <label for="oh-token">OpenHAB Server Token (not need if implicit user):</label><br>
+          <input type="text" id="oh-token" name="oh-token" placeholder="A persistent api token"><br>
+        </div>
+        <input type="submit" value="Start speaker">
+      </form>
+    </div>
+  </template>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
 </html>

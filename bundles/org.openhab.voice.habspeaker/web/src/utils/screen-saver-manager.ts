@@ -8,9 +8,7 @@ export class ScreenSaverManager {
     private active = false;
     private screenSaverTimeout: any = null;
     private isShown: boolean = false;
-    constructor(private showCb: (show: boolean) => void, private isBlocked?: () => boolean) {
-
-    }
+    constructor(private showCb: (show: boolean) => void, private isBlocked?: () => boolean) { }
     public readonly awake = () => {
         if (!this.active) {
             return;

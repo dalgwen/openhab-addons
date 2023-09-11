@@ -122,12 +122,9 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
                         var volume = Integer.parseInt(data.getOrDefault("volume", "0").toString());
                         var provider = data.getOrDefault("provider", "").toString();
                         var mediaId = data.getOrDefault("id", "").toString();
-                        @Nullable
-                        String playlistId = data.containsKey("playlistId") ? data.get("playlistId").toString() : null;
-                        var playlistIndex = Integer.parseInt(data.getOrDefault("playlistIndex", "0").toString());
                         mediaVolume = volume;
-                        var mediaState = new MediaState(MediaProvider.fromString(provider), mediaId, playlistId,
-                                playlistIndex, currentSecond, totalSeconds, playbackState);
+                        var mediaState = new MediaState(MediaProvider.fromString(provider), mediaId, currentSecond,
+                                totalSeconds, playbackState);
                         this.mediaState = mediaState;
                         if (thingHandler != null) {
                             thingHandler.onMediaStateUpdate(mediaState, volume);
@@ -257,13 +254,7 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         var data = new HashMap<String, Object>();
         data.put("type", "start");
         data.put("provider", startMediaMessage.provider.toString());
-        if (startMediaMessage.mediaId != null) {
-            data.put("mediaId", startMediaMessage.mediaId);
-        }
-        if (startMediaMessage.playlistId != null) {
-            data.put("playlistId", startMediaMessage.playlistId);
-        }
-        data.put("playlistIndex", startMediaMessage.playlistIndex);
+        data.put("mediaId", startMediaMessage.mediaId);
         data.put("second", startMediaMessage.startSecond);
         sendClientCommand(WebsocketOutputCommand.MEDIA_COMMAND, data);
     }

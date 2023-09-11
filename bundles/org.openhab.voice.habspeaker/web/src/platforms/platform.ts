@@ -1,5 +1,3 @@
-import type { MediaSessionCtrl, PlaybackState } from "../stores/media-players/media-session";
-
 export type PlatformName = 'web' | 'electron' | 'capacitor';
 
 export interface Platform {
@@ -10,11 +8,11 @@ export interface Platform {
     dimDeviceScreen(value: boolean): Promise<void>;
     keepDeviceAwake(value: boolean): Promise<void>;
     setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
-    setup(startMic: () => void): Promise<void>;
-    shouldRedirectToLogin(): Promise<boolean>;
+    setup(startMic: () => Promise<void>): Promise<void>;
+    isServerTokenNeeded(): Promise<boolean>;
 }
 export type SpeakerLocalSettings = {
     speakerId: string,
-    ohToken: string,
-    ohUrl: string,
+    ohToken?: string,
+    ohUrl?: string,
 }

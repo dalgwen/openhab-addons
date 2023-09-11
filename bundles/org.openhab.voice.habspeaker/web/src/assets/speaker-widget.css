@@ -1,0 +1,68 @@
+@import "./base.css";
+
+.speaker-widget {
+  box-shadow: inset 0px 0px 10px 0px rgba(0,0,0,0.75);
+  border: none;
+  padding: 0;
+  border-radius: 100%;
+  width: 200px;
+  height: 200px;
+  font-size: 3em;
+  color: var(--color-microphone);
+  padding: 0;
+  margin: 0;
+  background: var(--color-assistant);
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  line-height: 100px;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  -ms-touch-action: manipulation;
+  touch-action: manipulation;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  background-image: none;
+}
+@media (orientation: portrait) {
+  .speaker-widget {
+    width: 150px;
+    height: 150px;
+  }
+}
+.speaker-icon {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.speaker-icon svg {
+  fill: currentColor;
+  width: 100%;
+  height: 60%;
+  top: 20%;
+}
+.speaker-widget:disabled {
+  background: var(--color-assistant-disabled);
+  cursor: default;
+}
+
+.speaker-widget-ring {
+  box-shadow: inset 0px 0px 10px 5px rgba(0,0,0,0.5);
+  content: "";
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 5px solid var(--color-assistant);
+  border-radius: 50%;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  transform: scale(1.9, 1.9);
+  -webkit-transform: scale(1.9, 1.9);
+}

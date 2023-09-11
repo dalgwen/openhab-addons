@@ -16,30 +16,23 @@
     "sync:capacitor": "cap sync",
     "build:capacitor": "vite build --mode capacitor && cap copy",
     "preview": "vite preview --port 4173",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
     "@alexanderolsen/libsamplerate-js": "^2.0.3",
-    "pinia": "^2.0.27",
     "pkce-challenge": "^3.0.0",
     "reentrant-lock": "^2.0.1",
-    "rustpotter-worklet": "3.0.1",
-    "vue": "^3.2.41",
-    "vue-router": "^4.1.6"
+    "rustpotter-worklet": "3.0.1"
   },
   "devDependencies": {
     "@types/audioworklet": "0.0.43",
     "@types/dom-screen-wake-lock": "^1.0.0",
-    "@vitejs/plugin-vue": "^4.0.0",
-    "@vue/eslint-config-prettier": "^7.0.0",
     "eslint": "^8.22.0",
-    "eslint-plugin-vue": "^9.3.0",
     "prettier": "^2.7.1",
     "typescript": "^5.2.2",
     "vite": "^4.4.9",
     "vite-plugin-conditional-compiler": "^0.1.1",
-    "vite-plugin-pwa": "^0.16.4",
-    "vue-tsc": "^1.0.9"
+    "vite-plugin-pwa": "^0.16.4"
   },
   "optionalDependencies": {
     "@capacitor-community/keep-awake": "^3.0.0",

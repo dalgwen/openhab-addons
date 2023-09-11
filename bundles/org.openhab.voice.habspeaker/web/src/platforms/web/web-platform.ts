@@ -3,7 +3,8 @@ import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
 const storagePrefix = "habspeaker.ui:";
 const idLocalStorageKey = `${storagePrefix}id`;
 export class WebPlatform implements Platform {
-    wakeLock?: WakeLockSentinel;
+    private runningSetup = false;
+    private wakeLock?: WakeLockSentinel;
     getName(): PlatformName {
         return 'web';
     }
@@ -32,15 +33,30 @@ export class WebPlatform implements Platform {
     async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
         localStorage.setItem(idLocalStorageKey, localSettings.speakerId);
     }
-    async shouldRedirectToLogin(): Promise<boolean> {
-        return true;
+    async isServerTokenNeeded(): Promise<boolean> {
+        return false;
     }
     async getServerToken(): Promise<string | null> {
         // nothing to do
         return null;
     }
-    async setup(startMic: () => void): Promise<void> {
-        // nothing to do
+    async setup(startMic: () => Promise<void>): Promise<void> {
+        const wrapper = async () => {
+            if(this.runningSetup) {
+                return;
+            }
+            this.runningSetup = true;
+            try {
+                await startMic();
+                document.removeEventListener("click", wrapper);
+            } catch (error) {
+                console.error("Error starting IO:", error);
+            } finally {
+                this.runningSetup = false;
+            }
+        };
+        document.addEventListener("click", wrapper);
+        console.debug("Waiting click event at document.");
     }
     async getSpeakerId(): Promise<string | null> {
         return localStorage.getItem(idLocalStorageKey);

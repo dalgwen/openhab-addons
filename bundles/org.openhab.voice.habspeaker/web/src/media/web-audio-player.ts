@@ -1,20 +1,47 @@
-import { ref } from "vue";
-import { defineStore, storeToRefs } from "pinia";
-import { MediaProvider, MediaSessionCtrl, PlaybackState, useMediaSessionStore } from "./media-session";
-export const useWebAudioPlayerStore = defineStore("audio-player", () => {
-  const mediaSessionStore = useMediaSessionStore();
-  const { mediaController, mediaState } = storeToRefs(mediaSessionStore);
-  var player = ref<HTMLAudioElement | null>(null);
-  function registerMediaController(playerRef: HTMLAudioElement) {
-    const controller = mediaController.value = getMediaSessionCtrl(MediaProvider.AUDIO_PLAYER, playerRef, (state) => mediaState.value = state);
-    mediaSessionStore.getMediaVolume().then(level => controller.setVolume(level));
-    player.value = playerRef;
+import { MediaProvider, PlayerCtrl, PlaybackState, MediaPlayerFactory } from "./media-player";
+
+export class WebAudioPlayerFactory implements MediaPlayerFactory {
+  private audioElement?: HTMLAudioElement;
+  constructor(private root: HTMLElement) { }
+  claim(): Promise<boolean> {
+    return Promise.resolve(false);
   }
-  return {
-    registerMediaController,
-  };
-});
-export function getMediaSessionCtrl(provider: MediaProvider, playerRef: HTMLVideoElement | HTMLAudioElement, setMediaState: (state: PlaybackState) => void, disableScreenSaver: boolean = false): MediaSessionCtrl {
+  getId(): MediaProvider {
+    return MediaProvider.AUDIO_PLAYER;
+  }
+  async getPlayer(mediaId: string, setMediaState: (state: PlaybackState) => void): Promise<PlayerCtrl> {
+    let createNew = false;
+    if (!this.audioElement) {
+      createNew = true;
+      this.audioElement = document.createElement("audio");
+      this.audioElement.controls = true;
+      this.audioElement.autoplay = true;
+      this.audioElement.preload = "auto";
+      this.audioElement.src = mediaId;
+    } else {
+      this.audioElement.src = mediaId;
+      this.audioElement.load();
+    }
+    const audioEl = this.audioElement;
+    return new Promise(resolve => {
+      audioEl.addEventListener("load", () => {
+        const player = getPlayer(this.getId(), audioEl, setMediaState, true);
+        resolve(player);
+      });
+      if (createNew) {
+        this.root.appendChild(audioEl);
+      } else {
+        audioEl.load();
+      }
+    })
+  }
+  async killPlayer(): Promise<void> {
+    this.audioElement?.remove();
+    this.audioElement = undefined;
+  }
+
+}
+export function getPlayer(provider: MediaProvider, playerRef: HTMLVideoElement | HTMLAudioElement, setMediaState: (state: PlaybackState) => void, disableScreenSaver: boolean = false): PlayerCtrl {
   playerRef.addEventListener('pause', () => {
     setMediaState(PlaybackState.PAUSED);
   });
@@ -30,13 +57,6 @@ export function getMediaSessionCtrl(provider: MediaProvider, playerRef: HTMLVide
   return {
     getId: () => provider,
     getMediaId: async () => playerRef.currentSrc,
-    getPlaylistId: async () => {
-      // There is not playlist support implemented for web audio/video player 
-      return undefined;
-    },
-    getPlaylistIndex: async () => {
-      return undefined;
-    },
     play: async () => playerRef.play(),
     pause: async () => playerRef.pause(),
     stop: async () => playerRef.pause(),

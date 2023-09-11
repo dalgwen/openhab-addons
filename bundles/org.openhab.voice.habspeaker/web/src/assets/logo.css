@@ -1,0 +1,17 @@
+
+.logo-container {
+  padding: 3.5vh;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.logo-container img {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+
+.logo-container-mini {
+  padding: 4vh;
+}

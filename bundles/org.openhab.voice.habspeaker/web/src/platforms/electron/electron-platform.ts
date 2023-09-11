@@ -9,15 +9,15 @@ class ElectronPlatform implements Platform {
     async keepDeviceAwake(value: boolean) {
         await window.electronAPI.blockSystemSleep(value);
     }
-    async shouldRedirectToLogin(): Promise<boolean> {
-        return false;
+    async isServerTokenNeeded(): Promise<boolean> {
+        return true;
     }
     async getServerToken(): Promise<string | null> {
         const ohToken = await window.electronAPI.getTokenOpenHAB();
         return ohToken?.length ? ohToken : null;
     }
-    async setup(cb: () => void): Promise<void> {
-        window.electronAPI.onReady(cb);
+    async setup(startMic: () => Promise<void>): Promise<void> {
+        window.electronAPI.onReady(startMic);
     }
     async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
         await window.electronAPI.setLocalSettings(localSettings);

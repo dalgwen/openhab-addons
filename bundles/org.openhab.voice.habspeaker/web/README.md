@@ -1,14 +1,14 @@
-# web
+# Description
 
-Uses Vue 3 in Vite.
+Web UI for HABSpeaker audio ws.
 
-## Recommended IDE Setup
+# Icons
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+Microphone: https://icon-icons.com/es/icono/microfono-audio/61507 (License: https://creativecommons.org/licenses/by/4.0/)
 
-## Customize configuration
+Speaker: https://icon-icons.com/es/download/111240/SVG/512/ (License: Free)
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+# Developer Hits
 
 ## Project Setup
 
@@ -16,10 +16,10 @@ See [Vite Configuration Reference](https://vitejs.dev/config/).
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Compile and Hot-Reload for Development with OH proxy
 
 ```sh
-npm run dev
+OH_PROXY=http://192.168.1.100:8080 npm run dev
 ```
 
 ### Compile and Minify for Production
