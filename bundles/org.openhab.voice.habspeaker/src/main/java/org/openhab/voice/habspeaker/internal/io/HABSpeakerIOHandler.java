@@ -54,6 +54,13 @@ public interface HABSpeakerIOHandler {
     void onSinkVolumeUpdate(int value);
 
     /**
+     * Is called on remote source volume changes
+     *
+     * @param value current volume level (range 0 - 100)
+     */
+    void onSourceVolumeUpdate(int value);
+
+    /**
      * Is called on remote media playback updates
      *
      * @param mediaState the speaker media state

@@ -2,7 +2,7 @@
 
 import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
-import { createResampler, Resampler, ResamplerNoop } from "./resampler";
+import { createResampler, Resampler } from "./resampler";
 import { CircularBufferExecutor } from "./circular-buffer";
 import { ReentrantLock } from "reentrant-lock";
 
@@ -41,8 +41,8 @@ export default class IOWorker {
   streamSampleRate = 0;
   /** Used to receive the audio data from the WebAudioAPI */
   sourcePort?: MessagePort;
-  /** Holds the resampler used to convert from the sampleRate to the streamSampleRate, or a noop resampler*/
-  sourceResampler: Resampler = new ResamplerNoop();
+  /** Holds the resampler for the audio source data */
+  sourceResampler?: Resampler;
   /** Stores each sink context by its id */
   sinkContextStorage = new Map<string, SinkContext>();
   /** Lock used to ensure sink data chunks are processed in order */
@@ -89,7 +89,7 @@ export default class IOWorker {
           this.id = initData.id;
           this.sampleRate = initData.sampleRate;
           this.streamSampleRate = initData.sampleRate;
-          this.sourceResampler = new ResamplerNoop();
+          this.sourceResampler = undefined;
           this.token = initData.token ?? '';
           this.ohUrl = initData.ohUrl
             .replace('https:', 'wss:')
@@ -190,11 +190,11 @@ export default class IOWorker {
           (async () => {
             if (configureData.sampleRate !== -1) {
               this.streamSampleRate = configureData.sampleRate;
-              this.resamplerMode = configureData.resampleMode;
             } else {
               this.streamSampleRate = this.sampleRate;
             }
-            this.sourceResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1, SINK_CHUNK_SIZE);
+            this.resamplerMode = configureData.resampleMode;
+            this.sourceResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1);
             this.configurationACK = this.ackManager.createACK();
             this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
             await this.ackManager.awaitACK(this.configurationACK);
@@ -290,7 +290,7 @@ export default class IOWorker {
       this.sourcePort?.close();
       this.sourcePort = undefined;
       this.sourceResampler?.close();
-      this.sourceResampler = new ResamplerNoop();
+      this.sourceResampler = undefined;
       this.socket = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
       retry();
@@ -344,6 +344,7 @@ export default class IOWorker {
     let sinkContext = this.sinkContextStorage.get(streamId) as SinkContext;
     if (!sinkContext) {
       const sendSinkData = (buffer: Float32Array) => {
+        debugger
         const resampledBuffer = sinkContext.resampler.resample(buffer);
         if (sinkContext.port) {
           sinkContext.port.postMessage(resampledBuffer);
@@ -352,7 +353,7 @@ export default class IOWorker {
         }
       };
       sinkContext = {
-        resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels, SINK_CHUNK_SIZE * channels),
+        resampler: await createResampler(this.resamplerMode, this.streamSampleRate, this.sampleRate, channels),
         bufferedExecutor: new CircularBufferExecutor(new Float32Array(SINK_CHUNK_SIZE), sendSinkData),
         buffersCache: [],
         streamEnded: false,

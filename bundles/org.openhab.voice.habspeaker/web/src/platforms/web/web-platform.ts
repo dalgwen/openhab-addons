@@ -40,9 +40,9 @@ export class WebPlatform implements Platform {
         // nothing to do
         return null;
     }
-    async setup(startMic: () => Promise<void>): Promise<void> {
+    async setup(startMic: () => Promise<void>): Promise<string | null> {
         const wrapper = async () => {
-            if(this.runningSetup) {
+            if (this.runningSetup) {
                 return;
             }
             this.runningSetup = true;
@@ -57,6 +57,7 @@ export class WebPlatform implements Platform {
         };
         document.addEventListener("click", wrapper);
         console.debug("Waiting click event at document.");
+        return "Click the screen to start the speaker";
     }
     async getSpeakerId(): Promise<string | null> {
         return localStorage.getItem(idLocalStorageKey);

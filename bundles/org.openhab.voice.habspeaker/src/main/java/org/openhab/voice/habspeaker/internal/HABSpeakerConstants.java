@@ -49,6 +49,7 @@ public class HABSpeakerConstants {
     public static final ThingTypeUID SPEAKER_THING_TYPE = new ThingTypeUID(SERVICE_ID, "speaker");
     // CHANNELS
     public static final String SINK_VOLUME_CHANNEL = "sink-volume";
+    public static final String SOURCE_VOLUME_CHANNEL = "source-volume";
     public static final String MEDIA_CURRENT_SECOND_CHANNEL = "media-current-second";
     public static final String MEDIA_TOTAL_SECONDS_CHANNEL = "media-total-seconds";
     public static final String MEDIA_PROGRESS_CHANNEL = "media-progress";

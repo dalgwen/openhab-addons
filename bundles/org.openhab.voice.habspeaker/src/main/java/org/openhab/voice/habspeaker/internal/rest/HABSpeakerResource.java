@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.ui;
+package org.openhab.voice.habspeaker.internal.rest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +33,7 @@ import org.openhab.core.io.rest.RESTResource;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.handler.HABSpeakerThingHandler;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -93,13 +94,23 @@ public class HABSpeakerResource implements RESTResource {
             @ApiResponse(responseCode = "500", description = "Server error") })
     public Response config(@PathParam("speaker_id") String id) {
         var thing = thingRegistry.get(new ThingUID("habspeaker", "speaker", id));
-        String label = null;
-        if (thing != null) {
-            label = thing.getLabel();
+        String label = "HABSpeaker";
+        Long sampleRate = null;
+        if (thing != null && thing.getHandler() instanceof HABSpeakerThingHandler speakerHandler) {
+            String thingLabel = thing.getLabel();
+            if (thingLabel != null) {
+                label = thingLabel;
+            }
+            var speakerThingConfig = speakerHandler.getSpeakerConfig();
+            if (speakerThingConfig.changeSampleRate && speakerThingConfig.sampleRate != -1) {
+                sampleRate = speakerThingConfig.sampleRate;
+            }
         }
-        var config = configProvider.getConfig();
         Map<String, Object> configResp = new HashMap<>();
-        configResp.put("label", (label != null && !label.isBlank()) ? label : "HABSpeaker");
+        configResp.put("label", label);
+        if (sampleRate != null) {
+            configResp.put("sampleRate", sampleRate);
+        }
         return addAllowCorsHeaders(Response.ok(configResp)).build();
     }
 

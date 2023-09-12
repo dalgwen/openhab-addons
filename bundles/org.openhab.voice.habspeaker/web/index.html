@@ -14,7 +14,7 @@
   <div id="app_root" class="app">
     <header>
       <div class="title">
-        <span>HABSpeaker</span>
+        <span id="speaker_label">HABSpeaker</span>
       </div>
     </header>
     <div class="main">
@@ -27,20 +27,29 @@
       <img id="oh-logo" alt="openHAB logo" class="logo" src="/src/assets/openhab-logo.svg" width="125" height="48" />
     </div>
   </div>
+  <!-- Tooltip -->
+  <template id="tooltip_template">
+    <div class="tooltip">
+      <span id="text"></span>
+      <i id="close">X</i>
+    </div>
+  </template>
+  <!-- Screen Saver -->
   <template id="screen_saver_template">
     <div class="screen-saver">
       <img id="screen_saver_logo" alt="openHAB logo" src="/src/assets/openhab-logo.svg" width="125" height="48"
         ref="logo" unselectable="on" />
     </div>
   </template>
-
+  <!-- Config Form -->
   <template id="local_config_template">
     <div id="config_form_container" class="config-form-container">
       <div class="config-form-shadow"></div>
       <form class="config-form">
         <p id="config_form_msg"></p>
         <label for="speaker-id">Speaker Id:</label><br>
-        <input type="text" id="speaker-id" name="speaker-id" placeholder="Identifier against openHAB" required pattern="([A-z0-9]){2,}"><br>
+        <input type="text" id="speaker-id" name="speaker-id" placeholder="Identifier against openHAB" required
+          pattern="([A-z0-9]){2,}"><br>
         <div id="form_server_options">
           <label for="oh-url">OpenHAB URL:</label><br>
           <input type="url" id="oh-url" name="oh-url" placeholder="Your personal openHAB URL" required><br>

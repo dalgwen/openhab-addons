@@ -58,8 +58,9 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
     private final ScheduledExecutorService executor;
     private @Nullable ScheduledFuture<?> scheduledDisconnection;
     private int sinkVolume;
+    private int sourceVolume;
     private int mediaVolume;
-    private long streamSampleRate;
+    private long clientSampleRate;
     private @Nullable MediaState mediaState;
 
     public HABSpeakerWebSocketClient(HABSpeakerWebSocketManager wsAdapter, HABSpeakerConfigProvider configProvider,
@@ -75,30 +76,18 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         try {
             switch (command) {
                 case INITIALIZE:
-                    streamSampleRate = (int) data.get("sampleRate");
+                    clientSampleRate = (int) data.get("sampleRate");
                     var scheduledDisconnection = this.scheduledDisconnection;
                     if (scheduledDisconnection != null) {
                         scheduledDisconnection.cancel(true);
                     }
                     id = (String) data.getOrDefault("id", "");
                     wsAdapter.addHandler(this);
-                    thingHandler = getThingHandler();
-                    if (thingHandler != null) {
-                        if (thingHandler.getSpeakerConfig().sampleRate != -1L) {
-                            streamSampleRate = thingHandler.getSpeakerConfig().sampleRate;
-                        }
-                        sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.CONFIGURE,
-                                getSpeakerConfigMessage(thingHandler));
-                    } else {
-                        registerSpeakerComponents(id, streamSampleRate, null);
-                        sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.INITIALIZED);
-                    }
+                    sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.CONFIGURE,
+                            getSpeakerConfigMessage(getThingHandler()));
                     break;
                 case CONFIGURED:
-                    if (thingHandler == null) {
-                        throw new IOException("configured command send by unregistered speaker");
-                    }
-                    registerSpeakerComponents(id, streamSampleRate, thingHandler);
+                    registerSpeakerComponents(id, clientSampleRate, thingHandler);
                     sendClientCommand(HABSpeakerWebSocketClient.WebsocketOutputCommand.INITIALIZED);
                     break;
                 case ON_SPOT:
@@ -113,6 +102,17 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
                     } catch (NumberFormatException e) {
                         logger.warn("Unable to parse sink volume");
                     }
+                    break;
+                case SOURCE_VOLUME:
+                    try {
+                        sourceVolume = Integer.parseInt(data.getOrDefault("value", "0").toString());
+                        if (thingHandler != null) {
+                            thingHandler.onSourceVolumeUpdate(sinkVolume);
+                        }
+                    } catch (NumberFormatException e) {
+                        logger.warn("Unable to parse source volume");
+                    }
+                    break;
                 case MEDIA_STATE:
                     try {
                         var currentSecond = Long.parseLong(data.getOrDefault("currentSecond", "0").toString());
@@ -357,6 +357,13 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
     }
 
     @Override
+    public void setSourceVolume(int value) {
+        var data = new HashMap<String, Object>();
+        data.put("value", value);
+        sendClientCommand(WebsocketOutputCommand.SOURCE_VOLUME, data);
+    }
+
+    @Override
     public void setMediaVolume(int value) {
         var data = new HashMap<String, Object>();
         data.put("type", "volume");
@@ -379,6 +386,11 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         return sinkVolume;
     }
 
+    @Override
+    public int getSourceVolume() {
+        return sourceVolume;
+    }
+
     public @Nullable RemoteEndpoint getRemote() {
         return this.remote;
     }
@@ -397,6 +409,7 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         CONFIGURED,
         ON_SPOT,
         SINK_VOLUME,
+        SOURCE_VOLUME,
         MEDIA_STATE,
     }
 
@@ -406,6 +419,7 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         START_LISTENING,
         STOP_LISTENING,
         SINK_VOLUME,
+        SOURCE_VOLUME,
         MEDIA_COMMAND,
     }
 }

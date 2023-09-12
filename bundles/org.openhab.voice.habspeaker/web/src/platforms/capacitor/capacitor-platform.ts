@@ -53,7 +53,7 @@ class CapacitorPlatform extends WebPlatform implements Platform {
         await Preferences.set({ key: "ohToken", value: localSettings.ohToken });
         await Preferences.set({ key: "ohUrl", value: localSettings.ohUrl });
     }
-    async setup(startMic: () => Promise<void>): Promise<void> {
+    async setup(startMic: () => Promise<void>): Promise<string | null> {
         const requestPermissionsAndStart = async () => {
             let audioPermissionStatus = (await VoiceRecorder.hasAudioRecordingPermission()).value;
             if (!audioPermissionStatus) {
@@ -71,6 +71,7 @@ class CapacitorPlatform extends WebPlatform implements Platform {
             }
         }
         await requestPermissionsAndStart();
+        return null;
     }
 }
 

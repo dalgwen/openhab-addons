@@ -74,40 +74,43 @@ Those are:
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config                       | Type    | Group          | Description                                                                  |
-|------------------------------|---------|----------------|------------------------------------------------------------------------------|
-| sinkVolume                   | String  | audio          | Default sink volume.                                                         |
-| sinkStereo                   | Boolean | audio          | Use dual channel audio.                                                      |
-| sampleRate                   | Number  | audio          | Sample rate used for transmission, set to 'client' to use the device one.    |
-| clientResampleMode           | String  | audio          | Resample mode used by the client when resampling is needed.                  |
-| screenSaverTime              | String  | device         | Seconds to activate screen saver (0 for disabled).                           |
-| dimScreen                    | Boolean | device         | Prevent device of going to sleep/block (not available on web).               |
-| keepAwake                    | Boolean | device         | Lower the screen brightness while the screen saver is enabled.               |
-| stt                          | String  | voice          | The text-to-speech service to use, leave empty to use the default.           |
-| tts                          | String  | voice          | The speech-to-text service to use, leave empty to use the default.           |
-| voice                        | String  | voice          | The voice to use if no voice is specified, leave empty to use the default.   |
-| hli                          | String  | voice          | The human language interpreter to use, leave empty to use the default.       |
-| ks                           | String  | voice          | Enables keyword spotting using the specified service.                        |
-| listeningItem                | String  | voice          | If provided, the item will be switched on during the voice recognition.      |
-| rustpotterAvgThreshold       | Decimal | rustpotter_web | Spot average threshold (0 for disabled) (only for rustpotter web ks).        |
-| rustpotterThreshold          | Decimal | rustpotter_web | Spot detection threshold (only for rustpotter web ks).                       |
-| rustpotterScoreMode          | String  | rustpotter_web | Min detection scores (only for rustpotter web ks).                           |
-| rustpotterVADMode            | String  | rustpotter_web | Enables a basic VAD detector (only for rustpotter web ks).                   |
-| rustpotterScoreRef           | Decimal | rustpotter_web | Score reference (only for rustpotter web ks) (Advanced).                     |
-| rustpotterBandSize           | Number  | rustpotter_web | Band size (only for rustpotter web ks). (Advanced).                          |
-| rustpotterGainNormalizer     | Boolean | rustpotter_web | Enabled the gain-normalizer filter (only for rustpotter web ks).             |
-| rustpotterMinGain            | Decimal | rustpotter_web | Min gain applied by the gain-normalizer filter (only for rustpotter web ks). |
-| rustpotterMaxGain            | Decimal | rustpotter_web | Max gain applied by the gain-normalizer filter (only for rustpotter web ks). |
-| rustpotterGainRef            | Decimal | rustpotter_web | The gain-normalizer RMS reference (only for rustpotter web ks).              |
-| rustpotterBandPass           | Boolean | rustpotter_web | Enabled the band-pass filter (only for rustpotter web ks).                   |
-| rustpotterLowCutoff          | Decimal | rustpotter_web | Low cutoff for the band-pass filter (only for rustpotter web ks).            |
-| rustpotterHighCutoff         | Decimal | rustpotter_web | High cutoff for the band-pass filter (only for rustpotter web ks).           |
+| Config                       | Type    | Group          | Advanced | Description                                                                  |
+|------------------------------|---------|----------------|-----------------------------------------------------------------------------------------|
+| sinkVolume                   | String  | audio          | false     | Default sink volume.                                                         |
+| sinkStereo                   | Boolean | audio          | true      | Use dual channel audio.                                                      |
+| sampleRate                   | Number  | audio          | true      | Sample rate used for transmission, set to 'client' to use the device one.    |
+| clientResampleMode           | String  | audio          | true      | Resample mode used by the client when resampling is needed.                  |
+| changeSampleRate             | Boolean | audio          | true      | Set a custom audio context sample rate (not work on safari).                 |
+| useAudioElement              | Boolean | audio          | true      | Use an audio element to render the sink audio. (Affects echo cancellation)   |
+| screenSaverTime              | String  | device         | false     | Seconds to activate screen saver (0 for disabled).                           |
+| dimScreen                    | Boolean | device         | false     | Prevent device of going to sleep/block (not available on web).               |
+| keepAwake                    | Boolean | device         | false     | Lower the screen brightness while the screen saver is enabled.               |
+| stt                          | String  | voice          | false     | The text-to-speech service to use, leave empty to use the default.           |
+| tts                          | String  | voice          | false     | The speech-to-text service to use, leave empty to use the default.           |
+| voice                        | String  | voice          | false     | The voice to use if no voice is specified, leave empty to use the default.   |
+| hli                          | String  | voice          | false     | The human language interpreter to use, leave empty to use the default.       |
+| ks                           | String  | voice          | false     | Enables keyword spotting using the specified service.                        |
+| listeningItem                | String  | voice          | false     | If provided, the item will be switched on during the voice recognition.      |
+| rustpotterThreshold          | Decimal | rustpotter_web | false     | Spot detection threshold (only for rustpotter web ks).                       |
+| rustpotterAvgThreshold       | Decimal | rustpotter_web | true      | Spot average threshold (0 for disabled) (only for rustpotter web ks).        |
+| rustpotterScoreMode          | String  | rustpotter_web | true      | Min detection scores (only for rustpotter web ks).                           |
+| rustpotterVADMode            | String  | rustpotter_web | true      | Enables a basic VAD detector (only for rustpotter web ks).                   |
+| rustpotterScoreRef           | Decimal | rustpotter_web | true      | Score reference (only for rustpotter web ks) (Advanced).                     |
+| rustpotterBandSize           | Number  | rustpotter_web | true      | Band size (only for rustpotter web ks). (Advanced).                          |
+| rustpotterGainNormalizer     | Boolean | rustpotter_web | false     | Enabled the gain-normalizer filter (only for rustpotter web ks).             |
+| rustpotterMinGain            | Decimal | rustpotter_web | false     | Min gain applied by the gain-normalizer filter (only for rustpotter web ks). |
+| rustpotterMaxGain            | Decimal | rustpotter_web | false     | Max gain applied by the gain-normalizer filter (only for rustpotter web ks). |
+| rustpotterGainRef            | Decimal | rustpotter_web | false     | The gain-normalizer RMS reference (only for rustpotter web ks).              |
+| rustpotterBandPass           | Boolean | rustpotter_web | true      | Enabled the band-pass filter (only for rustpotter web ks).                   |
+| rustpotterLowCutoff          | Decimal | rustpotter_web | true      | Low cutoff for the band-pass filter (only for rustpotter web ks).            |
+| rustpotterHighCutoff         | Decimal | rustpotter_web | true      | High cutoff for the band-pass filter (only for rustpotter web ks).           |
 
 ## Thing Channels
 
 | Channel ID           |  Type   | description                                                             |
 |----------------------|---------|-------------------------------------------------------------------------|
 | sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                |
+| source-volume          | Dimmer  | Controls the source volume of the speaker.                              |
 | spot                 | Switch  | Starts dialog processing on the speaker.                                |
 | drop-in              | String  | Starts an immediate call with other speaker (by id).                    |
 | media-current-second | Number  | Current second for the media currently playing, allow seek.             |

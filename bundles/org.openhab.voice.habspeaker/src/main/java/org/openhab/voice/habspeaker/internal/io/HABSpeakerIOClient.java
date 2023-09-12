@@ -50,6 +50,20 @@ public interface HABSpeakerIOClient {
     int getSinkVolume();
 
     /**
+     * Sets the speaker source volume
+     * 
+     * @param value the desired volume level
+     */
+    void setSourceVolume(int value);
+
+    /**
+     * Gets the speaker source volume
+     *
+     * @return the speaker source volume level
+     */
+    int getSourceVolume();
+
+    /**
      * Sets the speaker media volume
      *
      * @param value the desired volume level

@@ -33,7 +33,7 @@ export type RustpotterOptions = {
   bandPassLowCutoff: number
   bandPassHighCutoff: number
 };
-export type ConfigureSpeakerCmd = { sinkVolume?: number, spotMode?: string, sampleRate: number, resampleMode: string, screenSaverTime?: number, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
+export type ConfigureSpeakerCmd = { sampleRate: number, resampleMode: string, useAudioElement: boolean, sinkVolume?: number, sourceVolume?: number, spotMode?: string, screenSaverTime?: number, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
 export type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
 { type: 'stop' } |
@@ -49,9 +49,13 @@ export enum WebSocketInCmd {
   CONFIGURED = "CONFIGURED",
   ON_SPOT = "ON_SPOT",
   SINK_VOLUME = "SINK_VOLUME",
+  SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_STATE = "MEDIA_STATE",
 };
-export type WebSocketInCmdType<T extends WebSocketInCmd> = T extends WebSocketInCmd.SINK_VOLUME ? { value: number } :
+export type WebSocketInCmdType<T extends WebSocketInCmd> =
+  T extends WebSocketInCmd.SINK_VOLUME ? SetVolumeCmd :
+  T extends WebSocketInCmd.SOURCE_VOLUME ? SetVolumeCmd :
+  T extends WebSocketInCmd.INITIALIZE ? { id: string, sampleRate: number } :
   T extends WebSocketInCmd.MEDIA_STATE ? MediaStateCmd :
   never;
 
@@ -102,12 +106,14 @@ export enum WorkerOutCmd {
   START_LISTENING = "START_LISTENING",
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
+  SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
 };
 export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
   T extends WorkerOutCmd.START_SINK ? { id: string, channels: number } :
   T extends WorkerOutCmd.STOP_SINK ? { id: string } :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
+  T extends WorkerOutCmd.SOURCE_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
   T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
   never;

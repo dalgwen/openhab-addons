@@ -1,21 +1,14 @@
 :root {
-  --hs-white: #fff;
-  --hs-black: #181818;
   --oh-red: #e64a19;
   --oh-grey: #474747;
+  --hs-black: #181818;
 }
 
 /* semantic color variables for this project */
 :root {
-  --color-assistant: var(--oh-red);
-  --color-assistant-disabled: var(--oh-grey);
-  --color-microphone: var(--oh-grey);
-  --color-internal-background: var(--oh-grey);
-  --color-form-background: var(--oh-red);
-  --color-background: var(--hs-black);
-  --color-text: var(--oh-grey);
-  --color-alert-text: var(--hs-white);
-  --color-form-label: var(--hs-white);
+  --color-primary: var(--oh-red);
+  --color-secondary: var(--oh-grey);
+  --color-tertiary: var(--hs-black);
 }
 
 *,
@@ -29,8 +22,8 @@
 
 body {
   min-height: 100vh;
-  color: var(--color-text);
-  background: var(--color-background);
+  color: var(--color-secondary);
+  background: var(--color-tertiary);
   transition: color 0.5s, background-color 0.5s;
   line-height: 1.6;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
@@ -69,74 +62,6 @@ body {
   align-items: center;
   justify-content: center;
   height: 88vh;
-  background-color: var(--color-internal-background);
+  background-color: var(--color-secondary);
   padding: 1rem;
-}
-
-.screen-saver {
-  position: absolute;
-  display: block;
-  background-color: black;
-  width: 100%;
-  height: 100%;
-  z-index: 999;
-  top: 0;
-  left: 0;
-  user-select: none;
-}
-
-.screen-saver img {
-  background-color: black;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  margin-left: -62.5px;
-  z-index: 999;
-  margin-top: -24px;
-  -moz-user-select: none;
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: default;
-}
-
-.config-form-container {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-}
-
-.config-form-container .config-form {
-  background-color: var(--color-form-background);
-  padding: 3em;
-  border-radius: 1em;
-  position: absolute;
-  width: 60%;
-  top: 20%;
-  left: 20%;
-  z-index: 1;
-  box-shadow: inset 0px 0px 10px 5px rgba(0,0,0,0.5);
-}
-
-.config-form-container .config-form p {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-@media (orientation: portrait) {
-  .config-form-container .config-form {
-    width: 90%;
-    left: 5%;
-  }
-}
-.config-form-container .config-form-shadow {
-  background-color: black;
-  opacity: 0.7;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
 }

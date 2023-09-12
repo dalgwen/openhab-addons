@@ -16,8 +16,9 @@ class ElectronPlatform implements Platform {
         const ohToken = await window.electronAPI.getTokenOpenHAB();
         return ohToken?.length ? ohToken : null;
     }
-    async setup(startMic: () => Promise<void>): Promise<void> {
+    async setup(startMic: () => Promise<void>): Promise<string | null> {
         window.electronAPI.onReady(startMic);
+        return null;
     }
     async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
         await window.electronAPI.setLocalSettings(localSettings);

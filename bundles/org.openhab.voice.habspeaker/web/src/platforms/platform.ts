@@ -8,7 +8,7 @@ export interface Platform {
     dimDeviceScreen(value: boolean): Promise<void>;
     keepDeviceAwake(value: boolean): Promise<void>;
     setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
-    setup(startMic: () => Promise<void>): Promise<void>;
+    setup(startMic: () => Promise<void>): Promise<string|null>;
     isServerTokenNeeded(): Promise<boolean>;
 }
 export type SpeakerLocalSettings = {

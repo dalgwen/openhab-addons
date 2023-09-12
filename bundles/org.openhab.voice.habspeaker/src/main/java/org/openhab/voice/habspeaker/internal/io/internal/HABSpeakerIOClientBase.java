@@ -12,25 +12,9 @@
  */
 package org.openhab.voice.habspeaker.internal.io.internal;
 
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.AudioException;
-import org.openhab.core.audio.AudioManager;
-import org.openhab.core.audio.AudioSink;
-import org.openhab.core.audio.AudioSource;
-import org.openhab.core.audio.AudioStream;
+import org.openhab.core.audio.*;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.KSService;
 import org.openhab.core.voice.VoiceManager;
@@ -38,6 +22,7 @@ import org.openhab.core.voice.text.HumanLanguageInterpreter;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSink;
 import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerKS;
@@ -46,6 +31,14 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
 
 /**
  * The {@link HABSpeakerIOClientBase} represents a speaker active connection.
@@ -89,18 +82,28 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         return thingHandler;
     }
 
-    protected Map<String, Object> getSpeakerConfigMessage(HABSpeakerIOHandler handler) throws IllegalStateException {
+    protected Map<String, Object> getSpeakerConfigMessage(@Nullable HABSpeakerIOHandler handler)
+            throws IllegalStateException {
+        logger.warn("CHECK 1");
+        if (handler == null) {
+            var speakerConfig = new HashMap<String, Object>();
+            var defaultConfig = new HABSpeakerThingConfig();
+            speakerConfig.put("sampleRate", defaultConfig.sampleRate);
+            speakerConfig.put("resampleMode", defaultConfig.clientResampleMode);
+            return speakerConfig;
+        }
         var config = handler.getSpeakerConfig();
-        var initializedConfig = new HashMap<String, Object>();
-        initializedConfig.put("sinkVolume", config.sinkVolume);
-        initializedConfig.put("sampleRate", config.sampleRate);
-        initializedConfig.put("resampleMode", config.clientResampleMode);
-        initializedConfig.put("screenSaverTime", config.screenSaverTime);
-        initializedConfig.put("dimScreen", config.dimScreen);
-        initializedConfig.put("keepAwake", config.keepAwake);
+        logger.warn("Sending configuration to '{}'", handler.getLabel());
+        var speakerConfig = new HashMap<String, Object>();
+        speakerConfig.put("sinkVolume", config.sinkVolume);
+        speakerConfig.put("sampleRate", config.sampleRate);
+        speakerConfig.put("resampleMode", config.clientResampleMode);
+        speakerConfig.put("screenSaverTime", config.screenSaverTime);
+        speakerConfig.put("dimScreen", config.dimScreen);
+        speakerConfig.put("keepAwake", config.keepAwake);
         var label = handler.getLabel();
         if (label != null) {
-            initializedConfig.put("label", label);
+            speakerConfig.put("label", label);
         }
         serverSpotting = false;
         var spotMode = SpotMode.NONE;
@@ -131,19 +134,20 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                     if (config.rustpotterGainRef != null) {
                         spotConfig.put("gainRef", config.rustpotterGainRef);
                     }
-                    initializedConfig.put("spotConfig", spotConfig);
+                    speakerConfig.put("spotConfig", spotConfig);
                 } else {
                     logger.warn("Missing rustpotter wakeword file '{}', keyword spotting disabled", wakewordFileName);
                 }
             } else if (voiceManager.getKS(config.ks) != null) {
+                logger.warn("Selected server ks: {}", config.ks);
                 serverSpotting = true;
                 spotMode = SpotMode.SERVER;
             } else {
                 logger.warn("Missing ks service {}", config.ks);
             }
         }
-        initializedConfig.put("spotMode", spotMode.toString());
-        return initializedConfig;
+        speakerConfig.put("spotMode", spotMode.toString());
+        return speakerConfig;
     }
 
     private boolean validateRustpotterWakeword(String modelName) {
@@ -165,6 +169,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         var sinkStereo = false;
         @Nullable
         String listeningItem = null;
+        long streamSampleRate = clientSampleRate;
         if (thingHandler != null) {
             // send speaker configuration before initialization
             var config = thingHandler.getSpeakerConfig();
@@ -172,15 +177,24 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
             if (thingLabel != null && !thingLabel.isBlank()) {
                 label = thingLabel;
             }
+            if (config.sampleRate != -1) {
+                streamSampleRate = config.sampleRate;
+            }
             listeningItem = !config.listeningItem.isBlank() ? config.listeningItem : null;
             sinkStereo = config.sinkStereo;
+        } else {
+            var config = new HABSpeakerThingConfig();
+            if (config.sampleRate != -1) {
+                streamSampleRate = config.sampleRate;
+            }
         }
+        logger.warn("Registering dialog components for {} at sample rate {}", label, streamSampleRate);
         initialized = true;
         // register source
-        var source = new HABSpeakerAudioSource(getSourceId(id), label, this, clientSampleRate);
+        var source = new HABSpeakerAudioSource(getSourceId(id), label, this, streamSampleRate);
         registerAudioComponent(source);
         // register sink
-        var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1, clientSampleRate);
+        var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1, streamSampleRate);
         registerAudioComponent(sink);
         // init dialog
         var defaultHLI = voiceManager.getHLI();
@@ -188,7 +202,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                 : List.of(speakerLanguageInterpreter, defaultHLI);
         List<HumanLanguageInterpreter> hlis = defaultHlis;
         @Nullable
-        KSService ks = voiceManager.getKS();
+        KSService ks = null;
         var dCBuilder = voiceManager.getDialogContextBuilder();
         dCBuilder.withSource(source).withSink(sink).withListeningItem(listeningItem);
         if (thingHandler != null) {

@@ -19,7 +19,7 @@
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
-    "@alexanderolsen/libsamplerate-js": "^2.0.3",
+    "@alexanderolsen/libsamplerate-js": "^2.0.4",
     "pkce-challenge": "^3.0.0",
     "reentrant-lock": "^2.0.1",
     "rustpotter-worklet": "3.0.1"

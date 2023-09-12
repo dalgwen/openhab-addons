@@ -1,0 +1,17 @@
+.tooltip {
+  position: absolute;
+  bottom: 4rem;
+  right: 2.2rem;
+  background: white;
+  padding: 1em;
+}
+
+.tooltip span {
+  font-size: bold;
+}
+
+.tooltip i {
+  margin-left: 1em;
+  font-weight: bold;
+  cursor: pointer;
+}

@@ -2,7 +2,6 @@ import { AudioSink } from "./audio-sink";
 import { AudioSource } from "./audio-source";
 import { WorkerInCmd, RustpotterOptions, MediaStateCmd, WorkerOutCmd, WorkerOutCmdType, ConfigureSpeakerCmd, MediaCommandCmd } from "./io-types";
 import { MessageACKManager } from "./message-ack-manager";
-import audioPortWorklet from "./audio-source-worklet.ts?sharedworker&url";
 import { RustpotterConfig, RustpotterService, ScoreMode, VADMode } from "rustpotter-worklet";
 
 export interface IOEventListeners {
@@ -14,6 +13,7 @@ export interface IOEventListeners {
   onStopSpeaking?: (io: IOMain) => void;
   onConfigured?: (config: ConfigureSpeakerCmd) => void;
   onMediaCommand?: (mediaCmd: MediaCommandCmd) => void;
+  onMessage?: (message: string, type: 'info' | 'error', ms?: number) => (() => void);
 }
 
 export class IOMain {
@@ -23,6 +23,7 @@ export class IOMain {
   // audio source
   private audioContext: AudioContext | null = null;
   private audioSource: AudioSource | null = null;
+  private sourceVolume: number = 50;
   private worker: Worker | null = null;
   private micStreaming = false;
   private listening: boolean = false;
@@ -46,9 +47,12 @@ export class IOMain {
   public isSpeaking() {
     return this.listening;
   }
-  private startVoiceAudioContext() {
+  private startVoiceAudioContext(customSampleRate?: number) {
     if (!this.audioContext) {
       let options: AudioContextOptions = {};
+      if (customSampleRate) {
+        options.sampleRate = customSampleRate;
+      }
       this.audioContext = new AudioContext(options);
       console.debug(`main: Created audio context with sample rate ${this.audioContext.sampleRate}`);
     }
@@ -194,23 +198,31 @@ export class IOMain {
   };
 
   // worker setup
-  private handleWorkerMessage<T extends WorkerOutCmd>(command: WorkerOutCmd, data: WorkerOutCmdType<any>) {
+  private handleWorkerMessage(command: WorkerOutCmd, data: WorkerOutCmdType<any>) {
     switch (command) {
       case WorkerOutCmd.CONFIGURE:
-        // TODO: disallow configure after initialized
         const speakerConfig = data as WorkerOutCmdType<typeof command>;
         (async () => {
+          const audioContext = this.getVoiceAudioContext();
+          const closeMsg = this.callbacks.onMessage?.("Resuming audio context, click to continue", "info");
+          await audioContext.resume();
+          closeMsg?.();
+          await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
+          this.audioSource?.setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
           if (speakerConfig.sinkVolume != null) {
             this.sinkVolume = speakerConfig.sinkVolume;
           }
+          debugger
           this.serverSpotting = false;
           switch (speakerConfig.spotMode) {
             case "server":
               await this.teardownRustpotter();
               this.serverSpotting = true;
+              this.callbacks.onMessage?.("Running keyword spotting against the server.", "info", 5000);
               break;
             case "rustpotter_web":
               if (speakerConfig.spotConfig?.keyword) {
+                this.callbacks.onMessage?.("Running keyword spotting locally.", "info", 5000);
                 try {
                   const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.keyword, speakerConfig.spotConfig);
                   console.debug("main: creating rustpotter audio worklet");
@@ -219,13 +231,16 @@ export class IOMain {
                   await this.audioSource?.start(this.rustpotterAudioNode);
                 } catch (error) {
                   console.error("Unable to start local ks processor", error);
+                  this.callbacks.onMessage?.("Error starting local keyword spotter.", "info", 5000);
                 }
               } else {
                 console.warn("main: Missed spotConfig configuration");
+                this.callbacks.onMessage?.("Error starting local keyword spotter.", "error", 5000);
               }
               break;
             case "none":
             default:
+              this.callbacks.onMessage?.("No keyword spotter, click the widget to trigger the dialog.", "info", 5000);
               await this.teardownRustpotter();
               break;
           }
@@ -240,12 +255,14 @@ export class IOMain {
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
         this.callbacks.onConnected?.(this);
+        this.callbacks.onMessage?.("Speaker connected.", "info", 2000);
         if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
           this.startMicStreaming();
         }
         break;
       case WorkerOutCmd.OFFLINE:
+        this.callbacks.onMessage?.("Speaker disconnected, trying to reconnect.", "error", 2000);
         this.sinkVolume = 0;
         this.serverSpotting = false;
         this.killMicProcessors();
@@ -264,7 +281,7 @@ export class IOMain {
         break;
       case WorkerOutCmd.START_SINK:
         const startSinkCmd = data as WorkerOutCmdType<typeof command>;
-        const sink = new AudioSink(startSinkCmd.id, this.getVoiceAudioContext(), startSinkCmd.channels, this.sinkVolume);
+        const sink = new AudioSink(startSinkCmd.id, startSinkCmd.channels, this.sinkVolume);
         const sinkPortCmd = { cmd: WorkerInCmd.SINK_PORT, id: sink.getId(), port: sink.getMessagePort() };
         this.worker?.postMessage(sinkPortCmd, [sinkPortCmd.port]);
         this.activeSinks.set(sink.getId(), sink);
@@ -316,9 +333,16 @@ export class IOMain {
         }
         break;
       case WorkerOutCmd.SINK_VOLUME:
-        const { value } = data as WorkerOutCmdType<typeof command>;
-        this.sinkVolume = value;
+        const { value: sinkVolume } = data as WorkerOutCmdType<typeof command>;
+        this.callbacks.onMessage?.(`Sink volume: ${sinkVolume}.`, "info", 1000);
+        this.sinkVolume = sinkVolume;
         this.activeSinks.forEach(sink => sink.setVolume(this.sinkVolume));
+        break;
+      case WorkerOutCmd.SOURCE_VOLUME:
+        const { value: sourceVolume } = data as WorkerOutCmdType<typeof command>;
+        this.callbacks.onMessage?.(`Source volume: ${sourceVolume}.`, "info", 1000);
+        this.sourceVolume = sourceVolume;
+        this.audioSource?.setVolume(sourceVolume);
         break;
       case WorkerOutCmd.MEDIA_COMMAND:
         const mediaCommandData = data as WorkerOutCmdType<typeof command>;
@@ -355,15 +379,14 @@ export class IOMain {
       vadMode,
     };
   }
-  public async initialize(speakerId: string, token: string | null) {
-    this.startVoiceAudioContext();
+  public async initialize(speakerId: string, token: string | null, customSampleRate?: number) {
+    this.startVoiceAudioContext(customSampleRate);
     const audioContext = this.getVoiceAudioContext();
     await audioContext.resume();
-    AudioSink.setupAudioElement(audioContext);
-    this.audioSource = new AudioSource(audioContext);
+    await AudioSource.configure(audioContext);
+    this.audioSource = new AudioSource(50);
     await this.audioSource.resume();
-    await AudioSink.registerProcessor(audioContext);
-    await audioContext.audioWorklet.addModule(audioPortWorklet);
+
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(() => {
       if (this.audioSource?.isSuspended()) {

@@ -12,10 +12,10 @@
  */
 package org.openhab.voice.habspeaker.internal.config;
 
-import java.util.List;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+
+import java.util.List;
 
 /**
  * The {@link HABSpeakerThingConfig} class defines the speaker configuration
@@ -81,12 +81,18 @@ public class HABSpeakerThingConfig {
     public boolean sinkStereo = false;
     /**
      * Audio sample rate.
+     * 
+     * -1 uses the browsers default and resamples the audio on the server.
      */
-    public long sampleRate = -1L;
+    public long sampleRate = 16000;
     /**
      * Audio sample rate.
      */
-    public String clientResampleMode = "wasm_sinc_medium_quality";
+    public String clientResampleMode = "SRC_LINEAR";
+    /**
+     * Audio sample rate.
+     */
+    public boolean changeSampleRate = false;
     // Rustpotter web config
     /**
      * Rustpotter web wakeword file

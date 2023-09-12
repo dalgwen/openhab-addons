@@ -1,17 +1,21 @@
+import audioSourceWorklet from "./audio-source-worklet.ts?sharedworker&url";
 /**
  * Utility class to encapsulate the creation of a {@link MediaStreamAudioSourceNode}, and its connected {@link AudioNode} processors.
  */
 export class AudioSource {
-    private micGainNode: GainNode;
-    private suspended: boolean = true;
+    private static audioContext?: AudioContext;
+    private gainNode: GainNode;
     private stream?: MediaStream;
     private sourceNode?: MediaStreamAudioSourceNode;
     private nodeProcessors?: AudioNode[];
-    constructor(private audioContext: AudioContext) {
-        // Add a gain node to the microphone to reduce noise
-        this.micGainNode = this.audioContext.createGain();
-        // TODO: customize this
-        this.micGainNode.gain.value = 0.75;
+
+    constructor(volume: number) {
+        this.gainNode = this.getAudioContext().createGain();
+        this.setVolume(volume);
+    }
+    public static async configure(audioContext: AudioContext) {
+        AudioSource.audioContext = audioContext;
+        await audioContext.audioWorklet.addModule(audioSourceWorklet);
     }
     private async init() {
         if (!this.stream) {
@@ -24,34 +28,21 @@ export class AudioSource {
                 video: false,
             });
         }
-        if (!this.sourceNode && this.audioContext) {
-            this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+        if (!this.sourceNode) {
+            this.sourceNode = this.getAudioContext().createMediaStreamSource(this.stream);
             // connect processor to source
-            this.sourceNode.connect(this.micGainNode);
+            this.sourceNode.connect(this.gainNode);
         }
     }
     isSuspended() {
-        return this.suspended || this.audioContext.state !== 'running';
-    }
-    async suspend() {
-        console.debug("main: suspending audio source");
-        this.suspended = true;
-        this.sourceNode?.disconnect();
-        this.sourceNode = undefined;
-        console.debug("main: deleting audio media stream");
-        this.stream?.getAudioTracks().forEach(t => t.stop());
-        this.stream = undefined;
+        return this.getAudioContext().state !== 'running';
     }
     async resume() {
-        if (this.suspended) {
-            this.suspended = false;
-            console.debug("main: resuming audio source");
-        }
-        if (this.audioContext.state !== 'running') {
+        if (this.getAudioContext().state !== 'running') {
             console.debug("main: resuming voice audio context");
-            await this.audioContext.resume();
+            await this.getAudioContext().resume();
         }
-        if (this.audioContext.state !== 'running') {
+        if (this.getAudioContext().state !== 'running') {
             console.debug("main: voice audio context not running");
         } else if (!this.stream || !this.stream.active) {
             console.debug("main: recreating audio media stream");
@@ -73,6 +64,9 @@ export class AudioSource {
         this.nodeProcessors = audioProcessors;
         console.debug(`main: ${this.nodeProcessors.length} active audio source processors`);
     }
+    setVolume(value: number) {
+        this.gainNode.gain.setValueAtTime((value / 100), this.getAudioContext().currentTime);
+    }
     stop() {
         if (this.nodeProcessors) {
             for (const audioNode of this.nodeProcessors) {
@@ -83,15 +77,21 @@ export class AudioSource {
         console.debug('main: no active audio source processors');
     }
     private connectNode(audioNode: AudioNode) {
-        this.micGainNode.connect(audioNode);
+        this.gainNode.connect(audioNode);
         if (audioNode.numberOfOutputs > 0) {
-            audioNode.connect(this.audioContext.destination);
+            audioNode.connect(this.getAudioContext().destination);
         }
     }
     private disconnectNode(audioNode: AudioNode) {
-        this.micGainNode.disconnect(audioNode);
+        this.gainNode.disconnect(audioNode);
         if (audioNode.numberOfOutputs > 0) {
-            audioNode.disconnect(this.audioContext.destination);
+            audioNode.disconnect(this.getAudioContext().destination);
         }
+    }
+    protected getAudioContext() {
+        if (!AudioSource.audioContext) {
+            throw new Error("Sink class must be initialized")
+        }
+        return AudioSource.audioContext;
     }
 }

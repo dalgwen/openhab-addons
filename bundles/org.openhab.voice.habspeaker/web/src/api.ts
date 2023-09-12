@@ -16,12 +16,10 @@ export class HABSpeakerREST {
       accept: "application/json",
     } as { [key: string]: string };
     if (this.getAccessToken()) { headers["Authorization"] = "Bearer " + this.getAccessToken(); }
-    const response = await fetch(`${await this.ohUrl()}/rest/habspeaker/config/${await this.speakerId()}`, { headers });
+    const response = await fetch(`${await this.ohUrl()}/rest/habspeaker/config/${await this.speakerId() ?? "never"}`, { headers });
     if (!response.ok) {
       if (response.status === 401) {
         throw new UnauthorizedError();
-      }if (response.status === 404) {
-        throw new NotFoundError();
       } else {
         throw new Error(`Response failed with status ${response.status}: ${response.statusText}`);
       }
@@ -50,13 +48,14 @@ export class HABSpeakerREST {
   public setTokenListener(listener: (accessToken: string) => void) {
     this.tokenListener = listener;
   }
-  public setServerToken(token: string|null) {
+  public setServerToken(token: string | null) {
     this.serverToken = token;
   }
 }
-
-export class NotFoundError extends Error { }
 export class UnauthorizedError extends Error { }
 export type UIConfig = {
+  // speaker thing label
   label: string;
+  // custom sample rate for the audio system
+  sampleRate?: number;
 };
