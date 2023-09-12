@@ -58,4 +58,12 @@ export type UIConfig = {
   label: string;
   // custom sample rate for the audio system
   sampleRate?: number;
+  // primary color
+  primaryColor?: string;
+  // primary color
+  secondaryColor?: string;
+  // primary color
+  tertiaryColor?: string;
+  // logo path
+  logoUrl?: string;
 };

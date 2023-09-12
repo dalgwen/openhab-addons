@@ -12,6 +12,22 @@
  */
 package org.openhab.voice.habspeaker.internal.handler;
 
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.AUDIO_SEARCH_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.DROP_IN_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CONTROL_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CURRENT_SECOND_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_PROGRESS_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_TOTAL_SECONDS_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_AUDIO_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_VIDEO_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SOURCE_VOLUME_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPOT_CHANNEL;
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.VIDEO_SEARCH_CHANNEL;
+
+import java.util.Map;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.items.ItemNotFoundException;
@@ -30,22 +46,6 @@ import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.AUDIO_SEARCH_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.DROP_IN_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CONTROL_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CURRENT_SECOND_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_PROGRESS_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_TOTAL_SECONDS_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_VOLUME_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_AUDIO_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.PLAY_VIDEO_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SINK_VOLUME_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SOURCE_VOLUME_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SPOT_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.VIDEO_SEARCH_CHANNEL;
 
 /**
  * The {@link HABSpeakerThingHandler} is responsible for handling commands, which are

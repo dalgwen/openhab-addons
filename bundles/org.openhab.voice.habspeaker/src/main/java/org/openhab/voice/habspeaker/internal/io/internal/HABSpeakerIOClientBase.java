@@ -12,6 +12,14 @@
  */
 package org.openhab.voice.habspeaker.internal.io.internal;
 
+import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.*;
@@ -31,14 +39,6 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
 
 /**
  * The {@link HABSpeakerIOClientBase} represents a speaker active connection.
@@ -101,6 +101,18 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         speakerConfig.put("screenSaverTime", config.screenSaverTime);
         speakerConfig.put("dimScreen", config.dimScreen);
         speakerConfig.put("keepAwake", config.keepAwake);
+        if (!config.primaryColor.isBlank()) {
+            speakerConfig.put("primaryColor", config.primaryColor);
+        }
+        if (!config.secondaryColor.isBlank()) {
+            speakerConfig.put("secondaryColor", config.secondaryColor);
+        }
+        if (!config.tertiaryColor.isBlank()) {
+            speakerConfig.put("tertiaryColor", config.tertiaryColor);
+        }
+        if (!config.logoUrl.isBlank()) {
+            speakerConfig.put("logoUrl", config.logoUrl);
+        }
         var label = handler.getLabel();
         if (label != null) {
             speakerConfig.put("label", label);

@@ -104,6 +104,10 @@ Those are:
 | rustpotterBandPass           | Boolean | rustpotter_web | true      | Enabled the band-pass filter (only for rustpotter web ks).                   |
 | rustpotterLowCutoff          | Decimal | rustpotter_web | true      | Low cutoff for the band-pass filter (only for rustpotter web ks).            |
 | rustpotterHighCutoff         | Decimal | rustpotter_web | true      | High cutoff for the band-pass filter (only for rustpotter web ks).           |
+| primaryColor                 | String  | theme          | false     | Css compatible color value to use as primary. (Default: OpenHAB red)         |
+| secondaryColor               | String  | theme          | false     | Css compatible color value to use as secondary. (Default: OpenHAB gay)       |
+| tertiaryColor                | String  | theme          | false     | Css compatible color value to use as tertiary. (Default: back)               |
+| logoUrl                      | String  | theme          | false     | Image path to use as logo. (Default: OpenHAB logo).                          |
 
 ## Thing Channels
 

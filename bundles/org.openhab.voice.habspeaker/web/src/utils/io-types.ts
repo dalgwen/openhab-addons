@@ -33,7 +33,23 @@ export type RustpotterOptions = {
   bandPassLowCutoff: number
   bandPassHighCutoff: number
 };
-export type ConfigureSpeakerCmd = { sampleRate: number, resampleMode: string, useAudioElement: boolean, sinkVolume?: number, sourceVolume?: number, spotMode?: string, screenSaverTime?: number, label?: string, dimScreen?: boolean, keepAwake?: boolean, spotConfig?: RustpotterOptions };
+export type ConfigureSpeakerCmd = {
+  sampleRate: number,
+  resampleMode: string,
+  useAudioElement: boolean,
+  sinkVolume?: number,
+  sourceVolume?: number,
+  spotMode?: string,
+  screenSaverTime?: number,
+  label?: string,
+  dimScreen?: boolean,
+  keepAwake?: boolean,
+  spotConfig?: RustpotterOptions
+  primaryColor?: string,
+  secondaryColor?: string,
+  tertiaryColor?: string,
+  logoUrl?: string
+};
 export type MediaCommandCmd = { type: 'play' } |
 { type: 'pause' } |
 { type: 'stop' } |

@@ -2,7 +2,7 @@
   position: absolute;
   bottom: 4rem;
   right: 2.2rem;
-  background: white;
+  background: var(--color-primary);
   padding: 1em;
 }
 

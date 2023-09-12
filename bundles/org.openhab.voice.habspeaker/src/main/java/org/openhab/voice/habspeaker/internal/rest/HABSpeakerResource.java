@@ -95,7 +95,7 @@ public class HABSpeakerResource implements RESTResource {
     public Response config(@PathParam("speaker_id") String id) {
         var thing = thingRegistry.get(new ThingUID("habspeaker", "speaker", id));
         String label = "HABSpeaker";
-        Long sampleRate = null;
+        Map<String, Object> configResp = new HashMap<>();
         if (thing != null && thing.getHandler() instanceof HABSpeakerThingHandler speakerHandler) {
             String thingLabel = thing.getLabel();
             if (thingLabel != null) {
@@ -103,14 +103,22 @@ public class HABSpeakerResource implements RESTResource {
             }
             var speakerThingConfig = speakerHandler.getSpeakerConfig();
             if (speakerThingConfig.changeSampleRate && speakerThingConfig.sampleRate != -1) {
-                sampleRate = speakerThingConfig.sampleRate;
+                configResp.put("sampleRate", speakerThingConfig.sampleRate);
+            }
+            if (!speakerThingConfig.primaryColor.isBlank()) {
+                configResp.put("primaryColor", speakerThingConfig.primaryColor);
+            }
+            if (!speakerThingConfig.secondaryColor.isBlank()) {
+                configResp.put("secondaryColor", speakerThingConfig.secondaryColor);
+            }
+            if (!speakerThingConfig.tertiaryColor.isBlank()) {
+                configResp.put("tertiaryColor", speakerThingConfig.tertiaryColor);
+            }
+            if (!speakerThingConfig.logoUrl.isBlank()) {
+                configResp.put("logoUrl", speakerThingConfig.logoUrl);
             }
         }
-        Map<String, Object> configResp = new HashMap<>();
         configResp.put("label", label);
-        if (sampleRate != null) {
-            configResp.put("sampleRate", sampleRate);
-        }
         return addAllowCorsHeaders(Response.ok(configResp)).build();
     }
 

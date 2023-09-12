@@ -14,17 +14,19 @@ const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platfor
 window.addEventListener('load', () => {
     const appRoot = queryElement<HTMLDivElement>("#app_root");
     const speakerWidget = queryElement<HTMLButtonElement>("#speaker_widget");
-    const optionsForm = new OptionsFormCtrl(appRoot, queryElement<HTMLTemplateElement>("#local_config_template"));
-    const tooltip = new TooltipCtrl(appRoot, queryElement<HTMLTemplateElement>("#tooltip_template"));
+    const optionsForm = new OptionsFormCtrl(appRoot, queryElement("#local_config_template"));
+    const tooltip = new TooltipCtrl(appRoot, queryElement("#tooltip_template"));
     const iconCtrl = new IconCtrl(speakerWidget, queryElement("#speaker_icon", speakerWidget));
     const mediaPlayer = new MediaPlayerManager(appRoot);
-    const screenSaver = new ScreenSaverManager(getScreenSaverCallback(appRoot, queryElement<HTMLTemplateElement>("#screen_saver_template")), () => mediaPlayer.getPlayer()?.getAwakeScreen() ?? false);
+    const themeCtrl = new ThemeCtrl(queryElement("#oh-logo"), queryElement("#speaker_label"));
+    const screenSaver = new ScreenSaverManager(getScreenSaverCallback(appRoot, queryElement("#screen_saver_template"), themeCtrl), () => mediaPlayer.getPlayer()?.getAwakeScreen() ?? false);
     const uiCtrl: UIControls = {
         iconCtrl,
         mediaPlayer,
         screenSaver,
         tooltip,
-        optionsForm
+        optionsForm,
+        themeCtrl,
     };
     (async () => {
         console.log("Setting up HABSpeaker UI");
@@ -46,7 +48,8 @@ type UIControls = {
     screenSaver: ScreenSaverManager,
     iconCtrl: IconCtrl,
     optionsForm: OptionsFormCtrl,
-    tooltip: TooltipCtrl
+    tooltip: TooltipCtrl,
+    themeCtrl: ThemeCtrl,
 }
 async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boolean): Promise<void> {
     const speakerId = await platform.getSpeakerId();
@@ -74,7 +77,8 @@ async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boo
             throw error;
         }
     }
-    updateSpeakerLabel(uiConfig.label);
+    uiControls.themeCtrl.setLabel(uiConfig.label);
+    uiControls.themeCtrl.update(uiConfig);
     uiControls.screenSaver.setSeconds(300);
     uiControls.screenSaver.bindUserEvents();
     const ioListeners = getIOListeners(
@@ -82,6 +86,7 @@ async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boo
         uiControls.mediaPlayer,
         uiControls.iconCtrl,
         uiControls.tooltip,
+        uiControls.themeCtrl,
     );
     const ioMain = new IOMain(await platform.getUrlOpenHAB(), ioListeners);
     uiControls.iconCtrl.setOnClick(ioMain.sendSpot.bind(ioMain));
@@ -96,7 +101,7 @@ async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boo
         })
         .catch(err => console.error("Platform setup has failed:", err));
 }
-function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlayerManager, icon: IconCtrl, tooltip: TooltipCtrl): IOEventListeners {
+function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlayerManager, icon: IconCtrl, tooltip: TooltipCtrl, themeCtrl: ThemeCtrl): IOEventListeners {
     return {
         onMediaCommand: getMediaCommandHandler(mediaPlayer),
         onMessage: tooltip.display.bind(tooltip),
@@ -117,8 +122,9 @@ function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlaye
             dimScreenEnabled = !!dimScreen;
             platform.keepDeviceAwake(!!keepAwake);
             if (label?.length) {
-                updateSpeakerLabel(label);
+                themeCtrl.setLabel(label);
             }
+            themeCtrl.update(config);
         },
         onStartListening() {
             mediaPlayer.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
@@ -142,8 +148,26 @@ function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlaye
         },
     };
 }
-function updateSpeakerLabel(label: string) {
-    queryElement("#speaker_label").textContent = label;
+class ThemeCtrl {
+    private logoUrl = openHABLogoURL;
+    constructor(private logo: HTMLImageElement, private label: HTMLSpanElement) { }
+    getLogoUrl() {
+        return this.logoUrl;
+    }
+    setLabel(value: string) {
+        this.label.textContent = value;
+    }
+    update(theme: { primaryColor?: string, secondaryColor?: string, tertiaryColor?: string, logoUrl?: string }) {
+        if (theme.logoUrl) {
+            this.logoUrl = theme.logoUrl;
+        } else {
+            this.logoUrl = openHABLogoURL;
+        }
+        this.logo.src = this.logoUrl;
+        document.documentElement.style.setProperty('--color-primary', theme.primaryColor ?? 'var(--oh-red)');
+        document.documentElement.style.setProperty('--color-secondary', theme.secondaryColor ?? 'var(--oh-grey)');
+        document.documentElement.style.setProperty('--color-tertiary', theme.tertiaryColor ?? 'var(--hs-black)');
+    }
 }
 // icon ctrl
 class IconCtrl {
@@ -287,7 +311,7 @@ export class TooltipCtrl {
 }
 // screen saver
 let dimScreenEnabled: boolean = false;
-function getScreenSaverCallback(appRoot: HTMLDivElement, screenSaverTemplate: HTMLTemplateElement) {
+function getScreenSaverCallback(appRoot: HTMLDivElement, screenSaverTemplate: HTMLTemplateElement, themeCtrl: ThemeCtrl) {
     let screenSaverClone: HTMLDivElement | null = null;
     let iconMovementInterval: any;
     function getMoveIconFn(logo: HTMLElement) {
@@ -314,7 +338,7 @@ function getScreenSaverCallback(appRoot: HTMLDivElement, screenSaverTemplate: HT
                 screenSaverClone = queryElement("div", screenSaverTemplate.content)
                     .cloneNode(true).firstChild?.parentElement as HTMLDivElement;
                 const logo = queryElement<HTMLImageElement>("#screen_saver_logo", screenSaverClone);
-                logo.src = openHABLogoURL;
+                logo.src = themeCtrl.getLogoUrl();
                 iconMovementInterval = setInterval(getMoveIconFn(logo), 5000);
                 appRoot.appendChild(screenSaverClone);
             }

@@ -39,6 +39,10 @@
 				<label>Rustpotter Web</label>
 				<description>Browser keyword spotting options.</description>
 			</parameter-group>
+			<parameter-group name="theme">
+				<label>Theme Options</label>
+				<description>Display customizations.</description>
+			</parameter-group>
 			<!-- Audio config -->
 			<parameter name="sinkVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Sink Volume</label>
@@ -282,6 +286,22 @@
 				<description>High cutoff for the band-pass filter.</description>
 				<default>400</default>
 				<advanced>true</advanced>
+			</parameter>
+			<parameter name="primaryColor" type="text" groupName="theme">
+				<label>Primary Color</label>
+				<description>Css compatible color value to use as primary. (Default: OpenHAB red)</description>
+			</parameter>
+			<parameter name="secondaryColor" type="text" groupName="theme">
+				<label>Primary Color</label>
+				<description>Css compatible color value to use as secondary. (Default: OpenHAB grey)</description>
+			</parameter>
+			<parameter name="tertiaryColor" type="text" groupName="theme">
+				<label>Tertiary Color</label>
+				<description>Css compatible color value to use as tertiary. (Default: back)</description>
+			</parameter>
+			<parameter name="logoUrl" type="text" groupName="theme">
+				<label>Logo URL</label>
+				<description>Image path to use as logo. (Default: OpenHAB logo)</description>
 			</parameter>
 		</config-description>
 	</thing-type>

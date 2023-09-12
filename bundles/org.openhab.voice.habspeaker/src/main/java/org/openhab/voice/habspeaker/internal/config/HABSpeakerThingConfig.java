@@ -12,10 +12,10 @@
  */
 package org.openhab.voice.habspeaker.internal.config;
 
+import java.util.List;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-
-import java.util.List;
 
 /**
  * The {@link HABSpeakerThingConfig} class defines the speaker configuration
@@ -164,4 +164,20 @@ public class HABSpeakerThingConfig {
      * Rustpotter web band pass high cutoff
      */
     public float rustpotterHighCutoff = 400f;
+    /**
+     * Theme primary color
+     */
+    public String primaryColor = "";
+    /**
+     * Theme secondary color
+     */
+    public String secondaryColor = "";
+    /**
+     * Theme tertiary color
+     */
+    public String tertiaryColor = "";
+    /**
+     * Logo url
+     */
+    public String logoUrl = "";
 }
