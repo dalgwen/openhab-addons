@@ -84,7 +84,6 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
 
     protected Map<String, Object> getSpeakerConfigMessage(@Nullable HABSpeakerIOHandler handler)
             throws IllegalStateException {
-        logger.warn("CHECK 1");
         if (handler == null) {
             var speakerConfig = new HashMap<String, Object>();
             var defaultConfig = new HABSpeakerThingConfig();
@@ -93,7 +92,6 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
             return speakerConfig;
         }
         var config = handler.getSpeakerConfig();
-        logger.warn("Sending configuration to '{}'", handler.getLabel());
         var speakerConfig = new HashMap<String, Object>();
         speakerConfig.put("sinkVolume", config.sinkVolume);
         speakerConfig.put("sampleRate", config.sampleRate);

@@ -344,7 +344,6 @@ export default class IOWorker {
     let sinkContext = this.sinkContextStorage.get(streamId) as SinkContext;
     if (!sinkContext) {
       const sendSinkData = (buffer: Float32Array) => {
-        debugger
         const resampledBuffer = sinkContext.resampler.resample(buffer);
         if (sinkContext.port) {
           sinkContext.port.postMessage(resampledBuffer);

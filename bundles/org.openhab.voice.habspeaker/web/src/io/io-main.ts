@@ -213,7 +213,6 @@ export class IOMain {
           if (speakerConfig.sinkVolume != null) {
             this.sinkVolume = speakerConfig.sinkVolume;
           }
-          debugger
           this.serverSpotting = false;
           switch (speakerConfig.spotMode) {
             case "server":
