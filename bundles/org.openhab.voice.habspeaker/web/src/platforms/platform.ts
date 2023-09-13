@@ -1,7 +1,7 @@
 export type PlatformName = 'web' | 'electron' | 'capacitor';
 
 export interface Platform {
-    getName(): PlatformName;
+    getName(): Promise<PlatformName>;
     getServerToken(): Promise<string | null>;
     getSpeakerId(): Promise<string | null>;
     getUrlOpenHAB(): Promise<string>;

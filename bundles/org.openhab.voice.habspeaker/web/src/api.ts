@@ -1,12 +1,12 @@
 
-import { OHAuthHelper } from "./utils/openhab-auth-helper";
+import { OHOAuth } from "./oh-oauth";
 
 export class HABSpeakerREST {
   private serverToken: string | null = null;
-  private ohAuthHelper: OHAuthHelper;
+  private ohAuthHelper: OHOAuth;
   private tokenListener: (accessToken: string) => void = () => { };
   constructor(private speakerId: () => Promise<string | null>, private ohUrl: () => Promise<string>,) {
-    this.ohAuthHelper = new OHAuthHelper({ path: '/habspeaker', ohUrl });
+    this.ohAuthHelper = new OHOAuth({ path: '/habspeaker', ohUrl });
   }
   public getAccessToken() {
     return this.serverToken ?? this.ohAuthHelper.hasAccessToken() ? this.ohAuthHelper.getAccessToken() : null;

@@ -1,42 +1,46 @@
-import "./assets/main.css";
-import microphoneIconSvg from "./assets/microphone.svg?raw";
-import openHABLogoURL from "./assets/openhab-logo.svg?url";
-import speakerIconSvg from "./assets/speaker.svg?raw";
-import { platform } from './platforms';
+import "./styles/index.css";
+
+import { Platform, startPlatform } from './platforms';
 import { HABSpeakerREST, UIConfig, UnauthorizedError } from './api';
-import { IOEventListeners, IOMain } from './utils/io-main';
-import { ScreenSaverManager } from './utils/screen-saver-manager';
-import { MediaPlayerManager, MediaProvider } from "./media/media-player";
-import { MediaCommandCmd } from "./utils/io-types";
-import { ReentrantLock } from "reentrant-lock";
-const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platform.getUrlOpenHAB.bind(platform));
+import { IOEventListeners, IOMain } from './io/io-main';
+import { MediaCtrl, MediaProvider } from "./ui-controls/media/media-ctrl";
+import { MediaCommandCmd } from "./io/io-types";
+import { OptionsFormCtrl } from "./ui-controls/options-form-ctrl";
+import { queryElement } from "./ui-controls/utils";
+import { TooltipCtrl } from "./ui-controls/tooltip-ctrl";
+import { WidgetCtrl } from "./ui-controls/widget-ctrl";
+import { ThemeCtrl } from "./ui-controls/theme-ctrl";
+import { ScreenSaverCtrl } from "./ui-controls";
+
 
 window.addEventListener('load', () => {
     const appRoot = queryElement<HTMLDivElement>("#app_root");
-    const speakerWidget = queryElement<HTMLButtonElement>("#speaker_widget");
-    const optionsForm = new OptionsFormCtrl(appRoot, queryElement("#local_config_template"));
     const tooltip = new TooltipCtrl(appRoot, queryElement("#tooltip_template"));
-    const iconCtrl = new IconCtrl(speakerWidget, queryElement("#speaker_icon", speakerWidget));
-    const mediaPlayer = new MediaPlayerManager(appRoot);
-    const themeCtrl = new ThemeCtrl(queryElement("#oh-logo"), queryElement("#speaker_label"));
-    const screenSaver = new ScreenSaverManager(getScreenSaverCallback(appRoot, queryElement("#screen_saver_template"), themeCtrl), () => mediaPlayer.getPlayer()?.getAwakeScreen() ?? false);
-    const uiCtrl: UIControls = {
-        iconCtrl,
-        mediaPlayer,
-        screenSaver,
-        tooltip,
-        optionsForm,
-        themeCtrl,
-    };
     (async () => {
+        const platform = await startPlatform()
+        const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platform.getUrlOpenHAB.bind(platform));
+        const speakerWidget = queryElement<HTMLButtonElement>("#speaker_widget");
+        const optionsForm = new OptionsFormCtrl(appRoot, queryElement("#local_config_template"), platform);
+        const widget = new WidgetCtrl(speakerWidget);
+        const media = new MediaCtrl(appRoot);
+        const theme = new ThemeCtrl(queryElement("#oh-logo"), queryElement("#speaker_label"));
+        const screenSaver = new ScreenSaverCtrl(appRoot, queryElement("#screen_saver_template"), platform, theme, media);
+        const uiCtrl: UIControls = {
+            widget,
+            media,
+            screenSaver,
+            tooltip,
+            optionsForm,
+            theme,
+        };
         console.log("Setting up HABSpeaker UI");
         queryElement<HTMLImageElement>("#oh-logo").addEventListener("click", () => openHiddenOptions(optionsForm));
         const serverToken = await platform.getServerToken();
         const allowLoginRedirect = !await platform.isServerTokenNeeded();
         if ((!allowLoginRedirect && !serverToken) || !await platform.getSpeakerId()) {
-            return optionsForm.open("Configuration needed", () => initializeSpeaker(uiCtrl, allowLoginRedirect));
+            return optionsForm.open("Configuration needed", () => initializeSpeaker(restAPI, platform, uiCtrl, allowLoginRedirect));
         } else {
-            return initializeSpeaker(uiCtrl, allowLoginRedirect);
+            return initializeSpeaker(restAPI, platform, uiCtrl, allowLoginRedirect);
         }
     })().catch(err => {
         console.error("Initialization error:", err)
@@ -44,16 +48,16 @@ window.addEventListener('load', () => {
     });
 }, { once: true });
 type UIControls = {
-    mediaPlayer: MediaPlayerManager,
-    screenSaver: ScreenSaverManager,
-    iconCtrl: IconCtrl,
+    media: MediaCtrl,
+    screenSaver: ScreenSaverCtrl,
+    widget: WidgetCtrl,
     optionsForm: OptionsFormCtrl,
     tooltip: TooltipCtrl,
-    themeCtrl: ThemeCtrl,
+    theme: ThemeCtrl,
 }
-async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boolean): Promise<void> {
+async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, uiControls: UIControls, allowLoginRedirect: boolean): Promise<void> {
     const speakerId = await platform.getSpeakerId();
-    const retry = () => initializeSpeaker(uiControls, allowLoginRedirect);
+    const retry = () => initializeSpeaker(restAPI, platform, uiControls, allowLoginRedirect);
     if (!speakerId) {
         return uiControls.optionsForm.open("Speaker id required.", retry);
     }
@@ -69,7 +73,7 @@ async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boo
             }
             if (allowLoginRedirect) {
                 await restAPI.authorize();
-                return await initializeSpeaker(uiControls, false);
+                return await initializeSpeaker(restAPI, platform, uiControls, false);
             } else {
                 throw error;
             }
@@ -77,41 +81,44 @@ async function initializeSpeaker(uiControls: UIControls, allowLoginRedirect: boo
             throw error;
         }
     }
-    uiControls.themeCtrl.setLabel(uiConfig.label);
-    uiControls.themeCtrl.update(uiConfig);
-    uiControls.screenSaver.setSeconds(300);
-    uiControls.screenSaver.bindUserEvents();
+    uiControls.theme.setLabel(uiConfig.label);
+    uiControls.theme.update(uiConfig);
     const ioListeners = getIOListeners(
+        platform,
         uiControls.screenSaver,
-        uiControls.mediaPlayer,
-        uiControls.iconCtrl,
+        uiControls.media,
+        uiControls.widget,
         uiControls.tooltip,
-        uiControls.themeCtrl,
+        uiControls.theme,
     );
     const ioMain = new IOMain(await platform.getUrlOpenHAB(), ioListeners);
-    uiControls.iconCtrl.setOnClick(ioMain.sendSpot.bind(ioMain));
+    uiControls.widget.setOnClick(ioMain.sendSpot.bind(ioMain));
     restAPI.setTokenListener(accessToken => ioMain.setAuthToken(accessToken));
     platform.setup(async () => {
-        await ioMain.initialize(speakerId, restAPI.getAccessToken(), uiConfig.sampleRate);
+        ioMain.setAuthToken(restAPI.getAccessToken());
+        await ioMain.initialize(speakerId, uiConfig.sampleRate);
     })
         .then((msg) => {
             if (msg) {
                 uiControls.tooltip.display(msg, "info", 3000);
             }
         })
-        .catch(err => console.error("Platform setup has failed:", err));
+        .catch(err => {
+            console.error("Platform setup has failed:", err);
+            uiControls.tooltip.display("Speaker setup has failed, please examine logs and report the issue", "info", 3000);
+        });
 }
-function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlayerManager, icon: IconCtrl, tooltip: TooltipCtrl, themeCtrl: ThemeCtrl): IOEventListeners {
+function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, mediaPlayer: MediaCtrl, widget: WidgetCtrl, tooltip: TooltipCtrl, themeCtrl: ThemeCtrl): IOEventListeners {
     return {
         onMediaCommand: getMediaCommandHandler(mediaPlayer),
         onMessage: tooltip.display.bind(tooltip),
         onConnected() {
             screenSaver.awake();
-            icon.setOnline(true);
+            widget.setOnline(true);
         },
         onDisconnected() {
             screenSaver.awake();
-            icon.setOnline(false);
+            widget.setOnline(false);
         },
         onConfigured(config) {
             screenSaver.awake();
@@ -119,7 +126,7 @@ function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlaye
             if (screenSaverTime != null && !isNaN(screenSaverTime)) {
                 screenSaver.setSeconds(screenSaverTime);
             }
-            dimScreenEnabled = !!dimScreen;
+            screenSaver.toggleScreenDim(!!dimScreen);
             platform.keepDeviceAwake(!!keepAwake);
             if (label?.length) {
                 themeCtrl.setLabel(label);
@@ -129,88 +136,26 @@ function getIOListeners(screenSaver: ScreenSaverManager, mediaPlayer: MediaPlaye
         onStartListening() {
             mediaPlayer.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            icon.setListening(true);
+            widget.setListening(true);
         },
         onStopListening() {
             mediaPlayer.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            icon.setListening(false);
+            widget.setListening(false);
         },
         onStartSpeaking() {
             mediaPlayer.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            icon.setSpeaking(true);
+            widget.setSpeaking(true);
         },
         onStopSpeaking() {
             mediaPlayer.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            icon.setSpeaking(false);
+            widget.setSpeaking(false);
         },
     };
 }
-class ThemeCtrl {
-    private logoUrl = openHABLogoURL;
-    constructor(private logo: HTMLImageElement, private label: HTMLSpanElement) { }
-    getLogoUrl() {
-        return this.logoUrl;
-    }
-    setLabel(value: string) {
-        this.label.textContent = value;
-    }
-    update(theme: { primaryColor?: string, secondaryColor?: string, tertiaryColor?: string, logoUrl?: string }) {
-        if (theme.logoUrl) {
-            this.logoUrl = theme.logoUrl;
-        } else {
-            this.logoUrl = openHABLogoURL;
-        }
-        this.logo.src = this.logoUrl;
-        document.documentElement.style.setProperty('--color-primary', theme.primaryColor ?? 'var(--oh-red)');
-        document.documentElement.style.setProperty('--color-secondary', theme.secondaryColor ?? 'var(--oh-grey)');
-        document.documentElement.style.setProperty('--color-tertiary', theme.tertiaryColor ?? 'var(--hs-black)');
-    }
-}
-// icon ctrl
-class IconCtrl {
-    private online = false;
-    private listening = false;
-    private speaking = false;
-    private onClick?: () => void;
-    constructor(private button: HTMLButtonElement, private iconAnchor: HTMLAnchorElement) {
-        button.addEventListener("click", () => this.online && this.onClick?.())
-    }
-    setOnline(value: boolean) {
-        this.online = value;
-        this.updateIcon();
-    }
-    setSpeaking(value: boolean) {
-        this.speaking = value;
-        this.updateIcon();
-    }
-    setListening(value: boolean) {
-        this.listening = value;
-        this.updateIcon();
-    }
-    updateIcon() {
-        if (this.online) {
-            this.button.disabled = false;
-            if (this.speaking) {
-                this.iconAnchor.innerHTML = speakerIconSvg;
-            } else if (this.listening) {
-                this.iconAnchor.innerHTML = microphoneIconSvg;
-            } else {
-                this.iconAnchor.innerHTML = "";
-            }
-        } else {
-            this.button.disabled = true;
-            this.iconAnchor.innerHTML = "";
-        }
-    }
-    setOnClick(cb: () => void) {
-        this.onClick = cb
-    }
-}
-// media
-function getMediaCommandHandler(playerMng: MediaPlayerManager) {
+function getMediaCommandHandler(playerMng: MediaCtrl) {
     return async (cmd: MediaCommandCmd) => {
         try {
             console.debug("main: running media command" + cmd.type);
@@ -260,129 +205,6 @@ function getMediaCommandHandler(playerMng: MediaPlayerManager) {
         }
     }
 }
-// tooltip
-export class TooltipCtrl {
-    tooltipLock = new ReentrantLock();
-    private level: 'info' | 'error' = 'info';
-    constructor(private appRoot: HTMLDivElement, private tooltipTemplate: HTMLTemplateElement) { }
-    public display(msg: string, type: 'info' | 'error', ms?: number): (() => void) {
-        if (type == 'info' && this.level !== 'info') {
-            console.debug("Ignoring info tooltip: " + msg);
-            return () => { };
-        }
-        const tooltipEl = queryElement("div", this.tooltipTemplate.content)
-            .cloneNode(true).firstChild?.parentElement as HTMLDivElement;
-        const p = queryElement<HTMLElement>("#text", tooltipEl);
-        p.textContent = msg;
-        const closeIcon = queryElement<HTMLElement>("#close", tooltipEl);
-
-        let timeoutRef: any = null;
-        let releaseLock: (() => void) | null = null;
-        let closed = false;
-        const close = (ev?: Event) => {
-            if (closed) {
-                return;
-            }
-            closed = true;
-            ev?.stopPropagation();
-            clearTimeout(timeoutRef);
-            tooltipEl.remove();
-            releaseLock?.();
-        }
-        this.tooltipLock.acquire().then(release => {
-            if (closed) {
-                release();
-                return;
-            }
-            releaseLock = release;
-            if (ms) {
-                closeIcon.remove();
-                timeoutRef = setTimeout(close, ms);
-            } else {
-                closeIcon.addEventListener("click", close)
-            }
-            this.appRoot.appendChild(tooltipEl);
-        });
-        return close;
-    }
-    public setLevel(value: typeof this.level) {
-        this.level = value;
-    }
-}
-// screen saver
-let dimScreenEnabled: boolean = false;
-function getScreenSaverCallback(appRoot: HTMLDivElement, screenSaverTemplate: HTMLTemplateElement, themeCtrl: ThemeCtrl) {
-    let screenSaverClone: HTMLDivElement | null = null;
-    let iconMovementInterval: any;
-    function getMoveIconFn(logo: HTMLElement) {
-        function getRandomArbitrary(min: number, max: number) {
-            return Math.round((Math.random() * (max - min) + min) * 100) / 100
-        }
-        return () => {
-            if (logo) {
-                logo.style.top = getRandomArbitrary(5, 95) + "%";
-                logo.style.left = getRandomArbitrary(10, 90) + "%";
-            }
-        }
-    }
-    return (enabled: boolean) => {
-        console.debug("Toggle screen saver: " + enabled);
-        if (dimScreenEnabled) {
-            // TODO: lock promise
-            platform.dimDeviceScreen(enabled)
-                .then(() => console.debug("Screen dimmed: " + enabled))
-                .catch(err => console.error("Error setting screen brightness: ", err));
-        }
-        if (enabled) {
-            if (!screenSaverClone) {
-                screenSaverClone = queryElement("div", screenSaverTemplate.content)
-                    .cloneNode(true).firstChild?.parentElement as HTMLDivElement;
-                const logo = queryElement<HTMLImageElement>("#screen_saver_logo", screenSaverClone);
-                logo.src = themeCtrl.getLogoUrl();
-                iconMovementInterval = setInterval(getMoveIconFn(logo), 5000);
-                appRoot.appendChild(screenSaverClone);
-            }
-        } else {
-            if (screenSaverClone) {
-                clearInterval(iconMovementInterval);
-                appRoot.removeChild(screenSaverClone);
-                screenSaverClone = null;
-            }
-        }
-    }
-}
-
-// Local options panel
-class OptionsFormCtrl {
-    constructor(private appRoot: HTMLElement, private configPanelTemplate: HTMLTemplateElement) { }
-    async open(message: string, cb: () => Promise<void>) {
-        const formContainer = queryElement<HTMLDivElement>("#config_form_container", this.configPanelTemplate.content)
-            .cloneNode(true).firstChild?.parentElement as HTMLDivElement;
-        const p = queryElement<HTMLParagraphElement>("#config_form_msg", formContainer);
-        p.textContent = message;
-        queryElement<HTMLInputElement>('#config_form_container input[name="speaker-id"]', formContainer).value = await platform.getSpeakerId() ?? ""
-        const serverOptions = queryElement<HTMLParagraphElement>("#form_server_options", formContainer);
-        const serverOptionsNeeded = await platform.isServerTokenNeeded();
-        if (!serverOptionsNeeded) {
-            serverOptions.remove();
-        } else {
-            queryElement<HTMLInputElement>('input[name="oh-url"]', serverOptions).value = await platform.getSpeakerId() ?? ""
-            queryElement<HTMLInputElement>('input[name="oh-token"]', serverOptions).value = await platform.getServerToken() ?? "";
-        }
-        formContainer.addEventListener("submit", async (ev: Event) => {
-            const data = new FormData(ev.target as HTMLFormElement);
-            const value = Object.fromEntries(data.entries()) as { "speaker-id": string, "oh-url"?: string, "oh-token"?: string, };
-            this.appRoot.removeChild(formContainer);
-            await platform.setSpeakerSettings({
-                speakerId: value["speaker-id"],
-                ohUrl: value["oh-url"],
-                ohToken: value["oh-token"],
-            });
-            await cb();
-        });
-        this.appRoot.appendChild(formContainer);
-    }
-}
 let clickCounter = 0;
 let clickTime = 0;
 async function openHiddenOptions(formController: OptionsFormCtrl) {
@@ -398,11 +220,3 @@ async function openHiddenOptions(formController: OptionsFormCtrl) {
     }
 }
 
-// utils 
-function queryElement<T extends Element>(selector: string, parent?: HTMLElement | DocumentFragment) {
-    const el = (parent ?? document).querySelector<T>(selector);
-    if (el == null) {
-        throw new Error("Missing required element: " + selector);
-    }
-    return el;
-}

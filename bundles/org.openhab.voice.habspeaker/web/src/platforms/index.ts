@@ -1,52 +1,47 @@
 /// <reference types="vite/client" />
 import type { Platform, SpeakerLocalSettings } from "./platform";
 export * from "./platform";
-const getPlatform: () => Promise<Platform> = async () => {
-
+export const startPlatform: () => Promise<Platform> = async () => {
     // #v-ifdef MODE=electron
-    return (await import('./electron/electron-platform')).electronPlatform;
+    return new PlatformAdapter((await import('./electron/electron-platform')).electronPlatform);
     // #v-endif
-
     // #v-ifdef MODE=capacitor
-    return (await import('./capacitor/capacitor-platform')).capacitorPlatform;
+    return new PlatformAdapter((await import('./capacitor/capacitor-platform')).capacitorPlatform);
     // #v-endif
-
-    return (await import('./web/web-platform')).webPlatform;
+    return new PlatformAdapter((await import('./web/web-platform')).webPlatform);
 };
 
-class PlatformAdapter {
+class PlatformAdapter implements Platform {
+    constructor(private readonly platform: Platform) { }
+    async setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void> {
+        await this.platform.setLocalSettings(localSettings);
+    }
     async getName() {
-        return (await getPlatform()).getName();
+        return this.platform.getName();
     }
     async keepDeviceAwake(value: boolean) {
-        (await getPlatform()).keepDeviceAwake(value);
+        this.platform.keepDeviceAwake(value);
     }
     async dimDeviceScreen(value: boolean) {
-        (await getPlatform()).dimDeviceScreen(value);
+        this.platform.dimDeviceScreen(value);
     }
     async setup(onReady: () => Promise<void>) {
-        const platform = await getPlatform();
-        console.info(`main: running ${platform.getName()} setup`);
-        return platform.setup(onReady);
+        console.info(`main: running ${await this.platform.getName()} setup`);
+        return this.platform.setup(onReady);
     }
     async getUrlOpenHAB() {
         if (import.meta.env.VITE_DEV_SERVER_URL) {
             return import.meta.env.VITE_DEV_SERVER_URL;
         }
-        return (await getPlatform()).getUrlOpenHAB();
+        return this.platform.getUrlOpenHAB();
     }
     async isServerTokenNeeded() {
-        return (await getPlatform()).isServerTokenNeeded();
+        return this.platform.isServerTokenNeeded();
     }
     async getSpeakerId() {
-        return (await getPlatform()).getSpeakerId();
-    }
-    async setSpeakerSettings(settings: SpeakerLocalSettings) {
-        await (await getPlatform()).setLocalSettings(settings);
+        return this.platform.getSpeakerId();
     }
     async getServerToken() {
-        return (await getPlatform()).getServerToken();
+        return this.platform.getServerToken();
     }
 }
-
-export const platform = new PlatformAdapter();

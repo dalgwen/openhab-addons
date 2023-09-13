@@ -1,8 +1,8 @@
-import { MediaStateCmd } from "../utils/io-types";
+import { MediaStateCmd } from "../../io/io-types";
 import { WebAudioPlayerFactory } from "./web-audio-player";
 import { WebVideoPlayerFactory } from "./web-video-player";
 import { ReentrantLock } from "reentrant-lock";
-export class MediaPlayerManager {
+export class MediaCtrl {
     private mediaPlayer?: PlayerCtrl;
     players: MediaPlayerFactory[];
     private mediaStateUpdateSeconds = 5;

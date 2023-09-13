@@ -1,6 +1,6 @@
 import { Platform, PlatformName, SpeakerLocalSettings } from "../platform";
 class ElectronPlatform implements Platform {
-    getName(): PlatformName {
+    async getName(): Promise<PlatformName> {
         return 'electron';
     }
     async dimDeviceScreen(value: boolean) {

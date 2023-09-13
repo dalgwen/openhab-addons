@@ -8,8 +8,8 @@ import { ScreenBrightness } from '@capacitor-community/screen-brightness';
 class CapacitorPlatform extends WebPlatform implements Platform {
     screenDimmed = false;
     screenBrightnessBU = 1;
-    getName(): PlatformName {
-        return 'capacitor';
+    getName(): Promise<PlatformName> {
+        return Promise.resolve('capacitor');
     }
     async keepDeviceAwake(value: boolean): Promise<void> {
         try {

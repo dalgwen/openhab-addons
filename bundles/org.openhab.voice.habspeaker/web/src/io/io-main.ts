@@ -37,7 +37,7 @@ export class IOMain {
   private currentWakeword: string | null = null;
   private rustpotterAudioNode: AudioNode | null = null;
 
-  constructor(private ohUrl: string, private callbacks: IOEventListeners = {}) { }
+  constructor(private ohUrl: string, private events: IOEventListeners = {}) { }
   public isOnline() {
     return this.online;
   }
@@ -151,9 +151,9 @@ export class IOMain {
       this.postToWorker(WorkerInCmd.MEDIA_STATE, state);
     }
   }
-  public setAuthToken(token: string) {
+  public setAuthToken(token: string | null) {
     this.accessToken = token;
-    if (this.worker) {
+    if (token && this.worker) {
       this.postToWorker(WorkerInCmd.TOKEN_RENEW, { token });
     }
   }
@@ -204,7 +204,7 @@ export class IOMain {
         const speakerConfig = data as WorkerOutCmdType<typeof command>;
         (async () => {
           const audioContext = this.getVoiceAudioContext();
-          const closeMsg = this.callbacks.onMessage?.("Resuming audio context, click to continue", "info");
+          const closeMsg = this.events.onMessage?.("Resuming audio context, click to continue", "info");
           await audioContext.resume();
           closeMsg?.();
           await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
@@ -218,11 +218,11 @@ export class IOMain {
             case "server":
               await this.teardownRustpotter();
               this.serverSpotting = true;
-              this.callbacks.onMessage?.("Running keyword spotting against the server.", "info", 5000);
+              this.events.onMessage?.("Running keyword spotting against the server.", "info", 5000);
               break;
             case "rustpotter_web":
               if (speakerConfig.spotConfig?.keyword) {
-                this.callbacks.onMessage?.("Running keyword spotting locally.", "info", 5000);
+                this.events.onMessage?.("Running keyword spotting locally.", "info", 5000);
                 try {
                   const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.keyword, speakerConfig.spotConfig);
                   console.debug("main: creating rustpotter audio worklet");
@@ -231,20 +231,20 @@ export class IOMain {
                   await this.audioSource?.start(this.rustpotterAudioNode);
                 } catch (error) {
                   console.error("Unable to start local ks processor", error);
-                  this.callbacks.onMessage?.("Error starting local keyword spotter.", "info", 5000);
+                  this.events.onMessage?.("Error starting local keyword spotter.", "info", 5000);
                 }
               } else {
                 console.warn("main: Missed spotConfig configuration");
-                this.callbacks.onMessage?.("Error starting local keyword spotter.", "error", 5000);
+                this.events.onMessage?.("Error starting local keyword spotter.", "error", 5000);
               }
               break;
             case "none":
             default:
-              this.callbacks.onMessage?.("No keyword spotter, click the widget to trigger the dialog.", "info", 5000);
+              this.events.onMessage?.("No keyword spotter, click the widget to trigger the dialog.", "info", 5000);
               await this.teardownRustpotter();
               break;
           }
-          this.callbacks.onConfigured?.(speakerConfig);
+          this.events.onConfigured?.(speakerConfig);
           this.postToWorker(WorkerInCmd.ACK_MESSAGE, { code: speakerConfig.ack });
         })();
         break;
@@ -254,25 +254,25 @@ export class IOMain {
         break;
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
-        this.callbacks.onConnected?.(this);
-        this.callbacks.onMessage?.("Speaker connected.", "info", 2000);
+        this.events.onConnected?.(this);
+        this.events.onMessage?.("Speaker connected.", "info", 2000);
         if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
           this.startMicStreaming();
         }
         break;
       case WorkerOutCmd.OFFLINE:
-        this.callbacks.onMessage?.("Speaker disconnected, trying to reconnect.", "error", 2000);
+        this.events.onMessage?.("Speaker disconnected, trying to reconnect.", "error", 2000);
         this.sinkVolume = 0;
         this.serverSpotting = false;
         this.killMicProcessors();
         if (this.listening) {
           this.listening = false;
-          this.callbacks.onStopListening?.(this);
+          this.events.onStopListening?.(this);
         }
         if (this.online) {
           this.online = false;
-          this.callbacks.onDisconnected?.(this);
+          this.events.onDisconnected?.(this);
         }
         if (this.listenPortACK) {
           this.messageACKs.abortACK(this.listenPortACK);
@@ -288,7 +288,7 @@ export class IOMain {
         const startSpeaking = this.activeSinks.size === 1;
         sink.start().then(() => {
           if (startSpeaking) {
-            this.callbacks.onStartSpeaking?.(this);
+            this.events.onStartSpeaking?.(this);
           }
         }).catch(err => console.error(err));
         break;
@@ -300,7 +300,7 @@ export class IOMain {
           this.activeSinks.delete(stopSinkCmd.id);
           activeSink.close();
           if (this.activeSinks.size === 0) {
-            this.callbacks.onStopSpeaking?.(this);
+            this.events.onStopSpeaking?.(this);
           }
         } else {
           console.error("main: unable to stop sink, not found ", stopSinkCmd.id);
@@ -313,7 +313,7 @@ export class IOMain {
         }
         if (!this.listening) {
           this.listening = true;
-          this.callbacks.onStartListening?.(this);
+          this.events.onStartListening?.(this);
         }
         if (!this.serverSpotting) {
           this.startMicStreaming();
@@ -326,7 +326,7 @@ export class IOMain {
         }
         if (this.listening) {
           this.listening = false;
-          this.callbacks.onStopListening?.(this);
+          this.events.onStopListening?.(this);
         }
         if (!this.serverSpotting) {
           this.stopMicStreaming();
@@ -334,19 +334,19 @@ export class IOMain {
         break;
       case WorkerOutCmd.SINK_VOLUME:
         const { value: sinkVolume } = data as WorkerOutCmdType<typeof command>;
-        this.callbacks.onMessage?.(`Sink volume: ${sinkVolume}.`, "info", 1000);
+        this.events.onMessage?.(`Sink volume: ${sinkVolume}.`, "info", 1000);
         this.sinkVolume = sinkVolume;
         this.activeSinks.forEach(sink => sink.setVolume(this.sinkVolume));
         break;
       case WorkerOutCmd.SOURCE_VOLUME:
         const { value: sourceVolume } = data as WorkerOutCmdType<typeof command>;
-        this.callbacks.onMessage?.(`Source volume: ${sourceVolume}.`, "info", 1000);
+        this.events.onMessage?.(`Source volume: ${sourceVolume}.`, "info", 1000);
         this.sourceVolume = sourceVolume;
         this.audioSource?.setVolume(sourceVolume);
         break;
       case WorkerOutCmd.MEDIA_COMMAND:
         const mediaCommandData = data as WorkerOutCmdType<typeof command>;
-        const sendCommand = () => this.callbacks.onMediaCommand?.(mediaCommandData);
+        const sendCommand = () => this.events.onMediaCommand?.(mediaCommandData);
         if (mediaCommandData.type === 'play' || mediaCommandData.type == 'pause') {
           sendCommand();
         } else {
@@ -379,7 +379,8 @@ export class IOMain {
       vadMode,
     };
   }
-  public async initialize(speakerId: string, token: string | null, customSampleRate?: number) {
+  public async initialize(speakerId: string, customSampleRate?: number) {
+    this.events.onMessage?.("Initiating speaker.", "info", 1000);
     this.startVoiceAudioContext(customSampleRate);
     const audioContext = this.getVoiceAudioContext();
     await audioContext.resume();
@@ -403,7 +404,7 @@ export class IOMain {
     });
     return new Promise((resolve, reject) => {
       try {
-        this.worker = new Worker(new URL("../utils/io-worker.ts", import.meta.url), {
+        this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
           name: "hab_speaker-worker",
           type: "module",
         });
@@ -420,7 +421,7 @@ export class IOMain {
         this.worker?.postMessage({
           cmd: WorkerInCmd.INITIALIZE,
           id: speakerId,
-          token,
+          token: this.accessToken,
           sampleRate: this.getVoiceAudioContext().sampleRate,
           ohUrl: this.ohUrl,
         });

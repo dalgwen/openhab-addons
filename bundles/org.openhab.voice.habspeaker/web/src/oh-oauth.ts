@@ -1,9 +1,16 @@
-export class OHAuthHelper {
+export class OHOAuth {
     accessToken = "";
     currentTokenExpireTime?: number;
     refreshAccessTokenTimeoutRef: any;
     refreshOnVisibilityChangeFn: (() => void) | null = null;
-    constructor(private options: { useCookie?: boolean, path?: string, setup?: boolean, ohUrl?: () => Promise<string> } = {}) {
+    codeVerifierKey: string;
+    authStateKey: string;
+    refreshTokenKey: string;
+    constructor(private options: { storagePrefix?: string, useCookie?: boolean, path?: string, setup?: boolean, ohUrl?: () => Promise<string> } = {}) {
+        const prefix = options.storagePrefix ?? 'openhab.ui';
+        this.codeVerifierKey = `${prefix}:codeVerifier`;
+        this.authStateKey = `${prefix}:authState`;
+        this.refreshTokenKey = `${prefix}:refreshToken`;
     }
     getRedirectUri() {
         return window.location.origin + (this.options.path ?? '');
@@ -12,8 +19,9 @@ export class OHAuthHelper {
         const PkceChallenge = await import('pkce-challenge');
         const pkceChallenge = PkceChallenge.default()
         const authState = (this.options.setup ? 'setup-' : '') + generateUUID();
-        sessionStorage.setItem('openhab.ui:codeVerifier', pkceChallenge.code_verifier)
-        sessionStorage.setItem('openhab.ui:authState', authState)
+
+        sessionStorage.setItem(this.codeVerifierKey, pkceChallenge.code_verifier)
+        sessionStorage.setItem(this.authStateKey, authState)
         var redirectUri = this.getRedirectUri();
         (window.location as any) = `${await this.getUrl()}/auth?` + urlEncodeObject({
             response_type: "code",
@@ -103,27 +111,27 @@ export class OHAuthHelper {
         this.accessToken = "";
     }
     getRefreshToken() {
-        return localStorage.getItem("openhab.ui:refreshToken") || null;
+        return localStorage.getItem(this.refreshTokenKey) || null;
     }
     setRefreshToken(refreshToken: string) {
-        localStorage.setItem("openhab.ui:refreshToken", refreshToken);
+        localStorage.setItem(this.refreshTokenKey, refreshToken);
     }
     async tryExchangeAuthorizationCode() {
         const { code, state } = getQueryParams();
         if (code && state) {
-            const authState = sessionStorage.getItem('openhab.ui:authState')
-            sessionStorage.removeItem('openhab.ui:authState');
+            const authState = sessionStorage.getItem(this.authStateKey)
+            sessionStorage.removeItem(this.authStateKey);
             if (authState !== state) {
                 throw new Error('Invalid state');
             }
             if (window.history) {
                 window.history.replaceState(null, window.document.title, window.location.href.replace('?code=' + code, '').replace('&state=' + authState, ''))
             }
-            const codeVerifier = sessionStorage.getItem('openhab.ui:codeVerifier');
+            const codeVerifier = sessionStorage.getItem(this.codeVerifierKey);
             if (!codeVerifier) {
                 throw new Error('Missing code verifier.');
             }
-            sessionStorage.removeItem('openhab.ui:codeVerifier');
+            sessionStorage.removeItem(this.codeVerifierKey);
             var redirectUri = this.getRedirectUri();
             const body = urlEncodeObject({
                 'grant_type': 'authorization_code',

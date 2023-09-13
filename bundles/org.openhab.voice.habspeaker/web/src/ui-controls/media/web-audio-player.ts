@@ -1,4 +1,4 @@
-import { MediaProvider, PlayerCtrl, PlaybackState, MediaPlayerFactory } from "./media-player";
+import { MediaProvider, PlayerCtrl, PlaybackState, MediaPlayerFactory } from "./media-ctrl";
 
 export class WebAudioPlayerFactory implements MediaPlayerFactory {
   private audioElement?: HTMLAudioElement;

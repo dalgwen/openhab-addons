@@ -5,8 +5,8 @@ const idLocalStorageKey = `${storagePrefix}id`;
 export class WebPlatform implements Platform {
     private runningSetup = false;
     private wakeLock?: WakeLockSentinel;
-    getName(): PlatformName {
-        return 'web';
+    getName(): Promise<PlatformName> {
+        return Promise.resolve('web');
     }
     async keepDeviceAwake(value: boolean): Promise<void> {
         if (value && this.wakeLock == null) {
