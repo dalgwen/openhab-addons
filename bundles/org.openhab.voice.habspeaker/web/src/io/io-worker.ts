@@ -172,7 +172,7 @@ export default class IOWorker {
   onWebSocketCommand(data: any) {
     try {
       if ((import.meta as any).env.DEV) {
-        console.debug("websocket => worker: ", data);
+        console.debug("websocket => io-worker: ", data);
       }
       const command = data.cmd as WebSocketOutCmd;
       switch (command) {
@@ -207,6 +207,10 @@ export default class IOWorker {
           const sinkVolumeData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.SINK_VOLUME, sinkVolumeData);
           break;
+        case WebSocketOutCmd.SOURCE_VOLUME:
+          const sourceVolumeData = data as WebSocketOutCmdType<typeof command>;
+          this.postToMainThread(WorkerOutCmd.SOURCE_VOLUME, sourceVolumeData);
+          break;
         case WebSocketOutCmd.MEDIA_COMMAND:
           const mediaCommandData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.MEDIA_COMMAND, mediaCommandData);
@@ -215,7 +219,7 @@ export default class IOWorker {
           throw new Error("Unknown command " + data.cmd);
       }
     } catch (error) {
-      console.error("Error handling command in worker: ", error);
+      console.error("Error handling command in io-worker: ", error);
     }
   }
   /**
@@ -248,7 +252,7 @@ export default class IOWorker {
         sampleRate: this.sampleRate,
       });
       if ((import.meta as any).env.DEV) {
-        console.debug("worker => websocket:", initMessage);
+        console.debug("io-worker => websocket:", initMessage);
       }
       if (!wsRef) {
         console.error("on open: Websocket is not connected!")
@@ -269,20 +273,20 @@ export default class IOWorker {
             const blob = msg.data;
             this.sinkLock
               .lock(() => blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer)))
-              .catch(err => console.error("worker: error on sink blob", err));
+              .catch(err => console.error("io-worker: error on sink blob", err));
             if ((import.meta as any).env.DEV) {
-              console.debug("websocket => worker: Binary data");
+              console.debug("websocket => io-worker: Binary data");
             }
           }
           break;
         default:
           console.error(
-            "websocket => worker: unprocessed message typeof " + msgType
+            "websocket => io-worker: unprocessed message typeof " + msgType
           );
       }
     });
     wsRef.addEventListener("close", () => {
-      console.warn("websocket => worker: connection closed");
+      console.warn("websocket => io-worker: connection closed");
       if (this.configurationACK != null) {
         this.ackManager.abortACK(this.configurationACK);
         this.configurationACK = undefined;

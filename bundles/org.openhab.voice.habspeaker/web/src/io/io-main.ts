@@ -205,42 +205,43 @@ export class IOMain {
         const speakerConfig = data as WorkerOutCmdType<typeof command>;
         (async () => {
           const audioContext = this.getVoiceAudioContext();
+          const resumeAudio = () => audioContext.resume();
           const closeMsg = this.events.onMessage?.("Resuming audio context, click to continue", "info");
+          document.addEventListener("click", resumeAudio);
           await audioContext.resume();
+          document.removeEventListener("click", resumeAudio);
           closeMsg?.();
           await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
-          this.audioSource?.setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
-          if (speakerConfig.sinkVolume != null) {
-            this.sinkVolume = speakerConfig.sinkVolume;
-          }
+          this.getAudioSource().setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
+          this.sinkVolume = speakerConfig.sinkVolume ?? this.sinkVolume;
           this.serverSpotting = false;
           switch (speakerConfig.spotMode) {
             case "server":
               await this.teardownRustpotter();
               this.serverSpotting = true;
-              this.events.onMessage?.("Running keyword spotting against the server.", "info", 5000);
+              this.events.onMessage?.("Running keyword spotting against the server", "info", 5000);
               break;
             case "rustpotter_web":
               if (speakerConfig.spotConfig?.keyword) {
-                this.events.onMessage?.("Running keyword spotting locally.", "info", 5000);
+                this.events.onMessage?.("Running keyword spotting locally", "info", 5000);
                 try {
                   const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.keyword, speakerConfig.spotConfig);
                   console.debug("main: creating rustpotter audio worklet");
                   this.rustpotterAudioNode = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
                   console.debug("main: connecting rustpotter audio worklet");
-                  await this.audioSource?.start(this.rustpotterAudioNode);
+                  await this.getAudioSource().start(this.rustpotterAudioNode);
                 } catch (error) {
                   console.error("Unable to start local ks processor", error);
-                  this.events.onMessage?.("Error starting local keyword spotter.", "info", 5000);
+                  this.events.onMessage?.("Error starting local keyword spotter", "info", 5000);
                 }
               } else {
                 console.warn("main: Missed spotConfig configuration");
-                this.events.onMessage?.("Error starting local keyword spotter.", "error", 5000);
+                this.events.onMessage?.("Error starting local keyword spotter", "error", 5000);
               }
               break;
             case "none":
             default:
-              this.events.onMessage?.("No keyword spotter, click the widget to trigger the dialog.", "info", 5000);
+              this.events.onMessage?.("No keyword spotter, click the widget to trigger the dialog", "info", 5000);
               await this.teardownRustpotter();
               break;
           }
@@ -255,14 +256,14 @@ export class IOMain {
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
         this.events.onConnected?.(this);
-        this.events.onMessage?.("Speaker connected.", "info", 2000);
+        this.events.onMessage?.("Speaker connected", "info", 2000);
         if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
           this.startMicStreaming();
         }
         break;
       case WorkerOutCmd.OFFLINE:
-        this.events.onMessage?.("Speaker disconnected, trying to reconnect.", "error", 2000);
+        this.events.onMessage?.("Speaker disconnected, trying to reconnect", "error", 2000);
         this.sinkVolume = 0;
         this.serverSpotting = false;
         this.killMicProcessors();
@@ -334,15 +335,15 @@ export class IOMain {
         break;
       case WorkerOutCmd.SINK_VOLUME:
         const { value: sinkVolume } = data as WorkerOutCmdType<typeof command>;
-        this.events.onMessage?.(`Sink volume: ${sinkVolume}.`, "info", 1000);
+        this.events.onMessage?.(`Sink volume: ${sinkVolume}`, "info", 1000);
         this.sinkVolume = sinkVolume;
         this.activeSinks.forEach(sink => sink.setVolume(this.sinkVolume));
         break;
       case WorkerOutCmd.SOURCE_VOLUME:
         const { value: sourceVolume } = data as WorkerOutCmdType<typeof command>;
-        this.events.onMessage?.(`Source volume: ${sourceVolume}.`, "info", 1000);
+        this.events.onMessage?.(`Source volume: ${sourceVolume}`, "info", 1000);
         this.sourceVolume = sourceVolume;
-        this.audioSource?.setVolume(sourceVolume);
+        this.getAudioSource().setVolume(sourceVolume);
         break;
       case WorkerOutCmd.MEDIA_COMMAND:
         const mediaCommandData = data as WorkerOutCmdType<typeof command>;
@@ -374,7 +375,7 @@ export class IOMain {
     };
   }
   public async initialize(speakerId: string, customSampleRate?: number) {
-    this.events.onMessage?.("Initiating speaker.", "info", 1000);
+    this.events.onMessage?.("Connecting speaker...", "info", 500);
     this.startVoiceAudioContext(customSampleRate);
     const audioContext = this.getVoiceAudioContext();
     await audioContext.resume();
@@ -384,10 +385,9 @@ export class IOMain {
 
     // microphone stream checker, to keep the stream alive on undetected disconnections  
     setInterval(() => {
-      if (this.audioSource?.isSuspended()) {
-        this.audioSource
-          .resume()
-          .catch(err => console.error("Unable to resume audio context", err))
+      const source = this.getAudioSource();
+      if (source.isSuspended()) {
+        source.resume().catch(err => console.error("Unable to resume audio context", err))
       }
     }, 10000);
     document.addEventListener("visibilitychange", () => {

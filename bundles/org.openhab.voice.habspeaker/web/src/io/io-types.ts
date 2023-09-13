@@ -72,6 +72,7 @@ export type WebSocketInCmdType<T extends WebSocketInCmd> =
   T extends WebSocketInCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WebSocketInCmd.SOURCE_VOLUME ? SetVolumeCmd :
   T extends WebSocketInCmd.INITIALIZE ? { id: string, sampleRate: number } :
+  T extends WebSocketInCmd.CONFIGURED ? { sinkVolume: number; sourceVolume: number; mediaVolume: number; } :
   T extends WebSocketInCmd.MEDIA_STATE ? MediaStateCmd :
   never;
 
@@ -82,6 +83,7 @@ export enum WebSocketOutCmd {
   START_LISTENING = "START_LISTENING",
   STOP_LISTENING = "STOP_LISTENING",
   SINK_VOLUME = "SINK_VOLUME",
+  SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
 }
 

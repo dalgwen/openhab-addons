@@ -120,7 +120,10 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
 function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, media: MediaCtrl, widget: WidgetCtrl, tooltip: TooltipCtrl, theme: ThemeCtrl): IOEventListeners {
     return {
         onMediaCommand: getMediaCommandHandler(media),
-        onMessage: tooltip.display.bind(tooltip),
+        onMessage: (...args) => {
+            screenSaver.awake();
+            return tooltip.display(...args);
+        },
         onConnected() {
             screenSaver.awake();
             widget.setOnline(true);
