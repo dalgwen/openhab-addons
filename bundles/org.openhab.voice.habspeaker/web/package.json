@@ -4,7 +4,7 @@
     "name": "Miguel Álvarez Díez (GiviMAD)"
   },
   "description": "A web UI to consume OpenHAB's dialog processing capabilities",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "private": true,
   "scripts": {
     "dev": "vite --mode pwa",
