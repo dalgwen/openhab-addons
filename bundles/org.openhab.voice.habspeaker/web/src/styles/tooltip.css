@@ -1,17 +1,25 @@
 .tooltip {
   position: absolute;
-  bottom: 4rem;
-  right: 2.2rem;
+  bottom: .4rem;
+  right: .4rem;
   background: var(--color-primary);
   padding: 1em;
 }
-
 .tooltip span {
-  font-size: bold;
+  font-size: medium;
 }
-
 .tooltip i {
   margin-left: 1em;
   font-weight: bold;
   cursor: pointer;
+}
+@media (orientation: portrait) {
+  .tooltip {
+    bottom: .2rem;
+    right: .2rem;
+    padding: 0.5em;
+  }
+  .tooltip span {
+    font-size: small;
+  }
 }

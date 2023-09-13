@@ -57,7 +57,7 @@ export class WebPlatform implements Platform {
         };
         document.addEventListener("click", wrapper);
         console.debug("Waiting click event at document.");
-        return "Click the screen to start the speaker";
+        return "Click outside the widget to start the speaker";
     }
     async getSpeakerId(): Promise<string | null> {
         return localStorage.getItem(idLocalStorageKey);

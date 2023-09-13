@@ -3,6 +3,7 @@ import speakerIconSvg from "../icons/speaker.svg?raw";
 import { queryElement } from "./utils";
 export class WidgetCtrl {
     private readonly iconAnchor: HTMLAnchorElement;
+    private mini = false;
     private online = false;
     private listening = false;
     private speaking = false;
@@ -22,6 +23,17 @@ export class WidgetCtrl {
     setListening(value: boolean) {
         this.listening = value;
         this.updateIcon();
+    }
+    setMini(value: boolean) {
+        if(value && !this.mini) {
+            this.mini = true;
+            this.button.classList.add("mini-widget");
+            console.debug('enable mini-widget mode');
+        } else if(!value && this.mini) {
+            this.mini = false;
+            this.button.classList.remove("mini-widget");
+            console.debug('disable mini-widget mode');
+        }
     }
     updateIcon() {
         if (this.online) {

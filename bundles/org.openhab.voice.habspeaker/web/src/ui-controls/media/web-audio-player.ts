@@ -1,45 +1,20 @@
 import { MediaProvider, PlayerCtrl, PlaybackState, MediaPlayerFactory } from "./media-ctrl";
 
 export class WebAudioPlayerFactory implements MediaPlayerFactory {
-  private audioElement?: HTMLAudioElement;
-  constructor(private root: HTMLElement) { }
+  constructor() { }
   claim(): Promise<boolean> {
     return Promise.resolve(false);
   }
   getId(): MediaProvider {
     return MediaProvider.AUDIO_PLAYER;
   }
-  async getPlayer(mediaId: string, setMediaState: (state: PlaybackState) => void): Promise<PlayerCtrl> {
-    let createNew = false;
-    if (!this.audioElement) {
-      createNew = true;
-      this.audioElement = document.createElement("audio");
-      this.audioElement.controls = true;
-      this.audioElement.autoplay = true;
-      this.audioElement.preload = "auto";
-      this.audioElement.src = mediaId;
-    } else {
-      this.audioElement.src = mediaId;
-      this.audioElement.load();
-    }
-    const audioEl = this.audioElement;
-    return new Promise(resolve => {
-      audioEl.addEventListener("load", () => {
-        const player = getPlayer(this.getId(), audioEl, setMediaState, true);
-        resolve(player);
-      });
-      if (createNew) {
-        this.root.appendChild(audioEl);
-      } else {
-        audioEl.load();
-      }
-    })
+  async getPlayer(setMediaState: (state: PlaybackState) => void): Promise<PlayerCtrl> {
+    const audioElement = document.createElement("audio");
+    audioElement.controls = true;
+    audioElement.autoplay = true;
+    audioElement.preload = "auto";
+    return getPlayer(this.getId(), audioElement, setMediaState, true);
   }
-  async killPlayer(): Promise<void> {
-    this.audioElement?.remove();
-    this.audioElement = undefined;
-  }
-
 }
 export function getPlayer(provider: MediaProvider, playerRef: HTMLVideoElement | HTMLAudioElement, setMediaState: (state: PlaybackState) => void, disableScreenSaver: boolean = false): PlayerCtrl {
   playerRef.addEventListener('pause', () => {
@@ -55,8 +30,13 @@ export function getPlayer(provider: MediaProvider, playerRef: HTMLVideoElement |
     setMediaState(PlaybackState.STOPPED);
   });
   return {
+    getRoot: () => playerRef,
     getId: () => provider,
-    getMediaId: async () => playerRef.currentSrc,
+    getMedia: async () => playerRef.currentSrc,
+    setMedia: async (id) => {
+      playerRef.src = id;
+      playerRef.load();
+    },
     play: async () => playerRef.play(),
     pause: async () => playerRef.pause(),
     stop: async () => playerRef.pause(),

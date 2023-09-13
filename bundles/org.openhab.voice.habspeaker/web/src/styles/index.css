@@ -1,6 +1,7 @@
 @import "./base.css";
-@import "./speaker-widget.css";
 @import "./logo.css";
+@import "./media.css";
+@import "./widget.css";
 @import "./config-form.css";
 @import "./screen-saver.css";
 @import "./tooltip.css";

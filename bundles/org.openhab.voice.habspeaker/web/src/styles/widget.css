@@ -1,5 +1,3 @@
-@import "./base.css";
-
 .speaker-widget {
   box-shadow: inset 0px 0px 10px 0px rgba(0,0,0,0.75);
   border: none;
@@ -40,12 +38,13 @@
   height: 100%;
   top: 0;
   left: 0;
+  margin: 0 auto;
 }
 .speaker-icon svg {
+  display: block;
   fill: currentColor;
   width: 100%;
-  height: 60%;
-  top: 20%;
+  height: 100%;
 }
 .speaker-widget:disabled {
   background: var(--color-secondary);
@@ -65,4 +64,16 @@
   left: 0px;
   transform: scale(1.9, 1.9);
   -webkit-transform: scale(1.9, 1.9);
+}
+
+.mini-widget {  
+  box-shadow: inset 0px 0px 10px 0px rgba(0,0,0,0.25);
+  position: absolute;
+  width: 3.3vh;
+  height: 3.3vh;
+  bottom: -5.5vh;
+}
+
+.mini-widget .speaker-widget-ring {
+  border: 3px solid var(--color-primary);
 }

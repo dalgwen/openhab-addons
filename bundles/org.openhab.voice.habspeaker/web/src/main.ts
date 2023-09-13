@@ -15,14 +15,15 @@ import { ScreenSaverCtrl } from "./ui-controls";
 
 window.addEventListener('load', () => {
     const appRoot = queryElement<HTMLDivElement>("#app_root");
-    const tooltip = new TooltipCtrl(appRoot, queryElement("#tooltip_template"));
+    const appMain = queryElement<HTMLDivElement>("#app_main");
+    const tooltip = new TooltipCtrl(appMain, queryElement("#tooltip_template"));
     (async () => {
         const platform = await startPlatform()
         const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platform.getUrlOpenHAB.bind(platform), platform.getUrlLogin.bind(platform), await platform.redirectToRoot());
         const speakerWidget = queryElement<HTMLButtonElement>("#speaker_widget");
         const optionsForm = new OptionsFormCtrl(appRoot, queryElement("#local_config_template"), platform);
         const widget = new WidgetCtrl(speakerWidget);
-        const media = new MediaCtrl(appRoot);
+        const media = new MediaCtrl(appMain);
         const theme = new ThemeCtrl(queryElement("#oh-logo"), queryElement("#speaker_label"));
         const screenSaver = new ScreenSaverCtrl(appRoot, queryElement("#screen_saver_template"), platform, theme, media);
         const uiCtrl: UIControls = {
@@ -93,6 +94,13 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
         uiControls.theme,
     );
     const ioMain = new IOMain(await platform.getUrlOpenHAB(), ioListeners);
+    uiControls.media.setListener(async playerState => {
+        uiControls.screenSaver.awake();
+        uiControls.widget.setMini(!!playerState);
+        if (playerState) {
+            ioMain.sendMediaState(playerState);
+        }
+    })
     uiControls.widget.setOnClick(ioMain.sendSpot.bind(ioMain));
     restAPI.setTokenListener(accessToken => ioMain.setAuthToken(accessToken));
     platform.setup(async () => {
@@ -109,9 +117,9 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
             uiControls.tooltip.display("Speaker setup has failed, please examine logs and report the issue", "info", 3000);
         });
 }
-function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, mediaPlayer: MediaCtrl, widget: WidgetCtrl, tooltip: TooltipCtrl, themeCtrl: ThemeCtrl): IOEventListeners {
+function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, media: MediaCtrl, widget: WidgetCtrl, tooltip: TooltipCtrl, theme: ThemeCtrl): IOEventListeners {
     return {
-        onMediaCommand: getMediaCommandHandler(mediaPlayer),
+        onMediaCommand: getMediaCommandHandler(media),
         onMessage: tooltip.display.bind(tooltip),
         onConnected() {
             screenSaver.awake();
@@ -130,27 +138,27 @@ function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, mediaP
             screenSaver.toggleScreenDim(!!dimScreen);
             platform.keepDeviceAwake(!!keepAwake);
             if (label?.length) {
-                themeCtrl.setLabel(label);
+                theme.setLabel(label);
             }
-            themeCtrl.update(config);
+            theme.update(config);
         },
         onStartListening() {
-            mediaPlayer.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
+            media.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
             widget.setListening(true);
         },
         onStopListening() {
-            mediaPlayer.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
+            media.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
             widget.setListening(false);
         },
         onStartSpeaking() {
-            mediaPlayer.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
+            media.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
             widget.setSpeaking(true);
         },
         onStopSpeaking() {
-            mediaPlayer.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
+            media.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
             widget.setSpeaking(false);
         },
@@ -159,16 +167,20 @@ function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, mediaP
 function getMediaCommandHandler(playerMng: MediaCtrl) {
     return async (cmd: MediaCommandCmd) => {
         try {
-            console.debug("main: running media command" + cmd.type);
+            console.debug(`main: running media command ${cmd.type}`);
             if ('start' === cmd.type) {
                 playerMng.loadMedia(cmd.provider as MediaProvider, {
                     mediaId: cmd.mediaId,
                     startSecond: cmd.second,
-                });
+                }).catch(err => console.error("Error loading media: ", err));
                 return;
             }
             if ('claim' === cmd.type) {
                 playerMng.claimMedia(cmd.provider as MediaProvider);
+                return;
+            }
+            if ('volume' === cmd.type) {
+                playerMng.setMediaVolume(cmd.level);
                 return;
             }
             const mediaPlayer = playerMng.getPlayer();
@@ -194,9 +206,6 @@ function getMediaCommandHandler(playerMng: MediaCtrl) {
                     break;
                 case 'seek':
                     await mediaPlayer.seek(cmd.second);
-                    break;
-                case 'volume':
-                    playerMng.setMediaVolume(cmd.level);
                     break;
                 default:
                     console.error("Unsupported media command: ", cmd);

@@ -346,13 +346,7 @@ export class IOMain {
         break;
       case WorkerOutCmd.MEDIA_COMMAND:
         const mediaCommandData = data as WorkerOutCmdType<typeof command>;
-        const sendCommand = () => this.events.onMediaCommand?.(mediaCommandData);
-        if (mediaCommandData.type === 'play' || mediaCommandData.type == 'pause') {
-          sendCommand();
-        } else {
-          // try delay command execution to avoid stressing the cpu, because it causes glitches on mobile devices
-          this.runWhenSilence(sendCommand);
-        }
+        this.events.onMediaCommand?.(mediaCommandData);
         break;
       default:
         console.error(`main: Unknown worker command ${command}`);
@@ -430,16 +424,5 @@ export class IOMain {
         reject(error);
       }
     });
-  }
-
-  private async runWhenSilence(cb: () => void, delay = 1500, max = 5000) {
-    let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += delay;
-      if (elapsed > max || (!this.listening && this.activeSinks.size === 0)) {
-        clearInterval(interval);
-        cb();
-      }
-    }, delay);
   }
 }
