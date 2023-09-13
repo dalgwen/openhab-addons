@@ -5,11 +5,13 @@ export interface Platform {
     getServerToken(): Promise<string | null>;
     getSpeakerId(): Promise<string | null>;
     getUrlOpenHAB(): Promise<string>;
+    getUrlLogin(): Promise<string>;
     dimDeviceScreen(value: boolean): Promise<void>;
     keepDeviceAwake(value: boolean): Promise<void>;
     setLocalSettings(localSettings: SpeakerLocalSettings): Promise<void>;
     setup(startMic: () => Promise<void>): Promise<string|null>;
     isServerTokenNeeded(): Promise<boolean>;
+    redirectToRoot(): Promise<boolean>;
 }
 export type SpeakerLocalSettings = {
     speakerId: string,

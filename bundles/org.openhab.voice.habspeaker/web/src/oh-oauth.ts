@@ -6,7 +6,7 @@ export class OHOAuth {
     codeVerifierKey: string;
     authStateKey: string;
     refreshTokenKey: string;
-    constructor(private options: { storagePrefix?: string, useCookie?: boolean, path?: string, setup?: boolean, ohUrl?: () => Promise<string> } = {}) {
+    constructor(private options: { storagePrefix?: string, useCookie?: boolean, path?: string, setup?: boolean, ohUrl?: () => Promise<string>, loginUrl?: () => Promise<string> } = {}) {
         const prefix = options.storagePrefix ?? 'openhab.ui';
         this.codeVerifierKey = `${prefix}:codeVerifier`;
         this.authStateKey = `${prefix}:authState`;
@@ -23,7 +23,9 @@ export class OHOAuth {
         sessionStorage.setItem(this.codeVerifierKey, pkceChallenge.code_verifier)
         sessionStorage.setItem(this.authStateKey, authState)
         var redirectUri = this.getRedirectUri();
-        (window.location as any) = `${await this.getUrl()}/auth?` + urlEncodeObject({
+        const loginPage = `${await this.getLoginUrl()}/auth`;
+        console.log("Redirecting to authentication page " + loginPage);
+        (window.location as any) = `${loginPage}?` + urlEncodeObject({
             response_type: "code",
             client_id: redirectUri,
             redirect_uri: redirectUri,
@@ -162,7 +164,10 @@ export class OHOAuth {
         return false;
     }
     private async getUrl() {
-        return (this.options.ohUrl?.() ?? Promise.resolve(''))
+        return this.options.ohUrl?.() ?? Promise.resolve('')
+    }
+    private async getLoginUrl() {
+        return this.options.loginUrl?.() ?? this.getUrl()
     }
 }
 function getQueryParams() {

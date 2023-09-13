@@ -29,6 +29,12 @@ class ElectronPlatform implements Platform {
     getUrlOpenHAB(): Promise<string> {
         return window.electronAPI.getUrlOpenHAB();
     }
+    getUrlLogin(): Promise<string> {
+        return this.getUrlOpenHAB();
+    }
+    async redirectToRoot(): Promise<boolean> {
+        return true;
+    }
 }
 
 export const electronPlatform = new ElectronPlatform();

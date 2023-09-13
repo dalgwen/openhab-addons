@@ -13,6 +13,7 @@ export default defineConfig(async ({ command, mode }) => {
   const OH_PROXY_URL = process.env.OH_PROXY ?? "http://127.0.0.1:8080";
   if (command == "serve") {
     (process.env as any).VITE_DEV_SERVER_URL = "http://localhost:5173";
+    (process.env as any).VITE_DEV_OH_PROXY = OH_PROXY_URL;
   }
   switch (mode) {
     case "electron":

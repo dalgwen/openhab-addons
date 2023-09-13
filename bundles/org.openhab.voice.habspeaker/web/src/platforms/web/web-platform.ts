@@ -69,6 +69,15 @@ export class WebPlatform implements Platform {
         }
         return `${location.protocol}//${location.hostname}${port}`
     }
+    getUrlLogin(): Promise<string> {
+        return this.getUrlOpenHAB();
+    }
+    async redirectToRoot(): Promise<boolean> {
+        if (import.meta.env.VITE_DEV_SERVER_URL) {
+            return true;
+        }
+        return false;
+    }
 }
 
 export const webPlatform = new WebPlatform();

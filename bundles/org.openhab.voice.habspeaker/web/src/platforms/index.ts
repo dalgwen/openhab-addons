@@ -35,6 +35,15 @@ class PlatformAdapter implements Platform {
         }
         return this.platform.getUrlOpenHAB();
     }
+    async getUrlLogin() {
+        if (import.meta.env.VITE_DEV_OH_PROXY) {
+            return import.meta.env.VITE_DEV_OH_PROXY;
+        }
+        return this.platform.getUrlLogin();
+    }
+    async redirectToRoot() {
+        return this.platform.redirectToRoot();
+    }
     async isServerTokenNeeded() {
         return this.platform.isServerTokenNeeded();
     }

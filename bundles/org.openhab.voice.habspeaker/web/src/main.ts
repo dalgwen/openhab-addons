@@ -18,7 +18,7 @@ window.addEventListener('load', () => {
     const tooltip = new TooltipCtrl(appRoot, queryElement("#tooltip_template"));
     (async () => {
         const platform = await startPlatform()
-        const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platform.getUrlOpenHAB.bind(platform));
+        const restAPI = new HABSpeakerREST(platform.getSpeakerId.bind(platform), platform.getUrlOpenHAB.bind(platform), platform.getUrlLogin.bind(platform), await platform.redirectToRoot());
         const speakerWidget = queryElement<HTMLButtonElement>("#speaker_widget");
         const optionsForm = new OptionsFormCtrl(appRoot, queryElement("#local_config_template"), platform);
         const widget = new WidgetCtrl(speakerWidget);
@@ -72,6 +72,7 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
                 return uiControls.optionsForm.open("Token no valid!", retry);
             }
             if (allowLoginRedirect) {
+                console.debug("Trying to get credentials...");
                 await restAPI.authorize();
                 return await initializeSpeaker(restAPI, platform, uiControls, false);
             } else {

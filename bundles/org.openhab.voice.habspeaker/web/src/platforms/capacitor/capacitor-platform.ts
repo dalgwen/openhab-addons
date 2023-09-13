@@ -42,6 +42,9 @@ class CapacitorPlatform extends WebPlatform implements Platform {
     async getUrlOpenHAB(): Promise<string> {
         return (await Preferences.get({ key: "ohUrl" }))?.value ?? '';
     }
+    getUrlLogin(): Promise<string> {
+        return this.getUrlOpenHAB();
+    }
     async getServerToken(): Promise<string> {
         return (await Preferences.get({ key: "ohToken" }))?.value ?? '';
     }
@@ -72,6 +75,9 @@ class CapacitorPlatform extends WebPlatform implements Platform {
         }
         await requestPermissionsAndStart();
         return null;
+    }
+    async redirectToRoot(): Promise<boolean> {
+        return true;
     }
 }
 
