@@ -6,7 +6,7 @@ Web UI for HABSpeaker audio ws.
 
 Microphone: https://icon-icons.com/es/icono/microfono-audio/61507 (from Maria & Guillem) (License: https://creativecommons.org/licenses/by/4.0/)
 
-Speaker: https://icon-icons.com/es/download/111240/SVG/512/ (from Aaron Jin) (License: Free)
+Speaker: https://icon-icons.com/es/icono/Altavoz-audio-sonido-volumen/111240 (from Aaron Jin) (License: Free)
 
 # Developer Hints
 
@@ -38,19 +38,13 @@ The WebSocket connection to your server is stablish inside the Worker and also t
 Sample rate conversion can be skipped and done in the server if configured.
 
 The worker instruct the main thread about whetter it should start/stop the audio streaming.
-The when notified the main thread sets up an AudioWorklet instances to transfer the audio to/from the WebAudioAPI to the worker, by transferring the MessagePort of the Worklet instance to the worker thread, and connect the worker to the AudioContext source or destination.
+When notified the main thread sets up an AudioWorklet instance to transfer the audio to/from the WebAudioAPI to the worker, by transferring the MessagePort of the Worklet instance to the worker thread, and connect the worker to the AudioContext source or destination.
 
 The io only implements sending one outgoing audio stream, because the audio source data is piped to the different consumers in the openHAB server.
 
 The io implements receiving multiple concurrent incoming audio streams as it uses a basic protocol implementation between the client and the addon that allows the client to identify the stream of the audio chucks sent over the WebSocket and whether an audio transmission has ended and the resources needed to play that stream can be disconnect from the audio context and disposed.
 
 `The reason to include a resampler library is because Safari does not play well when changing the AudioContext sample rate, so in order to allow low-bandwidth audio this is included. There is an advanced option to change the AudioContext sample rate among the speaker thing configuration. Note that the project does not contains browser specific code.`
-
-## Project Setup
-
-```sh
-npm install
-```
 
 ### Compile and Hot-Reload for Development with OH proxy
 
