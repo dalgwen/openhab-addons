@@ -49,6 +49,11 @@
 				<description>Default sink volume</description>
 				<default>80</default>
 			</parameter>
+			<parameter name="sourceVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
+				<label>Source Volume</label>
+				<description>Default source volume</description>
+				<default>50</default>
+			</parameter>
 			<parameter name="sinkStereo" type="boolean" groupName="audio">
 				<label>Sink Stereo</label>
 				<description>Use dual channel audio</description>

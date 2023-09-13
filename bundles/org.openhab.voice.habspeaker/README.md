@@ -77,6 +77,7 @@ Those are:
 | Config                       | Type    | Group          | Advanced | Description                                                                  |
 |------------------------------|---------|----------------|-----------------------------------------------------------------------------------------|
 | sinkVolume                   | String  | audio          | false     | Default sink volume.                                                         |
+| sourceVolume                 | String  | audio          | false     | Default sink volume.                                                         |
 | sinkStereo                   | Boolean | audio          | true      | Use dual channel audio.                                                      |
 | sampleRate                   | Number  | audio          | true      | Sample rate used for transmission, set to 'client' to use the device one.    |
 | clientResampleMode           | String  | audio          | true      | Resample mode used by the client when resampling is needed.                  |

@@ -79,6 +79,7 @@ export class IOMain {
     const command = { cmd: WorkerInCmd.SOURCE_PORT, port: _webSocketWorkletNode.port, ack: this.listenPortACK };
     this.worker?.postMessage(command, [command.port]);
     await this.messageACKs.awaitACK(this.listenPortACK);
+    this.listenPortACK = undefined;
     return _webSocketWorkletNode as AudioNode;
   }
   private async setupRustpotter(wakeword: string, options: RustpotterOptions): Promise<RustpotterService> {

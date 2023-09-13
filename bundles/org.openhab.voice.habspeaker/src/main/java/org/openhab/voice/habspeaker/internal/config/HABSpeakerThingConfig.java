@@ -76,6 +76,10 @@ public class HABSpeakerThingConfig {
      */
     public int sinkVolume = 100;
     /**
+     * Default volume for the sink
+     */
+    public int sourceVolume = 100;
+    /**
      * Use dual channel audio sink
      */
     public boolean sinkStereo = false;

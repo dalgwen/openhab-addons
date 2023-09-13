@@ -77,6 +77,9 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         if (speakerIO != null) {
             this.sinkVolume = speakerIO.getSinkVolume();
             this.sourceVolume = speakerIO.getSourceVolume();
+        } else {
+            this.sinkVolume = config.sinkVolume;
+            this.sourceVolume = config.sourceVolume;
         }
     }
 
