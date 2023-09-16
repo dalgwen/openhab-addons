@@ -190,7 +190,7 @@ App installers can be found [here](https://github.com/habspeaker/habspeaker-buil
 
 ## Audio Component Details:
 
-The audio sink registered supports the following audio format: WAV PCM-SIGNED 16000hz 16-bit mono (single channel).
+The audio source registered supports the following audio format: WAV PCM-SIGNED 16000hz 16-bit mono.
 It's supported by most if not all the speech-to-text services available at openHAB. 
 
-The audio source registered supports any wav or mp3 audio as it will try to convert it to the appropriate format (PCM-SIGNED 16-bit mono (or stereo) at 16000HZ).
+The audio sink registered supports any wav or mp3 audio as it will try to convert it to the appropriate format.

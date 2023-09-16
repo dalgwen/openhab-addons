@@ -222,10 +222,10 @@ export class IOMain {
               this.events.onMessage?.("Running keyword spotting against the server", "info", 5000);
               break;
             case "rustpotter_web":
-              if (speakerConfig.spotConfig?.keyword) {
+              if (speakerConfig.spotConfig?.wakeword) {
                 this.events.onMessage?.("Running keyword spotting locally", "info", 5000);
                 try {
-                  const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.keyword, speakerConfig.spotConfig);
+                  const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.wakeword, speakerConfig.spotConfig);
                   console.debug("main: creating rustpotter audio worklet");
                   this.rustpotterAudioNode = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
                   console.debug("main: connecting rustpotter audio worklet");

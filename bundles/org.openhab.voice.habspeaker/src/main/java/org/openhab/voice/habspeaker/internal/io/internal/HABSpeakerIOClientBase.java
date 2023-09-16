@@ -15,14 +15,22 @@ package org.openhab.voice.habspeaker.internal.io.internal;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.SERVICE_ID;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.audio.*;
+import org.openhab.core.audio.AudioException;
+import org.openhab.core.audio.AudioManager;
+import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
+import org.openhab.core.audio.AudioStream;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.voice.KSService;
 import org.openhab.core.voice.VoiceManager;
@@ -55,6 +63,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
     private final HABSpeakerLanguageInterpreter speakerLanguageInterpreter;
     protected @Nullable HABSpeakerIOHandler thingHandler = null;
     private boolean initialized = false;
+    protected long streamSampleRate = 0;
     protected boolean serverSpotting = false;
     private @Nullable HABSpeakerKS ks = null;
     protected final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool("habspeaker");
@@ -126,7 +135,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                     logger.debug("Using rustpotter web with keyword '{}'", wakewordFileName);
                     spotMode = SpotMode.RUSTPOTTER_WEB;
                     var spotConfig = new HashMap<String, Object>();
-                    spotConfig.put("keyword", wakewordFileName);
+                    spotConfig.put("wakeword", wakewordFileName);
                     spotConfig.put("averagedThreshold", config.rustpotterAvgThreshold);
                     spotConfig.put("threshold", config.rustpotterThreshold);
                     spotConfig.put("minScores", config.rustpotterMinScores);
@@ -198,10 +207,11 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
                 streamSampleRate = config.sampleRate;
             }
         }
-        logger.warn("Registering dialog components for {} at sample rate {}", label, streamSampleRate);
+        logger.debug("Registering dialog components for '{}' (stream sample rate {})", id, streamSampleRate);
+        this.streamSampleRate = streamSampleRate;
         initialized = true;
         // register source
-        var source = new HABSpeakerAudioSource(getSourceId(id), label, this, streamSampleRate);
+        var source = new HABSpeakerAudioSource(getSourceId(id), label, this);
         registerAudioComponent(source);
         // register sink
         var sink = new HABSpeakerAudioSink(getSinkId(id), label, this, sinkStereo ? 2 : 1, streamSampleRate);
@@ -252,6 +262,12 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
         if (initialized) {
             stopDropIn();
             var source = audioManager.getSource(getSourceId(id));
+            if (source instanceof HABSpeakerAudioSource hsAudioSource) {
+                try {
+                    hsAudioSource.close();
+                } catch (Exception ignored) {
+                }
+            }
             if (source != null) {
                 try {
                     voiceManager.stopDialog(source);
@@ -298,7 +314,7 @@ public abstract class HABSpeakerIOClientBase implements HABSpeakerIOClient {
             }
             logger.debug("Starting drop-in to {}", speakerIO.getId());
             try {
-                dropInSink.process(source.getInputStream(((HABSpeakerAudioSource) source).getInternalStreamFormat()));
+                dropInSink.process(source.getInputStream(source.getSupportedFormats().stream().findFirst().get()));
             } catch (AudioException | ArrayIndexOutOfBoundsException e) {
                 logger.warn("{} while running drop-in {}: ", e.getClass().getName(), getId(), e);
                 stopDropIn();

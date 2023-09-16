@@ -13,14 +13,11 @@
 package org.openhab.voice.habspeaker.internal.audio;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
-
-import javax.sound.sampled.UnsupportedAudioFileException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -28,7 +25,6 @@ import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
-import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
 
 /**
@@ -37,27 +33,22 @@ import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public class HABSpeakerAudioSource implements AudioSource {
-    private final Set<AudioFormat> supportedFormats = new HashSet<>();
+public class HABSpeakerAudioSource implements AudioSource, AutoCloseable {
+    public static int SUPPORTED_BIT_DEPTH = 16;
+    public static int SUPPORTED_SAMPLE_RATE = 16000;
+    public static int SUPPORTED_CHANNELS = 1;
+    public static AudioFormat SUPPORTED_FORMAT = new AudioFormat(AudioFormat.CONTAINER_WAVE,
+            AudioFormat.CODEC_PCM_SIGNED, false, SUPPORTED_BIT_DEPTH, null, (long) SUPPORTED_SAMPLE_RATE,
+            SUPPORTED_CHANNELS);
+    private final static Set<HABSpeakerAudioStream> activeStreams = new HashSet<>();
     private final String sourceId;
     private final String sourceLabel;
     private final HABSpeakerIOClient speakerIO;
-    private final long streamSampleRate;
-    private final AudioFormat internalStreamFormat;
 
-    public HABSpeakerAudioSource(String id, String label, HABSpeakerIOClient speakerIO, long streamSampleRate) {
+    public HABSpeakerAudioSource(String id, String label, HABSpeakerIOClient speakerIO) {
         this.sourceId = id;
         this.sourceLabel = label;
         this.speakerIO = speakerIO;
-        this.streamSampleRate = streamSampleRate;
-        this.internalStreamFormat = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16,
-                null, streamSampleRate, 1);
-        supportedFormats.add(this.internalStreamFormat);
-        if (streamSampleRate != 16000L) {
-            // we also support this one resampling the stream
-            supportedFormats.add(new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false, 16,
-                    null, 16000L, 1));
-        }
     }
 
     @Override
@@ -72,46 +63,46 @@ public class HABSpeakerAudioSource implements AudioSource {
 
     @Override
     public Set<AudioFormat> getSupportedFormats() {
-        return supportedFormats;
-    }
-
-    public AudioFormat getInternalStreamFormat() {
-        return internalStreamFormat;
+        return Set.of(SUPPORTED_FORMAT);
     }
 
     @Override
     public AudioStream getInputStream(AudioFormat audioFormat) throws AudioException {
         try {
-            var pipeOutput = new PipedOutputStream();
-            var pipeInput = new PipedInputStream(pipeOutput, 4096 * 4) {
-                @Override
-                public void close() throws IOException {
-                    speakerIO.removeSourceListener(pipeOutput);
-                    super.close();
-                }
-            };
-            speakerIO.addSourceListener(pipeOutput);
-            var originalAudioFormat = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false,
-                    16, null, this.streamSampleRate, 1);
-            if (audioFormat.getFrequency() != null && audioFormat.getFrequency() != this.streamSampleRate) {
-                var convertedAudioStream = new ConvertedAudioStream(pipeInput, originalAudioFormat,
-                        audioFormat.getFrequency(), 1, true);
-                return new HABSpeakerAudioStream(convertedAudioStream.getFormat(), convertedAudioStream);
-            }
-            return new HABSpeakerAudioStream(originalAudioFormat, pipeInput);
-        } catch (IOException | UnsupportedAudioFileException e) {
+            return new HABSpeakerAudioStream(speakerIO, SUPPORTED_FORMAT);
+        } catch (IOException e) {
             throw new AudioException(e);
         }
     }
 
+    @Override
+    public void close() throws Exception {
+        new HashSet<>(activeStreams).forEach(s -> {
+            try {
+                s.close();
+            } catch (IOException ignored) {
+            }
+        });
+    }
+
     public static class HABSpeakerAudioStream extends AudioStream {
-        private final InputStream input;
+        private final HABSpeakerIOClient speakerIO;
         private final AudioFormat format;
+        private final PipedInputStream pipedInput;
+        private final PipedOutputStream pipedOutput;
         private boolean closed = false;
 
-        public HABSpeakerAudioStream(AudioFormat format, InputStream input) {
-            this.input = input;
+        public HABSpeakerAudioStream(HABSpeakerIOClient speakerIO, AudioFormat format) throws IOException {
+            this.speakerIO = speakerIO;
+            this.pipedOutput = new PipedOutputStream();
+            this.pipedInput = new PipedInputStream(this.pipedOutput);
             this.format = format;
+            activeStreams.add(this);
+            speakerIO.addSourceListener(this);
+        }
+
+        public void write(byte[] bytes) throws IOException {
+            this.pipedOutput.write(bytes);
         }
 
         @Override
@@ -121,34 +112,35 @@ public class HABSpeakerAudioSource implements AudioSource {
 
         @Override
         public int read() throws IOException {
-            byte[] b = new byte[1];
-            int bytesRead = read(b);
-            if (-1 == bytesRead) {
-                return bytesRead;
+            if (closed) {
+                return -1;
             }
-            return b[0];
+            return pipedInput.read();
         }
 
         @Override
         public int read(byte @Nullable [] b) throws IOException {
-            return read(b, 0, b == null ? 0 : b.length);
+            if (closed) {
+                return -1;
+            }
+            return pipedInput.read(b);
         }
 
         @Override
         public int read(byte @Nullable [] b, int off, int len) throws IOException {
             if (closed) {
-                throw new IOException("Stream closed");
+                return -1;
             }
-            if (b == null) {
-                throw new IOException("Buffer is null");
-            }
-            return input.read(b, off, len);
+            return pipedInput.read(b, off, len);
         }
 
         @Override
         public void close() throws IOException {
             closed = true;
-            input.close();
+            pipedOutput.close();
+            pipedInput.close();
+            speakerIO.removeSourceListener(this);
+            activeStreams.remove(this);
         }
     }
 }

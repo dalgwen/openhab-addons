@@ -86,6 +86,11 @@ public class ConvertedAudioStream extends AudioStream {
     }
 
     @Override
+    public int available() throws IOException {
+        return this.pcmNormalizedInputStream.available();
+    }
+
+    @Override
     public int read(byte @Nullable [] b) throws IOException {
         return pcmNormalizedInputStream.read(b);
     }

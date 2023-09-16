@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocketAdapter {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketManager.class);
     private final List<HABSpeakerWebSocketClient> wsHandlers = new ArrayList<>();
-    private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("OH-voice-habspeaker");
+    private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("voice-habspeaker");
     protected final BundleContext bundleContext;
     protected final VoiceManager voiceManager;
     protected final AudioManager audioManager;
@@ -76,7 +76,6 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
     }
 
     private void pingHandlers() {
-        logger.debug("Pinging {} clients...", wsHandlers.size());
         var handlers = new ArrayList<>(wsHandlers);
         for (var handler : handlers) {
             if (handler != null) {

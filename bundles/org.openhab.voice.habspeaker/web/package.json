@@ -21,7 +21,7 @@
   "dependencies": {
     "@alexanderolsen/libsamplerate-js": "^2.0.4",
     "pkce-challenge": "^3.0.0",
-    "reentrant-lock": "^2.0.1",
+    "reentrant-lock": "^3.0.0",
     "rustpotter-worklet": "3.0.1"
   },
   "devDependencies": {

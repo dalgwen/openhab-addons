@@ -13,7 +13,9 @@
 package org.openhab.voice.habspeaker.internal.io.internal;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,14 +25,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
+import org.openhab.core.audio.AudioFormat;
+import org.openhab.core.audio.UnsupportedAudioFormatException;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
+import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
+import org.openhab.voice.habspeaker.internal.audio.internal.ConvertedAudioStream;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +57,7 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketClient.class);
     private static final TypeReference<HashMap<String, Object>> WEBSOCKET_MAPPER_TYPE_REF = new TypeReference<>() {
     };
-    private final ConcurrentLinkedQueue<OutputStream> listeners = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<HABSpeakerAudioSource.HABSpeakerAudioStream> sourceStreams = new ConcurrentLinkedQueue<>();
 
     private String id = "";
     private volatile @Nullable Session session;
@@ -62,6 +70,9 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
     private int mediaVolume;
     private long clientSampleRate;
     private @Nullable MediaState mediaState;
+    private @Nullable PipedOutputStream sourceAudioPipedOutput;
+    private @Nullable PipedInputStream sourceAudioPipedInput;
+    private @Nullable InputStream sourceAudioStream;
 
     public HABSpeakerWebSocketClient(HABSpeakerWebSocketManager wsAdapter, HABSpeakerConfigProvider configProvider,
             ScheduledExecutorService executor) {
@@ -157,20 +168,73 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         }
     }
 
-    public void addSourceListener(OutputStream output) {
-        synchronized (listeners) {
-            if (listeners.add(output) && listeners.size() == (serverSpotting ? 2 : 1)) {
+    public void addSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream output) {
+        logger.debug("Registering source stream for '{}'", getId());
+        synchronized (sourceStreams) {
+            if (!sourceStreams.add(output)) {
+                return;
+            }
+            if (this.sourceAudioStream == null) {
+                try {
+                    var pipedOutput = new PipedOutputStream();
+                    this.sourceAudioPipedOutput = pipedOutput;
+                    var pipedInput = new PipedInputStream(pipedOutput, 4096 * 4);
+                    this.sourceAudioPipedInput = pipedInput;
+                    if (streamSampleRate != HABSpeakerAudioSource.SUPPORTED_SAMPLE_RATE) {
+                        logger.debug("Enabling audio resampling for the audio source stream {} => {}", streamSampleRate,
+                                HABSpeakerAudioSource.SUPPORTED_SAMPLE_RATE);
+                        var format = new AudioFormat(AudioFormat.CONTAINER_WAVE, AudioFormat.CODEC_PCM_SIGNED, false,
+                                HABSpeakerAudioSource.SUPPORTED_BIT_DEPTH, null, streamSampleRate,
+                                HABSpeakerAudioSource.SUPPORTED_CHANNELS);
+                        this.sourceAudioStream = new ConvertedAudioStream(pipedInput, format,
+                                HABSpeakerAudioSource.SUPPORTED_SAMPLE_RATE, HABSpeakerAudioSource.SUPPORTED_CHANNELS,
+                                true);
+                    } else {
+                        logger.debug("Audio source stream already has sample rate {}",
+                                HABSpeakerAudioSource.SUPPORTED_SAMPLE_RATE);
+                        this.sourceAudioStream = pipedInput;
+                    }
+                } catch (IOException | UnsupportedAudioFormatException | UnsupportedAudioFileException e) {
+                    logger.error("Unable to setup audio source stream", e);
+                }
+            }
+            if (sourceStreams.size() == (serverSpotting ? 2 : 1)) {
                 logger.debug("Send start listening {}", getId());
                 sendClientCommand(WebsocketOutputCommand.START_LISTENING);
             }
         }
     }
 
-    public void removeSourceListener(OutputStream output) {
-        synchronized (listeners) {
-            if (listeners.remove(output) && listeners.size() == (serverSpotting ? 1 : 0)) {
+    public void removeSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream output) {
+        logger.debug("Unregistering source stream for '{}'", getId());
+        synchronized (sourceStreams) {
+            if (sourceStreams.remove(output) && sourceStreams.size() == (serverSpotting ? 1 : 0)) {
                 logger.debug("Send stop listening {}", getId());
                 sendClientCommand(WebsocketOutputCommand.STOP_LISTENING);
+            }
+            if (sourceStreams.size() == 0) {
+                logger.debug("Disposing audio source internal resources for '{}'", getId());
+                if (this.sourceAudioStream != null) {
+                    try {
+                        this.sourceAudioStream.close();
+                    } catch (IOException ignored) {
+                    }
+                    this.sourceAudioStream = null;
+                }
+                if (this.sourceAudioPipedOutput != null) {
+                    try {
+                        this.sourceAudioPipedOutput.close();
+                    } catch (IOException ignored) {
+                    }
+                    this.sourceAudioPipedOutput = null;
+                }
+                if (this.sourceAudioPipedInput != null) {
+                    try {
+                        this.sourceAudioPipedInput.close();
+                    } catch (IOException ignored) {
+                    }
+                    this.sourceAudioPipedInput = null;
+                }
             }
         }
     }
@@ -304,16 +368,33 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
     public void onWebSocketBinary(byte @Nullable [] payload, int offset, int len) {
         logger.trace("Received binary data of length {}", len);
         if (payload != null) {
-            writeToListeners(payload);
+            writeToSourceStreams(payload);
         }
     }
 
-    private void writeToListeners(byte[] payload) {
-        for (var listener : listeners) {
+    private void writeToSourceStreams(byte[] payload) {
+        if (this.sourceAudioStream == null || this.sourceAudioPipedOutput == null) {
+            logger.debug("Source already disposed ignoring data");
+            return;
+        }
+        byte[] convertedPayload;
+        try {
+            this.sourceAudioPipedOutput.write(payload);
+            int available = this.sourceAudioStream.available();
+            if (available > 0) {
+                convertedPayload = this.sourceAudioStream.readNBytes(available);
+            } else {
+                return;
+            }
+        } catch (IOException e) {
+            logger.error("Error writing source audio", e);
+            return;
+        }
+        for (var sourceAudioStream : sourceStreams) {
             try {
-                listener.write(payload);
+                sourceAudioStream.write(convertedPayload);
             } catch (IOException e) {
-                logger.debug("IOException while piping to source: {}", e.getMessage());
+                logger.debug("IOException while piping source data: {}", e.getMessage());
             }
         }
     }
@@ -341,7 +422,15 @@ public class HABSpeakerWebSocketClient extends HABSpeakerIOClientBase implements
         logger.debug("Session closed with code {}: {}", statusCode, reason);
         wsAdapter.removeHandler(this);
         stopDropIn();
+        sourceStreams.forEach(l -> {
+            try {
+                l.close();
+            } catch (IOException err) {
+                logger.error("IOException closing source audio stream", err);
+            }
+        });
         unregisterSpeakerComponents(id);
+        sourceStreams.clear();
     }
 
     @Override

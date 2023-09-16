@@ -19,6 +19,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
+import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 
 /**
@@ -113,14 +114,14 @@ public interface HABSpeakerIOClient {
      *
      * @param out the {@link OutputStream} to send audio to.
      */
-    void addSourceListener(OutputStream out);
+    void addSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream out);
 
     /**
      * Stop streaming the speaker mic to this output stream.
      *
      * @param out the {@link OutputStream} to send audio to.
      */
-    void removeSourceListener(OutputStream out);
+    void removeSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream out);
 
     /**
      * Starts a dialog on the speaker
