@@ -25,7 +25,7 @@ import org.openhab.core.audio.AudioException;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSource;
 import org.openhab.core.audio.AudioStream;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 
 /**
  * The {@link HABSpeakerAudioSource} class defines the speaker Audio Source
@@ -43,9 +43,9 @@ public class HABSpeakerAudioSource implements AudioSource, AutoCloseable {
     private final static Set<HABSpeakerAudioStream> activeStreams = new HashSet<>();
     private final String sourceId;
     private final String sourceLabel;
-    private final HABSpeakerIOClient speakerIO;
+    private final HABSpeakerIOConnection speakerIO;
 
-    public HABSpeakerAudioSource(String id, String label, HABSpeakerIOClient speakerIO) {
+    public HABSpeakerAudioSource(String id, String label, HABSpeakerIOConnection speakerIO) {
         this.sourceId = id;
         this.sourceLabel = label;
         this.speakerIO = speakerIO;
@@ -86,13 +86,13 @@ public class HABSpeakerAudioSource implements AudioSource, AutoCloseable {
     }
 
     public static class HABSpeakerAudioStream extends AudioStream {
-        private final HABSpeakerIOClient speakerIO;
+        private final HABSpeakerIOConnection speakerIO;
         private final AudioFormat format;
         private final PipedInputStream pipedInput;
         private final PipedOutputStream pipedOutput;
         private boolean closed = false;
 
-        public HABSpeakerAudioStream(HABSpeakerIOClient speakerIO, AudioFormat format) throws IOException {
+        public HABSpeakerAudioStream(HABSpeakerIOConnection speakerIO, AudioFormat format) throws IOException {
             this.speakerIO = speakerIO;
             this.pipedOutput = new PipedOutputStream();
             this.pipedInput = new PipedInputStream(this.pipedOutput);

@@ -10,28 +10,20 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.voice.habspeaker.internal.io;
+package org.openhab.voice.habspeaker.internal.io.internal.messages.out.media;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 
 /**
- * The {@link HABSpeakerIOListener} observes the active speaker connection.
+ * The {@link HABSpeakerThingConfig} class defines IO client configuration
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public interface HABSpeakerIOListener {
-    /**
-     * Called on speaker connection
-     * 
-     * @param speaker active speaker connection
-     */
-    void onSpeakerConnection(HABSpeakerIOConnection speaker);
+public class HABSpeakerOutMediaPause extends HABSpeakerOutMediaMessage {
 
-    /**
-     * Called on speaker disconnection
-     * 
-     * @param speaker inactive speaker connection
-     */
-    void onSpeakerDisconnection(HABSpeakerIOConnection speaker);
+    public HABSpeakerOutMediaPause() {
+        super(MediaMessageType.pause);
+    }
 }

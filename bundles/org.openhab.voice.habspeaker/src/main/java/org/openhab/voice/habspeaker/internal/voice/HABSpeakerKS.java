@@ -26,7 +26,7 @@ import org.openhab.core.voice.KSListener;
 import org.openhab.core.voice.KSService;
 import org.openhab.core.voice.KSServiceHandle;
 import org.openhab.core.voice.KSpottedEvent;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,12 +43,12 @@ public class HABSpeakerKS implements KSService {
         SUPPORTED_FORMATS.add(AudioFormat.WAV);
     }
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerKS.class);
-    private final HABSpeakerIOClient speakerIO;
+    private final HABSpeakerIOConnection speakerIO;
     private final @Nullable KSService serverKsService;
     private @Nullable KSServiceHandle serverKsServiceHandler;
     private @Nullable KSListener ksListener;
 
-    public HABSpeakerKS(HABSpeakerIOClient speakerIO, @Nullable KSService serverKsService) {
+    public HABSpeakerKS(HABSpeakerIOConnection speakerIO, @Nullable KSService serverKsService) {
         this.speakerIO = speakerIO;
         this.serverKsService = serverKsService;
     }

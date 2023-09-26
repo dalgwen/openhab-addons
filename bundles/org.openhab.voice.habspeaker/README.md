@@ -53,8 +53,6 @@ Define the phrases you can use to interact with the speaker. For the phrases you
 Those are:
 
 * **Command Send Message** - Message to say on the speaker on command success. (Default: done)
-* **Start Drop In Phrase** - Phrase to start drop-in to another speaker.
-* **Stop Drop In Phrase** - Phrase to stop drop-in on the current speaker.
 * **Resume Media Phrase** - Phrase to resume media.
 * **Pause Media Phrase** - Phrase to pause media.
 * **Stop Media Phrase** - Phrase to pause media.
@@ -74,10 +72,11 @@ Those are:
 |-------------|----------------------------------|
 | speaker     | A connected speaker (the web ui) |
 
-| Config                       | Type    | Group          | Advanced | Description                                                                  |
-|------------------------------|---------|----------------|-----------------------------------------------------------------------------------------|
+| Config                       | Type    | Group          | Advanced  | Description                                                                  |
+|------------------------------|---------|----------------|------------------------------------------------------------------------------------------|
 | sinkVolume                   | String  | audio          | false     | Default sink volume.                                                         |
 | sourceVolume                 | String  | audio          | false     | Default sink volume.                                                         |
+| mediaVolume                  | String  | audio          | false     | Default media player volume.                                                 |
 | sinkStereo                   | Boolean | audio          | true      | Use dual channel audio.                                                      |
 | sampleRate                   | Number  | audio          | true      | Sample rate used for transmission, set to 'client' to use the device one.    |
 | clientResampleMode           | String  | audio          | true      | Resample mode used by the client when resampling is needed.                  |
@@ -117,7 +116,6 @@ Those are:
 | sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                |
 | source-volume          | Dimmer  | Controls the source volume of the speaker.                              |
 | spot                 | Switch  | Starts dialog processing on the speaker.                                |
-| drop-in              | String  | Starts an immediate call with other speaker (by id).                    |
 | media-current-second | Number  | Current second for the media currently playing, allow seek.             |
 | media-total-seconds  | Number  | Total seconds for the media currently playing.                          |
 | media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.          |

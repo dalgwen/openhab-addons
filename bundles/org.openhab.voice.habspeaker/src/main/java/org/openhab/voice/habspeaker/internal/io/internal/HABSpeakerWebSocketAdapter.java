@@ -33,7 +33,7 @@ import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.io.websocket.WebSocketAdapter;
 import org.openhab.core.voice.VoiceManager;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerConfigProvider;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.osgi.framework.BundleContext;
@@ -44,16 +44,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link HABSpeakerWebSocketManager} class defines the adapter to
+ * The {@link HABSpeakerWebSocketAdapter} class defines the adapter to
  * create websocket connections.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
 @Component(service = { HABSpeakerIOManager.class, WebSocketAdapter.class })
-public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocketAdapter {
-    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketManager.class);
-    private final List<HABSpeakerWebSocketClient> wsHandlers = new ArrayList<>();
+public class HABSpeakerWebSocketAdapter implements HABSpeakerIOManager, WebSocketAdapter {
+    private final Logger logger = LoggerFactory.getLogger(HABSpeakerWebSocketAdapter.class);
+    private final List<HABSpeakerWebSocketConnection> wsHandlers = new ArrayList<>();
     private final ScheduledExecutorService executor = ThreadPoolManager.getScheduledPool("voice-habspeaker");
     protected final BundleContext bundleContext;
     protected final VoiceManager voiceManager;
@@ -61,12 +61,12 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
     private final ScheduledFuture<?> pingTask;
     private final HABSpeakerConfigProvider configProvider;
 
-    private final Set<HABSpeakerIOClient> speakerConnections = Collections.synchronizedSet(new HashSet<>());
+    private final Set<HABSpeakerIOConnection> speakerConnections = Collections.synchronizedSet(new HashSet<>());
 
     private @Nullable HABSpeakerIOListener connectionListener = null;
 
     @Activate
-    public HABSpeakerWebSocketManager(BundleContext bundleContext, final @Reference AudioManager audioManager,
+    public HABSpeakerWebSocketAdapter(BundleContext bundleContext, final @Reference AudioManager audioManager,
             final @Reference VoiceManager voiceManager, final @Reference HABSpeakerConfigProvider configProvider) {
         this.bundleContext = bundleContext;
         this.configProvider = configProvider;
@@ -117,13 +117,13 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
         }
     }
 
-    public List<HABSpeakerIOClient> getSpeakerConnections() {
+    public List<HABSpeakerIOConnection> getSpeakerConnections() {
         synchronized (speakerConnections) {
             return new ArrayList<>(speakerConnections);
         }
     }
 
-    private void onSpeakerConnected(HABSpeakerIOClient speaker) throws IllegalStateException {
+    private void onSpeakerConnected(HABSpeakerIOConnection speaker) throws IllegalStateException {
         synchronized (speakerConnections) {
             if (getSpeakerConnection(speaker.getId()) != null) {
                 throw new IllegalStateException("Another speaker with the same id is already connected");
@@ -131,25 +131,25 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
             speakerConnections.add(speaker);
             var protocolListener = this.connectionListener;
             if (protocolListener != null) {
-                protocolListener.onConnected(speaker);
+                protocolListener.onSpeakerConnection(speaker);
             }
             logger.debug("connected speakers {}", speakerConnections.size());
         }
     }
 
-    private void onSpeakerDisconnected(HABSpeakerIOClient speaker) {
+    private void onSpeakerDisconnected(HABSpeakerIOConnection speaker) {
         logger.debug("speaker disconnected '{}'", speaker.getId());
         synchronized (speakerConnections) {
             speakerConnections.remove(speaker);
             var protocolListener = this.connectionListener;
             if (protocolListener != null) {
-                protocolListener.onDisconnected(speaker);
+                protocolListener.onSpeakerDisconnection(speaker);
             }
             logger.debug("connected speakers {}", speakerConnections.size());
         }
     }
 
-    protected void addHandler(HABSpeakerWebSocketClient speaker) {
+    protected void addHandler(HABSpeakerWebSocketConnection speaker) {
         wsHandlers.add(speaker);
         onSpeakerConnected(speaker);
     }
@@ -158,14 +158,14 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
         this.connectionListener = connectionListener;
     }
 
-    public @Nullable HABSpeakerIOClient getSpeakerConnection(String id) {
+    public @Nullable HABSpeakerIOConnection getSpeakerConnection(String id) {
         synchronized (speakerConnections) {
             return speakerConnections.stream()
                     .filter(speakerConnection -> speakerConnection.getId().equalsIgnoreCase(id)).findAny().orElse(null);
         }
     }
 
-    protected void removeHandler(HABSpeakerWebSocketClient habSpeakerWebSocketIO) {
+    protected void removeHandler(HABSpeakerWebSocketConnection habSpeakerWebSocketIO) {
         if (wsHandlers.remove(habSpeakerWebSocketIO)) {
             onSpeakerDisconnected(habSpeakerWebSocketIO);
         }
@@ -180,7 +180,7 @@ public class HABSpeakerWebSocketManager implements HABSpeakerIOManager, WebSocke
     public Object createWebSocket(ServletUpgradeRequest servletUpgradeRequest,
             ServletUpgradeResponse servletUpgradeResponse) {
         logger.debug("creating connection!");
-        return new HABSpeakerWebSocketClient(this, configProvider, executor);
+        return new HABSpeakerWebSocketConnection(this, configProvider, executor);
     }
 
     public synchronized void dispose() {

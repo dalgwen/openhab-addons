@@ -60,5 +60,4 @@ public class HABSpeakerConstants {
     public static final String AUDIO_SEARCH_CHANNEL = "audio-search";
     public static final String VIDEO_SEARCH_CHANNEL = "video-search";
     public static final String SPOT_CHANNEL = "spot";
-    public static final String DROP_IN_CHANNEL = "drop-in";
 }

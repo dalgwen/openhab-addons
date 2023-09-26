@@ -6,9 +6,9 @@ export const SINK_TERMINATION_BYTE = "0";
  * Byte that indicates sink stream format, 5 position of each chunk
  */
 export enum StreamType {
-  // 16000Hz 16bit int 1 channel little-endian
+  // 16bit int 1 channel little-endian
   PCM16BitMono = "1",
-  // 16000Hz 16bit int 2 channel little-endian
+  // 16bit int 2 channel little-endian
   PCM16BitStereo = "2",
 }
 // message types
@@ -18,20 +18,20 @@ type SetVolumeCmd = { value: number };
 export type RustpotterOptions = {
   wakeword: string
   threshold: number
-  averagedThreshold: number
+  avgThreshold: number
   scoreRef: number
   bandSize: number
   minScores: number
   eager: boolean
   scoreMode: string
   vadMode: string
-  gainNormalizerEnabled: boolean
+  gainNormalizer: boolean
   minGain: number
   maxGain: number
   gainRef?: number
-  bandPassEnabled: boolean
-  bandPassLowCutoff: number
-  bandPassHighCutoff: number
+  bandPass: boolean
+  lowCutoff: number
+  highCutoff: number
 };
 export type ConfigureSpeakerCmd = {
   sampleRate: number,
@@ -56,7 +56,7 @@ export type MediaCommandCmd = { type: 'play' } |
 { type: 'next' } |
 { type: 'previous' } |
 { type: 'seek', second: number } |
-{ type: 'volume', level: number } |
+{ type: 'volume', value: number } |
 { type: 'claim', provider: string } |
 { type: 'start', provider: string, mediaId: string, second: number };
 // Commands from worker to server (no command for sending audio as is sent as binary).

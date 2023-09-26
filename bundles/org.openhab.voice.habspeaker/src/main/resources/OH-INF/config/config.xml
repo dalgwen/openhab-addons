@@ -13,10 +13,6 @@
 			<label>Media Providers</label>
 			<description>Configure required credentials for the supported media providers.</description>
 		</parameter-group>
-		<parameter name="stopDropInPhrase" type="text" groupName="voice">
-			<label>Stop Drop In Phrase</label>
-			<description>Phrase to stop drop-in on the current speaker.</description>
-		</parameter>
 		<parameter name="commandSentMessage" type="text" groupName="voice">
 			<label>Command send message</label>
 			<description>Phrase to say on the speaker on command success.</description>

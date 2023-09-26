@@ -13,7 +13,6 @@
 package org.openhab.voice.habspeaker.internal.handler;
 
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.AUDIO_SEARCH_CHANNEL;
-import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.DROP_IN_CHANNEL;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CONTROL_CHANNEL;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_CURRENT_SECOND_CHANNEL;
 import static org.openhab.voice.habspeaker.internal.HABSpeakerConstants.MEDIA_PROGRESS_CHANNEL;
@@ -47,9 +46,8 @@ import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.UnDefType;
 import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOHandler;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,17 +60,15 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeakerIOHandler {
     private final Logger logger = LoggerFactory.getLogger(HABSpeakerThingHandler.class);
-    private final HABSpeakerIOManager ioManager;
     private final ItemRegistry itemRegistry;
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
-    private @Nullable HABSpeakerIOClient speakerIO;
-    private @Nullable Integer sinkVolume;
-    private @Nullable Integer sourceVolume;
-    private @Nullable Integer mediaVolume;
+    private @Nullable HABSpeakerIOConnection speakerIO;
+    private int sinkVolume = -1;
+    private int sourceVolume = -1;
+    private int mediaVolume = -1;
 
-    public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry, HABSpeakerIOManager ioManager) {
+    public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry) {
         super(thing);
-        this.ioManager = ioManager;
         this.itemRegistry = itemRegistry;
     }
 
@@ -80,32 +76,20 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     public void initialize() {
         this.config = getConfigAs(HABSpeakerThingConfig.class);
         updateStatus();
-        if (speakerIO != null) {
-            this.sinkVolume = speakerIO.getSinkVolume();
-            this.sourceVolume = speakerIO.getSourceVolume();
-        } else {
-            this.sinkVolume = config.sinkVolume;
-            this.sourceVolume = config.sourceVolume;
-        }
     }
 
-    public void setSpeakerIO(@Nullable HABSpeakerIOClient speakerIO) {
+    public void setSpeakerIO(@Nullable HABSpeakerIOConnection speakerIO) {
         this.speakerIO = speakerIO;
         if (speakerIO != null) {
-            speakerIO.setThingHandler(this);
-        }
-    }
-
-    public void dropIn(String speakerId) {
-        var anotherSpeaker = ioManager.getSpeakerConnection(speakerId);
-        if (anotherSpeaker == null || speakerIO == null) {
-            logger.warn("Speaker not available");
-            return;
-        }
-        try {
-            speakerIO.dropIn(anotherSpeaker);
-        } catch (IllegalStateException e) {
-            logger.warn("Unable to drop-in: {}", e.getMessage());
+            if (this.sinkVolume != -1) {
+                speakerIO.setSinkVolume(this.sinkVolume);
+            }
+            if (this.sourceVolume != -1) {
+                speakerIO.setSourceVolume(this.sourceVolume);
+            }
+            if (this.mediaVolume != -1) {
+                speakerIO.setMediaVolume(this.mediaVolume);
+            }
         }
     }
 
@@ -145,6 +129,30 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
             cleanChannels();
         }
         updateStatus(newStatus);
+        if (getThing().getStatus() == ThingStatus.ONLINE && speakerIO != null) {
+            var sinkVolume = speakerIO.getSinkVolume();
+            if (sinkVolume != -1) {
+                if (isLinked(SINK_VOLUME_CHANNEL)) {
+                    updateState(SINK_VOLUME_CHANNEL, new DecimalType(sinkVolume));
+                }
+            }
+            var sourceVolume = speakerIO.getSourceVolume();
+            if (sourceVolume != -1) {
+                if (isLinked(SOURCE_VOLUME_CHANNEL)) {
+                    updateState(SOURCE_VOLUME_CHANNEL, new DecimalType(sourceVolume));
+                }
+            }
+            var mediaVolume = speakerIO.getMediaVolume();
+            if (mediaVolume != -1) {
+                if (isLinked(MEDIA_VOLUME_CHANNEL)) {
+                    updateState(MEDIA_VOLUME_CHANNEL, new DecimalType(mediaVolume));
+                }
+            }
+        } else {
+            this.sinkVolume = config.sinkVolume;
+            this.sourceVolume = config.sourceVolume;
+            this.mediaVolume = config.mediaVolume;
+        }
     }
 
     @Override
@@ -160,46 +168,53 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                 return;
             }
             switch (channelId) {
-                case SINK_VOLUME_CHANNEL:
+                case SINK_VOLUME_CHANNEL -> {
                     if (command instanceof RefreshType) {
-                        if (sinkVolume != null) {
-                            onSinkVolumeUpdate(sinkVolume);
+                        if (sinkVolume != -1) {
+                            if (isLinked(SINK_VOLUME_CHANNEL)) {
+                                updateState(SINK_VOLUME_CHANNEL, new PercentType(sinkVolume));
+                            }
                         }
                         return;
                     }
-                    if (command instanceof DecimalType) {
-                        sinkVolume = ((DecimalType) command).intValue();
-                        speakerIO.setSinkVolume(sinkVolume);
-                        return;
+                    if (command instanceof DecimalType volumeCommand) {
+                        sinkVolume = volumeCommand.intValue();
+                        if (sinkVolume != speakerIO.getSinkVolume()) {
+                            speakerIO.setSinkVolume(sinkVolume);
+                        }
                     }
-                    break;
-                case SOURCE_VOLUME_CHANNEL:
+                }
+                case SOURCE_VOLUME_CHANNEL -> {
                     if (command instanceof RefreshType) {
-                        if (sourceVolume != null) {
-                            onSourceVolumeUpdate(sourceVolume);
+                        if (sourceVolume != -1) {
+                            if (isLinked(SOURCE_VOLUME_CHANNEL)) {
+                                updateState(SOURCE_VOLUME_CHANNEL, new PercentType(sourceVolume));
+                            }
                         }
                         return;
                     }
-                    if (command instanceof DecimalType) {
-                        sourceVolume = ((DecimalType) command).intValue();
-                        speakerIO.setSourceVolume(sourceVolume);
-                        return;
+                    if (command instanceof DecimalType volumeCommand) {
+                        sourceVolume = volumeCommand.intValue();
+                        if (sourceVolume != speakerIO.getSourceVolume()) {
+                            speakerIO.setSourceVolume(sourceVolume);
+                        }
                     }
-                    break;
-                case MEDIA_VOLUME_CHANNEL:
+                }
+                case MEDIA_VOLUME_CHANNEL -> {
                     if (command instanceof RefreshType) {
-                        if (mediaVolume != null) {
-                            onMediaVolumeUpdate(mediaVolume);
+                        if (mediaVolume != -1) {
+                            if (isLinked(MEDIA_VOLUME_CHANNEL)) {
+                                updateState(MEDIA_VOLUME_CHANNEL, new PercentType(mediaVolume));
+                            }
                         }
                         return;
                     }
                     if (command instanceof DecimalType) {
                         mediaVolume = ((DecimalType) command).intValue();
                         speakerIO.setMediaVolume(mediaVolume);
-                        return;
                     }
-                    break;
-                case SPOT_CHANNEL:
+                }
+                case SPOT_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         if (isLinked(SPOT_CHANNEL)) {
                             updateState(SPOT_CHANNEL, OnOffType.OFF);
@@ -212,47 +227,29 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                             updateState(SPOT_CHANNEL, OnOffType.OFF);
                         }
                     }
-                    break;
-                case DROP_IN_CHANNEL:
-                    if (command instanceof RefreshType) {
-                        var dropInSpeaker = speakerIO.getDropIn();
-                        if (dropInSpeaker != null) {
-                            updateState(DROP_IN_CHANNEL, StringType.valueOf(dropInSpeaker.getId()));
-                        } else {
-                            updateState(DROP_IN_CHANNEL, OnOffType.OFF);
-                        }
-                        return;
-                    } else {
-                        var commandText = command.toFullString();
-                        if (commandText.isBlank() || commandText.equals("OFF") || commandText.equals("NULL")) {
-                            speakerIO.dropIn(null);
-                        } else if (!commandText.isBlank()) {
-                            dropIn(commandText);
-                        }
-                    }
-                    break;
-                case MEDIA_CURRENT_SECOND_CHANNEL:
+                }
+                case MEDIA_CURRENT_SECOND_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
                     }
                     if (command instanceof DecimalType) {
                         speakerIO.playerSeekToSecond(((DecimalType) command).longValue());
                     }
-                    break;
-                case MEDIA_TOTAL_SECONDS_CHANNEL:
+                }
+                case MEDIA_TOTAL_SECONDS_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
                     }
-                    break;
-                case MEDIA_PROGRESS_CHANNEL:
+                }
+                case MEDIA_PROGRESS_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
                     }
                     if (command instanceof PercentType) {
                         speakerIO.playerSeekToPercent(((PercentType) command).intValue());
                     }
-                    break;
-                case MEDIA_CONTROL_CHANNEL:
+                }
+                case MEDIA_CONTROL_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
                     }
@@ -265,70 +262,42 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
                     if (command instanceof NextPreviousType) {
                         speakerIO.playerCommand((NextPreviousType) command);
                     }
-                    break;
-                case PLAY_AUDIO_CHANNEL:
+                }
+                case PLAY_AUDIO_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
-                    } else {
-                        playMedia(speakerIO, HABSpeakerIOClient.MediaProvider.AUDIO_PLAYER, command.toFullString());
                     }
-                    break;
-                case PLAY_VIDEO_CHANNEL:
+                    playMedia(speakerIO, HABSpeakerIOConnection.MediaProvider.AUDIO_PLAYER, command.toFullString());
+                }
+                case PLAY_VIDEO_CHANNEL -> {
                     if (command instanceof RefreshType) {
                         return;
-                    } else {
-                        playMedia(speakerIO, HABSpeakerIOClient.MediaProvider.VIDEO_PLAYER, command.toFullString());
                     }
-                    break;
-                default:
-                    logger.warn("Unsupported channel: {}", channelId);
+                    playMedia(speakerIO, HABSpeakerIOConnection.MediaProvider.VIDEO_PLAYER, command.toFullString());
+                }
+                default -> logger.warn("Unsupported channel: {}", channelId);
             }
         } catch (Exception e) {
             logger.error("Unexpected error", e);
         }
     }
 
-    private void playMedia(HABSpeakerIOClient speakerIO, HABSpeakerIOClient.MediaProvider provider, String id) {
+    private void playMedia(HABSpeakerIOConnection speakerIO, HABSpeakerIOConnection.MediaProvider provider, String id) {
         if (id.isBlank() || "NULL".equals(id)) {
             speakerIO.playerStop();
         } else {
-            speakerIO.playerStart(new HABSpeakerIOClient.StartMediaMessage(provider, id, 0));
-        }
-    }
-
-    public void onMediaVolumeUpdate(int volume) {
-        mediaVolume = volume;
-        if (isLinked(MEDIA_VOLUME_CHANNEL)) {
-            updateState(MEDIA_VOLUME_CHANNEL, new PercentType(volume));
-        }
-    }
-
-    public void onSinkVolumeUpdate(int volume) {
-        sinkVolume = volume;
-        if (isLinked(SINK_VOLUME_CHANNEL)) {
-            updateState(SINK_VOLUME_CHANNEL, new PercentType(volume));
-        }
-    }
-
-    public void onSourceVolumeUpdate(int volume) {
-        sourceVolume = volume;
-        if (isLinked(SOURCE_VOLUME_CHANNEL)) {
-            updateState(SOURCE_VOLUME_CHANNEL, new PercentType(volume));
+            speakerIO.playerStart(new HABSpeakerIOConnection.StartMediaMessage(provider, id, 0));
         }
     }
 
     @Override
-    public void onMediaStateUpdate(HABSpeakerIOClient.MediaState mediaState, int volume) {
+    public void onMediaStateUpdate(HABSpeakerIOConnection.MediaState mediaState, int volume) {
         String videoMediaUrl = "";
         String audioMediaUrl = "";
         if (mediaState.provider != null && mediaState.mediaId != null) {
             switch (mediaState.provider) {
-                case VIDEO_PLAYER:
-                    videoMediaUrl = mediaState.mediaId;
-                    break;
-                case AUDIO_PLAYER:
-                    audioMediaUrl = mediaState.mediaId;
-                    break;
+                case VIDEO_PLAYER -> videoMediaUrl = mediaState.mediaId;
+                case AUDIO_PLAYER -> audioMediaUrl = mediaState.mediaId;
             }
         }
         if (isLinked(PLAY_VIDEO_CHANNEL)) {
@@ -349,7 +318,7 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
         }
         if (isLinked(MEDIA_CONTROL_CHANNEL)) {
             updateState(MEDIA_CONTROL_CHANNEL,
-                    mediaState.playbackState == HABSpeakerIOClient.PlaybackStates.PLAYING ? PlayPauseType.PLAY
+                    mediaState.playbackState == HABSpeakerIOConnection.PlaybackStates.PLAYING ? PlayPauseType.PLAY
                             : PlayPauseType.PAUSE);
         }
         if (isLinked(MEDIA_VOLUME_CHANNEL)) {

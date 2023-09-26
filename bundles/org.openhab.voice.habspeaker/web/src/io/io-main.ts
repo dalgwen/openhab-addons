@@ -357,18 +357,18 @@ export class IOMain {
     const scoreMode = (ScoreMode[options.scoreMode as any] as any) ?? ScoreMode.max;
     const vadMode = !!(options.vadMode?.length) ? (VADMode[options.vadMode as any] as any) ?? null : null;
     return {
-      averagedThreshold: options.averagedThreshold,
+      averagedThreshold: options.avgThreshold,
       threshold: options.threshold,
       minScores: options.minScores,
       eager: options.eager,
       minGain: options.minGain,
       maxGain: options.maxGain,
-      bandPassEnabled: options.bandPassEnabled,
-      bandPassLowCutoff: options.bandPassLowCutoff,
-      bandPassHighCutoff: options.bandPassHighCutoff,
+      bandPassEnabled: options.bandPass,
+      bandPassLowCutoff: options.lowCutoff,
+      bandPassHighCutoff: options.highCutoff,
       bandSize: options.bandSize,
       scoreRef: options.scoreRef,
-      gainNormalizerEnabled: options.gainNormalizerEnabled,
+      gainNormalizerEnabled: options.gainNormalizer,
       gainRef: options.gainRef,
       scoreMode,
       vadMode,

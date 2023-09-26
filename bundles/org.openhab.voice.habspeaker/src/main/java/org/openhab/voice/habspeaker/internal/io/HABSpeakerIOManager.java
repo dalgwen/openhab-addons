@@ -31,14 +31,14 @@ public interface HABSpeakerIOManager {
      * @return active speaker connection if any
      */
     @Nullable
-    HABSpeakerIOClient getSpeakerConnection(String id);
+    HABSpeakerIOConnection getSpeakerConnection(String id);
 
     /**
      * Get active speaker connections
      * 
      * @return list of active speaker connections
      */
-    List<HABSpeakerIOClient> getSpeakerConnections();
+    List<HABSpeakerIOConnection> getSpeakerConnections();
 
     /**
      * Sets the active connection listener

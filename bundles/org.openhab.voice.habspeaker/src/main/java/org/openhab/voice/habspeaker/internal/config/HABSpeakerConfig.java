@@ -26,16 +26,6 @@ public class HABSpeakerConfig {
      * Phrase to say on the speaker on command success
      */
     public String commandSentMessage = "done";
-
-    /**
-     * Phrase to start drop-in to other speaker
-     */
-    public String startDropInPhrase = "";
-
-    /**
-     * Phrase to stop drop-in on the current speaker
-     */
-    public String stopDropInPhrase = "";
     /**
      * Phrase to listen audio.
      */

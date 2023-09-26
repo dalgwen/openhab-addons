@@ -24,7 +24,7 @@ import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.DiscoveryService;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingUID;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -55,7 +55,7 @@ public class HABSpeakerDiscoveryService extends AbstractDiscoveryService {
         wsAdapter.getSpeakerConnections().forEach(this::discoverDevice);
     }
 
-    public void discoverDevice(HABSpeakerIOClient speaker) {
+    public void discoverDevice(HABSpeakerIOConnection speaker) {
         var id = speaker.getId();
         logger.debug("Speaker {} discovered", id);
         Map<String, Object> properties = new HashMap<>();

@@ -47,26 +47,12 @@ public interface HABSpeakerIOHandler {
     HABSpeakerThingConfig getSpeakerConfig();
 
     /**
-     * Is called on remote sink volume changes
-     *
-     * @param value current volume level (range 0 - 100)
-     */
-    void onSinkVolumeUpdate(int value);
-
-    /**
-     * Is called on remote source volume changes
-     *
-     * @param value current volume level (range 0 - 100)
-     */
-    void onSourceVolumeUpdate(int value);
-
-    /**
      * Is called on remote media playback updates
      *
      * @param mediaState the speaker media state
      * @param volume the speaker media volume
      */
-    void onMediaStateUpdate(HABSpeakerIOClient.MediaState mediaState, int volume);
+    void onMediaStateUpdate(HABSpeakerIOConnection.MediaState mediaState, int volume);
 
     /**
      * Writes to video-search channel.

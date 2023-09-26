@@ -27,7 +27,7 @@ import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
-import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOClient;
+import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOConnection;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOListener;
 import org.openhab.voice.habspeaker.internal.io.HABSpeakerIOManager;
 import org.osgi.framework.Constants;
@@ -69,9 +69,12 @@ public class HABSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (thingTypeUID.equals(SPEAKER_THING_TYPE)) {
-            var handler = new HABSpeakerThingHandler(thing, itemRegistry, ioManager);
+            var handler = new HABSpeakerThingHandler(thing, itemRegistry);
             var speakerIO = ioManager.getSpeakerConnection(handler.getSpeakerId());
-            handler.setSpeakerIO(speakerIO);
+            if (speakerIO != null) {
+                speakerIO.setThingHandler(handler);
+                handler.setSpeakerIO(speakerIO);
+            }
             speakerHandlers.put(handler.getSpeakerId(), handler);
             return handler;
         }
@@ -84,17 +87,18 @@ public class HABSpeakerHandlerFactory extends BaseThingHandlerFactory implements
     }
 
     @Override
-    public void onConnected(HABSpeakerIOClient speaker) {
+    public void onSpeakerConnection(HABSpeakerIOConnection speaker) {
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("connecting speaker {} handler", speaker.getId());
+            speaker.setThingHandler(handler);
             handler.setSpeakerIO(speaker);
             handler.updateStatus();
         }
     }
 
     @Override
-    public void onDisconnected(HABSpeakerIOClient speaker) {
+    public void onSpeakerDisconnection(HABSpeakerIOConnection speaker) {
         var handler = speakerHandlers.get(speaker.getId());
         if (handler != null) {
             logger.debug("disconnecting speaker {} handler", speaker.getId());

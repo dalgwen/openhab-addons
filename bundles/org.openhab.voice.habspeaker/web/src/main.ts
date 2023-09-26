@@ -183,7 +183,7 @@ function getMediaCommandHandler(playerMng: MediaCtrl) {
                 return;
             }
             if ('volume' === cmd.type) {
-                playerMng.setMediaVolume(cmd.level);
+                playerMng.setMediaVolume(cmd.value);
                 return;
             }
             const mediaPlayer = playerMng.getPlayer();

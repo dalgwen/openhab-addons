@@ -11,7 +11,6 @@
 			<channel id="sink-volume" typeId="system.volume"/>
 			<channel id="source-volume" typeId="system.volume"/>
 			<channel id="spot" typeId="spot"/>
-			<channel id="drop-in" typeId="drop-in"/>
 			<channel id="media-current-second" typeId="media-current-second"/>
 			<channel id="media-total-seconds" typeId="media-total-seconds"/>
 			<channel id="media-progress" typeId="media-progress"/>
@@ -52,6 +51,11 @@
 			<parameter name="sourceVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Source Volume</label>
 				<description>Default source volume</description>
+				<default>50</default>
+			</parameter>
+			<parameter name="mediaVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
+				<label>Media Volume</label>
+				<description>Default media player volume</description>
 				<default>50</default>
 			</parameter>
 			<parameter name="sinkStereo" type="boolean" groupName="audio">
@@ -316,11 +320,6 @@
 		<item-type>Switch</item-type>
 		<label>Spot</label>
 		<description>Starts dialog processing on the speaker</description>
-	</channel-type>
-	<channel-type id="drop-in">
-		<item-type>String</item-type>
-		<label>Drop In</label>
-		<description>Starts an immediate call with other speaker (by id)</description>
 	</channel-type>
 	<channel-type id="media-current-second">
 		<item-type>Number</item-type>

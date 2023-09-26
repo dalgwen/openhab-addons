@@ -23,12 +23,12 @@ import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
 import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 
 /**
- * The {@link HABSpeakerIOClient} represents a speaker active connection.
+ * The {@link HABSpeakerIOConnection} represents a speaker active connection.
  *
  * @author Miguel Álvarez - Initial contribution
  */
 @NonNullByDefault
-public interface HABSpeakerIOClient {
+public interface HABSpeakerIOConnection {
     /**
      * Get the speaker identifier
      * 
@@ -127,17 +127,6 @@ public interface HABSpeakerIOClient {
      * Starts a dialog on the speaker
      */
     void spot();
-
-    /**
-     * Starts/stops communication with another speaker
-     */
-    void dropIn(@Nullable HABSpeakerIOClient anotherSpeakerIO) throws IllegalStateException;
-
-    /**
-     * Get current drop-in speaker
-     */
-    @Nullable
-    HABSpeakerIOClient getDropIn();
 
     /**
      * Get language interpreter linked to the speaker
@@ -297,9 +286,6 @@ public interface HABSpeakerIOClient {
             this.provider = provider;
             this.mediaId = mediaId;
             this.startSecond = startSecond;
-            if (mediaId == null) {
-                throw new IllegalStateException("Missing media info");
-            }
         }
     }
 }
