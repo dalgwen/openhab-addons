@@ -51,7 +51,7 @@
 			<parameter name="sourceVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Source Volume</label>
 				<description>Default source volume</description>
-				<default>50</default>
+				<default>75</default>
 			</parameter>
 			<parameter name="mediaVolume" type="decimal" min="0" max="100" step="1" groupName="audio">
 				<label>Media Volume</label>

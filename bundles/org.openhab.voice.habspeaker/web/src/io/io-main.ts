@@ -215,7 +215,8 @@ export class IOMain {
           this.getAudioSource().setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
           this.sinkVolume = speakerConfig.sinkVolume ?? this.sinkVolume;
           this.serverSpotting = false;
-          switch (speakerConfig.spotMode) {
+          console.debug(`main: configured spot mode ${speakerConfig.spotMode}`);
+          switch (speakerConfig.spotMode?.toLocaleLowerCase()) {
             case "server":
               await this.teardownRustpotter();
               this.serverSpotting = true;

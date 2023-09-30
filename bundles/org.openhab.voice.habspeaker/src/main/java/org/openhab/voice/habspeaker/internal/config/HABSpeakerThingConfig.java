@@ -74,11 +74,11 @@ public class HABSpeakerThingConfig {
     /**
      * Default volume for the sink
      */
-    public int sinkVolume = 100;
+    public int sinkVolume = 80;
     /**
      * Default volume for the source
      */
-    public int sourceVolume = 50;
+    public int sourceVolume = 75;
     /**
      * Default volume for media players
      */

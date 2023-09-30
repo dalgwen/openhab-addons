@@ -64,13 +64,9 @@ export enum WebSocketInCmd {
   INITIALIZE = "INITIALIZE",
   CONFIGURED = "CONFIGURED",
   ON_SPOT = "ON_SPOT",
-  SINK_VOLUME = "SINK_VOLUME",
-  SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_STATE = "MEDIA_STATE",
 };
 export type WebSocketInCmdType<T extends WebSocketInCmd> =
-  T extends WebSocketInCmd.SINK_VOLUME ? SetVolumeCmd :
-  T extends WebSocketInCmd.SOURCE_VOLUME ? SetVolumeCmd :
   T extends WebSocketInCmd.INITIALIZE ? { id: string, sampleRate: number } :
   T extends WebSocketInCmd.CONFIGURED ? { sinkVolume: number; sourceVolume: number; mediaVolume: number; } :
   T extends WebSocketInCmd.MEDIA_STATE ? MediaStateCmd :
@@ -101,7 +97,6 @@ export enum WorkerInCmd {
   ACK_MESSAGE = "ACK_MESSAGE",
   RESET_CONNECTION = "RESET_CONNECTION",
   TOKEN_RENEW = "TOKEN_RENEW",
-  SINK_VOLUME = "SINK_VOLUME",
   MEDIA_STATE = "MEDIA_STATE",
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
@@ -109,7 +104,6 @@ export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITI
   T extends WorkerInCmd.SINK_PORT ? { id: string, port: MessagePort } :
   T extends WorkerInCmd.ACK_MESSAGE ? { code: number } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
-  T extends WorkerInCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerInCmd.RESET_CONNECTION ? { id: string } :
   T extends WorkerInCmd.MEDIA_STATE ? MediaStateCmd :
   never;

@@ -184,6 +184,9 @@ public class HABSpeakerOutConfig extends HABSpeakerOutMessage {
             var defaultConfig = new HABSpeakerThingConfig();
             configMsg.sampleRate = defaultConfig.sampleRate;
             configMsg.resampleMode = defaultConfig.clientResampleMode;
+            configMsg.sinkVolume = defaultConfig.sinkVolume;
+            configMsg.sourceVolume = defaultConfig.sourceVolume;
+            configMsg.mediaVolume = defaultConfig.mediaVolume;
             return configMsg;
         }
         var config = handler.getSpeakerConfig();

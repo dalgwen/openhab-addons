@@ -138,10 +138,6 @@ export default class IOWorker {
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
           break;
-        case WorkerInCmd.SINK_VOLUME:
-          const volumeData = ev.data as WorkerInCmdType<typeof command>;
-          this.postToWebSocket(WebSocketInCmd.SINK_VOLUME, volumeData);
-          break;
         case WorkerInCmd.MEDIA_STATE:
           const mediaData = ev.data as WorkerInCmdType<typeof command>;
           this.postToWebSocket(WebSocketInCmd.MEDIA_STATE, mediaData);
