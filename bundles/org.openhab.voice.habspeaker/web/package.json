@@ -4,7 +4,7 @@
     "name": "Miguel Álvarez Díez (GiviMAD)"
   },
   "description": "A web UI to consume OpenHAB's dialog processing capabilities",
-  "version": "0.0.26",
+  "version": "0.0.27",
   "private": true,
   "scripts": {
     "dev": "vite --mode pwa",
@@ -45,7 +45,7 @@
     "@capacitor/ios": "^4.6.1",
     "@capacitor/preferences": "^4.0.2",
     "capacitor-voice-recorder": "^4.0.2",
-    "electron": "^24.1.3",
+    "electron": "^24.8.5",
     "electron-builder": "^24.2.1",
     "vite-plugin-electron": "^0.11.2"
   }
