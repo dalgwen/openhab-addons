@@ -92,7 +92,7 @@ public class HABSpeakerThingConfig {
      * 
      * -1 uses the browsers default and resamples the audio on the server.
      */
-    public long sampleRate = 16000;
+    public int sampleRate = 16000;
     /**
      * Audio sample rate.
      */

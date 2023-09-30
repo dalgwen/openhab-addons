@@ -12,15 +12,11 @@
  */
 package org.openhab.voice.habspeaker.internal.io;
 
-import java.io.OutputStream;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.PlayPauseType;
 import org.openhab.core.library.types.RewindFastforwardType;
-import org.openhab.voice.habspeaker.internal.audio.HABSpeakerAudioSource;
-import org.openhab.voice.habspeaker.internal.voice.HABSpeakerLanguageInterpreter;
 
 /**
  * The {@link HABSpeakerIOConnection} represents a speaker active connection.
@@ -110,28 +106,16 @@ public interface HABSpeakerIOConnection {
     void sendAudio(byte[] streamId, byte[] data);
 
     /**
-     * Start streaming the speaker mic to this output stream.
-     *
-     * @param out the {@link OutputStream} to send audio to.
+     * Notify client about listening state, it will stops audio streaming when spotting mode is not "server".
+     * 
+     * @param listening desired state.
      */
-    void addSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream out);
-
-    /**
-     * Stop streaming the speaker mic to this output stream.
-     *
-     * @param out the {@link OutputStream} to send audio to.
-     */
-    void removeSourceListener(HABSpeakerAudioSource.HABSpeakerAudioStream out);
+    void setListening(boolean listening);
 
     /**
      * Starts a dialog on the speaker
      */
     void spot();
-
-    /**
-     * Get language interpreter linked to the speaker
-     */
-    HABSpeakerLanguageInterpreter getLanguageInterpreter();
 
     /**
      * Resume/pause media playback if any

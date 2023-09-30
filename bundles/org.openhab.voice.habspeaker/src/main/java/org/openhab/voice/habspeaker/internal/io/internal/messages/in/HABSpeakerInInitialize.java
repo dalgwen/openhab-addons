@@ -24,7 +24,7 @@ import org.openhab.voice.habspeaker.internal.config.HABSpeakerThingConfig;
 public class HABSpeakerInInitialize extends HABSpeakerInMessage {
 
     public String id = "";
-    public long sampleRate;
+    public int sampleRate;
 
     public HABSpeakerInInitialize() {
         super(InputCommand.INITIALIZE);
