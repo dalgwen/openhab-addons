@@ -5,8 +5,9 @@ import webSinkWorkletUrl from "./audio-sink-worklet.ts?sharedworker&url";
 export class AudioSink {
     private static audioContext?: AudioContext;
     private static connectedNodes = 0;
-    private static audioElement?: HTMLAudioElement;
     private static destination?: MediaStreamAudioDestinationNode;
+    private static audioElement?: HTMLAudioElement;
+    private pauseTimeout: any;
 
     private gainNode: GainNode;
     private processorNode: AudioWorkletNode;
@@ -45,6 +46,9 @@ export class AudioSink {
             this.gainNode.connect(AudioSink.destination);
             if (AudioSink.connectedNodes === 1) {
                 console.debug("AudioSink: Play audio element");
+                if(this.pauseTimeout) {
+                    clearTimeout(this.pauseTimeout);
+                }
                 await AudioSink.audioElement.play();
             }
         }
@@ -57,10 +61,14 @@ export class AudioSink {
     }
     close() {
         AudioSink.connectedNodes--;
-        if (AudioSink.audioElement) {
+        const audioElement = AudioSink.audioElement;
+        if (audioElement) {
             if (AudioSink.connectedNodes === 0) {
                 console.debug("AudioSink: Pause audio element");
-                AudioSink.audioElement.pause();
+                this.pauseTimeout = setTimeout(() => {
+                    this.pauseTimeout = undefined;
+                    audioElement.pause();
+                }, 1000);
             }
         }
         this.processorNode.disconnect();
