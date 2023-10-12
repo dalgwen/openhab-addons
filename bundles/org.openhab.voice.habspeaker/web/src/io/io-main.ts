@@ -1,8 +1,7 @@
 import { ReentrantLock } from "reentrant-lock";
-import { AudioSink } from "./audio-sink";
-import { AudioSource } from "./audio-source";
+import { AudioSink } from "./audio/audio-sink";
+import { AudioSource } from "./audio/audio-source";
 import { WorkerInCmd, RustpotterOptions, MediaStateCmd, WorkerOutCmd, WorkerOutCmdType, ConfigureSpeakerCmd, MediaCommandCmd } from "./io-types";
-import { MessageACKManager } from "./message-ack-manager";
 import { RustpotterConfig, RustpotterService, ScoreMode, VADMode } from "rustpotter-worklet";
 
 export interface IOEventListeners {
@@ -17,7 +16,6 @@ export interface IOEventListeners {
 export class IOMain {
   private online: boolean = false;
   private accessToken: string | null = null;
-  private messageACKs = new MessageACKManager("main");
   // audio source
   private audioContext: AudioContext | null = null;
   private audioSource: AudioSource | null = null;
@@ -26,7 +24,7 @@ export class IOMain {
   private worker: Worker | null = null;
   private micStreaming = false;
   private listening: boolean = false;
-  private listenPortACK?: number;
+  private resolveSourcePort?: () => void;
   // audio sink
   private activeSinks = new Map<string, AudioSink>();
   private sinkVolume: number = 100;
@@ -74,11 +72,10 @@ export class IOMain {
   private async getWSProcessorNode() {
     const audioContext = this.getVoiceAudioContext();
     const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'habspeaker-source-worklet', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
-    this.listenPortACK = this.messageACKs.createACK();
-    const command = { cmd: WorkerInCmd.SOURCE_PORT, port: _webSocketWorkletNode.port, ack: this.listenPortACK };
+    const portPromise = new Promise<void>(resolve => this.resolveSourcePort = resolve);
+    const command = { cmd: WorkerInCmd.SOURCE_PORT, port: _webSocketWorkletNode.port };
     this.worker?.postMessage(command, [command.port]);
-    await this.messageACKs.awaitACK(this.listenPortACK);
-    this.listenPortACK = undefined;
+    await portPromise;
     return _webSocketWorkletNode as AudioNode;
   }
   private async setupRustpotter(wakeword: string, options: RustpotterOptions): Promise<RustpotterService> {
@@ -251,12 +248,12 @@ export class IOMain {
               break;
           }
           this.events.onConfigured?.(speakerConfig);
-          this.postToWorker(WorkerInCmd.ACK_MESSAGE, { code: speakerConfig.ack });
+          this.postToWorker(WorkerInCmd.CONFIGURED);
         })();
         break;
-      case WorkerOutCmd.ACK_MESSAGE:
-        const ackData = data as WorkerOutCmdType<typeof command>;
-        this.messageACKs.confirmACK(ackData.code);
+      case WorkerOutCmd.SOURCE_READY:
+        this.resolveSourcePort?.();
+        this.resolveSourcePort = undefined;
         break;
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
@@ -271,6 +268,8 @@ export class IOMain {
         this.events.onMessage?.("Speaker disconnected, trying to reconnect", "error", 2000);
         this.sinkVolume = 0;
         this.serverSpotting = false;
+        this.resolveSourcePort?.();
+        this.resolveSourcePort = undefined;
         this.killMicProcessors();
         if (this.listening) {
           this.listening = false;
@@ -279,10 +278,6 @@ export class IOMain {
         if (this.online) {
           this.online = false;
           this.events.onRunningChange?.(this);
-        }
-        if (this.listenPortACK) {
-          this.messageACKs.abortACK(this.listenPortACK);
-          this.listenPortACK = undefined;
         }
         break;
       case WorkerOutCmd.START_SINK:
@@ -423,25 +418,30 @@ export class IOMain {
     this.audioSource = new AudioSource(50);
     await this.audioSource.resume();
     this.startSourceCheckInterval();
-    this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
-      name: "hab_speaker-worker",
-      type: "module",
-    });
-    this.worker.onmessage = (ev: MessageEvent<any>) => {
-      if ((import.meta as any).env.DEV) {
-        console.debug("worker => main:", ev.data);
-      }
-      this.handleWorkerMessage(ev.data.cmd as WorkerOutCmd, ev.data);
-    };
-    this.worker.onerror = (err) => {
-      console.error("io-main: Worker error.", err);
-    };
-    this.worker?.postMessage({
-      cmd: WorkerInCmd.INITIALIZE,
-      id: speakerId,
-      token: this.accessToken,
-      sampleRate: this.getVoiceAudioContext().sampleRate,
-      ohUrl: this.ohUrl,
-    });
+    try {
+      this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
+        name: "hab_speaker-worker",
+        type: "module",
+      });
+      this.worker.onmessage = (ev: MessageEvent<any>) => {
+        if ((import.meta as any).env.DEV) {
+          console.debug("worker => main:", ev.data);
+        }
+        this.handleWorkerMessage(ev.data.cmd as WorkerOutCmd, ev.data);
+      };
+      this.worker.onerror = (err) => {
+        console.error("io-main: Worker error.", err);
+      };
+      this.worker?.postMessage({
+        cmd: WorkerInCmd.INITIALIZE,
+        id: speakerId,
+        token: this.accessToken,
+        sampleRate: this.getVoiceAudioContext().sampleRate,
+        ohUrl: this.ohUrl,
+      });
+    } catch (error) {
+      this.events.onMessage?.("Unable to start WebWorker, try reloading the page", "error", 2000);
+      throw error;
+    }
   }
 }

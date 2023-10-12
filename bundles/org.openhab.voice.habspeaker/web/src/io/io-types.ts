@@ -92,20 +92,19 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
 // Commands from main thread to worker.
 export enum WorkerInCmd {
   INITIALIZE = "INITIALIZE",
+  CONFIGURED = "CONFIGURED",
   RESUME = "RESUME",
   SUSPEND = "SUSPEND",
   SOURCE_PORT = "SOURCE_PORT",
   SINK_PORT = "SINK_PORT",
   ON_SPOT = "ON_SPOT",
-  ACK_MESSAGE = "ACK_MESSAGE",
   RESET_CONNECTION = "RESET_CONNECTION",
   TOKEN_RENEW = "TOKEN_RENEW",
   MEDIA_STATE = "MEDIA_STATE",
 };
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
-  T extends WorkerInCmd.SOURCE_PORT ? { port: MessagePort, ack: number } :
+  T extends WorkerInCmd.SOURCE_PORT ? { port: MessagePort } :
   T extends WorkerInCmd.SINK_PORT ? { id: string, port: MessagePort } :
-  T extends WorkerInCmd.ACK_MESSAGE ? { code: number } :
   T extends WorkerInCmd.TOKEN_RENEW ? { token: string } :
   T extends WorkerInCmd.RESET_CONNECTION ? { id: string } :
   T extends WorkerInCmd.MEDIA_STATE ? MediaStateCmd :
@@ -114,7 +113,7 @@ export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITI
 export enum WorkerOutCmd {
   CONFIGURE = "CONFIGURE",
   INITIALIZED = "INITIALIZED",
-  ACK_MESSAGE = "ACK_MESSAGE",
+  SOURCE_READY = "SOURCE_READY",
   OFFLINE = "OFFLINE",
   START_SINK = "START_SINK",
   STOP_SINK = "STOP_SINK",
@@ -124,11 +123,10 @@ export enum WorkerOutCmd {
   SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
 };
-export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd & { ack: number } :
+export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
   T extends WorkerOutCmd.START_SINK ? { id: string, channels: number } :
   T extends WorkerOutCmd.STOP_SINK ? { id: string } :
   T extends WorkerOutCmd.SINK_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.SOURCE_VOLUME ? SetVolumeCmd :
   T extends WorkerOutCmd.MEDIA_COMMAND ? MediaCommandCmd :
-  T extends WorkerOutCmd.ACK_MESSAGE ? { code: number } :
   never;

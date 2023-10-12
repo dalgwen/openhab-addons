@@ -1,9 +1,8 @@
 /// <reference lib="webworker" />
 
 import { SINK_TERMINATION_BYTE, StreamType, WebSocketInCmd, WebSocketInCmdType, WebSocketOutCmd, WebSocketOutCmdType, WorkerInCmd, WorkerInCmdType, WorkerOutCmd, WorkerOutCmdType } from "./io-types";
-import { MessageACKManager } from "./message-ack-manager";
-import { createResampler, Resampler } from "./resampler";
-import { CircularBufferExecutor } from "./circular-buffer";
+import { createResampler, Resampler } from "./audio/resampler";
+import { CircularBufferExecutor } from "./audio/circular-buffer";
 import { ReentrantLock } from "reentrant-lock";
 
 /** Size of the circular buffer used to ensure the audio chunk size */
@@ -53,10 +52,8 @@ export default class IOWorker {
   resamplerMode: string = "";
   /** Holds the openHAB server url */
   ohUrl: string = '';
-  /** Used to wait for some tasks to be done on the main thread */
-  ackManager = new MessageACKManager("worker");
-  /** Token used to wait until the main thread has handled the speaker configuration message */
-  configurationACK?: number;
+  /** Waiting for main configuration confirmation */
+  configuring: boolean = false;
   /** Enables auto reconnection */
   reconnect: boolean = false;
   /** Reconnection timeout reference */
@@ -104,6 +101,12 @@ export default class IOWorker {
           this.reconnect = true;
           this.connectWebSocket();
           break;
+        case WorkerInCmd.CONFIGURED:
+          if (this.configuring) {
+            this.configuring = false;
+            this.postToWebSocket(WebSocketInCmd.CONFIGURED);
+          }
+          break;
         case WorkerInCmd.RESUME:
           this.reconnect = true;
           this.connectWebSocket();
@@ -116,17 +119,13 @@ export default class IOWorker {
           }
           this.disconnectWebSocket();
           break;
-        case WorkerInCmd.ACK_MESSAGE:
-          const ackData = ev.data as WorkerInCmdType<typeof command>;
-          this.ackManager.confirmACK(ackData.code);
-          break;
         case WorkerInCmd.SOURCE_PORT:
           const listenData = ev.data as WorkerInCmdType<typeof command>;
           this.sourcePort?.close();
           this.sourcePort = listenData.port;
           this.sourcePort.onmessage = (ev) => this.handleSourceAudioBuffer(ev.data);
           this.sourcePort.start();
-          this.postToMainThread(WorkerOutCmd.ACK_MESSAGE, { code: listenData.ack });
+          this.postToMainThread(WorkerOutCmd.SOURCE_READY);
           break;
         case WorkerInCmd.SINK_PORT:
           const speakPortData = ev.data as WorkerInCmdType<typeof command>;
@@ -207,12 +206,9 @@ export default class IOWorker {
             }
             this.resamplerMode = configureData.resampleMode;
             this.sourceResampler = await createResampler(this.resamplerMode, this.sampleRate, this.streamSampleRate, 1);
-            this.configurationACK = this.ackManager.createACK();
-            this.postToMainThread(WorkerOutCmd.CONFIGURE, { ...configureData, ack: this.configurationACK });
-            await this.ackManager.awaitACK(this.configurationACK);
-            this.configurationACK = undefined;
+            this.configuring = true;
+            this.postToMainThread(WorkerOutCmd.CONFIGURE, configureData);
           })()
-            .then(() => this.postToWebSocket(WebSocketInCmd.CONFIGURED))
             .catch((err) => console.error("worker configuration error:", err));
           break;
         case WebSocketOutCmd.SINK_VOLUME:
@@ -298,10 +294,7 @@ export default class IOWorker {
     });
     wsRef.addEventListener("close", () => {
       console.warn("websocket => io-worker: connection closed");
-      if (this.configurationACK != null) {
-        this.ackManager.abortACK(this.configurationACK);
-        this.configurationACK = undefined;
-      }
+      this.configuring = false;
       this.sourcePort?.close();
       this.sourcePort = undefined;
       this.sourceResampler?.close();

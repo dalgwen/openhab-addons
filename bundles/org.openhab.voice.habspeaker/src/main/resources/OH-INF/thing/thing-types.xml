@@ -99,7 +99,8 @@
 			</parameter>
 			<parameter name="useAudioElement" type="boolean" groupName="audio">
 				<label>Use Audio Element</label>
-				<description>Use an audio element to render the sink audio. (Have effects on browser's echo cancellation) (Improves volume level on IOS)</description>
+				<description>Use an audio element to render the sink audio. (Have effects on browser's echo cancellation) (Improves
+					volume level on IOS)</description>
 				<default>false</default>
 				<advanced>true</advanced>
 			</parameter>
