@@ -124,13 +124,9 @@ function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, media:
             screenSaver.awake();
             return tooltip.display(...args);
         },
-        onConnected() {
+        onRunningChange(io) {
             screenSaver.awake();
-            widget.setOnline(true);
-        },
-        onDisconnected() {
-            screenSaver.awake();
-            widget.setOnline(false);
+            widget.setOnline(io.isRunning());
         },
         onConfigured(config) {
             screenSaver.awake();
@@ -145,25 +141,17 @@ function getIOListeners(platform: Platform, screenSaver: ScreenSaverCtrl, media:
             }
             theme.update(config);
         },
-        onStartListening() {
-            media.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
+        onListeningChange(io) {
+            const listening = io.isListening();
+            media.muteMediaVolume(listening).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            widget.setListening(true);
+            widget.setListening(listening);
         },
-        onStopListening() {
-            media.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
+        onSpeakingChange(io) {
+            const speaking = io.isSpeaking();
+            media.muteMediaVolume(speaking).catch(err => console.error("Error dimming media volume:", err));
             screenSaver.awake();
-            widget.setListening(false);
-        },
-        onStartSpeaking() {
-            media.muteMediaVolume(true).catch(err => console.error("Error dimming media volume:", err));
-            screenSaver.awake();
-            widget.setSpeaking(true);
-        },
-        onStopSpeaking() {
-            media.muteMediaVolume(false).catch(err => console.error("Error dimming media volume:", err));
-            screenSaver.awake();
-            widget.setSpeaking(false);
+            widget.setSpeaking(speaking);
         },
     };
 }

@@ -37,6 +37,10 @@ public class HABSpeakerThingConfig {
      * Prevent device from going to sleep/block while running the application.
      */
     public boolean keepAwake = false;
+    /**
+     * Suspend audio context and connection in background.
+     */
+    public boolean suspendOnHide = false;
     // Voice config
     /**
      * Custom tts service for this speaker
@@ -87,6 +91,10 @@ public class HABSpeakerThingConfig {
      * Use dual channel audio sink
      */
     public boolean sinkStereo = false;
+    /**
+     * Use an audio element to render the sink audio.
+     */
+    public boolean useAudioElement = false;
     /**
      * Audio sample rate.
      * 

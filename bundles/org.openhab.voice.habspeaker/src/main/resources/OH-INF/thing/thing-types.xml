@@ -92,15 +92,14 @@
 				<advanced>true</advanced>
 			</parameter>
 			<parameter name="changeSampleRate" type="boolean" groupName="audio">
-				<label>Change AudioContext Sample Rate</label>
-				<description>Change the default AudioContext sample rate, needed to reboot the speaker, only works on Firefox and
-					Chrome browsers.</description>
+				<label>Change Audio Context Sample Rate</label>
+				<description>Change the default AudioContext sample rate. (Only applyed on initial load) (Behaves wrong on Safari)</description>
 				<default>false</default>
 				<advanced>true</advanced>
 			</parameter>
 			<parameter name="useAudioElement" type="boolean" groupName="audio">
 				<label>Use Audio Element</label>
-				<description>Use an audio element to render the sink audio. (Have effects on browser's echo cancellation)</description>
+				<description>Use an audio element to render the sink audio. (Have effects on browser's echo cancellation) (Improves volume level on IOS)</description>
 				<default>false</default>
 				<advanced>true</advanced>
 			</parameter>
@@ -118,6 +117,12 @@
 			<parameter name="keepAwake" type="boolean" groupName="device">
 				<label>Keep device awake</label>
 				<description>Prevent device from going to sleep/block while running the application.</description>
+				<default>false</default>
+			</parameter>
+			<parameter name="suspendOnHide" type="boolean" groupName="device">
+				<label>Suspend on hide</label>
+				<description>Suspend audio context and connection in background. (Recommended for IOS because of bugs in the
+					AudioContext state after returning to foreground)</description>
 				<default>false</default>
 			</parameter>
 			<!-- Voice config -->

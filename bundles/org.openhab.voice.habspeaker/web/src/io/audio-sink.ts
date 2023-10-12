@@ -20,6 +20,7 @@ export class AudioSink {
         await audioContext.audioWorklet.addModule(webSinkWorkletUrl);
         AudioSink.audioContext = audioContext;
         if (useAudioElement) {
+            console.debug("AudioSink: Using audio element to render sound");
             if (!AudioSink.destination) {
                 AudioSink.destination = audioContext.createMediaStreamDestination();
             }
@@ -28,6 +29,7 @@ export class AudioSink {
                 AudioSink.audioElement.srcObject = AudioSink.destination.stream;
             }
         } else {
+            console.debug("AudioSink: Using audio context destination to render sound");
             AudioSink.destination?.stream.getTracks().forEach(t => t.stop());
             AudioSink.destination = undefined;
             AudioSink.audioElement?.remove();
@@ -42,6 +44,7 @@ export class AudioSink {
         } else {
             this.gainNode.connect(AudioSink.destination);
             if (AudioSink.connectedNodes === 1) {
+                console.debug("AudioSink: Play audio element");
                 await AudioSink.audioElement.play();
             }
         }
@@ -56,6 +59,7 @@ export class AudioSink {
         AudioSink.connectedNodes--;
         if (AudioSink.audioElement) {
             if (AudioSink.connectedNodes === 0) {
+                console.debug("AudioSink: Pause audio element");
                 AudioSink.audioElement.pause();
             }
         }

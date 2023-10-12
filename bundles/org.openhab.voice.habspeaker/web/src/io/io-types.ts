@@ -37,6 +37,7 @@ export type ConfigureSpeakerCmd = {
   sampleRate: number,
   resampleMode: string,
   useAudioElement: boolean,
+  suspendOnHide: boolean,
   sinkVolume?: number,
   sourceVolume?: number,
   spotMode?: string,
@@ -91,6 +92,8 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
 // Commands from main thread to worker.
 export enum WorkerInCmd {
   INITIALIZE = "INITIALIZE",
+  RESUME = "RESUME",
+  SUSPEND = "SUSPEND",
   SOURCE_PORT = "SOURCE_PORT",
   SINK_PORT = "SINK_PORT",
   ON_SPOT = "ON_SPOT",

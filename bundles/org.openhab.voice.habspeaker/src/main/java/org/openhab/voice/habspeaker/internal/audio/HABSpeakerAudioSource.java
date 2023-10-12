@@ -174,11 +174,11 @@ public class HABSpeakerAudioSource implements AudioSource, AutoCloseable {
     }
 
     private void removeSourceListener(HABSpeakerAudioStream output) {
-        logger.debug("Unregistering source stream for '{}'", getId());
+        logger.debug("Unregister source audio stream for '{}'", getId());
         synchronized (sourceStreams) {
             if (!sourceStreams.remove(output)) {
                 // never
-                logger.error("unregistered source");
+                logger.debug("Source audio stream already unregistered");
                 return;
             }
             if (sourceStreams.size() == (serverSpotting ? 1 : 0)) {

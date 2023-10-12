@@ -47,6 +47,10 @@ public class HABSpeakerOutConfig extends HABSpeakerOutMessage {
      * Prevent device from going to sleep/block while running the application.
      */
     public boolean keepAwake = false;
+    /**
+     * Suspend audio context and connection in background.
+     */
+    public boolean suspendOnHide = false;
     // Sink config
     /**
      * Default media volume
@@ -64,6 +68,10 @@ public class HABSpeakerOutConfig extends HABSpeakerOutMessage {
      * Use dual channel audio sink
      */
     public boolean sinkStereo = false;
+    /**
+     * Use dual channel audio sink
+     */
+    public boolean useAudioElement = false;
     /**
      * IO audio sample rate.
      */
@@ -195,9 +203,11 @@ public class HABSpeakerOutConfig extends HABSpeakerOutMessage {
         configMsg.mediaVolume = speaker.getMediaVolume() != -1 ? speaker.getMediaVolume() : config.mediaVolume;
         configMsg.sampleRate = config.sampleRate;
         configMsg.resampleMode = config.clientResampleMode;
+        configMsg.useAudioElement = config.useAudioElement;
         configMsg.screenSaverTime = config.screenSaverTime;
         configMsg.dimScreen = config.dimScreen;
         configMsg.keepAwake = config.keepAwake;
+        configMsg.suspendOnHide = config.suspendOnHide;
         if (!config.primaryColor.isBlank()) {
             configMsg.primaryColor = config.primaryColor;
         }

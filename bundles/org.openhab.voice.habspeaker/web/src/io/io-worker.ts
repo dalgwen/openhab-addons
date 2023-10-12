@@ -6,9 +6,11 @@ import { createResampler, Resampler } from "./resampler";
 import { CircularBufferExecutor } from "./circular-buffer";
 import { ReentrantLock } from "reentrant-lock";
 
-/** Size of the circular buffer used to ensure a constant chunk size */
+/** Size of the circular buffer used to ensure the audio chunk size */
 const SINK_CHUNK_SIZE = 4096;
 
+/** WebSocket reconnection timeout */
+const RECONNECT_MS = 5000;
 
 /** Contains the state and resources of an active sink */
 type SinkContext = {
@@ -55,6 +57,11 @@ export default class IOWorker {
   ackManager = new MessageACKManager("worker");
   /** Token used to wait until the main thread has handled the speaker configuration message */
   configurationACK?: number;
+  /** Enables auto reconnection */
+  reconnect: boolean = false;
+  /** Reconnection timeout reference */
+  reconnectTimeoutRef?: any = null;
+
   constructor(private postMessage: PostMessage) {
   }
   /**
@@ -94,7 +101,20 @@ export default class IOWorker {
           this.ohUrl = initData.ohUrl
             .replace('https:', 'wss:')
             .replace('http:', 'ws:');
+          this.reconnect = true;
           this.connectWebSocket();
+          break;
+        case WorkerInCmd.RESUME:
+          this.reconnect = true;
+          this.connectWebSocket();
+          break;
+        case WorkerInCmd.SUSPEND:
+          this.reconnect = false;
+          if (this.reconnectTimeoutRef) {
+            clearTimeout(this.reconnectTimeoutRef);
+            this.reconnectTimeoutRef = null;
+          }
+          this.disconnectWebSocket();
           break;
         case WorkerInCmd.ACK_MESSAGE:
           const ackData = ev.data as WorkerInCmdType<typeof command>;
@@ -149,11 +169,7 @@ export default class IOWorker {
         case WorkerInCmd.RESET_CONNECTION:
           const { id } = ev.data as WorkerInCmdType<typeof command>;
           this.id = id;
-          if (this.socket) {
-            this.socket.close();
-          } else {
-            console.error("reset connection: WebSocket is not connected");
-          }
+          this.disconnectWebSocket();
           break;
         default:
           throw new Error("Unknown command: " + ev.data.cmd);
@@ -222,13 +238,12 @@ export default class IOWorker {
    *  Starts the websocket connection to the openHAB server, with retry on error/disconnection.
    */
   private connectWebSocket() {
-    let retryRef: any = null;
     const retry = () => {
-      if (retryRef) {
-        clearTimeout(retryRef);
-        retryRef = null;
+      if (this.reconnectTimeoutRef) {
+        clearTimeout(this.reconnectTimeoutRef);
+        this.reconnectTimeoutRef = null;
       }
-      retryRef = setTimeout(this.connectWebSocket.bind(this), 10000);
+      this.reconnectTimeoutRef = setTimeout(this.connectWebSocket.bind(this), RECONNECT_MS);
     };
     let wsRef = this.socket;
     let query = "";
@@ -293,10 +308,22 @@ export default class IOWorker {
       this.sourceResampler = undefined;
       this.socket = undefined;
       this.postToMainThread(WorkerOutCmd.OFFLINE);
-      retry();
+      if (this.reconnect) {
+        retry();
+      }
     });
     wsRef.addEventListener("error", (err) => console.error("ERROR:", err));
     return wsRef;
+  }
+  /**
+   * Closes the active socket connection if any
+   */
+  private disconnectWebSocket() {
+    if (this.socket) {
+      this.socket.close();
+    } else {
+      console.error("io-worker: WebSocket is not connected");
+    }
   }
   /**
    * Sends audio though a {@link WebSocket} after encode it as a int 16 buffer.

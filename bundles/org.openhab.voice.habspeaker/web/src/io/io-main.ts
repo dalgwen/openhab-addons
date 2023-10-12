@@ -1,3 +1,4 @@
+import { ReentrantLock } from "reentrant-lock";
 import { AudioSink } from "./audio-sink";
 import { AudioSource } from "./audio-source";
 import { WorkerInCmd, RustpotterOptions, MediaStateCmd, WorkerOutCmd, WorkerOutCmdType, ConfigureSpeakerCmd, MediaCommandCmd } from "./io-types";
@@ -5,12 +6,9 @@ import { MessageACKManager } from "./message-ack-manager";
 import { RustpotterConfig, RustpotterService, ScoreMode, VADMode } from "rustpotter-worklet";
 
 export interface IOEventListeners {
-  onConnected?: (io: IOMain) => void;
-  onDisconnected?: (io: IOMain) => void;
-  onStartListening?: (io: IOMain) => void;
-  onStopListening?: (io: IOMain) => void;
-  onStartSpeaking?: (io: IOMain) => void;
-  onStopSpeaking?: (io: IOMain) => void;
+  onRunningChange?: (io: IOMain) => void;
+  onListeningChange?: (io: IOMain) => void;
+  onSpeakingChange?: (io: IOMain) => void;
   onConfigured?: (config: ConfigureSpeakerCmd) => void;
   onMediaCommand?: (mediaCmd: MediaCommandCmd) => void;
   onMessage?: (message: string, type: 'info' | 'error', ms?: number) => (() => void);
@@ -23,6 +21,7 @@ export class IOMain {
   // audio source
   private audioContext: AudioContext | null = null;
   private audioSource: AudioSource | null = null;
+  private speakerStateLock = new ReentrantLock();
   private sourceVolume: number = 50;
   private worker: Worker | null = null;
   private micStreaming = false;
@@ -38,14 +37,14 @@ export class IOMain {
   private rustpotterAudioNode: AudioNode | null = null;
 
   constructor(private ohUrl: string, private events: IOEventListeners = {}) { }
-  public isOnline() {
-    return this.online;
+  public isRunning() {
+    return this.online && this.audioContext?.state === 'running';
   }
   public isListening() {
     return this.listening;
   }
   public isSpeaking() {
-    return this.listening;
+    return this.activeSinks.size > 0;
   }
   private startVoiceAudioContext(customSampleRate?: number) {
     if (!this.audioContext) {
@@ -141,6 +140,7 @@ export class IOMain {
   }
   public sendSpot() {
     if (this.online && this.audioSource && !this.audioSource.isSuspended()) {
+      console.info("main: sending spot event");
       this.postToWorker(WorkerInCmd.ON_SPOT);
     }
   }
@@ -205,12 +205,16 @@ export class IOMain {
         const speakerConfig = data as WorkerOutCmdType<typeof command>;
         (async () => {
           const audioContext = this.getVoiceAudioContext();
-          const resumeAudio = () => audioContext.resume();
+          const resumeAudioContext = () => audioContext.resume();
           const closeMsg = this.events.onMessage?.("Resuming audio context, click to continue", "info");
-          document.addEventListener("click", resumeAudio);
-          await audioContext.resume();
-          document.removeEventListener("click", resumeAudio);
+          document.addEventListener("click", resumeAudioContext);
+          await this.getAudioSource().resume();
+          document.removeEventListener("click", resumeAudioContext);
           closeMsg?.();
+          document.removeEventListener("visibilitychange", this.handleSuspendOnHidden);
+          if (speakerConfig.suspendOnHide) {
+            document.addEventListener("visibilitychange", this.handleSuspendOnHidden);
+          }
           await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
           this.getAudioSource().setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
           this.sinkVolume = speakerConfig.sinkVolume ?? this.sinkVolume;
@@ -256,7 +260,7 @@ export class IOMain {
         break;
       case WorkerOutCmd.INITIALIZED:
         this.online = true;
-        this.events.onConnected?.(this);
+        this.events.onRunningChange?.(this);
         this.events.onMessage?.("Speaker connected", "info", 2000);
         if (this.serverSpotting) {
           console.debug("remote spot enabled, starting mic streaming");
@@ -270,11 +274,11 @@ export class IOMain {
         this.killMicProcessors();
         if (this.listening) {
           this.listening = false;
-          this.events.onStopListening?.(this);
+          this.events.onListeningChange?.(this);
         }
         if (this.online) {
           this.online = false;
-          this.events.onDisconnected?.(this);
+          this.events.onRunningChange?.(this);
         }
         if (this.listenPortACK) {
           this.messageACKs.abortACK(this.listenPortACK);
@@ -288,9 +292,10 @@ export class IOMain {
         this.worker?.postMessage(sinkPortCmd, [sinkPortCmd.port]);
         this.activeSinks.set(sink.getId(), sink);
         const startSpeaking = this.activeSinks.size === 1;
+        console.debug(`main: starting sink ${sink.getId()}`);
         sink.start().then(() => {
           if (startSpeaking) {
-            this.events.onStartSpeaking?.(this);
+            this.events.onSpeakingChange?.(this);
           }
         }).catch(err => console.error(err));
         break;
@@ -302,7 +307,7 @@ export class IOMain {
           this.activeSinks.delete(stopSinkCmd.id);
           activeSink.close();
           if (this.activeSinks.size === 0) {
-            this.events.onStopSpeaking?.(this);
+            this.events.onSpeakingChange?.(this);
           }
         } else {
           console.error("main: unable to stop sink, not found ", stopSinkCmd.id);
@@ -315,7 +320,7 @@ export class IOMain {
         }
         if (!this.listening) {
           this.listening = true;
-          this.events.onStartListening?.(this);
+          this.events.onListeningChange?.(this);
         }
         if (!this.serverSpotting) {
           this.startMicStreaming();
@@ -328,7 +333,7 @@ export class IOMain {
         }
         if (this.listening) {
           this.listening = false;
-          this.events.onStopListening?.(this);
+          this.events.onListeningChange?.(this);
         }
         if (!this.serverSpotting) {
           this.stopMicStreaming();
@@ -375,55 +380,68 @@ export class IOMain {
       vadMode,
     };
   }
+  private sourceCheckIntervalRef: any = null;
+  private startSourceCheckInterval() {
+    this.stopSourceCheckInterval();
+    this.sourceCheckIntervalRef = setInterval(() => this.getAudioSource()
+      .resume()
+      .catch(err => console.error("Unable to resume audio context", err)),
+      10000,
+    );
+  }
+  private stopSourceCheckInterval() {
+    if (this.sourceCheckIntervalRef) {
+      clearInterval(this.sourceCheckIntervalRef);
+      this.sourceCheckIntervalRef = null;
+    }
+  }
+  private handleSuspendOnHidden = () => {
+    if (!document.hidden) {
+      this.speakerStateLock.lock(async () => {
+        await this.getVoiceAudioContext().resume().catch(err => console.error("Error resuming audio context", err));
+        this.startSourceCheckInterval();
+        this.postToWorker(WorkerInCmd.RESUME);
+      });
+    } else {
+      this.speakerStateLock.lock(async () => {
+        this.stopSourceCheckInterval();
+        await this.getVoiceAudioContext().suspend().catch(err => console.error("Error suspending audio context", err));
+        this.postToWorker(WorkerInCmd.SUSPEND);
+      });
+    }
+  };
   public async initialize(speakerId: string, customSampleRate?: number) {
     this.events.onMessage?.("Connecting speaker...", "info", 500);
     this.startVoiceAudioContext(customSampleRate);
     const audioContext = this.getVoiceAudioContext();
+    audioContext.onstatechange = () => {
+      console.debug(`main: Audio context state '${audioContext.state}'`);
+      this.events.onRunningChange?.(this);
+    };
     await audioContext.resume();
     await AudioSource.configure(audioContext);
     this.audioSource = new AudioSource(50);
     await this.audioSource.resume();
-
-    // microphone stream checker, to keep the stream alive on undetected disconnections  
-    setInterval(() => {
-      const source = this.getAudioSource();
-      if (source.isSuspended()) {
-        source.resume().catch(err => console.error("Unable to resume audio context", err))
-      }
-    }, 10000);
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && this.audioSource?.isSuspended()) {
-        this.audioSource.resume()
-          .catch(err => console.error("Unable to resume audio context", err))
-      }
+    this.startSourceCheckInterval();
+    this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
+      name: "hab_speaker-worker",
+      type: "module",
     });
-    return new Promise((resolve, reject) => {
-      try {
-        this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
-          name: "hab_speaker-worker",
-          type: "module",
-        });
-        this.worker.onmessage = (ev: MessageEvent<any>) => {
-          if ((import.meta as any).env.DEV) {
-            console.debug("worker => main:", ev.data);
-          }
-          this.handleWorkerMessage(ev.data.cmd as WorkerOutCmd, ev.data);
-        };
-        this.worker.onerror = (err) => {
-          console.error(err);
-          reject(err);
-        };
-        this.worker?.postMessage({
-          cmd: WorkerInCmd.INITIALIZE,
-          id: speakerId,
-          token: this.accessToken,
-          sampleRate: this.getVoiceAudioContext().sampleRate,
-          ohUrl: this.ohUrl,
-        });
-        resolve(this.worker);
-      } catch (error) {
-        reject(error);
+    this.worker.onmessage = (ev: MessageEvent<any>) => {
+      if ((import.meta as any).env.DEV) {
+        console.debug("worker => main:", ev.data);
       }
+      this.handleWorkerMessage(ev.data.cmd as WorkerOutCmd, ev.data);
+    };
+    this.worker.onerror = (err) => {
+      console.error("io-main: Worker error.", err);
+    };
+    this.worker?.postMessage({
+      cmd: WorkerInCmd.INITIALIZE,
+      id: speakerId,
+      token: this.accessToken,
+      sampleRate: this.getVoiceAudioContext().sampleRate,
+      ohUrl: this.ohUrl,
     });
   }
 }

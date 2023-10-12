@@ -77,6 +77,7 @@ Those are:
 | sinkVolume                   | String  | audio          | false     | Default sink volume.                                                         |
 | sourceVolume                 | String  | audio          | false     | Default sink volume.                                                         |
 | mediaVolume                  | String  | audio          | false     | Default media player volume.                                                 |
+| suspendOnHide                | Boolean | audio          | false     | Suspend speaker when in background, recommended to avoid problems on IOS.    |
 | sinkStereo                   | Boolean | audio          | true      | Use dual channel audio.                                                      |
 | sampleRate                   | Number  | audio          | true      | Sample rate used for transmission, set to 'client' to use the device one.    |
 | clientResampleMode           | String  | audio          | true      | Resample mode used by the client when resampling is needed.                  |
