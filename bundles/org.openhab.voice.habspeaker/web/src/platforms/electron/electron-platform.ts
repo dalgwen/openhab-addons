@@ -4,7 +4,7 @@ class ElectronPlatform implements Platform {
         return 'electron';
     }
     async dimDeviceScreen(value: boolean) {
-        console.warn("TODO: implement");
+        console.warn("TODO: implement dim screen ", value);
     }
     async keepDeviceAwake(value: boolean) {
         await window.electronAPI.blockSystemSleep(value);

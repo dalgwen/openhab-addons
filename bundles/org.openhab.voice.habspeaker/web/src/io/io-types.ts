@@ -66,7 +66,7 @@ export enum WebSocketInCmd {
   CONFIGURED = "CONFIGURED",
   ON_SPOT = "ON_SPOT",
   MEDIA_STATE = "MEDIA_STATE",
-};
+}
 export type WebSocketInCmdType<T extends WebSocketInCmd> =
   T extends WebSocketInCmd.INITIALIZE ? { id: string, sampleRate: number } :
   T extends WebSocketInCmd.CONFIGURED ? { sinkVolume: number; sourceVolume: number; mediaVolume: number; } :
@@ -101,7 +101,7 @@ export enum WorkerInCmd {
   RESET_CONNECTION = "RESET_CONNECTION",
   TOKEN_RENEW = "TOKEN_RENEW",
   MEDIA_STATE = "MEDIA_STATE",
-};
+}
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
   T extends WorkerInCmd.SOURCE_PORT ? { port: MessagePort } :
   T extends WorkerInCmd.SINK_PORT ? { id: string, port: MessagePort } :
@@ -122,7 +122,7 @@ export enum WorkerOutCmd {
   SINK_VOLUME = "SINK_VOLUME",
   SOURCE_VOLUME = "SOURCE_VOLUME",
   MEDIA_COMMAND = "MEDIA_COMMAND",
-};
+}
 export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
   T extends WorkerOutCmd.START_SINK ? { id: string, channels: number } :
   T extends WorkerOutCmd.STOP_SINK ? { id: string } :

@@ -57,7 +57,7 @@ export default class IOWorker {
   /** Enables auto reconnection */
   reconnect: boolean = false;
   /** Reconnection timeout reference */
-  reconnectTimeoutRef?: any = null;
+  reconnectTimeoutRef?: ReturnType<typeof setTimeout>;
 
   constructor(private postMessage: PostMessage) {
   }
@@ -81,14 +81,14 @@ export default class IOWorker {
   /**
    * Handles the {@link WorkerInCmd} received from the main thread
    */
-  onMainThreadCommand(ev: any) {
+  onMainThreadCommand(ev: MessageEvent<unknown>) {
     try {
       if (ev.origin !== "" || typeof ev.data !== 'object') {
         return;
       }
-      const command = ev.data.cmd as WorkerInCmd;
+      const command = (ev.data as unknown as { cmd: WorkerInCmd })?.cmd;
       switch (command) {
-        case WorkerInCmd.INITIALIZE:
+        case WorkerInCmd.INITIALIZE: {
           const initData = ev.data as WorkerInCmdType<typeof command>;
           this.id = initData.id;
           this.sampleRate = initData.sampleRate;
@@ -101,6 +101,7 @@ export default class IOWorker {
           this.reconnect = true;
           this.connectWebSocket();
           break;
+        }
         case WorkerInCmd.CONFIGURED:
           if (this.configuring) {
             this.configuring = false;
@@ -115,11 +116,11 @@ export default class IOWorker {
           this.reconnect = false;
           if (this.reconnectTimeoutRef) {
             clearTimeout(this.reconnectTimeoutRef);
-            this.reconnectTimeoutRef = null;
+            this.reconnectTimeoutRef = undefined;
           }
           this.disconnectWebSocket();
           break;
-        case WorkerInCmd.SOURCE_PORT:
+        case WorkerInCmd.SOURCE_PORT: {
           const listenData = ev.data as WorkerInCmdType<typeof command>;
           this.sourcePort?.close();
           this.sourcePort = listenData.port;
@@ -127,7 +128,8 @@ export default class IOWorker {
           this.sourcePort.start();
           this.postToMainThread(WorkerOutCmd.SOURCE_READY);
           break;
-        case WorkerInCmd.SINK_PORT:
+        }
+        case WorkerInCmd.SINK_PORT: {
           const speakPortData = ev.data as WorkerInCmdType<typeof command>;
           const sinkContext = this.sinkContextStorage.get(speakPortData.id);
           if (sinkContext) {
@@ -154,24 +156,28 @@ export default class IOWorker {
             console.error("Unable to handle sink port, missing sink context");
           }
           break;
+        }
         case WorkerInCmd.ON_SPOT:
           this.postToWebSocket(WebSocketInCmd.ON_SPOT);
           break;
-        case WorkerInCmd.MEDIA_STATE:
+        case WorkerInCmd.MEDIA_STATE: {
           const mediaData = ev.data as WorkerInCmdType<typeof command>;
           this.postToWebSocket(WebSocketInCmd.MEDIA_STATE, mediaData);
           break;
-        case WorkerInCmd.TOKEN_RENEW:
+        }
+        case WorkerInCmd.TOKEN_RENEW: {
           const { token } = ev.data as WorkerInCmdType<typeof command>;
           this.token = token;
           break;
-        case WorkerInCmd.RESET_CONNECTION:
+        }
+        case WorkerInCmd.RESET_CONNECTION: {
           const { id } = ev.data as WorkerInCmdType<typeof command>;
           this.id = id;
           this.disconnectWebSocket();
           break;
+        }
         default:
-          throw new Error("Unknown command: " + ev.data.cmd);
+          throw new Error("Unknown command: " + command);
       }
     } catch (error) {
       console.error("Error handling command in worker: ", error);
@@ -180,12 +186,12 @@ export default class IOWorker {
   /**
    * Handles the {@link WebSocketOutCmd} received from OpenHAB
    */
-  onWebSocketCommand(data: any) {
+  onWebSocketCommand(data: unknown) {
     try {
-      if ((import.meta as any).env.DEV) {
+      if (import.meta.env.DEV) {
         console.debug("websocket => io-worker: ", data);
       }
-      const command = data.cmd as WebSocketOutCmd;
+      const command = (data as { cmd: WebSocketOutCmd }).cmd as WebSocketOutCmd;
       switch (command) {
         case WebSocketOutCmd.INITIALIZED:
           this.postToMainThread(WorkerOutCmd.INITIALIZED);
@@ -197,8 +203,8 @@ export default class IOWorker {
           this.postToMainThread(WorkerOutCmd.STOP_LISTENING);
           break;
         case WebSocketOutCmd.CONFIGURE:
-          const configureData = data as WebSocketOutCmdType<typeof command>;
           (async () => {
+            const configureData = data as WebSocketOutCmdType<typeof command>;
             if (configureData.sampleRate !== -1) {
               this.streamSampleRate = configureData.sampleRate;
             } else {
@@ -209,22 +215,25 @@ export default class IOWorker {
             this.configuring = true;
             this.postToMainThread(WorkerOutCmd.CONFIGURE, configureData);
           })()
-            .catch((err) => console.error("worker configuration error:", err));
+            .catch((err) => console.error("io-worker: configuration error:", err));
           break;
-        case WebSocketOutCmd.SINK_VOLUME:
+        case WebSocketOutCmd.SINK_VOLUME: {
           const sinkVolumeData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.SINK_VOLUME, sinkVolumeData);
           break;
-        case WebSocketOutCmd.SOURCE_VOLUME:
+        }
+        case WebSocketOutCmd.SOURCE_VOLUME: {
           const sourceVolumeData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.SOURCE_VOLUME, sourceVolumeData);
           break;
-        case WebSocketOutCmd.MEDIA_COMMAND:
+        }
+        case WebSocketOutCmd.MEDIA_COMMAND: {
           const mediaCommandData = data as WebSocketOutCmdType<typeof command>;
           this.postToMainThread(WorkerOutCmd.MEDIA_COMMAND, mediaCommandData);
           break;
+        }
         default:
-          throw new Error("Unknown command " + data.cmd);
+          throw new Error("Unknown command " + command);
       }
     } catch (error) {
       console.error("Error handling command in io-worker: ", error);
@@ -237,7 +246,7 @@ export default class IOWorker {
     const retry = () => {
       if (this.reconnectTimeoutRef) {
         clearTimeout(this.reconnectTimeoutRef);
-        this.reconnectTimeoutRef = null;
+        this.reconnectTimeoutRef = undefined;
       }
       this.reconnectTimeoutRef = setTimeout(this.connectWebSocket.bind(this), RECONNECT_MS);
     };
@@ -258,7 +267,7 @@ export default class IOWorker {
         id: this.id,
         sampleRate: this.sampleRate,
       });
-      if ((import.meta as any).env.DEV) {
+      if (import.meta.env.DEV) {
         console.debug("io-worker => websocket:", initMessage);
       }
       if (!wsRef) {
@@ -281,7 +290,7 @@ export default class IOWorker {
             this.sinkLock
               .lock(() => blob.arrayBuffer().then((buffer) => this.handleSinkAudioBuffer(buffer)))
               .catch(err => console.error("io-worker: error on sink blob", err));
-            if ((import.meta as any).env.DEV) {
+            if (import.meta.env.DEV) {
               console.debug("websocket => io-worker: Binary data");
             }
           }

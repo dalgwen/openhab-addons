@@ -10,7 +10,7 @@ export class ScreenSaverCtrl {
     private dimScreenEnabled: boolean = false;
     private dimScreenLock = new ReentrantLock();
     private screenSaverClone?: HTMLDivElement;
-    private iconMovementInterval?: any;
+    private iconMovementInterval?: ReturnType<typeof setInterval>;
 
     constructor(private readonly appRoot: HTMLDivElement, private readonly screenSaverTemplate: HTMLTemplateElement, private readonly platform: Platform, private readonly themeCtrl: ThemeCtrl, mediaPlayer: MediaCtrl) {
         this.manager = new ScreenSaverManager(this.display.bind(this), () => mediaPlayer.getPlayer()?.getAwakeScreen() ?? false);

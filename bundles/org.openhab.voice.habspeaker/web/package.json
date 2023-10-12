@@ -16,7 +16,7 @@
     "sync:capacitor": "cap sync",
     "build:capacitor": "vite build --mode capacitor && cap copy",
     "preview": "vite preview --port 4173",
-    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .ts --ignore-path .gitignore"
   },
   "dependencies": {
     "@alexanderolsen/libsamplerate-js": "^2.0.4",
@@ -27,7 +27,9 @@
   "devDependencies": {
     "@types/audioworklet": "0.0.43",
     "@types/dom-screen-wake-lock": "^1.0.0",
-    "eslint": "^8.22.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
     "prettier": "^2.7.1",
     "typescript": "^5.2.2",
     "vite": "^4.4.9",

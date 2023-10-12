@@ -6,7 +6,7 @@ export class ScreenSaverManager {
     private screenSaverSeconds = -1;
     private lastAwakeTime = Date.now();
     private active = false;
-    private screenSaverTimeout: any = null;
+    private screenSaverTimeout?: ReturnType<typeof setTimeout>;
     private isShown: boolean = false;
     constructor(private showCb: (show: boolean) => void, private isBlocked?: () => boolean) { }
     public readonly awake = () => {
@@ -44,7 +44,7 @@ export class ScreenSaverManager {
         const elapsed = (Date.now() - this.lastAwakeTime) / 1000;
         if (elapsed >= this.screenSaverSeconds) {
             if (!this.isBlocked?.()) {
-                this.screenSaverTimeout = null;
+                this.screenSaverTimeout;
                 this.showScreenSaver(true);
             } else {
                 this.startScreenSaver(this.screenSaverSeconds);

@@ -16,7 +16,7 @@ export class TooltipCtrl {
         p.textContent = msg;
         const closeIcon = queryElement<HTMLElement>("#close", tooltipEl);
 
-        let timeoutRef: any = null;
+        let timeoutRef: ReturnType<typeof setTimeout>;
         let releaseLock: (() => void) | null = null;
         let closed = false;
         const close = (ev?: Event) => {

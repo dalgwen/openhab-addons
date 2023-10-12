@@ -16,8 +16,8 @@ export class WebPlatform implements Platform {
             }
             try {
                 this.wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err: any) {
-                console.error(`Unable to keep device awake: ${err.name}, ${err.message}`);
+            } catch (err: unknown) {
+                console.error("Unable to keep device awake: ", err);
             }
         } else if (!value && this.wakeLock != null) {
             const wakeLock = this.wakeLock;

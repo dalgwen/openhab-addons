@@ -9,7 +9,7 @@ export class MediaCtrl {
     private mediaVolume = 100;
     private mediaVolumeBackup = -1;
     private muteMediaCounter = 0;
-    private mediaStateInterval: any = null;
+    private mediaStateInterval?: ReturnType<typeof setTimeout>;
     private mediaStateLock = new ReentrantLock();
     private listener?: (cmd?: MediaStateCmd) => Promise<void>;
     constructor(private playerRoot: HTMLElement) {

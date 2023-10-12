@@ -46,7 +46,7 @@ export class IOMain {
   }
   private startVoiceAudioContext(customSampleRate?: number) {
     if (!this.audioContext) {
-      let options: AudioContextOptions = {};
+      const options: AudioContextOptions = {};
       if (customSampleRate) {
         options.sampleRate = customSampleRate;
       }
@@ -104,7 +104,7 @@ export class IOMain {
     }
     if (wakeword !== this.currentWakeword) {
       console.debug(`main: downloading and adding rustpotter wakeword '${wakeword}'`);
-      let headers: HeadersInit = {};
+      const headers: HeadersInit = {};
       if (this.accessToken?.length) {
         headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
@@ -124,7 +124,7 @@ export class IOMain {
       this.currentWakeword = null;
     }
   }
-  private postToWorker(cmd: string, args: { [key: string]: any } = {}) {
+  private postToWorker(cmd: string, args: { [key: string]: unknown } = {}) {
     try {
       if (this.worker) {
         this.worker.postMessage({ cmd, ...args });
@@ -186,71 +186,28 @@ export class IOMain {
     } else {
       console.warn("main: trying to stop microphone streaming but it's already stopped!");
     }
-  };
+  }
   private async killMicProcessors() {
     this.audioSource?.stop();
     if (this.rustpotterAudioNode) {
       this.rustpotterAudioNode = null;
       await this.rustpotter?.disposeProcessorNode();
     }
-  };
+  }
 
   // worker setup
-  private handleWorkerMessage(command: WorkerOutCmd, data: WorkerOutCmdType<any>) {
+  private handleWorkerMessage(command: WorkerOutCmd, data: WorkerOutCmdType<WorkerOutCmd>) {
     switch (command) {
-      case WorkerOutCmd.CONFIGURE:
+      case WorkerOutCmd.CONFIGURE: {
         const speakerConfig = data as WorkerOutCmdType<typeof command>;
-        (async () => {
-          const audioContext = this.getVoiceAudioContext();
-          const resumeAudioContext = () => audioContext.resume();
-          const closeMsg = this.events.onMessage?.("Resuming audio context, click to continue", "info");
-          document.addEventListener("click", resumeAudioContext);
-          await this.getAudioSource().resume();
-          document.removeEventListener("click", resumeAudioContext);
-          closeMsg?.();
-          document.removeEventListener("visibilitychange", this.handleSuspendOnHidden);
-          if (speakerConfig.suspendOnHide) {
-            document.addEventListener("visibilitychange", this.handleSuspendOnHidden);
-          }
-          await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
-          this.getAudioSource().setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
-          this.sinkVolume = speakerConfig.sinkVolume ?? this.sinkVolume;
-          this.serverSpotting = false;
-          console.debug(`main: configured spot mode ${speakerConfig.spotMode}`);
-          switch (speakerConfig.spotMode?.toLocaleLowerCase()) {
-            case "server":
-              await this.teardownRustpotter();
-              this.serverSpotting = true;
-              this.events.onMessage?.("Running keyword spotting against the server", "info", 5000);
-              break;
-            case "rustpotter_web":
-              if (speakerConfig.spotConfig?.wakeword) {
-                this.events.onMessage?.("Running keyword spotting locally", "info", 5000);
-                try {
-                  const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.wakeword, speakerConfig.spotConfig);
-                  console.debug("main: creating rustpotter audio worklet");
-                  this.rustpotterAudioNode = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
-                  console.debug("main: connecting rustpotter audio worklet");
-                  await this.getAudioSource().start(this.rustpotterAudioNode);
-                } catch (error) {
-                  console.error("Unable to start local ks processor", error);
-                  this.events.onMessage?.("Error starting local keyword spotter", "info", 5000);
-                }
-              } else {
-                console.warn("main: Missed spotConfig configuration");
-                this.events.onMessage?.("Error starting local keyword spotter", "error", 5000);
-              }
-              break;
-            case "none":
-            default:
-              this.events.onMessage?.("No keyword spotter, click the widget to trigger the dialog", "info", 5000);
-              await this.teardownRustpotter();
-              break;
-          }
-          this.events.onConfigured?.(speakerConfig);
-          this.postToWorker(WorkerInCmd.CONFIGURED);
-        })();
+        this.updateConfiguration(speakerConfig)
+          .catch(err => console.error("io-worker: error updating speaker configuration", err))
+          .finally(() => {
+            this.events.onConfigured?.(speakerConfig);
+            this.postToWorker(WorkerInCmd.CONFIGURED);
+          });
         break;
+      }
       case WorkerOutCmd.SOURCE_READY:
         this.resolveSourcePort?.();
         this.resolveSourcePort = undefined;
@@ -280,7 +237,7 @@ export class IOMain {
           this.events.onRunningChange?.(this);
         }
         break;
-      case WorkerOutCmd.START_SINK:
+      case WorkerOutCmd.START_SINK: {
         const startSinkCmd = data as WorkerOutCmdType<typeof command>;
         const sink = new AudioSink(startSinkCmd.id, startSinkCmd.channels, this.sinkVolume);
         const sinkPortCmd = { cmd: WorkerInCmd.SINK_PORT, id: sink.getId(), port: sink.getMessagePort() };
@@ -294,7 +251,8 @@ export class IOMain {
           }
         }).catch(err => console.error(err));
         break;
-      case WorkerOutCmd.STOP_SINK:
+      }
+      case WorkerOutCmd.STOP_SINK: {
         const stopSinkCmd = data as WorkerOutCmdType<typeof command>;
         const activeSink = this.activeSinks.get(stopSinkCmd.id);
         if (activeSink) {
@@ -308,6 +266,7 @@ export class IOMain {
           console.error("main: unable to stop sink, not found ", stopSinkCmd.id);
         }
         break;
+      }
       case WorkerOutCmd.START_LISTENING:
         if (!this.online) {
           console.debug("main: ignoring start listening message before init");
@@ -334,29 +293,81 @@ export class IOMain {
           this.stopMicStreaming();
         }
         break;
-      case WorkerOutCmd.SINK_VOLUME:
+      case WorkerOutCmd.SINK_VOLUME: {
         const { value: sinkVolume } = data as WorkerOutCmdType<typeof command>;
         this.events.onMessage?.(`Sink volume: ${sinkVolume}`, "info", 1000);
         this.sinkVolume = sinkVolume;
         this.activeSinks.forEach(sink => sink.setVolume(this.sinkVolume));
         break;
-      case WorkerOutCmd.SOURCE_VOLUME:
+      }
+      case WorkerOutCmd.SOURCE_VOLUME: {
         const { value: sourceVolume } = data as WorkerOutCmdType<typeof command>;
         this.events.onMessage?.(`Source volume: ${sourceVolume}`, "info", 1000);
         this.sourceVolume = sourceVolume;
         this.getAudioSource().setVolume(sourceVolume);
         break;
-      case WorkerOutCmd.MEDIA_COMMAND:
+      }
+      case WorkerOutCmd.MEDIA_COMMAND: {
         const mediaCommandData = data as WorkerOutCmdType<typeof command>;
         this.events.onMediaCommand?.(mediaCommandData);
         break;
+      }
       default:
         console.error(`main: Unknown worker command ${command}`);
     }
   }
+  private async updateConfiguration(speakerConfig: ConfigureSpeakerCmd) {
+    const audioContext = this.getVoiceAudioContext();
+    const resumeAudioContext = () => audioContext.resume();
+    const closeMsg = this.events.onMessage?.("Resuming audio context, click to continue", "info");
+    document.addEventListener("click", resumeAudioContext);
+    await this.getAudioSource().resume();
+    document.removeEventListener("click", resumeAudioContext);
+    closeMsg?.();
+    document.removeEventListener("visibilitychange", this.handleSuspendOnHidden);
+    if (speakerConfig.suspendOnHide) {
+      document.addEventListener("visibilitychange", this.handleSuspendOnHidden);
+    }
+    await AudioSink.configure(audioContext, speakerConfig.useAudioElement);
+    this.getAudioSource().setVolume(speakerConfig.sourceVolume ?? this.sourceVolume);
+    this.sinkVolume = speakerConfig.sinkVolume ?? this.sinkVolume;
+    this.serverSpotting = false;
+    console.debug(`main: configured spot mode ${speakerConfig.spotMode}`);
+    switch (speakerConfig.spotMode?.toLocaleLowerCase()) {
+      case "server":
+        await this.teardownRustpotter();
+        this.serverSpotting = true;
+        this.events.onMessage?.("Running keyword spotting against the server", "info", 5000);
+        break;
+      case "rustpotter_web":
+        if (speakerConfig.spotConfig?.wakeword) {
+          this.events.onMessage?.("Running keyword spotting locally", "info", 5000);
+          try {
+            const rustpotter = await this.setupRustpotter(speakerConfig.spotConfig.wakeword, speakerConfig.spotConfig);
+            console.debug("main: creating rustpotter audio worklet");
+            this.rustpotterAudioNode = await rustpotter.getProcessorNode(this.getVoiceAudioContext());
+            console.debug("main: connecting rustpotter audio worklet");
+            await this.getAudioSource().start(this.rustpotterAudioNode);
+          } catch (error) {
+            console.error("Unable to start local ks processor", error);
+            this.events.onMessage?.("Error starting local keyword spotter", "info", 5000);
+          }
+        } else {
+          console.warn("main: Missed spotConfig configuration");
+          this.events.onMessage?.("Error starting local keyword spotter", "error", 5000);
+        }
+        break;
+      case "none":
+      default:
+        this.events.onMessage?.("No keyword spotter, click the widget to trigger the dialog", "info", 5000);
+        await this.teardownRustpotter();
+        break;
+    }
+  }
+
   private getRustpotterConfig(options: RustpotterOptions): RustpotterConfig {
-    const scoreMode = (ScoreMode[options.scoreMode as any] as any) ?? ScoreMode.max;
-    const vadMode = !!(options.vadMode?.length) ? (VADMode[options.vadMode as any] as any) ?? null : null;
+    const scoreMode = (ScoreMode as unknown as { [key: string]: ScoreMode })[options.scoreMode] ?? ScoreMode.max;
+    const vadMode = options.vadMode?.length ? (VADMode as unknown as { [key: string]: VADMode })[options.vadMode] : undefined;
     return {
       averagedThreshold: options.avgThreshold,
       threshold: options.threshold,
@@ -375,7 +386,7 @@ export class IOMain {
       vadMode,
     };
   }
-  private sourceCheckIntervalRef: any = null;
+  private sourceCheckIntervalRef?: ReturnType<typeof setInterval>;
   private startSourceCheckInterval() {
     this.stopSourceCheckInterval();
     this.sourceCheckIntervalRef = setInterval(() => this.getAudioSource()
@@ -387,7 +398,7 @@ export class IOMain {
   private stopSourceCheckInterval() {
     if (this.sourceCheckIntervalRef) {
       clearInterval(this.sourceCheckIntervalRef);
-      this.sourceCheckIntervalRef = null;
+      this.sourceCheckIntervalRef = undefined;
     }
   }
   private handleSuspendOnHidden = () => {
@@ -423,11 +434,11 @@ export class IOMain {
         name: "hab_speaker-worker",
         type: "module",
       });
-      this.worker.onmessage = (ev: MessageEvent<any>) => {
-        if ((import.meta as any).env.DEV) {
+      this.worker.onmessage = (ev: MessageEvent<unknown>) => {
+        if (import.meta.env.DEV) {
           console.debug("worker => main:", ev.data);
         }
-        this.handleWorkerMessage(ev.data.cmd as WorkerOutCmd, ev.data);
+        this.handleWorkerMessage((ev.data as unknown as { cmd: WorkerOutCmd }).cmd, ev.data as unknown as WorkerOutCmdType<WorkerOutCmd>);
       };
       this.worker.onerror = (err) => {
         console.error("io-main: Worker error.", err);

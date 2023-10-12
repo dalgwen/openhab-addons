@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, systemPreferences, powerSaveBlocker } from 'electron'
+import { app, ipcMain, systemPreferences, powerSaveBlocker } from 'electron'
 import { join } from 'node:path';
 import { access, constants, readFile, writeFile, mkdir } from "node:fs/promises";
 
@@ -13,7 +13,7 @@ export async function requestPermissions() {
   }
 }
 
-export function registerAPIHandlers(winGetter: () => BrowserWindow | undefined) {
+export function registerAPIHandlers() {
   ipcMain.handle('setting:commit', async (_, localSettings) => await saveConfigFile(localSettings));
   ipcMain.handle('setting:speaker-id', async () => (await getLocalConfig())?.speakerId);
   ipcMain.handle('setting:oh-url', async () => (await getLocalConfig())?.ohUrl);
@@ -40,6 +40,7 @@ async function fileExists(path: string) {
       await access(path, constants.F_OK);
       return true;
     } catch (error) {
+      return false;
     }
   }
   return false;
@@ -56,7 +57,7 @@ type ConfigFile = {
 export function isConfigLoaded() {
   return !!config;
 }
-async function saveConfigFile(localSettings: any) {
+async function saveConfigFile(localSettings: unknown) {
   if (!await fileExists(SPEAKER_CONFIG_FOLDER)) {
     await mkdir(SPEAKER_CONFIG_FOLDER);
   }
@@ -65,29 +66,25 @@ async function saveConfigFile(localSettings: any) {
 }
 async function loadConfigFromFile() {
   try {
-    try {
-      await access(SPEAKER_CONFIG_PATH, constants.F_OK);
-    } catch (error) {
-      throw new Error("Local settings file not found, please ensure it is in place.")
-    }
-    let configFile: ConfigFile;
-    try {
-      configFile = JSON.parse((await readFile(SPEAKER_CONFIG_PATH)).toString()) as ConfigFile;
-    } catch (error) {
-      throw new Error("Unable to parse speaker settings as json.")
-    }
-    if (!configFile.speakerId) {
-      // TODO: validate alphanumeric with dashes
-      throw new Error('Incorrect speakerId settings property');
-    }
-    if (!configFile.ohUrl) {
-      // TODO: validate url
-      throw new Error('Incorrect ohUrl settings property');
-    }
-    return configFile;
+    await access(SPEAKER_CONFIG_PATH, constants.F_OK);
   } catch (error) {
-    throw error;
+    throw new Error("Local settings file not found, please ensure it is in place.")
   }
+  let configFile: ConfigFile;
+  try {
+    configFile = JSON.parse((await readFile(SPEAKER_CONFIG_PATH)).toString()) as ConfigFile;
+  } catch (error) {
+    throw new Error("Unable to parse speaker settings as json.")
+  }
+  if (!configFile.speakerId) {
+    // TODO: validate alphanumeric with dashes
+    throw new Error('Incorrect speakerId settings property');
+  }
+  if (!configFile.ohUrl) {
+    // TODO: validate url
+    throw new Error('Incorrect ohUrl settings property');
+  }
+  return configFile;
 }
 // load speaker config
 let config: ConfigFile = null;

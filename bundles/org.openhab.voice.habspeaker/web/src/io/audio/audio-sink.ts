@@ -7,7 +7,7 @@ export class AudioSink {
     private static connectedNodes = 0;
     private static destination?: MediaStreamAudioDestinationNode;
     private static audioElement?: HTMLAudioElement;
-    private pauseTimeout: any;
+    private pauseTimeout?: ReturnType<typeof setTimeout>;
 
     private gainNode: GainNode;
     private processorNode: AudioWorkletNode;
@@ -46,7 +46,7 @@ export class AudioSink {
             this.gainNode.connect(AudioSink.destination);
             if (AudioSink.connectedNodes === 1) {
                 console.debug("AudioSink: Play audio element");
-                if(this.pauseTimeout) {
+                if (this.pauseTimeout) {
                     clearTimeout(this.pauseTimeout);
                 }
                 await AudioSink.audioElement.play();

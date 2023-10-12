@@ -47,7 +47,7 @@ async function createWindow() {
   })
 }
 function registerHABSpeakerHandlers() {
-  return registerAPIHandlers(() => win);
+  return registerAPIHandlers();
 }
 // start the application
 app.whenReady()

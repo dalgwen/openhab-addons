@@ -5,7 +5,7 @@ export async function createResampler(resampleMode: string, inputSampleRate: num
         console.debug("No resampling needed for this stream")
         return new ResamplerNoop();
     }
-    let resampler: Resampler = new ResamplerWasm(inputSampleRate, outputSampleRate, channels, resampleMode);
+    const resampler: Resampler = new ResamplerWasm(inputSampleRate, outputSampleRate, channels, resampleMode);
     await resampler.init();
     return resampler;
 }
@@ -29,7 +29,7 @@ export class ResamplerWasm implements Resampler {
     resamplerImpl!: ResamplerWASMImpl;
     constructor(private sampleRate: number, private targetSampleRate: number, private channels: number, private resampleMode: string) { }
     async init(): Promise<void> {
-        const converterType = (ConverterType as any)[this.resampleMode] as typeof ConverterType.SRC_LINEAR ?? ConverterType.SRC_LINEAR;
+        const converterType = (ConverterType as { [key: string]: typeof ConverterType.SRC_LINEAR })[this.resampleMode] ?? ConverterType.SRC_LINEAR;
         this.resamplerImpl = await createResamplerWASM(this.channels, this.sampleRate, this.targetSampleRate, { converterType });
     }
     resample(samples: Float32Array): Float32Array {

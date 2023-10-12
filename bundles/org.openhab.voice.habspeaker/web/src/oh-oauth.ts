@@ -1,7 +1,7 @@
 export class OHOAuth {
     accessToken = "";
     currentTokenExpireTime?: number;
-    refreshAccessTokenTimeoutRef: any;
+    refreshAccessTokenTimeoutRef?: ReturnType<typeof setTimeout>;
     refreshOnVisibilityChangeFn: (() => void) | null = null;
     codeVerifierKey: string;
     authStateKey: string;
@@ -22,10 +22,10 @@ export class OHOAuth {
 
         sessionStorage.setItem(this.codeVerifierKey, pkceChallenge.code_verifier)
         sessionStorage.setItem(this.authStateKey, authState)
-        var redirectUri = this.getRedirectUri();
+        const redirectUri = this.getRedirectUri();
         const loginPage = `${await this.getLoginUrl()}/auth`;
         console.log("Redirecting to authentication page " + loginPage);
-        (window.location as any) = `${loginPage}?` + urlEncodeObject({
+        (window.location as unknown as string) = `${loginPage}?` + urlEncodeObject({
             response_type: "code",
             client_id: redirectUri,
             redirect_uri: redirectUri,
@@ -47,7 +47,7 @@ export class OHOAuth {
                 throw new Error("Missing refresh token");
             }
             if (this.currentTokenExpireTime == null || refreshNow) {
-                var redirectUri = this.getRedirectUri();
+                const redirectUri = this.getRedirectUri();
                 const body = urlEncodeObject({
                     grant_type: "refresh_token",
                     client_id: redirectUri,
@@ -134,7 +134,7 @@ export class OHOAuth {
                 throw new Error('Missing code verifier.');
             }
             sessionStorage.removeItem(this.codeVerifierKey);
-            var redirectUri = this.getRedirectUri();
+            const redirectUri = this.getRedirectUri();
             const body = urlEncodeObject({
                 'grant_type': 'authorization_code',
                 'client_id': redirectUri,
@@ -173,7 +173,7 @@ export class OHOAuth {
 function getQueryParams() {
     const query = window.location.search.substring(1);
     return query.split('&').reduce((params, paramText) => {
-        var pair = paramText.split('=');
+        const pair = paramText.split('=');
         params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
         return params;
     }, {} as { [key: string]: string });
@@ -207,4 +207,4 @@ function generateUUID(mask?: string) {
         }
         return (c == 'x' ? r : (r & 0x7 | 0x8)).toString(16);
     });
-};
+}

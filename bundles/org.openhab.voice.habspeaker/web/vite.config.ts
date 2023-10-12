@@ -1,6 +1,6 @@
 import { defineConfig, PluginOption } from "vite";
 import ConditionalCompile from "vite-plugin-conditional-compiler";
-const pkg = require('./package.json');
+import pkg from './package.json';
 let isDevelopment = false;
 let isProduction = false;
 // https://vitejs.dev/config/
@@ -12,16 +12,17 @@ export default defineConfig(async ({ command, mode }) => {
   const envMode = isProduction ? 'production' : 'development';
   const OH_PROXY_URL = process.env.OH_PROXY ?? "http://127.0.0.1:8080";
   if (command == "serve") {
-    (process.env as any).VITE_DEV_SERVER_URL = "http://localhost:5173";
-    (process.env as any).VITE_DEV_OH_PROXY = OH_PROXY_URL;
+    (process.env as { [key: string]: unknown }).VITE_DEV_SERVER_URL = "http://localhost:5173";
+    (process.env as { [key: string]: unknown }).VITE_DEV_OH_PROXY = OH_PROXY_URL;
   }
   switch (mode) {
-    case "electron":
+    case "electron": {
       console.log(`Building ${envMode} HABSpeaker UI Electron bundle`);
-      const { rmSync } = require('node:fs');
+      const { rmSync } = await import('node:fs');
       rmSync('dist-electron', { recursive: true, force: true });
       plugins.push(await getElectronPlugin());
       break;
+    }
     case "capacitor":
       console.log(`Building ${envMode} HABSpeaker UI Capacitor bundle`);
       break;
@@ -103,6 +104,7 @@ async function getPWAPlugin() {
 
 async function getElectronPlugin() {
   const electron = (await import('vite-plugin-electron')).default;
+  const externalDeps = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.optionalDependencies)];
   return electron([
     {
       // Main-Process entry file of the Electron App.
@@ -116,7 +118,7 @@ async function getElectronPlugin() {
           minify: isProduction,
           outDir: 'dist-electron/',
           rollupOptions: {
-            external: { ...pkg.dependencies, ...pkg.optionalDependencies },
+            external: externalDeps,
           },
         },
         clearScreen: false,
@@ -135,7 +137,7 @@ async function getElectronPlugin() {
           minify: isProduction,
           outDir: 'dist-electron/',
           rollupOptions: {
-            external: { ...pkg.dependencies, ...pkg.optionalDependencies },
+            external: externalDeps,
           },
         },
         clearScreen: false,
