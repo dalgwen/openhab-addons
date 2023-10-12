@@ -22,7 +22,7 @@
     "@alexanderolsen/libsamplerate-js": "^2.0.4",
     "pkce-challenge": "^3.0.0",
     "reentrant-lock": "^3.0.0",
-    "rustpotter-worklet": "3.0.1"
+    "rustpotter-worklet": "^3.0.0"
   },
   "devDependencies": {
     "@types/audioworklet": "0.0.43",
@@ -33,7 +33,7 @@
     "prettier": "^2.7.1",
     "typescript": "^5.2.2",
     "vite": "^4.4.9",
-    "vite-plugin-conditional-compiler": "^0.1.1",
+    "vite-plugin-conditional-compiler": "^0.2.0",
     "vite-plugin-pwa": "^0.16.4"
   },
   "optionalDependencies": {
@@ -47,8 +47,8 @@
     "@capacitor/ios": "^4.6.1",
     "@capacitor/preferences": "^4.0.2",
     "capacitor-voice-recorder": "^4.0.2",
-    "electron": "^24.8.5",
-    "electron-builder": "^24.2.1",
-    "vite-plugin-electron": "^0.11.2"
+    "electron": "^24.8.8",
+    "electron-builder": "^24.6.4",
+    "vite-plugin-electron": "^0.14.1"
   }
 }
