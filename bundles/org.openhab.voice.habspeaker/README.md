@@ -115,15 +115,15 @@ Those are:
 | Channel ID           |  Type   | description                                                             |
 |----------------------|---------|-------------------------------------------------------------------------|
 | sink-volume          | Dimmer  | Controls the sink volume of the speaker.                                |
-| source-volume          | Dimmer  | Controls the source volume of the speaker.                              |
+| source-volume        | Dimmer  | Controls the source volume of the speaker.                              |
 | spot                 | Switch  | Starts dialog processing on the speaker.                                |
 | media-current-second | Number  | Current second for the media currently playing, allow seek.             |
 | media-total-seconds  | Number  | Total seconds for the media currently playing.                          |
 | media-progress       | Dimmer  | Played percentage for the media currently playing, allow seek.          |
 | play-audio           | String  | Start playing a audio by url.                                           |
 | play-video           | String  | Start playing a video by url.                                           |
-| audio-search         | String  | Used to write the searches from the 'listenAudioPhrase' voice command.  |
-| video-search         | String  | Used to write the searches from the 'watchVideoPhrase' voice command.   |
+| audio-search         | String  | Updated with searches from the 'listenAudioPhrase'voice command. (read) |
+| video-search         | String  | Updated with searches from the 'watchVideoPhrase' voice command. (read) |
 
 ## Thing Discovery
 

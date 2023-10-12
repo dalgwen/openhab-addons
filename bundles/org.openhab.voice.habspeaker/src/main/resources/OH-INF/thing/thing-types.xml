@@ -325,12 +325,12 @@
 	<channel-type id="spot">
 		<item-type>Switch</item-type>
 		<label>Spot</label>
-		<description>Starts dialog processing on the speaker</description>
+		<description>Starts dialog processing on the speaker.</description>
 	</channel-type>
 	<channel-type id="media-current-second">
 		<item-type>Number</item-type>
 		<label>Media Current Second</label>
-		<description>Current second for the media currently playing, allow seek</description>
+		<description>Current second for the media currently playing, allows seek.</description>
 	</channel-type>
 	<channel-type id="media-total-seconds">
 		<item-type>Number</item-type>
@@ -341,26 +341,28 @@
 	<channel-type id="media-progress">
 		<item-type>Dimmer</item-type>
 		<label>Media Progress</label>
-		<description>Played percentage for the media currently playing, allow seek</description>
+		<description>Played percentage for the media currently playing, allows seek.</description>
 	</channel-type>
 	<channel-type id="play-audio">
 		<item-type>String</item-type>
 		<label>Play Music by URL</label>
-		<description>Start playing a song by url using the device player</description>
+		<description>Start playing a song by url using the device player.</description>
 	</channel-type>
 	<channel-type id="play-video">
 		<item-type>String</item-type>
 		<label>Play Video by URL</label>
-		<description>Start playing a video by url using the device player</description>
+		<description>Start playing a video by url using the device player.</description>
 	</channel-type>
 	<channel-type id="audio-search">
 		<item-type>String</item-type>
-		<label>Play Music by URL</label>
-		<description>Used to write the searches from the 'listenAudioPhrase' voice command</description>
+		<label>Music Search</label>
+		<description>Updated with searches from the 'listenAudioPhrase' voice command.</description>
+		<state readOnly="true"/>
 	</channel-type>
 	<channel-type id="video-search">
 		<item-type>String</item-type>
-		<label>Play Video by URL</label>
-		<description>Used to write the searches from the 'watchVideoPhrase' voice command</description>
+		<label>Video Search</label>
+		<description>Updated with searches from the 'watchVideoPhrase' voice command.</description>
+		<state readOnly="true"/>
 	</channel-type>
 </thing:thing-descriptions>
