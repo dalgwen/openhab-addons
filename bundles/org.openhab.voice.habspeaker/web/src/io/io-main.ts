@@ -391,8 +391,8 @@ export class IOMain {
     this.stopSourceCheckInterval();
     this.sourceCheckIntervalRef = setInterval(() => this.getAudioSource()
       .resume()
-      .catch(err => console.error("Unable to resume audio context", err)),
-      10000,
+      .catch(err => console.error("Unable to resume audio source", err)),
+      5000,
     );
   }
   private stopSourceCheckInterval() {
