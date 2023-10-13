@@ -4,7 +4,7 @@
     "name": "Miguel Álvarez Díez (GiviMAD)"
   },
   "description": "A web UI to consume OpenHAB's dialog processing capabilities",
-  "version": "0.0.27",
+  "version": "0.0.28",
   "private": true,
   "scripts": {
     "dev": "vite --mode pwa",
@@ -25,28 +25,27 @@
     "rustpotter-worklet": "^3.0.0"
   },
   "devDependencies": {
-    "@types/audioworklet": "0.0.43",
+    "@types/audioworklet": "0.0.50",
     "@types/dom-screen-wake-lock": "^1.0.0",
     "@typescript-eslint/eslint-plugin": "^6.7.5",
     "@typescript-eslint/parser": "^6.7.5",
     "eslint": "^8.51.0",
-    "prettier": "^2.7.1",
     "typescript": "^5.2.2",
     "vite": "^4.4.9",
     "vite-plugin-conditional-compiler": "^0.2.0",
     "vite-plugin-pwa": "^0.16.4"
   },
   "optionalDependencies": {
-    "@capacitor-community/keep-awake": "^3.0.0",
-    "@capacitor-community/screen-brightness": "^4.0.0",
-    "@capacitor/android": "^4.6.1",
-    "@capacitor/app": "^4.1.1",
-    "@capacitor/cli": "^4.6.1",
-    "@capacitor/core": "^4.6.1",
-    "@capacitor/dialog": "^4.1.0",
-    "@capacitor/ios": "^4.6.1",
-    "@capacitor/preferences": "^4.0.2",
-    "capacitor-voice-recorder": "^4.0.2",
+    "@capacitor-community/keep-awake": "^4.0.0",
+    "@capacitor-community/screen-brightness": "^5.0.0",
+    "@capacitor/android": "^5.5.0",
+    "@capacitor/app": "^5.0.6",
+    "@capacitor/cli": "^5.5.0",
+    "@capacitor/core": "^5.5.0",
+    "@capacitor/dialog": "^5.0.6",
+    "@capacitor/ios": "^5.5.0",
+    "@capacitor/preferences": "^5.0.6",
+    "capacitor-voice-recorder": "^5.0.0",
     "electron": "^24.8.8",
     "electron-builder": "^24.6.4",
     "vite-plugin-electron": "^0.14.1"

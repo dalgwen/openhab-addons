@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'org.givimad.habspeaker',
   appName: 'HABSpeaker',
   webDir: 'dist',
-  bundledWebRuntime: false,
   includePlugins: [
     "@capacitor/preferences",
     "@capacitor/dialog",

@@ -2,10 +2,10 @@
 import type { Platform, SpeakerLocalSettings } from "./platform";
 export * from "./platform";
 export const startPlatform: () => Promise<Platform> = async () => {
-    // #v-ifdef MODE=electron
+    // #v-ifdef MODE='electron'
     return new PlatformAdapter((await import('./electron/electron-platform')).electronPlatform);
     // #v-endif
-    // #v-ifdef MODE=capacitor
+    // #v-ifdef MODE='capacitor'
     return new PlatformAdapter((await import('./capacitor/capacitor-platform')).capacitorPlatform);
     // #v-endif
     return new PlatformAdapter((await import('./web/web-platform')).webPlatform);

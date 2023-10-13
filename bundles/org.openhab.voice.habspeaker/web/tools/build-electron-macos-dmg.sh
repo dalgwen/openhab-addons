@@ -29,4 +29,5 @@ esac
 echostep "Installing HABSpeaker node deps"
 npm ci
 echostep "Building HABSpeaker macOS DMG for $TARGET_PLATFORM"
+export CSC_IDENTITY_AUTO_DISCOVERY=false # Skip code signing
 npm run build:electron -- $ELECTRON_PLATFORM_ARG

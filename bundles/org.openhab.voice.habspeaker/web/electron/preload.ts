@@ -1,8 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 let windowOnReadyCallback: (() => void) | undefined;
+let loaded = false;
 // expose electron to app
 contextBridge.exposeInMainWorld('electronAPI', {
-  onReady: (cb: () => void) => windowOnReadyCallback = cb,
+  onReady: (cb: () => void) => {
+    if (!loaded) {
+      windowOnReadyCallback = cb
+    } else {
+      cb();
+    }
+  },
   setLocalSettings: (localSettings: unknown) => ipcRenderer.invoke('setting:commit', localSettings),
   getSpeakerId: () => ipcRenderer.invoke('setting:speaker-id'),
   getTokenOpenHAB: () => ipcRenderer.invoke('setting:oh-token'),
@@ -172,6 +179,7 @@ function useLoading() {
 const { appendLoading, removeLoading } = useLoading()
 domReady().then(appendLoading)
 setTimeout(() => {
+  loaded = true;
   if (windowOnReadyCallback) {
     windowOnReadyCallback();
     windowOnReadyCallback = null;

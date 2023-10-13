@@ -36,9 +36,8 @@ window.addEventListener('load', () => {
         };
         console.log("Setting up HABSpeaker UI");
         queryElement<HTMLImageElement>("#oh-logo").addEventListener("click", () => openHiddenOptions(optionsForm));
-        const serverToken = await platform.getServerToken();
         const allowLoginRedirect = !await platform.isServerTokenNeeded();
-        if ((!allowLoginRedirect && !serverToken) || !await platform.getSpeakerId()) {
+        if (!(await platform.getSpeakerId())?.length || !(await platform.getUrlOpenHAB())?.length) {
             return optionsForm.open("Configuration needed", () => initializeSpeaker(restAPI, platform, uiCtrl, allowLoginRedirect));
         } else {
             return initializeSpeaker(restAPI, platform, uiCtrl, allowLoginRedirect);
@@ -58,9 +57,13 @@ type UIControls = {
 }
 async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, uiControls: UIControls, allowLoginRedirect: boolean): Promise<void> {
     const speakerId = await platform.getSpeakerId();
+    const ohUrl = await platform.getUrlOpenHAB();
     const retry = () => initializeSpeaker(restAPI, platform, uiControls, allowLoginRedirect);
-    if (!speakerId) {
+    if (!speakerId?.length) {
         return uiControls.optionsForm.open("Speaker id required.", retry);
+    }
+    if (!ohUrl?.length) {
+        return uiControls.optionsForm.open("OH url required.", retry);
     }
     restAPI.setServerToken(await platform.getServerToken());
     let uiConfig: UIConfig;
@@ -69,15 +72,12 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
     } catch (error) {
         if (error instanceof UnauthorizedError) {
             console.debug("Authorization required!");
-            if (await platform.isServerTokenNeeded()) {
-                return uiControls.optionsForm.open("Token no valid!", retry);
-            }
-            if (allowLoginRedirect) {
+            if (!allowLoginRedirect) {
+                return uiControls.optionsForm.open("Valid api token required!", retry);
+            } else {
                 console.debug("Trying to get credentials...");
                 await restAPI.authorize();
                 return await initializeSpeaker(restAPI, platform, uiControls, false);
-            } else {
-                throw error;
             }
         } else {
             throw error;
@@ -102,7 +102,7 @@ async function initializeSpeaker(restAPI: HABSpeakerREST, platform: Platform, ui
         }
     })
     uiControls.widget.setOnClick(ioMain.sendSpot.bind(ioMain));
-    restAPI.setTokenListener(accessToken => ioMain.setAuthToken(accessToken));
+    restAPI.setTokenListener(ioMain.setAuthToken.bind(ioMain));
     platform.setup(async () => {
         ioMain.setAuthToken(restAPI.getAccessToken());
         await ioMain.initialize(speakerId, uiConfig.sampleRate);

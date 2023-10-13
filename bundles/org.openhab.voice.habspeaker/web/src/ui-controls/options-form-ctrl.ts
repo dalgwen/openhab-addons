@@ -14,7 +14,7 @@ export class OptionsFormCtrl {
         if (!serverOptionsNeeded) {
             serverOptions.remove();
         } else {
-            queryElement<HTMLInputElement>('input[name="oh-url"]', serverOptions).value = await this.platform.getSpeakerId() ?? ""
+            queryElement<HTMLInputElement>('input[name="oh-url"]', serverOptions).value = await this.platform.getUrlOpenHAB() ?? ""
             queryElement<HTMLInputElement>('input[name="oh-token"]', serverOptions).value = await this.platform.getServerToken() ?? "";
         }
         formContainer.addEventListener("submit", async (ev: Event) => {
