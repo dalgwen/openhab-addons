@@ -15,12 +15,8 @@ package org.openhab.voice.habspeaker.internal.audio.internal;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
 import java.util.Objects;
-import javazoom.spi.mpeg.sampled.convert.MpegFormatConversionProvider;
-import javazoom.spi.mpeg.sampled.file.MpegAudioFileReader;
 
-import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -33,7 +29,6 @@ import org.openhab.core.audio.FixedLengthAudioStream;
 import org.openhab.core.audio.UnsupportedAudioFormatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tritonus.share.sampled.file.TAudioFileFormat;
 
 /**
  * This class convert a stream to the normalized pcm
@@ -149,7 +144,7 @@ public class ConvertedAudioStream extends AudioStream {
     }
 
     /**
-     * If necessary, this method convert MP3 to PCM, and try to
+     * This method convert to the target PMC format when needed, and try to
      * extract duration information.
      *
      * @param innerInputStream An audio stream
@@ -171,34 +166,7 @@ public class ConvertedAudioStream extends AudioStream {
         }
         // A stream supporting reset operation (reset is mandatory to parse formation without loosing data)
         InputStream resettableInnerInputStream = new BufferedInputStream(innerInputStream);
-        if (AudioFormat.MP3.isCompatible(inAudioFormat)) {
-            MpegAudioFileReader mpegAudioFileReader = new MpegAudioFileReader();
-            if (length > 0) { // compute duration if possible
-                AudioFileFormat audioFileFormat = mpegAudioFileReader.getAudioFileFormat(resettableInnerInputStream);
-                if (audioFileFormat instanceof TAudioFileFormat) {
-                    Map<String, Object> taudioFileFormatProperties = audioFileFormat.properties();
-                    if (taudioFileFormatProperties.containsKey("mp3.framesize.bytes")
-                            && taudioFileFormatProperties.containsKey("mp3.framerate.fps")) {
-                        Integer frameSize = (Integer) taudioFileFormatProperties.get("mp3.framesize.bytes");
-                        Float frameRate = (Float) taudioFileFormatProperties.get("mp3.framerate.fps");
-                        if (frameSize != null && frameRate != null) {
-                            duration = Math.round((length / (frameSize * frameRate)) * 1000);
-                            logger.debug("Duration of input stream : {}", duration);
-                        }
-                    }
-                }
-                resettableInnerInputStream.reset();
-            }
-
-            logger.debug("Sound is a MP3. Trying to reencode it");
-            AudioInputStream sourceAIS = mpegAudioFileReader.getAudioInputStream(resettableInnerInputStream);
-            javax.sound.sampled.AudioFormat sourceFormat = sourceAIS.getFormat();
-            MpegFormatConversionProvider mpegconverter = new MpegFormatConversionProvider();
-            javax.sound.sampled.AudioFormat convertFormat = new javax.sound.sampled.AudioFormat(
-                    javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16,
-                    sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
-            return mpegconverter.getAudioInputStream(convertFormat, sourceAIS);
-        } else if (AudioFormat.WAV.isCompatible(inAudioFormat)) {
+        if (AudioFormat.WAV.isCompatible(inAudioFormat)) {
             // return the same input stream, but try to compute the duration first
             AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(resettableInnerInputStream);
             if (length > 0) {

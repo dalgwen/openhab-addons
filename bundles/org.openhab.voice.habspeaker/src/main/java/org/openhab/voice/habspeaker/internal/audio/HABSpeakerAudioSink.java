@@ -79,7 +79,6 @@ public class HABSpeakerAudioSink implements AudioSink {
                 null, clientSampleRate);
         supportedFormats.add(this.internalStreamFormat);
         supportedFormats.add(AudioFormat.WAV);
-        supportedFormats.add(AudioFormat.MP3);
     }
 
     public AudioFormat getInternalStreamFormat() {

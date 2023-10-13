@@ -11,31 +11,6 @@
   <artifactId>org.openhab.voice.habspeaker</artifactId>
   <name>openHAB Add-ons :: Bundles :: Voice :: HABSpeaker</name>
   <description>Web UI for dialog processing againts OpenHAB</description>
-  <dependencies>
-    <dependency>
-      <groupId>com.googlecode.soundlibs</groupId>
-      <artifactId>mp3spi</artifactId>
-      <version>1.9.5.4</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.googlecode.soundlibs</groupId>
-      <artifactId>jlayer</artifactId>
-      <version>1.0.1.4</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.googlecode.soundlibs</groupId>
-      <artifactId>tritonus-share</artifactId>
-      <version>0.3.7.4</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty.websocket</groupId>
-      <artifactId>websocket-server</artifactId>
-      <version>9.4.49.v20220914</version>
-    </dependency>
-  </dependencies>
 
   <build>
     <plugins>
