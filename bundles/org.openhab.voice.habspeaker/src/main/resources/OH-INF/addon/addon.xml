@@ -3,7 +3,7 @@
 	xmlns:addon="https://openhab.org/schemas/addon/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
 
-	<type>voice</type>
+	<type>binding</type>
 	<name>HABSpeaker</name>
 	<description>Dialog processing in the browser using your openHAB server</description>
 	<connection>local</connection>
