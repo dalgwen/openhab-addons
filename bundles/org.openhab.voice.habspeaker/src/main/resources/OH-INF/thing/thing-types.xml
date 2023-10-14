@@ -298,7 +298,7 @@
 				<description>Css compatible color value to use as primary. (Default: OpenHAB red)</description>
 			</parameter>
 			<parameter name="secondaryColor" type="text" groupName="theme">
-				<label>Primary Color</label>
+				<label>Secondary Color</label>
 				<description>Css compatible color value to use as secondary. (Default: OpenHAB grey)</description>
 			</parameter>
 			<parameter name="tertiaryColor" type="text" groupName="theme">
