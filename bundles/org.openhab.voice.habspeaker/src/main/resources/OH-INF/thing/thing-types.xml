@@ -170,15 +170,6 @@
 				</filter>
 				<context>item</context>
 			</parameter>
-			<parameter name="listeningItem" type="text" groupName="voice">
-				<context>item</context>
-				<filter>
-					<criteria name="type">Switch</criteria>
-				</filter>
-				<label>Listening Switch</label>
-				<description>If provided, the item will be switched on during the period when the dialog processor has spotted the
-					keyword and is listening for commands.</description>
-			</parameter>
 			<parameter name="listenCommandItem" type="text" groupName="voice">
 				<context>item</context>
 				<filter>
