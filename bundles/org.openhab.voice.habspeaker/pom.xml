@@ -17,15 +17,15 @@
       <plugin>
         <groupId>org.commonjava.maven.plugins</groupId>
         <artifactId>directory-maven-plugin</artifactId>
-        <version>0.3.1</version>
+        <version>1.0</version>
       </plugin>
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
-        <version>1.9.0</version>
+        <version>1.14.0</version>
         <configuration>
-          <nodeVersion>v18.16.0</nodeVersion>
-          <npmVersion>9.5.1</npmVersion>
+          <nodeVersion>v18.18.2</nodeVersion>
+          <npmVersion>9.8.1</npmVersion>
           <workingDirectory>web</workingDirectory>
         </configuration>
         <executions>
