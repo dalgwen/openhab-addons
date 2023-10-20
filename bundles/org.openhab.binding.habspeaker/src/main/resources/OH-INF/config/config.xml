@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config-description:config-descriptions
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:config-description="https://openhab.org/schemas/config-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/config-description/v1.0.0 https://openhab.org/schemas/config-description-1.0.0.xsd">
+	<config-description uri="binding:habspeaker">
+		<parameter-group name="voice">
+			<label>Voice Control</label>
+			<description>Define the phrases you can use to interact with the speaker (leave a command empty to disable it). The
+				symbol $* represents free captured text.</description>
+		</parameter-group>
+		<parameter-group name="media-providers">
+			<label>Media Providers</label>
+			<description>Configure required credentials for the supported media providers.</description>
+		</parameter-group>
+		<parameter name="commandSentMessage" type="text" groupName="voice">
+			<label>Command send message</label>
+			<description>Phrase to say on the speaker on command success.</description>
+		</parameter>
+		<parameter name="resumeMediaPhrase" type="text" groupName="voice">
+			<label>Resume Media Phrase</label>
+			<description>Phrase template to resume media.</description>
+		</parameter>
+		<parameter name="pauseMediaPhrase" type="text" groupName="voice">
+			<label>Pause Media Phrase</label>
+			<description>Phrase template to pause media.</description>
+		</parameter>
+		<parameter name="stopMediaPhrase" type="text" groupName="voice">
+			<label>Stop Media Phrase</label>
+			<description>Phrase template to stop media.</description>
+		</parameter>
+		<parameter name="decreaseMediaVolumePhrase" type="text" groupName="voice">
+			<label>Decrease Media Volume Phrase</label>
+			<description>Phrase template to decrease the media volume by the configured step.</description>
+		</parameter>
+		<parameter name="increaseMediaVolumePhrase" type="text" groupName="voice">
+			<label>Increase Media Volume Phrase</label>
+			<description>Phrase template to increase the media volume by the configured step.</description>
+		</parameter>
+		<parameter name="mediaVolumeStep" type="integer" groupName="voice">
+			<label>Media Volume Step</label>
+			<description>Volume step used by the increase/decrease media volume phrases.</description>
+			<default>10</default>
+		</parameter>
+		<parameter name="fastForwardMediaProgressPhrase" type="text" groupName="voice">
+			<label>Fast-Forward Media Progress Phrase</label>
+			<description>Phrase template to fast-forward the media progress.</description>
+		</parameter>
+		<parameter name="rewindMediaProgressPhrase" type="text" groupName="voice">
+			<label>Rewind Media Progress Phrase</label>
+			<description>Phrase template to rewind the media progress.</description>
+		</parameter>
+		<parameter name="nextMediaPhrase" type="text" groupName="voice">
+			<label>Next Media Phrase</label>
+			<description>Phrase template to go to the next media item.</description>
+		</parameter>
+		<parameter name="previousMediaPhrase" type="text" groupName="voice">
+			<label>Previous Media Phrase</label>
+			<description>Phrase template to go to the previous media item.</description>
+		</parameter>
+		<parameter name="listenAudioPhrase" type="text" groupName="voice">
+			<label>Listen Audio Phrase</label>
+			<description>Phrase to listen audio (Example: 'tune $*'). Writes to the speaker 'video-search' channel, there is no
+				built-in media search.</description>
+		</parameter>
+		<parameter name="watchVideoPhrase" type="text" groupName="voice">
+			<label>Watch Video Phrase</label>
+			<description>Phrase to watch video (Example: 'watch video $*'). Writes to the speaker 'audio-search' channel, there
+				is no built-in media search.</description>
+		</parameter>
+		<parameter name="continueMediaOnPhrase" type="text" groupName="voice">
+			<label>Continue Media On Phrase</label>
+			<description>Phrase to continue media on another speaker (Example: 'continue on $*').</description>
+		</parameter>
+		<parameter name="claimMediaPhrase" type="text" groupName="voice">
+			<label>Claim Media Phrase</label>
+			<description>Phrase to continue media into the current speaker (Example: 'continue here').</description>
+		</parameter>
+	</config-description>
+</config-description:config-descriptions>

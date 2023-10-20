@@ -2036,7 +2036,7 @@
     </dependency>
     <dependency>
       <groupId>org.openhab.addons.bundles</groupId>
-      <artifactId>org.openhab.voice.habspeaker</artifactId>
+      <artifactId>org.openhab.binding.habspeaker</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

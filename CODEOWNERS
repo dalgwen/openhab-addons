@@ -409,7 +409,7 @@
 /bundles/org.openhab.transform.xslt/ @openhab/add-ons-maintainers
 /bundles/org.openhab.voice.googlestt/ @GiviMAD
 /bundles/org.openhab.voice.googletts/ @gbicskei
-/bundles/org.openhab.voice.habspeaker/ @GiviMAD
+/bundles/org.openhab.binding.habspeaker/ @GiviMAD
 /bundles/org.openhab.voice.mactts/ @kaikreuzer
 /bundles/org.openhab.voice.marytts/ @kaikreuzer
 /bundles/org.openhab.voice.mimictts/ @dalgwen
