@@ -104,7 +104,7 @@ async function getPWAPlugin() {
 
 async function getElectronPlugin() {
   const electron = (await import('vite-plugin-electron')).default;
-  const externalDeps = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.optionalDependencies)];
+  const externalDeps = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.devDependencies), ...Object.keys(pkg.optionalDependencies)];
   return electron([
     {
       // Main-Process entry file of the Electron App.
