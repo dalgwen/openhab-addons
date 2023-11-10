@@ -19,6 +19,7 @@ package org.asamk.signal.manager.internal;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
+import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.Configuration;
 import org.asamk.signal.manager.api.Device;
 import org.asamk.signal.manager.api.DeviceLinkUrl;
@@ -28,18 +29,23 @@ import org.asamk.signal.manager.api.GroupInviteLinkUrl;
 import org.asamk.signal.manager.api.GroupNotFoundException;
 import org.asamk.signal.manager.api.GroupSendingNotAllowedException;
 import org.asamk.signal.manager.api.Identity;
+import org.asamk.signal.manager.api.IdentityVerificationCode;
 import org.asamk.signal.manager.api.InactiveGroupLinkException;
+import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.InvalidDeviceLinkException;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.InvalidUsernameException;
 import org.asamk.signal.manager.api.LastGroupAdminException;
 import org.asamk.signal.manager.api.Message;
 import org.asamk.signal.manager.api.MessageEnvelope;
+import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotPrimaryDeviceException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PendingAdminApprovalException;
+import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.Profile;
+import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.ReceiveConfig;
 import org.asamk.signal.manager.api.Recipient;
 import org.asamk.signal.manager.api.RecipientIdentifier;
@@ -58,6 +64,7 @@ import org.asamk.signal.manager.api.UserStatus;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.Context;
+import org.asamk.signal.manager.helper.RecipientHelper.RegisteredUser;
 import org.asamk.signal.manager.storage.AttachmentStore;
 import org.asamk.signal.manager.storage.AvatarStore;
 import org.asamk.signal.manager.storage.SignalAccount;
@@ -71,6 +78,7 @@ import org.asamk.signal.manager.util.AttachmentUtils;
 import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.MimeUtils;
 import org.asamk.signal.manager.util.StickerUtils;
+import org.signal.libsignal.protocol.InvalidMessageException;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +87,10 @@ import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServicePreview;
 import org.whispersystems.signalservice.api.messages.SignalServiceReceiptMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceTypingMessage;
-import org.whispersystems.signalservice.api.push.ACI;
 import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.api.push.ServiceId.ACI;
+import org.whispersystems.signalservice.api.push.ServiceIdType;
+import org.whispersystems.signalservice.api.push.exceptions.CdsiResourceExhaustedException;
 import org.whispersystems.signalservice.api.util.DeviceNameUtil;
 import org.whispersystems.signalservice.api.util.InvalidNumberException;
 import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
@@ -105,6 +115,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -182,8 +193,8 @@ public class ManagerImpl implements Manager {
         });
         disposable.add(account.getIdentityKeyStore().getIdentityChanges().subscribe(serviceId -> {
             logger.trace("Archiving old sessions for {}", serviceId);
-            account.getAciSessionStore().archiveSessions(serviceId);
-            account.getPniSessionStore().archiveSessions(serviceId);
+            account.getAccountData(ServiceIdType.ACI).getSessionStore().archiveSessions(serviceId);
+            account.getAccountData(ServiceIdType.PNI).getSessionStore().archiveSessions(serviceId);
             account.getSenderKeyStore().deleteSharedWith(serviceId);
             final var recipientId = account.getRecipientResolver().resolveRecipient(serviceId);
             final var profile = account.getProfileStore().getProfile(recipientId);
@@ -205,10 +216,22 @@ public class ManagerImpl implements Manager {
 
     public void checkAccountState() throws IOException {
         context.getAccountHelper().checkAccountState();
+        final var lastRecipientsRefresh = account.getLastRecipientsRefresh();
+        if (lastRecipientsRefresh == null
+                || lastRecipientsRefresh < System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)) {
+            try {
+                context.getRecipientHelper().refreshUsers();
+            } catch (Exception e) {
+                logger.warn("Full CDSI recipients refresh failed, ignoring: {} ({})",
+                        e.getMessage(),
+                        e.getClass().getSimpleName());
+                logger.debug("Full CDSI refresh failed", e);
+            }
+        }
     }
 
     @Override
-    public Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException {
+    public Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException, RateLimitException {
         final var canonicalizedNumbers = numbers.stream().collect(Collectors.toMap(n -> n, n -> {
             try {
                 final var canonicalizedNumber = PhoneNumberFormatter.formatNumber(n, account.getNumber());
@@ -226,7 +249,14 @@ public class ManagerImpl implements Manager {
                 .stream()
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet());
-        final var registeredUsers = context.getRecipientHelper().getRegisteredUsers(canonicalizedNumbersSet);
+
+        final Map<String, RegisteredUser> registeredUsers;
+        try {
+            registeredUsers = context.getRecipientHelper().getRegisteredUsers(canonicalizedNumbersSet);
+        } catch (CdsiResourceExhaustedException e) {
+            logger.debug("CDSI resource exhausted: {}", e.getMessage());
+            throw new RateLimitException(System.currentTimeMillis() + e.getRetryAfterSeconds() * 1000L);
+        }
 
         return numbers.stream().collect(Collectors.toMap(n -> n, n -> {
             final var number = canonicalizedNumbers.get(n);
@@ -237,7 +267,7 @@ public class ManagerImpl implements Manager {
                     : context.getProfileHelper()
                             .getRecipientProfile(account.getRecipientResolver().resolveRecipient(serviceId));
             return new UserStatus(number.isEmpty() ? null : number,
-                    serviceId == null ? null : serviceId.uuid(),
+                    serviceId == null ? null : serviceId.getRawUuid(),
                     profile != null
                             && profile.getUnidentifiedAccessMode() == Profile.UnidentifiedAccessMode.UNRESTRICTED);
         }));
@@ -315,6 +345,26 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
+    public void startChangeNumber(
+            String newNumber, boolean voiceVerification, String captcha
+    ) throws RateLimitException, IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, NotPrimaryDeviceException {
+        if (!account.isPrimaryDevice()) {
+            throw new NotPrimaryDeviceException();
+        }
+        context.getAccountHelper().startChangeNumber(newNumber, voiceVerification, captcha);
+    }
+
+    @Override
+    public void finishChangeNumber(
+            String newNumber, String verificationCode, String pin
+    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException {
+        if (!account.isPrimaryDevice()) {
+            throw new NotPrimaryDeviceException();
+        }
+        context.getAccountHelper().finishChangeNumber(newNumber, verificationCode, pin);
+    }
+
+    @Override
     public void unregister() throws IOException {
         context.getAccountHelper().unregister();
     }
@@ -359,7 +409,10 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void addDeviceLink(DeviceLinkUrl linkUrl) throws IOException, InvalidDeviceLinkException {
+    public void addDeviceLink(DeviceLinkUrl linkUrl) throws IOException, InvalidDeviceLinkException, NotPrimaryDeviceException {
+        if (!account.isPrimaryDevice()) {
+            throw new NotPrimaryDeviceException();
+        }
         context.getAccountHelper().addDevice(linkUrl);
     }
 
@@ -376,7 +429,7 @@ public class ManagerImpl implements Manager {
     }
 
     void refreshPreKeys() throws IOException {
-        context.getPreKeyHelper().refreshPreKeys();
+        context.getPreKeyHelper().refreshPreKeysIfNecessary();
     }
 
     @Override
@@ -610,23 +663,30 @@ public class ManagerImpl implements Manager {
         } else {
             messageBuilder.withBody(message.messageText());
         }
-        if (message.attachments().size() > 0) {
+        if (!message.attachments().isEmpty()) {
             messageBuilder.withAttachments(context.getAttachmentHelper().uploadAttachments(message.attachments()));
         }
-        if (message.mentions().size() > 0) {
+        if (!message.mentions().isEmpty()) {
             messageBuilder.withMentions(resolveMentions(message.mentions()));
         }
-        if (message.textStyles().size() > 0) {
+        if (!message.textStyles().isEmpty()) {
             messageBuilder.withBodyRanges(message.textStyles().stream().map(TextStyle::toBodyRange).toList());
         }
         if (message.quote().isPresent()) {
             final var quote = message.quote().get();
+            final var quotedAttachments = new ArrayList<SignalServiceDataMessage.Quote.QuotedAttachment>();
+            for (final var a : quote.attachments()) {
+                final var quotedAttachment = new SignalServiceDataMessage.Quote.QuotedAttachment(a.contentType(),
+                        a.filename(),
+                        a.preview() == null ? null : context.getAttachmentHelper().uploadAttachment(a.preview()));
+                quotedAttachments.add(quotedAttachment);
+            }
             messageBuilder.withQuote(new SignalServiceDataMessage.Quote(quote.timestamp(),
                     context.getRecipientHelper()
                             .resolveSignalServiceAddress(context.getRecipientHelper().resolveRecipient(quote.author()))
                             .getServiceId(),
                     quote.message(),
-                    List.of(),
+                    quotedAttachments,
                     resolveMentions(quote.mentions()),
                     SignalServiceDataMessage.Quote.Type.NORMAL,
                     quote.textStyles().stream().map(TextStyle::toBodyRange).toList()));
@@ -655,7 +715,7 @@ public class ManagerImpl implements Manager {
                     manifestSticker.emoji(),
                     AttachmentUtils.createAttachmentStream(streamDetails, Optional.empty())));
         }
-        if (message.previews().size() > 0) {
+        if (!message.previews().isEmpty()) {
             final var previews = new ArrayList<SignalServicePreview>(message.previews().size());
             for (final var p : message.previews()) {
                 final var image = p.image().isPresent() ? context.getAttachmentHelper()
@@ -698,7 +758,7 @@ public class ManagerImpl implements Manager {
         for (final var recipient : recipients) {
             if (recipient instanceof RecipientIdentifier.Uuid u) {
                 account.getMessageSendLogStore()
-                        .deleteEntryForRecipientNonGroup(targetSentTimestamp, ServiceId.from(u.uuid()));
+                        .deleteEntryForRecipientNonGroup(targetSentTimestamp, ACI.from(u.uuid()));
             } else if (recipient instanceof RecipientIdentifier.Single r) {
                 try {
                     final var recipientId = context.getRecipientHelper().resolveRecipient(r);
@@ -774,7 +834,7 @@ public class ManagerImpl implements Manager {
                         .resolveRecipientAddress(recipientId)
                         .serviceId();
                 if (serviceId.isPresent()) {
-                    account.getAciSessionStore().deleteAllSessions(serviceId.get());
+                    account.getAccountData(ServiceIdType.ACI).getSessionStore().deleteAllSessions(serviceId.get());
                 }
             }
         }
@@ -814,7 +874,7 @@ public class ManagerImpl implements Manager {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
-        if (recipients.size() == 0) {
+        if (recipients.isEmpty()) {
             return;
         }
         final var recipientIds = context.getRecipientHelper().resolveRecipients(recipients);
@@ -846,7 +906,7 @@ public class ManagerImpl implements Manager {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
-        if (groupIds.size() == 0) {
+        if (groupIds.isEmpty()) {
             return;
         }
         boolean shouldRotateProfileKey = false;
@@ -889,8 +949,23 @@ public class ManagerImpl implements Manager {
 
         var sticker = new StickerPack(packId, packKey);
         account.getStickerStore().addStickerPack(sticker);
+        context.getSyncHelper().sendStickerOperationsMessage(List.of(sticker), List.of());
 
         return new StickerPackUrl(packId, packKey);
+    }
+
+    @Override
+    public void installStickerPack(StickerPackUrl url) throws IOException {
+        final var packId = url.packId();
+        final var packKey = url.packKey();
+        try {
+            context.getStickerHelper().retrieveStickerPack(packId, packKey);
+        } catch (InvalidMessageException e) {
+            throw new IOException(e);
+        }
+
+        final var sticker = context.getStickerHelper().addOrUpdateStickerPack(packId, packKey, true);
+        context.getSyncHelper().sendStickerOperationsMessage(List.of(sticker), List.of());
     }
 
     @Override
@@ -1008,7 +1083,7 @@ public class ManagerImpl implements Manager {
             return true;
         }
         synchronized (messageHandlers) {
-            return messageHandlers.size() > 0;
+            return !messageHandlers.isEmpty();
         }
     }
 
@@ -1038,7 +1113,7 @@ public class ManagerImpl implements Manager {
             synchronized (messageHandlers) {
                 receiveThread = null;
                 isReceivingSynchronous = false;
-                if (messageHandlers.size() > 0) {
+                if (!messageHandlers.isEmpty()) {
                     startReceiveThreadIfRequired();
                 }
             }
@@ -1126,7 +1201,12 @@ public class ManagerImpl implements Manager {
 
     @Override
     public List<Identity> getIdentities() {
-        return account.getIdentityKeyStore().getIdentities().stream().map(this::toIdentity).toList();
+        return account.getIdentityKeyStore()
+                .getIdentities()
+                .stream()
+                .map(this::toIdentity)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private Identity toIdentity(final IdentityInfo identityInfo) {
@@ -1136,6 +1216,10 @@ public class ManagerImpl implements Manager {
 
         final var address = account.getRecipientAddressResolver()
                 .resolveRecipientAddress(account.getRecipientResolver().resolveRecipient(identityInfo.getServiceId()));
+        if (address.serviceId().isPresent() && !Objects.equals(address.serviceId().get(),
+                identityInfo.getServiceId())) {
+            return null;
+        }
         final var scannableFingerprint = context.getIdentityHelper()
                 .computeSafetyNumberForScanning(identityInfo.getServiceId(), identityInfo.getIdentityKey());
         return new Identity(address.toApiRecipientAddress(),
@@ -1166,25 +1250,20 @@ public class ManagerImpl implements Manager {
 
     @Override
     public boolean trustIdentityVerified(
-            RecipientIdentifier.Single recipient, byte[] fingerprint
+            RecipientIdentifier.Single recipient, IdentityVerificationCode verificationCode
     ) throws UnregisteredRecipientException {
-        return trustIdentity(recipient, r -> context.getIdentityHelper().trustIdentityVerified(r, fingerprint));
-    }
-
-    @Override
-    public boolean trustIdentityVerifiedSafetyNumber(
-            RecipientIdentifier.Single recipient, String safetyNumber
-    ) throws UnregisteredRecipientException {
-        return trustIdentity(recipient,
-                r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber));
-    }
-
-    @Override
-    public boolean trustIdentityVerifiedSafetyNumber(
-            RecipientIdentifier.Single recipient, byte[] safetyNumber
-    ) throws UnregisteredRecipientException {
-        return trustIdentity(recipient,
-                r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber));
+        if (verificationCode instanceof IdentityVerificationCode.Fingerprint fingerprint) {
+            return trustIdentity(recipient,
+                    r -> context.getIdentityHelper().trustIdentityVerified(r, fingerprint.fingerprint()));
+        } else if (verificationCode instanceof IdentityVerificationCode.SafetyNumber safetyNumber) {
+            return trustIdentity(recipient,
+                    r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber.safetyNumber()));
+        } else if (verificationCode instanceof IdentityVerificationCode.ScannableSafetyNumber safetyNumber) {
+            return trustIdentity(recipient,
+                    r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber.safetyNumber()));
+        } else {
+            throw new AssertionError("Invalid verification code type");
+        }
     }
 
     @Override

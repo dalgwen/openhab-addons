@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.messages.SendMessageResult;
 import org.whispersystems.signalservice.api.push.ServiceId;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.function.BiFunction;
 
@@ -58,22 +57,25 @@ public class IdentityHelper {
     }
 
     public String computeSafetyNumber(ServiceId serviceId, IdentityKey theirIdentityKey) {
-        final Fingerprint fingerprint = computeSafetyNumberFingerprint(serviceId, theirIdentityKey);
+        final var fingerprint = computeSafetyNumberFingerprint(serviceId, theirIdentityKey, false);
         return fingerprint == null ? null : fingerprint.getDisplayableFingerprint().getDisplayText();
     }
 
     public ScannableFingerprint computeSafetyNumberForScanning(ServiceId serviceId, IdentityKey theirIdentityKey) {
-        final Fingerprint fingerprint = computeSafetyNumberFingerprint(serviceId, theirIdentityKey);
+        var fingerprint = computeSafetyNumberFingerprint(serviceId, theirIdentityKey, false);
+        if (fingerprint == null) {
+            fingerprint = computeSafetyNumberFingerprint(serviceId, theirIdentityKey, true);
+        }
         return fingerprint == null ? null : fingerprint.getScannableFingerprint();
     }
 
     private Fingerprint computeSafetyNumberFingerprint(
-            final ServiceId serviceId, final IdentityKey theirIdentityKey
+            final ServiceId serviceId, final IdentityKey theirIdentityKey, boolean useServiceId
     ) {
         final var recipientId = account.getRecipientResolver().resolveRecipient(serviceId);
         final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
 
-        if (false) {
+        if (useServiceId) {
             if (serviceId.isUnknown()) {
                 return null;
             }
@@ -94,10 +96,8 @@ public class IdentityHelper {
     private boolean trustIdentity(
             RecipientId recipientId, BiFunction<ServiceId, IdentityKey, Boolean> verifier, TrustLevel trustLevel
     ) {
-        final var serviceId = account.getRecipientAddressResolver()
-                .resolveRecipientAddress(recipientId)
-                .serviceId()
-                .orElse(null);
+        final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
+        final var serviceId = address.serviceId().orElse(null);
         if (serviceId == null) {
             return false;
         }
@@ -111,13 +111,8 @@ public class IdentityHelper {
         }
 
         account.getIdentityKeyStore().setIdentityTrustLevel(serviceId, identity.getIdentityKey(), trustLevel);
-        try {
-            final var address = context.getRecipientHelper()
-                    .resolveSignalServiceAddress(account.getRecipientResolver().resolveRecipient(serviceId));
-            context.getSyncHelper().sendVerifiedMessage(address, identity.getIdentityKey(), trustLevel);
-        } catch (IOException e) {
-            logger.warn("Failed to send verification sync message: {}", e.getMessage());
-        }
+        context.getSyncHelper()
+                .sendVerifiedMessage(address.toSignalServiceAddress(), identity.getIdentityKey(), trustLevel);
 
         return true;
     }

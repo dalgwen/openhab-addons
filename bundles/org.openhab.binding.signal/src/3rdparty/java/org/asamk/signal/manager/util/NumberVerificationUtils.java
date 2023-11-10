@@ -7,7 +7,8 @@ import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.helper.PinHelper;
-import org.whispersystems.signalservice.api.KbsPinData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalServiceAccountManager;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
 import org.whispersystems.signalservice.api.push.exceptions.NoSuchSessionException;
@@ -24,6 +25,8 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 public class NumberVerificationUtils {
+
+    private final static Logger logger = LoggerFactory.getLogger(NumberVerificationUtils.class);
 
     public static String handleVerificationSession(
             SignalServiceAccountManager accountManager,
@@ -116,8 +119,7 @@ public class NumberVerificationUtils {
                 throw new PinLockedException(e.getTimeRemaining());
             }
 
-            KbsPinData registrationLockData;
-            registrationLockData = pinHelper.getRegistrationLockData(pin, e);
+            final var registrationLockData = pinHelper.getRegistrationLockData(pin, e);
             if (registrationLockData == null) {
                 throw e;
             }
@@ -145,7 +147,7 @@ public class NumberVerificationUtils {
 
     private static RegistrationSessionMetadataResponse requestValidSession(
             final SignalServiceAccountManager accountManager
-    ) throws NoSuchSessionException, IOException {
+    ) throws IOException {
         return Utils.handleResponseException(accountManager.createRegistrationSession(null, "", ""));
     }
 
@@ -155,6 +157,7 @@ public class NumberVerificationUtils {
         try {
             return validateSession(accountManager, sessionId);
         } catch (NoSuchSessionException e) {
+            logger.debug("No registration session, creating new one.");
             return requestValidSession(accountManager);
         }
     }

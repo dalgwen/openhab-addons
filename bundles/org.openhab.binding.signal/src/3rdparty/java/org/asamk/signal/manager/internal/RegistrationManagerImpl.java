@@ -29,16 +29,19 @@ import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.PinHelper;
 import org.asamk.signal.manager.storage.SignalAccount;
+import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.NumberVerificationUtils;
 import org.asamk.signal.manager.util.Utils;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalServiceAccountManager;
+import org.whispersystems.signalservice.api.account.PreKeyCollection;
 import org.whispersystems.signalservice.api.groupsv2.ClientZkOperations;
 import org.whispersystems.signalservice.api.groupsv2.GroupsV2Operations;
-import org.whispersystems.signalservice.api.push.ACI;
-import org.whispersystems.signalservice.api.push.PNI;
+import org.whispersystems.signalservice.api.push.ServiceId.ACI;
+import org.whispersystems.signalservice.api.push.ServiceId.PNI;
+import org.whispersystems.signalservice.api.push.ServiceIdType;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedException;
 import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
@@ -79,32 +82,20 @@ public class RegistrationManagerImpl implements RegistrationManager {
 
         GroupsV2Operations groupsV2Operations;
         try {
-            groupsV2Operations = new GroupsV2Operations(ClientZkOperations.create(serviceEnvironmentConfig.getSignalServiceConfiguration()),
+            groupsV2Operations = new GroupsV2Operations(ClientZkOperations.create(serviceEnvironmentConfig.signalServiceConfiguration()),
                     ServiceConfig.GROUP_MAX_SIZE);
         } catch (Throwable ignored) {
             groupsV2Operations = null;
         }
-        this.accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.getSignalServiceConfiguration(),
+        this.accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.signalServiceConfiguration(),
                 new DynamicCredentialsProvider(
                         // Using empty UUID, because registering doesn't work otherwise
                         null, null, account.getNumber(), account.getPassword(), SignalServiceAddress.DEFAULT_DEVICE_ID),
                 userAgent,
                 groupsV2Operations,
                 ServiceConfig.AUTOMATIC_NETWORK_RETRY);
-        final var keyBackupService = accountManager.getKeyBackupService(ServiceConfig.getIasKeyStore(),
-                serviceEnvironmentConfig.getKeyBackupConfig().getEnclaveName(),
-                serviceEnvironmentConfig.getKeyBackupConfig().getServiceId(),
-                serviceEnvironmentConfig.getKeyBackupConfig().getMrenclave(),
-                10);
-        final var fallbackKeyBackupServices = serviceEnvironmentConfig.getFallbackKeyBackupConfigs()
-                .stream()
-                .map(config -> accountManager.getKeyBackupService(ServiceConfig.getIasKeyStore(),
-                        config.getEnclaveName(),
-                        config.getServiceId(),
-                        config.getMrenclave(),
-                        10))
-                .toList();
-        this.pinHelper = new PinHelper(keyBackupService, fallbackKeyBackupServices);
+        final var secureValueRecoveryV2 = accountManager.getSecureValueRecoveryV2(serviceEnvironmentConfig.svr2Mrenclave());
+        this.pinHelper = new PinHelper(secureValueRecoveryV2);
     }
 
     @Override
@@ -113,7 +104,7 @@ public class RegistrationManagerImpl implements RegistrationManager {
     ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException {
         if (account.isRegistered()
                 && account.getServiceEnvironment() != null
-                && account.getServiceEnvironment() != serviceEnvironmentConfig.getType()) {
+                && account.getServiceEnvironment() != serviceEnvironmentConfig.type()) {
             throw new IOException("Account is registered in another environment: " + account.getServiceEnvironment());
         }
 
@@ -138,12 +129,21 @@ public class RegistrationManagerImpl implements RegistrationManager {
     public void verifyAccount(
             String verificationCode, String pin
     ) throws IOException, PinLockedException, IncorrectPinException {
-        var sessionId = account.getSessionId(account.getNumber());
-        final var result = NumberVerificationUtils.verifyNumber(sessionId,
+        if (account.getPniIdentityKeyPair() == null) {
+            account.setPniIdentityKeyPair(KeyUtils.generateIdentityKeyPair());
+        }
+
+        final var aciPreKeys = generatePreKeysForType(ServiceIdType.ACI);
+        final var pniPreKeys = generatePreKeysForType(ServiceIdType.PNI);
+        final var result = NumberVerificationUtils.verifyNumber(account.getSessionId(account.getNumber()),
                 verificationCode,
                 pin,
                 pinHelper,
-                this::verifyAccountWithCode);
+                (sessionId1, verificationCode1, registrationLock) -> verifyAccountWithCode(sessionId1,
+                        verificationCode1,
+                        registrationLock,
+                        aciPreKeys,
+                        pniPreKeys));
         final var response = result.first();
         final var masterKey = result.second();
         if (masterKey == null) {
@@ -151,9 +151,9 @@ public class RegistrationManagerImpl implements RegistrationManager {
         }
 
         //accountManager.setGcmId(Optional.of(GoogleCloudMessaging.getInstance(this).register(REGISTRATION_ID)));
-        final var aci = ACI.parseOrNull(response.getUuid());
-        final var pni = PNI.parseOrNull(response.getPni());
-        account.finishRegistration(aci, pni, masterKey, pin);
+        final var aci = ACI.parseOrThrow(response.getUuid());
+        final var pni = PNI.parseOrThrow(response.getPni());
+        account.finishRegistration(aci, pni, masterKey, pin, aciPreKeys, pniPreKeys);
         accountFileUpdater.updateAccountIdentifiers(account.getNumber(), aci);
 
         ManagerImpl m = null;
@@ -203,7 +203,7 @@ public class RegistrationManagerImpl implements RegistrationManager {
 
     private boolean attemptReactivateAccount() {
         try {
-            final var accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.getSignalServiceConfiguration(),
+            final var accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.signalServiceConfiguration(),
                     account.getCredentialsProvider(),
                     userAgent,
                     null,
@@ -228,7 +228,11 @@ public class RegistrationManagerImpl implements RegistrationManager {
     }
 
     private VerifyAccountResponse verifyAccountWithCode(
-            final String sessionId, final String verificationCode, final String registrationLock
+            final String sessionId,
+            final String verificationCode,
+            final String registrationLock,
+            final PreKeyCollection aciPreKeys,
+            final PreKeyCollection pniPreKeys
     ) throws IOException {
         try {
             Utils.handleResponseException(accountManager.verifyAccount(verificationCode, sessionId));
@@ -238,7 +242,25 @@ public class RegistrationManagerImpl implements RegistrationManager {
         return Utils.handleResponseException(accountManager.registerAccount(sessionId,
                 null,
                 account.getAccountAttributes(registrationLock),
+                aciPreKeys,
+                pniPreKeys,
+                null,
                 true));
+    }
+
+    private PreKeyCollection generatePreKeysForType(ServiceIdType serviceIdType) {
+        final var accountData = account.getAccountData(serviceIdType);
+        final var keyPair = accountData.getIdentityKeyPair();
+        final var preKeyMetadata = accountData.getPreKeyMetadata();
+
+        final var nextSignedPreKeyId = preKeyMetadata.getNextSignedPreKeyId();
+        final var signedPreKey = KeyUtils.generateSignedPreKeyRecord(nextSignedPreKeyId, keyPair.getPrivateKey());
+
+        final var privateKey = keyPair.getPrivateKey();
+        final var kyberPreKeyIdOffset = preKeyMetadata.getNextKyberPreKeyId();
+        final var lastResortKyberPreKey = KeyUtils.generateKyberPreKeyRecord(kyberPreKeyIdOffset, privateKey);
+
+        return new PreKeyCollection(keyPair.getPublicKey(), signedPreKey, lastResortKyberPreKey);
     }
 
     @Override
