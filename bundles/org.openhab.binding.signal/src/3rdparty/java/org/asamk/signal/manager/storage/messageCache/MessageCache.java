@@ -51,13 +51,21 @@ public class MessageCache {
     public CachedMessage cacheMessage(SignalServiceEnvelope envelope, RecipientId recipientId) {
         final var now = System.currentTimeMillis();
 
+        File cacheFile;
         try {
-            var cacheFile = getMessageCacheFile(recipientId, now, envelope.getTimestamp());
+            cacheFile = getMessageCacheFile(recipientId, now, envelope.getTimestamp());
+        } catch (IOException e) {
+            logger.warn("Failed to create recipient folder in disk cache: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+
+        final var cachedMessage = new CachedMessage(cacheFile, envelope);
+        try {
             MessageCacheUtils.storeEnvelope(envelope, cacheFile);
-            return new CachedMessage(cacheFile, envelope);
+            return cachedMessage;
         } catch (IOException e) {
             logger.warn("Failed to store encrypted message in disk cache, ignoring: {}", e.getMessage());
-            return null;
+            return cachedMessage;
         }
     }
 
@@ -66,6 +74,7 @@ public class MessageCache {
         if (cacheFile.equals(cachedMessage.getFile())) {
             return cachedMessage;
         }
+        logger.debug("Moving cached message {} to {}", cachedMessage.getFile().toPath(), cacheFile.toPath());
         Files.move(cachedMessage.getFile().toPath(), cacheFile.toPath());
         return new CachedMessage(cacheFile);
     }
@@ -125,7 +134,7 @@ public class MessageCache {
                 final var cacheFile = getMessageCacheFile(recipientId, file.getName());
                 Files.move(file.toPath(), cacheFile.toPath());
             } catch (IOException e) {
-                logger.warn("Failed to move cache file “{}”, ignoring: {}", file, e.getMessage());
+                logger.warn("Failed to move cache file “{}”, ignoring: {}", file, e.getMessage(), e);
             }
         }
     }
