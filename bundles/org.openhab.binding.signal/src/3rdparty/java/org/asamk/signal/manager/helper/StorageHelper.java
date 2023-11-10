@@ -19,7 +19,6 @@ import org.whispersystems.signalservice.api.storage.SignalAccountRecord;
 import org.whispersystems.signalservice.api.storage.SignalStorageManifest;
 import org.whispersystems.signalservice.api.storage.SignalStorageRecord;
 import org.whispersystems.signalservice.api.storage.StorageId;
-import org.whispersystems.signalservice.internal.storage.protos.AccountRecord;
 import org.whispersystems.signalservice.internal.storage.protos.ManifestRecord;
 
 import java.io.IOException;
@@ -80,13 +79,13 @@ public class StorageHelper {
         logger.trace("Reading {} new records", manifest.get().getStorageIds().size());
         for (final var record : getSignalStorageRecords(storageIds)) {
             logger.debug("Reading record of type {}", record.getType());
-            if (record.getType() == ManifestRecord.Identifier.Type.ACCOUNT_VALUE) {
+            if (record.getType() == ManifestRecord.Identifier.Type.ACCOUNT.getValue()) {
                 readAccountRecord(record);
-            } else if (record.getType() == ManifestRecord.Identifier.Type.GROUPV2_VALUE) {
+            } else if (record.getType() == ManifestRecord.Identifier.Type.GROUPV2.getValue()) {
                 readGroupV2Record(record);
-            } else if (record.getType() == ManifestRecord.Identifier.Type.GROUPV1_VALUE) {
+            } else if (record.getType() == ManifestRecord.Identifier.Type.GROUPV1.getValue()) {
                 readGroupV1Record(record);
-            } else if (record.getType() == ManifestRecord.Identifier.Type.CONTACT_VALUE) {
+            } else if (record.getType() == ManifestRecord.Identifier.Type.CONTACT.getValue()) {
                 readContactRecord(record);
             }
         }
@@ -101,15 +100,16 @@ public class StorageHelper {
         }
 
         final var contactRecord = record.getContact().get();
-        final var serviceId = contactRecord.getServiceId();
-        if (contactRecord.getNumber().isEmpty() && serviceId.isUnknown()) {
+        final var aci = contactRecord.getAci().orElse(null);
+        final var pni = contactRecord.getPni().orElse(null);
+        if (contactRecord.getNumber().isEmpty() && aci == null && pni == null) {
             return;
         }
-        final var address = new RecipientAddress(serviceId, contactRecord.getNumber().orElse(null));
+        final var address = new RecipientAddress(aci, pni, contactRecord.getNumber().orElse(null));
         var recipientId = account.getRecipientResolver().resolveRecipient(address);
-        if (serviceId.isValid() && contactRecord.getUsername().isPresent()) {
+        if (aci != null && contactRecord.getUsername().isPresent()) {
             recipientId = account.getRecipientTrustedResolver()
-                    .resolveRecipientTrusted(serviceId, contactRecord.getUsername().get());
+                    .resolveRecipientTrusted(aci, contactRecord.getUsername().get());
         }
 
         final var contact = account.getContactStore().getContact(recipientId);
@@ -170,15 +170,15 @@ public class StorageHelper {
                 logger.warn("Received invalid contact profile key from storage");
             }
         }
-        if (contactRecord.getIdentityKey().isPresent() && serviceId.isValid()) {
+        if (contactRecord.getIdentityKey().isPresent() && aci != null) {
             try {
                 logger.trace("Storing identity key {}", recipientId);
                 final var identityKey = new IdentityKey(contactRecord.getIdentityKey().get());
-                account.getIdentityKeyStore().saveIdentity(serviceId, identityKey);
+                account.getIdentityKeyStore().saveIdentity(aci, identityKey);
 
                 final var trustLevel = TrustLevel.fromIdentityState(contactRecord.getIdentityState());
                 if (trustLevel != null) {
-                    account.getIdentityKeyStore().setIdentityTrustLevel(serviceId, identityKey, trustLevel);
+                    account.getIdentityKeyStore().setIdentityTrustLevel(aci, identityKey, trustLevel);
                 }
             } catch (InvalidKeyException e) {
                 logger.warn("Received invalid contact identity key from storage");
@@ -255,14 +255,10 @@ public class StorageHelper {
         account.getConfigurationStore()
                 .setUnidentifiedDeliveryIndicators(accountRecord.isSealedSenderIndicatorsEnabled());
         account.getConfigurationStore().setLinkPreviews(accountRecord.isLinkPreviewsEnabled());
-        if (accountRecord.getPhoneNumberSharingMode() != AccountRecord.PhoneNumberSharingMode.UNRECOGNIZED) {
-            account.getConfigurationStore()
-                    .setPhoneNumberSharingMode(switch (accountRecord.getPhoneNumberSharingMode()) {
-                        case EVERYBODY -> PhoneNumberSharingMode.EVERYBODY;
-                        case NOBODY -> PhoneNumberSharingMode.NOBODY;
-                        default -> PhoneNumberSharingMode.CONTACTS;
-                    });
-        }
+        account.getConfigurationStore().setPhoneNumberSharingMode(switch (accountRecord.getPhoneNumberSharingMode()) {
+            case EVERYBODY -> PhoneNumberSharingMode.EVERYBODY;
+            case NOBODY, UNKNOWN -> PhoneNumberSharingMode.NOBODY;
+        });
         account.getConfigurationStore().setPhoneNumberUnlisted(accountRecord.isPhoneNumberUnlisted());
         account.setUsername(accountRecord.getUsername());
 
@@ -301,7 +297,7 @@ public class StorageHelper {
             logger.warn("Failed to read storage records, ignoring.");
             return null;
         }
-        return records.size() > 0 ? records.get(0) : null;
+        return !records.isEmpty() ? records.get(0) : null;
     }
 
     private List<SignalStorageRecord> getSignalStorageRecords(final Collection<StorageId> storageIds) throws IOException {

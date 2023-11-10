@@ -265,13 +265,9 @@ public class SignalService {
         if (finalMessageReceiverThread != null) {
             finalMessageReceiverThread.stopReceiving();
         }
-        try {
-            Manager managerFinal = manager;
-            if (managerFinal != null) {
-                managerFinal.close();
-            }
-        } catch (IOException e) {
-            logger.info("Error closing signal manager for {}. Reason : {}", phoneNumber, e.getMessage());
+        Manager managerFinal = manager;
+        if (managerFinal != null) {
+            managerFinal.close();
         }
     }
 

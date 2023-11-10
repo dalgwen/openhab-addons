@@ -1,7 +1,5 @@
 package org.asamk.signal.manager.helper;
 
-import com.google.protobuf.ByteString;
-
 import org.asamk.signal.manager.api.Contact;
 import org.asamk.signal.manager.api.GroupId;
 import org.asamk.signal.manager.api.GroupNotFoundException;
@@ -41,6 +39,7 @@ import org.whispersystems.signalservice.api.push.exceptions.ProofRequiredExcepti
 import org.whispersystems.signalservice.api.push.exceptions.RateLimitException;
 import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserException;
 import org.whispersystems.signalservice.internal.push.exceptions.InvalidUnidentifiedAccessHeaderException;
+import org.whispersystems.signalservice.internal.push.http.PartialSendCompleteListener;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -52,6 +51,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import okio.ByteString;
 
 public class SendHelper {
 
@@ -185,6 +186,10 @@ public class SendHelper {
 
     public SendMessageResult sendSyncMessage(SignalServiceSyncMessage message) {
         var messageSender = dependencies.getMessageSender();
+        if (!account.isMultiDevice()) {
+            logger.trace("Not sending sync message because there are no linked devices.");
+            return SendMessageResult.success(account.getSelfAddress(), List.of(), false, false, 0, Optional.empty());
+        }
         try {
             return messageSender.sendSyncMessage(message, context.getUnidentifiedAccessHelper().getAccessForSync());
         } catch (UnregisteredUserException e) {
@@ -262,10 +267,10 @@ public class SendHelper {
 
         final var senderKeyDistributionMessage = dependencies.getMessageSender()
                 .getOrCreateNewGroupSession(group.getDistributionId());
-        final var distributionBytes = ByteString.copyFrom(senderKeyDistributionMessage.serialize());
+        final var distributionBytes = ByteString.of(senderKeyDistributionMessage.serialize());
         final var contentToSend = messageSendLogEntry.content()
-                .toBuilder()
-                .setSenderKeyDistributionMessage(distributionBytes)
+                .newBuilder()
+                .senderKeyDistributionMessage(distributionBytes)
                 .build();
 
         final var result = handleSendMessage(recipientId,
@@ -330,29 +335,41 @@ public class SendHelper {
         final AtomicLong entryId = new AtomicLong(-1);
 
         final var urgent = true;
-        final LegacySenderHandler legacySender = (recipients, unidentifiedAccess, isRecipientUpdate) -> messageSender.sendDataMessage(
-                recipients,
-                unidentifiedAccess,
-                isRecipientUpdate,
-                contentHint,
-                message,
-                SignalServiceMessageSender.LegacyGroupEvents.EMPTY,
-                sendResult -> {
-                    logger.trace("Partial message send result: {}", sendResult.isSuccess());
-                    synchronized (entryId) {
-                        if (entryId.get() == -1) {
-                            final var newId = messageSendLogStore.insertIfPossible(message.getTimestamp(),
-                                    sendResult,
-                                    contentHint,
-                                    urgent);
-                            entryId.set(newId);
-                        } else {
-                            messageSendLogStore.addRecipientToExistingEntryIfPossible(entryId.get(), sendResult);
-                        }
-                    }
-                },
-                () -> false,
-                urgent);
+        final PartialSendCompleteListener partialSendCompleteListener = sendResult -> {
+            logger.trace("Partial message send result: {}", sendResult.isSuccess());
+            synchronized (entryId) {
+                if (entryId.get() == -1) {
+                    final var newId = messageSendLogStore.insertIfPossible(message.getTimestamp(),
+                            sendResult,
+                            contentHint,
+                            urgent);
+                    entryId.set(newId);
+                } else {
+                    messageSendLogStore.addRecipientToExistingEntryIfPossible(entryId.get(), sendResult);
+                }
+            }
+        };
+        final LegacySenderHandler legacySender = (recipients, unidentifiedAccess, isRecipientUpdate) ->
+                editTargetTimestamp.isEmpty()
+                        ? messageSender.sendDataMessage(recipients,
+                        unidentifiedAccess,
+                        isRecipientUpdate,
+                        contentHint,
+                        message,
+                        SignalServiceMessageSender.LegacyGroupEvents.EMPTY,
+                        partialSendCompleteListener,
+                        () -> false,
+                        urgent)
+                        : messageSender.sendEditMessage(recipients,
+                                unidentifiedAccess,
+                                isRecipientUpdate,
+                                contentHint,
+                                message,
+                                SignalServiceMessageSender.LegacyGroupEvents.EMPTY,
+                                partialSendCompleteListener,
+                                () -> false,
+                                urgent,
+                                editTargetTimestamp.get());
         final SenderKeySenderHandler senderKeySender = (distId, recipients, unidentifiedAccess, isRecipientUpdate) -> messageSender.sendGroupDataMessage(
                 distId,
                 recipients,
@@ -448,7 +465,7 @@ public class SendHelper {
                 : getSenderKeyCapableRecipientIds(recipientIds);
         final var allResults = new ArrayList<SendMessageResult>(recipientIds.size());
 
-        if (senderKeyTargets.size() > 0) {
+        if (!senderKeyTargets.isEmpty()) {
             final var results = sendGroupMessageInternalWithSenderKey(senderKeySender,
                     senderKeyTargets,
                     distributionId,
@@ -462,7 +479,7 @@ public class SendHelper {
                         .filter(r -> !r.isSuccess())
                         .map(r -> context.getRecipientHelper().resolveRecipient(r.getAddress()))
                         .toList();
-                if (failedTargets.size() > 0) {
+                if (!failedTargets.isEmpty()) {
                     senderKeyTargets = new HashSet<>(senderKeyTargets);
                     failedTargets.forEach(senderKeyTargets::remove);
                 }
@@ -473,8 +490,8 @@ public class SendHelper {
         legacyTargets.removeAll(senderKeyTargets);
         final boolean onlyTargetIsSelfWithLinkedDevice = recipientIds.isEmpty() && account.isMultiDevice();
 
-        if (legacyTargets.size() > 0 || onlyTargetIsSelfWithLinkedDevice) {
-            if (legacyTargets.size() > 0) {
+        if (!legacyTargets.isEmpty() || onlyTargetIsSelfWithLinkedDevice) {
+            if (!legacyTargets.isEmpty()) {
                 logger.debug("Need to do {} legacy sends.", legacyTargets.size());
             } else {
                 logger.debug("Need to do a legacy send to send a sync message for a group of only ourselves.");
@@ -482,7 +499,7 @@ public class SendHelper {
 
             final List<SendMessageResult> results = sendGroupMessageInternalWithLegacy(legacySender,
                     legacyTargets,
-                    isRecipientUpdate || allResults.size() > 0);
+                    isRecipientUpdate || !allResults.isEmpty());
             allResults.addAll(results);
         }
         final var duration = Duration.ofMillis(System.currentTimeMillis() - startTime);

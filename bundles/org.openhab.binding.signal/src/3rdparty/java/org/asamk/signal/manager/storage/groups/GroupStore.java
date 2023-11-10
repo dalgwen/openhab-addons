@@ -1,7 +1,5 @@
 package org.asamk.signal.manager.storage.groups;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-
 import org.asamk.signal.manager.api.GroupId;
 import org.asamk.signal.manager.api.GroupIdV1;
 import org.asamk.signal.manager.api.GroupIdV2;
@@ -19,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.DistributionId;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -241,6 +240,7 @@ public class GroupStore {
             final var sql = """
                             INSERT OR REPLACE INTO %s (_id, group_id, group_id_v2, name, color, expiration_time, blocked, archived)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            RETURNING _id
                             """.formatted(TABLE_GROUP_V1);
             try (final var statement = connection.prepareStatement(sql)) {
                 if (internalId == null) {
@@ -255,14 +255,13 @@ public class GroupStore {
                 statement.setLong(6, groupV1.getMessageExpirationTimer());
                 statement.setBoolean(7, groupV1.isBlocked());
                 statement.setBoolean(8, groupV1.archived);
-                statement.executeUpdate();
+                final var generatedKey = Utils.executeQueryForOptional(statement, Utils::getIdMapper);
 
                 if (internalId == null) {
-                    final var generatedKeys = statement.getGeneratedKeys();
-                    if (generatedKeys.next()) {
-                        internalId = generatedKeys.getLong(1);
+                    if (generatedKey.isPresent()) {
+                        internalId = generatedKey.get();
                     } else {
-                        throw new RuntimeException("Failed to add new recipient to database");
+                        throw new RuntimeException("Failed to add new group to database");
                     }
                 }
             }
@@ -295,7 +294,7 @@ public class GroupStore {
                 if (groupV2.getGroup() == null) {
                     statement.setNull(4, Types.NUMERIC);
                 } else {
-                    statement.setBytes(4, groupV2.getGroup().toByteArray());
+                    statement.setBytes(4, groupV2.getGroup().encode());
                 }
                 statement.setBytes(5, UuidUtil.toByteArray(groupV2.getDistributionId().asUuid()));
                 statement.setBoolean(6, groupV2.isBlocked());
@@ -349,12 +348,12 @@ public class GroupStore {
             final var permissionDenied = resultSet.getBoolean("permission_denied");
             return new GroupInfoV2(GroupId.v2(groupId),
                     new GroupMasterKey(masterKey),
-                    groupData == null ? null : DecryptedGroup.parseFrom(groupData),
+                    groupData == null ? null : DecryptedGroup.ADAPTER.decode(groupData),
                     DistributionId.from(UuidUtil.parseOrThrow(distributionId)),
                     blocked,
                     permissionDenied,
                     recipientResolver);
-        } catch (InvalidInputException | InvalidProtocolBufferException e) {
+        } catch (InvalidInputException | IOException e) {
             return null;
         }
     }
