@@ -8,7 +8,7 @@ import org.signal.libsignal.protocol.message.CiphertextMessage;
 import org.signal.libsignal.protocol.message.DecryptionErrorMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
 import org.whispersystems.signalservice.api.push.ServiceId;
-import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
+import org.whispersystems.signalservice.internal.push.Envelope;
 
 import java.util.Optional;
 
@@ -18,22 +18,25 @@ public class SendRetryMessageRequestAction implements HandleAction {
     private final ServiceId serviceId;
     private final ProtocolException protocolException;
     private final SignalServiceEnvelope envelope;
+    private final ServiceId accountId;
 
     public SendRetryMessageRequestAction(
             final RecipientId recipientId,
             final ServiceId serviceId,
             final ProtocolException protocolException,
-            final SignalServiceEnvelope envelope
+            final SignalServiceEnvelope envelope,
+            final ServiceId accountId
     ) {
         this.recipientId = recipientId;
         this.serviceId = serviceId;
         this.protocolException = protocolException;
         this.envelope = envelope;
+        this.accountId = accountId;
     }
 
     @Override
     public void execute(Context context) throws Throwable {
-        context.getAccount().getAciSessionStore().archiveSessions(serviceId);
+        context.getAccount().getAccountData(accountId).getSessionStore().archiveSessions(serviceId);
 
         int senderDevice = protocolException.getSenderDevice();
         Optional<GroupId> groupId = protocolException.getGroupId().isPresent() ? Optional.of(GroupId.unknownVersion(
@@ -47,7 +50,9 @@ public class SendRetryMessageRequestAction implements HandleAction {
             envelopeType = messageContent.getType();
         } else {
             originalContent = envelope.getContent();
-            envelopeType = envelopeTypeToCiphertextMessageType(envelope.getType());
+            envelopeType = envelope.getType() == null
+                    ? CiphertextMessage.WHISPER_TYPE
+                    : envelopeTypeToCiphertextMessageType(envelope.getType());
         }
 
         DecryptionErrorMessage decryptionErrorMessage = DecryptionErrorMessage.forOriginalMessage(originalContent,
@@ -59,10 +64,14 @@ public class SendRetryMessageRequestAction implements HandleAction {
     }
 
     private static int envelopeTypeToCiphertextMessageType(int envelopeType) {
-        return switch (envelopeType) {
-            case SignalServiceProtos.Envelope.Type.PREKEY_BUNDLE_VALUE -> CiphertextMessage.PREKEY_TYPE;
-            case SignalServiceProtos.Envelope.Type.UNIDENTIFIED_SENDER_VALUE -> CiphertextMessage.SENDERKEY_TYPE;
-            case SignalServiceProtos.Envelope.Type.PLAINTEXT_CONTENT_VALUE -> CiphertextMessage.PLAINTEXT_CONTENT_TYPE;
+        final var type = Envelope.Type.fromValue(envelopeType);
+        if (type == null) {
+            return CiphertextMessage.WHISPER_TYPE;
+        }
+        return switch (type) {
+            case PREKEY_BUNDLE -> CiphertextMessage.PREKEY_TYPE;
+            case UNIDENTIFIED_SENDER -> CiphertextMessage.SENDERKEY_TYPE;
+            case PLAINTEXT_CONTENT -> CiphertextMessage.PLAINTEXT_CONTENT_TYPE;
             default -> CiphertextMessage.WHISPER_TYPE;
         };
     }

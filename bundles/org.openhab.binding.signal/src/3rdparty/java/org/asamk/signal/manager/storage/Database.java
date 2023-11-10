@@ -48,7 +48,7 @@ public abstract class Database implements AutoCloseable {
     }
 
     @Override
-    public void close() throws SQLException {
+    public void close() {
         dataSource.close();
     }
 
