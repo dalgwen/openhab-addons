@@ -5,9 +5,11 @@ import org.signal.libsignal.protocol.IdentityKeyPair;
 import org.signal.libsignal.protocol.InvalidKeyException;
 import org.signal.libsignal.protocol.ecc.Curve;
 import org.signal.libsignal.protocol.ecc.ECPrivateKey;
+import org.signal.libsignal.protocol.kem.KEMKeyPair;
+import org.signal.libsignal.protocol.kem.KEMKeyType;
+import org.signal.libsignal.protocol.state.KyberPreKeyRecord;
 import org.signal.libsignal.protocol.state.PreKeyRecord;
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
-import org.signal.libsignal.protocol.util.Medium;
 import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
@@ -16,6 +18,9 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+
+import static org.asamk.signal.manager.config.ServiceConfig.PREKEY_BATCH_SIZE;
+import static org.asamk.signal.manager.config.ServiceConfig.PREKEY_MAXIMUM_ID;
 
 public class KeyUtils {
 
@@ -43,10 +48,10 @@ public class KeyUtils {
         return new IdentityKeyPair(djbIdentityKey, djbPrivateKey);
     }
 
-    public static List<PreKeyRecord> generatePreKeyRecords(final int offset, final int batchSize) {
-        var records = new ArrayList<PreKeyRecord>(batchSize);
-        for (var i = 0; i < batchSize; i++) {
-            var preKeyId = (offset + i) % Medium.MAX_VALUE;
+    public static List<PreKeyRecord> generatePreKeyRecords(final int offset) {
+        var records = new ArrayList<PreKeyRecord>(PREKEY_BATCH_SIZE);
+        for (var i = 0; i < PREKEY_BATCH_SIZE; i++) {
+            var preKeyId = (offset + i) % PREKEY_MAXIMUM_ID;
             var keyPair = Curve.generateKeyPair();
             var record = new PreKeyRecord(preKeyId, keyPair);
 
@@ -56,16 +61,34 @@ public class KeyUtils {
     }
 
     public static SignedPreKeyRecord generateSignedPreKeyRecord(
-            final IdentityKeyPair identityKeyPair, final int signedPreKeyId
+            final int signedPreKeyId, final ECPrivateKey privateKey
     ) {
         var keyPair = Curve.generateKeyPair();
         byte[] signature;
         try {
-            signature = Curve.calculateSignature(identityKeyPair.getPrivateKey(), keyPair.getPublicKey().serialize());
+            signature = Curve.calculateSignature(privateKey, keyPair.getPublicKey().serialize());
         } catch (InvalidKeyException e) {
             throw new AssertionError(e);
         }
         return new SignedPreKeyRecord(signedPreKeyId, System.currentTimeMillis(), keyPair, signature);
+    }
+
+    public static List<KyberPreKeyRecord> generateKyberPreKeyRecords(
+            final int offset, final ECPrivateKey privateKey
+    ) {
+        var records = new ArrayList<KyberPreKeyRecord>(PREKEY_BATCH_SIZE);
+        for (var i = 0; i < PREKEY_BATCH_SIZE; i++) {
+            var preKeyId = (offset + i) % PREKEY_MAXIMUM_ID;
+            records.add(generateKyberPreKeyRecord(preKeyId, privateKey));
+        }
+        return records;
+    }
+
+    public static KyberPreKeyRecord generateKyberPreKeyRecord(final int preKeyId, final ECPrivateKey privateKey) {
+        KEMKeyPair keyPair = KEMKeyPair.generate(KEMKeyType.KYBER_1024);
+        byte[] signature = privateKey.calculateSignature(keyPair.getPublicKey().serialize());
+
+        return new KyberPreKeyRecord(preKeyId, System.currentTimeMillis(), keyPair, signature);
     }
 
     public static ProfileKey createProfileKey() {
@@ -97,5 +120,9 @@ public class KeyUtils {
         var secret = new byte[size];
         secureRandom.nextBytes(secret);
         return secret;
+    }
+
+    public static int getRandomInt(int bound) {
+        return secureRandom.nextInt(bound);
     }
 }
