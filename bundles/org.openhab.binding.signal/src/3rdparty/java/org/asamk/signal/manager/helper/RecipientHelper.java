@@ -6,16 +6,17 @@ import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.internal.SignalDependencies;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
+import org.signal.core.util.Base64;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.signal.libsignal.usernames.Username;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.push.ACI;
-import org.whispersystems.signalservice.api.push.PNI;
 import org.whispersystems.signalservice.api.push.ServiceId;
+import org.whispersystems.signalservice.api.push.ServiceId.ACI;
+import org.whispersystems.signalservice.api.push.ServiceId.PNI;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.push.exceptions.CdsiInvalidTokenException;
 import org.whispersystems.signalservice.api.services.CdsiV2Service;
-import org.whispersystems.util.Base64UrlSafe;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -24,6 +25,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static org.asamk.signal.manager.config.ServiceConfig.MAXIMUM_ONE_OFF_REQUEST_SIZE;
 
 public class RecipientHelper {
 
@@ -80,7 +83,7 @@ public class RecipientHelper {
 
     public RecipientId resolveRecipient(final RecipientIdentifier.Single recipient) throws UnregisteredRecipientException {
         if (recipient instanceof RecipientIdentifier.Uuid uuidRecipient) {
-            return account.getRecipientResolver().resolveRecipient(ServiceId.from(uuidRecipient.uuid()));
+            return account.getRecipientResolver().resolveRecipient(ACI.from(uuidRecipient.uuid()));
         } else if (recipient instanceof RecipientIdentifier.Number numberRecipient) {
             final var number = numberRecipient.number();
             return account.getRecipientStore().resolveRecipientByNumber(number, () -> {
@@ -115,6 +118,10 @@ public class RecipientHelper {
         }
     }
 
+    public void refreshUsers() throws IOException {
+        getRegisteredUsers(account.getRecipientStore().getAllNumbers(), false);
+    }
+
     public RecipientId refreshRegisteredUser(RecipientId recipientId) throws IOException, UnregisteredRecipientException {
         final var address = resolveSignalServiceAddress(recipientId);
         if (address.getNumber().isEmpty()) {
@@ -126,8 +133,23 @@ public class RecipientHelper {
                 .resolveRecipientTrusted(new SignalServiceAddress(serviceId, number));
     }
 
-    public Map<String, RegisteredUser> getRegisteredUsers(final Set<String> numbers) throws IOException {
-        Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, true);
+    public Map<String, RegisteredUser> getRegisteredUsers(
+            final Set<String> numbers
+    ) throws IOException {
+        if (numbers.size() > MAXIMUM_ONE_OFF_REQUEST_SIZE) {
+            final var allNumbers = new HashSet<>(account.getRecipientStore().getAllNumbers()) {{
+                addAll(numbers);
+            }};
+            return getRegisteredUsers(allNumbers, false);
+        } else {
+            return getRegisteredUsers(numbers, true);
+        }
+    }
+
+    private Map<String, RegisteredUser> getRegisteredUsers(
+            final Set<String> numbers, final boolean isPartialRefresh
+    ) throws IOException {
+        Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, isPartialRefresh, true);
 
         // Store numbers as recipients, so we have the number/uuid association
         registeredUsers.forEach((number, u) -> account.getRecipientTrustedResolver()
@@ -139,7 +161,7 @@ public class RecipientHelper {
     private ServiceId getRegisteredUserByNumber(final String number) throws IOException, UnregisteredRecipientException {
         final Map<String, RegisteredUser> aciMap;
         try {
-            aciMap = getRegisteredUsers(Set.of(number));
+            aciMap = getRegisteredUsers(Set.of(number), true);
         } catch (NumberFormatException e) {
             throw new UnregisteredRecipientException(new org.asamk.signal.manager.api.RecipientAddress(null, number));
         }
@@ -151,21 +173,54 @@ public class RecipientHelper {
     }
 
     private Map<String, RegisteredUser> getRegisteredUsersV2(
-            final Set<String> numbers, boolean useCompat
+            final Set<String> numbers, boolean isPartialRefresh, boolean useCompat
     ) throws IOException {
-        // Only partial refresh is implemented here
+        final var previousNumbers = isPartialRefresh ? Set.<String>of() : account.getCdsiStore().getAllNumbers();
+        final var newNumbers = new HashSet<>(numbers) {{
+            removeAll(previousNumbers);
+        }};
+        if (newNumbers.isEmpty() && previousNumbers.isEmpty()) {
+            logger.debug("No new numbers to query.");
+            return Map.of();
+        }
+        logger.trace("Querying CDSI for {} new numbers ({} previous), isPartialRefresh={}",
+                newNumbers.size(),
+                previousNumbers.size(),
+                isPartialRefresh);
+        final var token = previousNumbers.isEmpty()
+                ? Optional.<byte[]>empty()
+                : Optional.ofNullable(account.getCdsiToken());
+
         final CdsiV2Service.Response response;
         try {
             response = dependencies.getAccountManager()
-                    .getRegisteredUsersWithCdsi(Set.of(),
-                            numbers,
+                    .getRegisteredUsersWithCdsi(previousNumbers,
+                            newNumbers,
                             account.getRecipientStore().getServiceIdToProfileKeyMap(),
                             useCompat,
-                            Optional.empty(),
-                            serviceEnvironmentConfig.getCdsiMrenclave(),
-                            token -> {
-                                // Not storing for partial refresh
+                            token,
+                            serviceEnvironmentConfig.cdsiMrenclave(),
+                            null,
+                            newToken -> {
+                                if (isPartialRefresh) {
+                                    account.getCdsiStore().updateAfterPartialCdsQuery(newNumbers);
+                                    // Not storing newToken for partial refresh
+                                } else {
+                                    final var fullNumbers = new HashSet<>(previousNumbers) {{
+                                        addAll(newNumbers);
+                                    }};
+                                    final var seenNumbers = new HashSet<>(numbers) {{
+                                        addAll(newNumbers);
+                                    }};
+                                    account.getCdsiStore().updateAfterFullCdsQuery(fullNumbers, seenNumbers);
+                                    account.setCdsiToken(newToken);
+                                    account.setLastRecipientsRefresh(System.currentTimeMillis());
+                                }
                             });
+        } catch (CdsiInvalidTokenException e) {
+            account.setCdsiToken(null);
+            account.getCdsiStore().clearAll();
+            throw e;
         } catch (NumberFormatException e) {
             throw new IOException(e);
         }
@@ -180,7 +235,7 @@ public class RecipientHelper {
 
     private ACI getRegisteredUserByUsername(String username) throws IOException, BaseUsernameException {
         return dependencies.getAccountManager()
-                .getAciByUsernameHash(Base64UrlSafe.encodeBytesWithoutPadding(Username.hash(username)));
+                .getAciByUsernameHash(Base64.encodeUrlSafeWithoutPadding(new Username(username).getHash()));
     }
 
     public record RegisteredUser(Optional<ACI> aci, Optional<PNI> pni) {
