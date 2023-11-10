@@ -2,6 +2,7 @@ package org.asamk.signal.manager;
 
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
+import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.Configuration;
 import org.asamk.signal.manager.api.Device;
 import org.asamk.signal.manager.api.DeviceLinkUrl;
@@ -11,17 +12,22 @@ import org.asamk.signal.manager.api.GroupInviteLinkUrl;
 import org.asamk.signal.manager.api.GroupNotFoundException;
 import org.asamk.signal.manager.api.GroupSendingNotAllowedException;
 import org.asamk.signal.manager.api.Identity;
+import org.asamk.signal.manager.api.IdentityVerificationCode;
 import org.asamk.signal.manager.api.InactiveGroupLinkException;
+import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.InvalidDeviceLinkException;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.InvalidUsernameException;
 import org.asamk.signal.manager.api.LastGroupAdminException;
 import org.asamk.signal.manager.api.Message;
 import org.asamk.signal.manager.api.MessageEnvelope;
+import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotPrimaryDeviceException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PendingAdminApprovalException;
+import org.asamk.signal.manager.api.PinLockedException;
+import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.ReceiveConfig;
 import org.asamk.signal.manager.api.Recipient;
 import org.asamk.signal.manager.api.RecipientIdentifier;
@@ -80,13 +86,13 @@ public interface Manager extends Closeable {
      * @return A map of numbers to canonicalized number and uuid. If a number is not registered the uuid is null.
      * @throws IOException if it's unable to get the contacts to check if they're registered
      */
-    Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException;
+    Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException, RateLimitException;
 
     void updateAccountAttributes(String deviceName) throws IOException;
 
     Configuration getConfiguration();
 
-    void updateConfiguration(Configuration configuration) throws IOException, NotPrimaryDeviceException;
+    void updateConfiguration(Configuration configuration) throws NotPrimaryDeviceException;
 
     /**
      * Update the user's profile.
@@ -106,6 +112,14 @@ public interface Manager extends Closeable {
      */
     void deleteUsername() throws IOException;
 
+    void startChangeNumber(
+            String newNumber, boolean voiceVerification, String captcha
+    ) throws RateLimitException, IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, NotPrimaryDeviceException;
+
+    void finishChangeNumber(
+            String newNumber, String verificationCode, String pin
+    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException;
+
     void unregister() throws IOException;
 
     void deleteAccount() throws IOException;
@@ -116,7 +130,7 @@ public interface Manager extends Closeable {
 
     void removeLinkedDevices(int deviceId) throws IOException;
 
-    void addDeviceLink(DeviceLinkUrl linkUri) throws IOException, InvalidDeviceLinkException;
+    void addDeviceLink(DeviceLinkUrl linkUri) throws IOException, InvalidDeviceLinkException, NotPrimaryDeviceException;
 
     void setRegistrationLockPin(Optional<String> pin) throws IOException, NotPrimaryDeviceException;
 
@@ -146,11 +160,11 @@ public interface Manager extends Closeable {
 
     SendMessageResults sendReadReceipt(
             RecipientIdentifier.Single sender, List<Long> messageIds
-    ) throws IOException;
+    );
 
     SendMessageResults sendViewedReceipt(
             RecipientIdentifier.Single sender, List<Long> messageIds
-    ) throws IOException;
+    );
 
     SendMessageResults sendMessage(
             Message message, Set<RecipientIdentifier> recipients
@@ -185,7 +199,7 @@ public interface Manager extends Closeable {
 
     void setContactName(
             RecipientIdentifier.Single recipient, String givenName, final String familyName
-    ) throws NotPrimaryDeviceException, IOException, UnregisteredRecipientException;
+    ) throws NotPrimaryDeviceException, UnregisteredRecipientException;
 
     void setContactsBlocked(
             Collection<RecipientIdentifier.Single> recipient, boolean blocked
@@ -209,6 +223,8 @@ public interface Manager extends Closeable {
      * @return if successful, returns the URL to install the sticker pack in the signal app
      */
     StickerPackUrl uploadStickerPack(File path) throws IOException, StickerPackInvalidException;
+
+    void installStickerPack(StickerPackUrl url) throws IOException;
 
     List<StickerPack> getStickerPacks();
 
@@ -261,33 +277,12 @@ public interface Manager extends Closeable {
     List<Identity> getIdentities(RecipientIdentifier.Single recipient);
 
     /**
-     * Trust this the identity with this fingerprint
+     * Trust this the identity with this fingerprint/safetyNumber
      *
-     * @param recipient   account of the identity
-     * @param fingerprint Fingerprint
+     * @param recipient account of the identity
      */
     boolean trustIdentityVerified(
-            RecipientIdentifier.Single recipient, byte[] fingerprint
-    ) throws UnregisteredRecipientException;
-
-    /**
-     * Trust this the identity with this safety number
-     *
-     * @param recipient    account of the identity
-     * @param safetyNumber Safety number
-     */
-    boolean trustIdentityVerifiedSafetyNumber(
-            RecipientIdentifier.Single recipient, String safetyNumber
-    ) throws UnregisteredRecipientException;
-
-    /**
-     * Trust this the identity with this scannable safety number
-     *
-     * @param recipient    account of the identity
-     * @param safetyNumber Scannable safety number
-     */
-    boolean trustIdentityVerifiedSafetyNumber(
-            RecipientIdentifier.Single recipient, byte[] safetyNumber
+            RecipientIdentifier.Single recipient, IdentityVerificationCode verificationCode
     ) throws UnregisteredRecipientException;
 
     /**
@@ -304,7 +299,7 @@ public interface Manager extends Closeable {
     InputStream retrieveAttachment(final String id) throws IOException;
 
     @Override
-    void close() throws IOException;
+    void close();
 
     interface ReceiveMessageHandler {
 
