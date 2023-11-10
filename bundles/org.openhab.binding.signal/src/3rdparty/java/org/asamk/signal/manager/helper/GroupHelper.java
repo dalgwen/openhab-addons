@@ -125,11 +125,11 @@ public class GroupHelper {
             groupInfoV2 = new GroupInfoV2(groupId, groupMasterKey, account.getRecipientResolver());
         }
 
-        if (groupInfoV2.getGroup() == null || groupInfoV2.getGroup().getRevision() < revision) {
+        if (groupInfoV2.getGroup() == null || groupInfoV2.getGroup().revision < revision) {
             DecryptedGroup group = null;
             if (signedGroupChange != null
                     && groupInfoV2.getGroup() != null
-                    && groupInfoV2.getGroup().getRevision() + 1 == revision) {
+                    && groupInfoV2.getGroup().revision + 1 == revision) {
                 final var decryptedGroupChange = context.getGroupV2Helper()
                         .getDecryptedGroupChange(signedGroupChange, groupMasterKey);
 
@@ -151,8 +151,8 @@ public class GroupHelper {
             }
             if (group != null) {
                 storeProfileKeysFromMembers(group);
-                final var avatar = group.getAvatar();
-                if (avatar != null && !avatar.isEmpty()) {
+                final var avatar = group.avatar;
+                if (!avatar.isEmpty()) {
                     downloadGroupAvatar(groupId, groupSecretParams, avatar);
                 }
             }
@@ -300,14 +300,14 @@ public class GroupHelper {
         } catch (GroupLinkNotActiveException e) {
             throw new InactiveGroupLinkException("Group link inactive (reason: " + e.getReason() + ")", e);
         }
-        if (groupJoinInfo.getPendingAdminApproval()) {
+        if (groupJoinInfo.pendingAdminApproval) {
             throw new PendingAdminApprovalException("You have already requested to join the group.");
         }
         final var groupChange = context.getGroupV2Helper()
                 .joinGroup(inviteLinkUrl.getGroupMasterKey(), inviteLinkUrl.getPassword(), groupJoinInfo);
         final var group = getOrMigrateGroup(inviteLinkUrl.getGroupMasterKey(),
-                groupJoinInfo.getRevision() + 1,
-                groupChange.toByteArray());
+                groupJoinInfo.revision + 1,
+                groupChange.encode());
 
         if (group.getGroup() == null) {
             // Only requested member, can't send update to group members
@@ -400,8 +400,8 @@ public class GroupHelper {
                     } catch (NotAGroupMemberException ignored) {
                     }
                     storeProfileKeysFromMembers(decryptedGroup);
-                    final var avatar = decryptedGroup.getAvatar();
-                    if (avatar != null && !avatar.isEmpty()) {
+                    final var avatar = decryptedGroup.avatar;
+                    if (!avatar.isEmpty()) {
                         downloadGroupAvatar(groupInfoV2.getGroupId(), groupSecretParams, avatar);
                     }
                 }
@@ -446,8 +446,8 @@ public class GroupHelper {
     }
 
     private void storeProfileKeysFromMembers(final DecryptedGroup group) {
-        for (var member : group.getMembersList()) {
-            final var serviceId = ServiceId.fromByteString(member.getUuid());
+        for (var member : group.members) {
+            final var serviceId = ServiceId.parseOrThrow(member.aciBytes);
             final var recipientId = account.getRecipientResolver().resolveRecipient(serviceId);
             final var profileStore = account.getProfileStore();
             if (profileStore.getProfileKey(recipientId) != null) {
@@ -455,7 +455,7 @@ public class GroupHelper {
                 continue;
             }
             try {
-                profileStore.storeProfileKey(recipientId, new ProfileKey(member.getProfileKey().toByteArray()));
+                profileStore.storeProfileKey(recipientId, new ProfileKey(member.profileKey.toByteArray()));
             } catch (InvalidInputException ignored) {
             }
         }
@@ -479,7 +479,7 @@ public class GroupHelper {
             final DecryptedGroup newDecryptedGroup
     ) throws NotAGroupMemberException {
         final var revisionWeWereAdded = context.getGroupV2Helper().findRevisionWeWereAdded(newDecryptedGroup);
-        final var localRevision = localGroup.getGroup() == null ? 0 : localGroup.getGroup().getRevision();
+        final var localRevision = localGroup.getGroup() == null ? 0 : localGroup.getGroup().revision;
         var fromRevision = Math.max(revisionWeWereAdded, localRevision);
         final var newProfileKeys = new HashMap<RecipientId, ProfileKey>();
         while (true) {
@@ -594,14 +594,14 @@ public class GroupHelper {
         if (members != null) {
             final var requestingMembers = new HashSet<>(members);
             requestingMembers.retainAll(group.getRequestingMembers());
-            if (requestingMembers.size() > 0) {
+            if (!requestingMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.approveJoinRequestMembers(group, requestingMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
             final var newMembers = new HashSet<>(members);
             newMembers.removeAll(group.getMembers());
             newMembers.removeAll(group.getRequestingMembers());
-            if (newMembers.size() > 0) {
+            if (!newMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.addMembers(group, newMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
@@ -617,20 +617,20 @@ public class GroupHelper {
                 existingRemoveMembers.removeAll(members);
             }
             existingRemoveMembers.remove(account.getSelfRecipientId());// self can be removed with sendQuitGroupMessage
-            if (existingRemoveMembers.size() > 0) {
+            if (!existingRemoveMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.removeMembers(group, existingRemoveMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
 
             var pendingRemoveMembers = new HashSet<>(removeMembers);
             pendingRemoveMembers.retainAll(group.getPendingMembers());
-            if (pendingRemoveMembers.size() > 0) {
+            if (!pendingRemoveMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.revokeInvitedMembers(group, pendingRemoveMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
             var requestingRemoveMembers = new HashSet<>(removeMembers);
             requestingRemoveMembers.retainAll(group.getRequestingMembers());
-            if (requestingRemoveMembers.size() > 0) {
+            if (!requestingRemoveMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.refuseJoinRequestMembers(group, requestingRemoveMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
@@ -640,7 +640,7 @@ public class GroupHelper {
             final var newAdmins = new HashSet<>(admins);
             newAdmins.retainAll(group.getMembers());
             newAdmins.removeAll(group.getAdminMembers());
-            if (newAdmins.size() > 0) {
+            if (!newAdmins.isEmpty()) {
                 for (var admin : newAdmins) {
                     var groupGroupChangePair = groupV2Helper.setMemberAdmin(group, admin, true);
                     result = sendUpdateGroupV2Message(group,
@@ -653,7 +653,7 @@ public class GroupHelper {
         if (removeAdmins != null) {
             final var existingRemoveAdmins = new HashSet<>(removeAdmins);
             existingRemoveAdmins.retainAll(group.getAdminMembers());
-            if (existingRemoveAdmins.size() > 0) {
+            if (!existingRemoveAdmins.isEmpty()) {
                 for (var admin : existingRemoveAdmins) {
                     var groupGroupChangePair = groupV2Helper.setMemberAdmin(group, admin, false);
                     result = sendUpdateGroupV2Message(group,
@@ -666,7 +666,7 @@ public class GroupHelper {
         if (banMembers != null) {
             final var newlyBannedMembers = new HashSet<>(banMembers);
             newlyBannedMembers.removeAll(group.getBannedMembers());
-            if (newlyBannedMembers.size() > 0) {
+            if (!newlyBannedMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.banMembers(group, newlyBannedMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
@@ -675,7 +675,7 @@ public class GroupHelper {
         if (unbanMembers != null) {
             var existingUnbanMembers = new HashSet<>(unbanMembers);
             existingUnbanMembers.retainAll(group.getBannedMembers());
-            if (existingUnbanMembers.size() > 0) {
+            if (!existingUnbanMembers.isEmpty()) {
                 var groupGroupChangePair = groupV2Helper.unbanMembers(group, existingUnbanMembers);
                 result = sendUpdateGroupV2Message(group, groupGroupChangePair.first(), groupGroupChangePair.second());
             }
@@ -745,7 +745,7 @@ public class GroupHelper {
         if (currentAdmins.contains(account.getSelfRecipientId())
                 && currentAdmins.size() == 1
                 && groupInfoV2.getMembers().size() > 1
-                && newAdmins.size() == 0) {
+                && newAdmins.isEmpty()) {
             // Last admin can't leave the group, unless she's also the last member
             throw new LastGroupAdminException(groupInfoV2.getGroupId(), groupInfoV2.getTitle());
         }
@@ -753,7 +753,7 @@ public class GroupHelper {
         groupInfoV2.setGroup(groupGroupChangePair.first());
         account.getGroupStore().updateGroup(groupInfoV2);
 
-        var messageBuilder = getGroupUpdateMessageBuilder(groupInfoV2, groupGroupChangePair.second().toByteArray());
+        var messageBuilder = getGroupUpdateMessageBuilder(groupInfoV2, groupGroupChangePair.second().encode());
         return sendGroupMessage(messageBuilder,
                 groupInfoV2.getMembersIncludingPendingWithout(account.getSelfRecipientId()),
                 groupInfoV2.getDistributionId());
@@ -782,7 +782,7 @@ public class GroupHelper {
 
     private SignalServiceDataMessage.Builder getGroupUpdateMessageBuilder(GroupInfoV2 g, byte[] signedGroupChange) {
         var group = SignalServiceGroupV2.newBuilder(g.getMasterKey())
-                .withRevision(g.getGroup().getRevision())
+                .withRevision(g.getGroup().revision)
                 .withSignedGroupChange(signedGroupChange);
         return SignalServiceDataMessage.newBuilder()
                 .asGroupMessage(group.build())
@@ -798,7 +798,7 @@ public class GroupHelper {
         members.addAll(group.getMembersIncludingPendingWithout(selfRecipientId));
         account.getGroupStore().updateGroup(group);
 
-        final var messageBuilder = getGroupUpdateMessageBuilder(group, groupChange.toByteArray());
+        final var messageBuilder = getGroupUpdateMessageBuilder(group, groupChange.encode());
         return sendGroupMessage(messageBuilder, members, group.getDistributionId());
     }
 
@@ -822,8 +822,8 @@ public class GroupHelper {
         if (avatarFile == null) {
             return null;
         }
-        try (final var avatar = Utils.createStreamDetails(avatarFile).first().getStream()) {
-            return IOUtils.readFully(avatar);
+        try (final var avatar = Utils.createStreamDetails(avatarFile).first()) {
+            return IOUtils.readFully(avatar.getStream());
         }
     }
 }

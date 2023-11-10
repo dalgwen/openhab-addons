@@ -9,11 +9,12 @@ import org.signal.libsignal.protocol.groups.state.SenderKeyRecord;
 import org.signal.libsignal.protocol.state.IdentityKeyStore;
 import org.signal.libsignal.protocol.state.KyberPreKeyRecord;
 import org.signal.libsignal.protocol.state.PreKeyRecord;
-import org.signal.libsignal.protocol.state.PreKeyStore;
 import org.signal.libsignal.protocol.state.SessionRecord;
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
 import org.signal.libsignal.protocol.state.SignedPreKeyStore;
 import org.whispersystems.signalservice.api.SignalServiceAccountDataStore;
+import org.whispersystems.signalservice.api.SignalServiceKyberPreKeyStore;
+import org.whispersystems.signalservice.api.SignalServicePreKeyStore;
 import org.whispersystems.signalservice.api.SignalServiceSenderKeyStore;
 import org.whispersystems.signalservice.api.SignalServiceSessionStore;
 import org.whispersystems.signalservice.api.push.DistributionId;
@@ -26,16 +27,18 @@ import java.util.function.Supplier;
 
 public class SignalProtocolStore implements SignalServiceAccountDataStore {
 
-    private final PreKeyStore preKeyStore;
+    private final SignalServicePreKeyStore preKeyStore;
     private final SignedPreKeyStore signedPreKeyStore;
+    private final SignalServiceKyberPreKeyStore kyberPreKeyStore;
     private final SignalServiceSessionStore sessionStore;
     private final IdentityKeyStore identityKeyStore;
     private final SignalServiceSenderKeyStore senderKeyStore;
     private final Supplier<Boolean> isMultiDevice;
 
     public SignalProtocolStore(
-            final PreKeyStore preKeyStore,
+            final SignalServicePreKeyStore preKeyStore,
             final SignedPreKeyStore signedPreKeyStore,
+            final SignalServiceKyberPreKeyStore kyberPreKeyStore,
             final SignalServiceSessionStore sessionStore,
             final IdentityKeyStore identityKeyStore,
             final SignalServiceSenderKeyStore senderKeyStore,
@@ -43,6 +46,7 @@ public class SignalProtocolStore implements SignalServiceAccountDataStore {
     ) {
         this.preKeyStore = preKeyStore;
         this.signedPreKeyStore = signedPreKeyStore;
+        this.kyberPreKeyStore = kyberPreKeyStore;
         this.sessionStore = sessionStore;
         this.identityKeyStore = identityKeyStore;
         this.senderKeyStore = senderKeyStore;
@@ -201,29 +205,61 @@ public class SignalProtocolStore implements SignalServiceAccountDataStore {
 
     @Override
     public KyberPreKeyRecord loadKyberPreKey(final int kyberPreKeyId) throws InvalidKeyIdException {
-        // TODO
-        throw new InvalidKeyIdException("Missing kyber prekey with ID: $kyberPreKeyId");
+        return kyberPreKeyStore.loadKyberPreKey(kyberPreKeyId);
     }
 
     @Override
     public List<KyberPreKeyRecord> loadKyberPreKeys() {
-        // TODO
-        return List.of();
+        return kyberPreKeyStore.loadKyberPreKeys();
     }
 
     @Override
     public void storeKyberPreKey(final int kyberPreKeyId, final KyberPreKeyRecord record) {
-        // TODO
+        kyberPreKeyStore.storeKyberPreKey(kyberPreKeyId, record);
     }
 
     @Override
     public boolean containsKyberPreKey(final int kyberPreKeyId) {
-        // TODO
-        return false;
+        return kyberPreKeyStore.containsKyberPreKey(kyberPreKeyId);
     }
 
     @Override
     public void markKyberPreKeyUsed(final int kyberPreKeyId) {
-        // TODO
+        kyberPreKeyStore.markKyberPreKeyUsed(kyberPreKeyId);
+    }
+
+    @Override
+    public List<KyberPreKeyRecord> loadLastResortKyberPreKeys() {
+        return kyberPreKeyStore.loadLastResortKyberPreKeys();
+    }
+
+    @Override
+    public void removeKyberPreKey(final int i) {
+        kyberPreKeyStore.removeKyberPreKey(i);
+    }
+
+    @Override
+    public void storeLastResortKyberPreKey(final int i, final KyberPreKeyRecord kyberPreKeyRecord) {
+        kyberPreKeyStore.storeLastResortKyberPreKey(i, kyberPreKeyRecord);
+    }
+
+    @Override
+    public void deleteAllStaleOneTimeKyberPreKeys(final long threshold, final int minCount) {
+        kyberPreKeyStore.deleteAllStaleOneTimeKyberPreKeys(threshold, minCount);
+    }
+
+    @Override
+    public void markAllOneTimeKyberPreKeysStaleIfNecessary(final long staleTime) {
+        kyberPreKeyStore.markAllOneTimeKyberPreKeysStaleIfNecessary(staleTime);
+    }
+
+    @Override
+    public void deleteAllStaleOneTimeEcPreKeys(final long threshold, final int minCount) {
+        preKeyStore.deleteAllStaleOneTimeEcPreKeys(threshold, minCount);
+    }
+
+    @Override
+    public void markAllOneTimeEcPreKeysStaleIfNecessary(final long staleTime) {
+        preKeyStore.markAllOneTimeEcPreKeysStaleIfNecessary(staleTime);
     }
 }
