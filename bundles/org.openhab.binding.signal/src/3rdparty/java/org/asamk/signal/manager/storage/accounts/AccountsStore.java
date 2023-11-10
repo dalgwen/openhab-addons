@@ -9,7 +9,7 @@ import org.asamk.signal.manager.storage.Utils;
 import org.asamk.signal.manager.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.push.ACI;
+import org.whispersystems.signalservice.api.push.ServiceId.ACI;
 import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
 
 import java.io.ByteArrayInputStream;
@@ -252,18 +252,14 @@ public class AccountsStore {
     }
 
     private void saveAccountsLocked(FileChannel fileChannel, AccountsStorage accountsStorage) throws IOException {
-        try {
-            try (var output = new ByteArrayOutputStream()) {
-                // Write to memory first to prevent corrupting the file in case of serialization errors
-                objectMapper.writeValue(output, accountsStorage);
-                var input = new ByteArrayInputStream(output.toByteArray());
-                fileChannel.position(0);
-                input.transferTo(Channels.newOutputStream(fileChannel));
-                fileChannel.truncate(fileChannel.position());
-                fileChannel.force(false);
-            }
-        } catch (Exception e) {
-            logger.error("Error saving accounts file: {}", e.getMessage(), e);
+        try (var output = new ByteArrayOutputStream()) {
+            // Write to memory first to prevent corrupting the file in case of serialization errors
+            objectMapper.writeValue(output, accountsStorage);
+            var input = new ByteArrayInputStream(output.toByteArray());
+            fileChannel.position(0);
+            input.transferTo(Channels.newOutputStream(fileChannel));
+            fileChannel.truncate(fileChannel.position());
+            fileChannel.force(false);
         }
     }
 

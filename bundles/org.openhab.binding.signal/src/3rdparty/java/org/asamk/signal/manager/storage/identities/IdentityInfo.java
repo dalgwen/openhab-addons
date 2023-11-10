@@ -6,22 +6,26 @@ import org.whispersystems.signalservice.api.push.ServiceId;
 
 public class IdentityInfo {
 
-    private final ServiceId serviceId;
+    private final String address;
     private final IdentityKey identityKey;
     private final TrustLevel trustLevel;
     private final long addedTimestamp;
 
     IdentityInfo(
-            final ServiceId serviceId, IdentityKey identityKey, TrustLevel trustLevel, long addedTimestamp
+            final String address, IdentityKey identityKey, TrustLevel trustLevel, long addedTimestamp
     ) {
-        this.serviceId = serviceId;
+        this.address = address;
         this.identityKey = identityKey;
         this.trustLevel = trustLevel;
         this.addedTimestamp = addedTimestamp;
     }
 
     public ServiceId getServiceId() {
-        return serviceId;
+        return ServiceId.parseOrThrow(address);
+    }
+
+    public String getAddress() {
+        return address;
     }
 
     public IdentityKey getIdentityKey() {

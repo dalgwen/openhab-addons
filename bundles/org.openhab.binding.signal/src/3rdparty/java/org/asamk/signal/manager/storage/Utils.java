@@ -56,7 +56,7 @@ public class Utils {
         return node;
     }
 
-    public static RecipientAddress getRecipientAddressFromIdentifier(final String identifier) {
+    public static RecipientAddress getRecipientAddressFromLegacyIdentifier(final String identifier) {
         if (UuidUtil.isUuid(identifier)) {
             return new RecipientAddress(ServiceId.parseOrThrow(identifier));
         } else {
@@ -111,6 +111,10 @@ public class Utils {
                 }
             }
         }, false);
+    }
+
+    public static Long getIdMapper(ResultSet resultSet) throws SQLException {
+        return resultSet.getLong("_id");
     }
 
     public interface ResultSetMapper<T> {
