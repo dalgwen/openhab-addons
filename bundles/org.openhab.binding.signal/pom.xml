@@ -68,15 +68,15 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <artifactId>bcprov-jdk15on</artifactId>
+      <artifactId>bcprov-jdk18on</artifactId>
       <groupId>org.bouncycastle</groupId>
-      <version>1.70</version>
+      <version>1.76</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <artifactId>bcutil-jdk15on</artifactId>
+      <artifactId>bcutil-jdk18on</artifactId>
       <groupId>org.bouncycastle</groupId>
-      <version>1.70</version>
+      <version>1.76</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
