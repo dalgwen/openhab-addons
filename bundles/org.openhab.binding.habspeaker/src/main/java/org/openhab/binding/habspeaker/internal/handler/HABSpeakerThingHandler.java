@@ -63,9 +63,9 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     private final ItemRegistry itemRegistry;
     private HABSpeakerThingConfig config = new HABSpeakerThingConfig();
     private @Nullable HABSpeakerIOConnection speakerIO;
-    private int sinkVolume;
-    private int sourceVolume;
-    private int mediaVolume;
+    private int sinkVolume = -1;
+    private int sourceVolume = -1;
+    private int mediaVolume = -1;
 
     public HABSpeakerThingHandler(Thing thing, ItemRegistry itemRegistry) {
         super(thing);
@@ -84,9 +84,15 @@ public class HABSpeakerThingHandler extends BaseThingHandler implements HABSpeak
     public void setSpeakerIO(@Nullable HABSpeakerIOConnection speakerIO) {
         this.speakerIO = speakerIO;
         if (speakerIO != null) {
-            speakerIO.setSinkVolume(this.sinkVolume);
-            speakerIO.setSourceVolume(this.sourceVolume);
-            speakerIO.setMediaVolume(this.mediaVolume);
+            if (this.sinkVolume != -1) {
+                speakerIO.setSinkVolume(this.sinkVolume);
+            }
+            if (this.sourceVolume != -1) {
+                speakerIO.setSourceVolume(this.sourceVolume);
+            }
+            if (this.mediaVolume != -1) {
+                speakerIO.setMediaVolume(this.mediaVolume);
+            }
         }
     }
 
