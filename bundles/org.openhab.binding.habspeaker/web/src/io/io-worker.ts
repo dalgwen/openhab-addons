@@ -5,7 +5,7 @@ import { createResampler, Resampler } from "./audio/resampler";
 import { CircularBufferExecutor } from "./audio/circular-buffer";
 import { ReentrantLock } from "reentrant-lock";
 
-/** Size of the circular buffer used to ensure the audio chunk size */
+/** Size of the circular buffer used to ensure the audio chunk size is constant no matter the browser or the audio sample rate */
 const SINK_CHUNK_SIZE = 4096;
 
 /** WebSocket reconnection timeout */

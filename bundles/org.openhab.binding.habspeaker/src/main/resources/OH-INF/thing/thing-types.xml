@@ -81,13 +81,12 @@
 			<parameter name="clientResampleMode" type="text" groupName="audio">
 				<label>ClientResampleMode</label>
 				<description>Audio resampling method applied when the transmission is not on the client sample rate</description>
-				<default>SRC_LINEAR</default>
+				<default>point</default>
 				<options>
-					<option value="SRC_SINC_BEST_QUALITY">Sinc best quality</option>
-					<option value="SRC_SINC_MEDIUM_QUALITY">Sinc medium quality</option>
-					<option value="SRC_SINC_FASTEST">Sinc fastest</option>
-					<option value="SRC_ZERO_ORDER_HOLD">Zero order hold</option>
-					<option value="SRC_LINEAR">Linear</option>
+					<option value="cubic">Cubic</option>
+					<option value="linear">Linear</option>
+					<option value="point">Point</option>
+					<option value="sinc">Sinc</option>
 				</options>
 				<advanced>true</advanced>
 			</parameter>

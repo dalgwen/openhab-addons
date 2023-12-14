@@ -16,23 +16,31 @@ export interface IOEventListeners {
 export class IOMain {
   private online: boolean = false;
   private accessToken: string | null = null;
-  // audio source
+  // voice audio context
   private audioContext: AudioContext | null = null;
+  /// audio source
   private audioSource: AudioSource | null = null;
   private speakerStateLock = new ReentrantLock();
   private sourceVolume: number = 50;
-  private worker: Worker | null = null;
   private micStreaming = false;
   private listening: boolean = false;
   private resolveSourcePort?: () => void;
-  // audio sink
+  ///
+  /// audio sink
   private activeSinks = new Map<string, AudioSink>();
   private sinkVolume: number = 100;
-  // keyword spotting
+  ///
+  /// keyword spotting
   private serverSpotting: boolean = false;
   private rustpotter: RustpotterService | null = null;
   private currentWakeword: string | null = null;
   private rustpotterAudioNode: AudioNode | null = null;
+  ///
+  // Worker to handle audio resampling, re-encoding and transmission,
+  private worker: Worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
+    name: "habspeaker-audio-worker",
+    type: "module",
+  });
 
   constructor(private ohUrl: string, private events: IOEventListeners = {}) { }
   public isRunning() {
@@ -44,6 +52,10 @@ export class IOMain {
   public isSpeaking() {
     return this.activeSinks.size > 0;
   }
+  /**
+   * Initializes the audio context used for the sink and source.
+   * @param customSampleRate Custom sample rate to use, not functional in some browsers.
+   */
   private startVoiceAudioContext(customSampleRate?: number) {
     if (!this.audioContext) {
       const options: AudioContextOptions = {};
@@ -54,12 +66,22 @@ export class IOMain {
       console.debug(`main: Created audio context with sample rate ${this.audioContext.sampleRate}`);
     }
   }
+  /**
+   * Returns the audio context asserting it's defined.
+   * 
+   * @returns the shared audio context.
+   */
   private getVoiceAudioContext(): AudioContext {
     if (!this.audioContext) {
       throw new Error('AudioContext not initialized');
     }
     return this.audioContext;
   }
+  /**
+   * Returns the audio context asserting it's initialized.
+   * 
+   * @returns the audio source implementation.
+   */
   private getAudioSource(): AudioSource {
     if (!this.audioSource) {
       throw new Error('AudioSource not initialized');
@@ -67,9 +89,9 @@ export class IOMain {
     return this.audioSource;
   }
   /**
-   * Returns a processor node that sends data through the websocket 
+   * Returns an audio processor node connected to the audio worker, so the audio gets converted and streamed to the server. 
   */
-  private async getWSProcessorNode() {
+  private async getWorkerAudioProcessor() {
     const audioContext = this.getVoiceAudioContext();
     const _webSocketWorkletNode = new AudioWorkletNode(audioContext, 'habspeaker-source-worklet', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
     const portPromise = new Promise<void>(resolve => this.resolveSourcePort = resolve);
@@ -155,11 +177,15 @@ export class IOMain {
       this.postToWorker(WorkerInCmd.TOKEN_RENEW, { token });
     }
   }
+  /**
+   * Connect the worker input audio node to the audio context media stream output,
+   * it keeps the keyword spotter input audio node connected if exists.
+   */
   private async startMicStreaming() {
     if (!this.micStreaming) {
       this.micStreaming = true;
       console.debug("starting microphone audio streaming");
-      const processors: AudioNode[] = [await this.getWSProcessorNode()];
+      const processors: AudioNode[] = [await this.getWorkerAudioProcessor()];
       if (!this.micStreaming) {
         console.warn("main: start microphone audio aborted");
         return;
@@ -172,6 +198,10 @@ export class IOMain {
       console.warn("main: trying to start microphone streaming but it's already started!");
     }
   }
+  /**
+   * Disconnect the worker input audio node from the audio context media stream output,
+   * it keeps the keyword spotter input audio node connected if exists.
+   */
   private stopMicStreaming() {
     if (this.micStreaming) {
       console.debug("stopping microphone audio streaming");
@@ -187,6 +217,9 @@ export class IOMain {
       console.warn("main: trying to stop microphone streaming but it's already stopped!");
     }
   }
+  /**
+   * Clean up function, tries to dispose worker and keyword spotter input audio nodes.
+   */
   private async killMicProcessors() {
     this.audioSource?.stop();
     if (this.rustpotterAudioNode) {
@@ -195,7 +228,12 @@ export class IOMain {
     }
   }
 
-  // worker setup
+  /**
+   * Handle messages from the websocket.
+   * 
+   * @param command the command name.
+   * @param data the command data.
+   */
   private handleWorkerMessage(command: WorkerOutCmd, data: WorkerOutCmdType<WorkerOutCmd>) {
     switch (command) {
       case WorkerOutCmd.CONFIGURE: {
@@ -316,6 +354,11 @@ export class IOMain {
         console.error(`main: Unknown worker command ${command}`);
     }
   }
+  /**
+   * Handles the speaker configuration message.
+   * 
+   * @param speakerConfig The speaker configuration instructed by the server.
+   */
   private async updateConfiguration(speakerConfig: ConfigureSpeakerCmd) {
     const audioContext = this.getVoiceAudioContext();
     const resumeAudioContext = () => audioContext.resume();
@@ -364,7 +407,12 @@ export class IOMain {
         break;
     }
   }
-
+  /**
+   * Parse the speaker rustpotter options into a valid rustpotter config.
+   * 
+   * @param options speaker options for rustpotter local execution.
+   * @returns a correct rustpotter config.
+   */
   private getRustpotterConfig(options: RustpotterOptions): RustpotterConfig {
     const scoreMode = (ScoreMode as unknown as { [key: string]: ScoreMode })[options.scoreMode] ?? ScoreMode.max;
     const vadMode = options.vadMode?.length ? (VADMode as unknown as { [key: string]: VADMode })[options.vadMode] : undefined;
@@ -416,6 +464,12 @@ export class IOMain {
       });
     }
   };
+  /**
+   * Initializes the workers instance.
+   * 
+   * @param speakerId the speaker identifier used by the server.
+   * @param customSampleRate Custom sample rate for the voice context, non functional in some browsers.
+   */
   public async initialize(speakerId: string, customSampleRate?: number) {
     this.events.onMessage?.("Connecting speaker...", "info", 500);
     this.startVoiceAudioContext(customSampleRate);
@@ -430,10 +484,6 @@ export class IOMain {
     await this.audioSource.resume();
     this.startSourceCheckInterval();
     try {
-      this.worker = new Worker(new URL("./io-worker.ts", import.meta.url), {
-        name: "hab_speaker-worker",
-        type: "module",
-      });
       this.worker.onmessage = (ev: MessageEvent<unknown>) => {
         if (import.meta.env.DEV) {
           console.debug("worker => main:", ev.data);

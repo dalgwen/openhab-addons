@@ -60,11 +60,15 @@ export type MediaCommandCmd = { type: 'play' } |
 { type: 'volume', value: number } |
 { type: 'claim', provider: string } |
 { type: 'start', provider: string, mediaId: string, second: number };
-// Commands from worker to server (no command for sending audio as is sent as binary).
+// Commands from worker to server (no command for sending audio as it is sent as binary message).
 export enum WebSocketInCmd {
+  // Instruct the server to start initialization.
   INITIALIZE = "INITIALIZE",
+  // Notifies the server that the configuration message has been processed and the client is ready.
   CONFIGURED = "CONFIGURED",
+  // Notifies the server local spot, so it can trigger the dialog processing execution.
   ON_SPOT = "ON_SPOT",
+  // Notifies the server about the client media state.
   MEDIA_STATE = "MEDIA_STATE",
 }
 export type WebSocketInCmdType<T extends WebSocketInCmd> =
@@ -75,12 +79,19 @@ export type WebSocketInCmdType<T extends WebSocketInCmd> =
 
 // Commands from server to worker (no command for receiving audio as is sent as binary).
 export enum WebSocketOutCmd {
+  // Message with speaker configuration.
   CONFIGURE = "CONFIGURE",
+  // Message that confirm initialization has completed and the sink and source and dialog has been setup in OpenHAB.
   INITIALIZED = "INITIALIZED",
+  // Message that instruct the client to start sending the microphone audio.
   START_LISTENING = "START_LISTENING",
+  // Message that instruct the client to stop sending the microphone audio.
   STOP_LISTENING = "STOP_LISTENING",
+  // Message that notifies a new sink volume.
   SINK_VOLUME = "SINK_VOLUME",
+  // Message that notifies a new source volume.
   SOURCE_VOLUME = "SOURCE_VOLUME",
+  // Message with a media command (play, pause, seek ...).
   MEDIA_COMMAND = "MEDIA_COMMAND",
 }
 
@@ -91,15 +102,25 @@ export type WebSocketOutCmdType<T extends WebSocketOutCmd> = T extends WebSocket
   never;
 // Commands from main thread to worker.
 export enum WorkerInCmd {
+  // Notifies the worker thread to start the speaker ws connection with reconnection logic.
   INITIALIZE = "INITIALIZE",
+  // Notifies the worker thread that the configuration message has been handled.
   CONFIGURED = "CONFIGURED",
+  // Notifies the worker thread to resume the speaker ws connection and reconnection logic.
   RESUME = "RESUME",
+  // Notifies the worker thread to suspend the speaker ws connection and reconnection logic.
   SUSPEND = "SUSPEND",
+  // Get a message port to receive the microphone audio stream.
   SOURCE_PORT = "SOURCE_PORT",
+  // Get a message port to send a sink audio stream.
   SINK_PORT = "SINK_PORT",
+  // Tell the worker to send a spot event to the server. Used for the button and local keyword spotter.
   ON_SPOT = "ON_SPOT",
+  // Tell the worker to force a disconnection without removing the reconnection logic, so it will reconnect again after some seconds. 
   RESET_CONNECTION = "RESET_CONNECTION",
+  // Share api authorization token renews to the worker so it can reopen the ws connection if needed. 
   TOKEN_RENEW = "TOKEN_RENEW",
+  // Send the media state to the worker so it can proxy it to the server.
   MEDIA_STATE = "MEDIA_STATE",
 }
 export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITIALIZE ? { id: string, sampleRate: number, token?: string, ohUrl: string } :
@@ -111,16 +132,27 @@ export type WorkerInCmdType<T extends WorkerInCmd> = T extends WorkerInCmd.INITI
   never;
 // Commands from worker to main thread.
 export enum WorkerOutCmd {
+  // Send the speaker config to main thread.
   CONFIGURE = "CONFIGURE",
+  // Notifies main thread speaker connection is ready.
   INITIALIZED = "INITIALIZED",
+  // Notifies main thread that the server is ready to start receiving audio.
   SOURCE_READY = "SOURCE_READY",
+  // Notifies main thread speaker connection was closed.
   OFFLINE = "OFFLINE",
+  // Notifies the main thread to setup the sink required resources and transfer its message port to the worker so the audio can be sent without using the main thread.
   START_SINK = "START_SINK",
+  // Notifies the main thread to tear down the sink required resources.
   STOP_SINK = "STOP_SINK",
+  // Notifies the main thread to setup the source audio processor and transfer its message port to the worker so the audio can be received without using the main thread.
   START_LISTENING = "START_LISTENING",
+  // Notifies the main thread to teardown the source audio processor.
   STOP_LISTENING = "STOP_LISTENING",
+  // Notifies main thread the selected sink volume.
   SINK_VOLUME = "SINK_VOLUME",
+  // Notifies main thread the selected source volume.
   SOURCE_VOLUME = "SOURCE_VOLUME",
+  // Notifies main thread about media control commands.
   MEDIA_COMMAND = "MEDIA_COMMAND",
 }
 export type WorkerOutCmdType<T extends WorkerOutCmd> = T extends WorkerOutCmd.CONFIGURE ? ConfigureSpeakerCmd :
