@@ -299,6 +299,7 @@ public class ItemChangedRule extends Script {
     };
 }
 ```
+
 ## Transformation Script in Java
 
 a sitemap referencing a transformation in Java
@@ -740,10 +741,8 @@ public class GroovyPort extends Script {
 Define a library class :
 
 ```java
-package mypackage;
-
-import org.openhab.automation.javascripting.scriptsupport.Script;
 import org.openhab.automation.javascripting.annotations.Library;
+import org.openhab.automation.javascripting.scriptsupport.Script;
 
 @Library
 public class MyLib extends Script {
@@ -751,10 +750,10 @@ public class MyLib extends Script {
     public static void sayStaticHello() {
         logger.info("Static Hello word");
     }
-    
+
     public void sayHello() {
-        logger.info("Hello word"); 
-    }    
+        logger.info("Hello word");
+    }
 }```
 
 Use it in another script, either in a static way or with an injection :
@@ -762,14 +761,12 @@ Use it in another script, either in a static way or with an injection :
 ```java
 import org.openhab.automation.javascripting.scriptsupport.Script;
 
-import java.util.Map;
-import mypackage.MyLib;
-
 public class UseLib extends Script {
 
     @org.openhab.automation.javascripting.annotations.Library
     MyLib mylib;
 
+    @Override
     public Object onLoad() {
         mylib.sayHello();
         MyLib.sayStaticHello();
