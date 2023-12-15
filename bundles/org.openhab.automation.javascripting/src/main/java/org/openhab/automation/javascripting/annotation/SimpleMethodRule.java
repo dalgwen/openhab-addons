@@ -19,6 +19,7 @@ import java.lang.reflect.Parameter;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.automation.javascripting.eventinfo.EventInfo;
 import org.openhab.automation.javascripting.scriptsupport.Script;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -35,6 +36,7 @@ public class SimpleMethodRule extends SimpleRule {
 
     private Script script;
     private Method method;
+    private Class<?> eventInfoType;
 
     public SimpleMethodRule(Script script, Method method) throws RuleParserException {
         this.script = script;
@@ -46,8 +48,9 @@ public class SimpleMethodRule extends SimpleRule {
         }
 
         Parameter parameter = parameters[0];
-        if (!(Map.class.isAssignableFrom(parameter.getType()))) {
-            throw new RuleParserException("Argument of method " + method.getName() + "must be a map");
+        this.eventInfoType = parameter.getType();
+        if (!EventInfo.class.isAssignableFrom(eventInfoType) && !Map.class.isAssignableFrom(eventInfoType)) {
+            throw new RuleParserException("Argument of method " + method.getName() + "must be a map or an EventInfo");
         }
     }
 
@@ -55,8 +58,14 @@ public class SimpleMethodRule extends SimpleRule {
     public Object execute(Action module, Map<String, ?> inputs) {
         Object returnObject = null;
         try {
-            returnObject = method.invoke(script, inputs);
-        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+            Object methodParameter = inputs;
+            if (EventInfo.class.isAssignableFrom(eventInfoType)) {
+                methodParameter = eventInfoType.getDeclaredConstructor().newInstance();
+                ((EventInfo) methodParameter).fill(inputs);
+            }
+            returnObject = method.invoke(script, methodParameter);
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | InstantiationException
+                | NoSuchMethodException | SecurityException e) {
             logger.error("Cannot execute rule {}", method.getName(), e);
         }
         return returnObject == null ? "" : returnObject;

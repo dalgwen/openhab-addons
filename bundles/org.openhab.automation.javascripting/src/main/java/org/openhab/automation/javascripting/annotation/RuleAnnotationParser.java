@@ -35,10 +35,10 @@ import org.openhab.automation.javascripting.annotations.ItemStateUpdateTriggers;
 import org.openhab.automation.javascripting.annotations.Rule;
 import org.openhab.automation.javascripting.annotations.SystemTrigger;
 import org.openhab.automation.javascripting.annotations.SystemTriggers;
-import org.openhab.automation.javascripting.annotations.ThingStateChangeTrigger;
-import org.openhab.automation.javascripting.annotations.ThingStateChangeTriggers;
-import org.openhab.automation.javascripting.annotations.ThingStateUpdateTrigger;
-import org.openhab.automation.javascripting.annotations.ThingStateUpdateTriggers;
+import org.openhab.automation.javascripting.annotations.ThingStatusChangeTrigger;
+import org.openhab.automation.javascripting.annotations.ThingStatusChangeTriggers;
+import org.openhab.automation.javascripting.annotations.ThingStatusUpdateTrigger;
+import org.openhab.automation.javascripting.annotations.ThingStatusUpdateTriggers;
 import org.openhab.automation.javascripting.scriptsupport.Script;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -151,23 +151,23 @@ public class RuleAnnotationParser {
                     }
                 }
 
-                if (a instanceof ThingStateUpdateTrigger trigger) {
-                    createThingStateUpdateTrigger(triggerList, trigger);
+                if (a instanceof ThingStatusUpdateTrigger trigger) {
+                    createThingStatusUpdateTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ThingStateUpdateTriggers triggers) {
-                    for (ThingStateUpdateTrigger trigger : triggers.value()) {
-                        createThingStateUpdateTrigger(triggerList, trigger);
+                if (a instanceof ThingStatusUpdateTriggers triggers) {
+                    for (ThingStatusUpdateTrigger trigger : triggers.value()) {
+                        createThingStatusUpdateTrigger(triggerList, trigger);
                     }
                 }
 
-                if (a instanceof ThingStateChangeTrigger trigger) {
-                    createThingStateChangeTrigger(triggerList, trigger);
+                if (a instanceof ThingStatusChangeTrigger trigger) {
+                    createThingStatusChangeTrigger(triggerList, trigger);
                 }
 
-                if (a instanceof ThingStateChangeTriggers triggers) {
-                    for (ThingStateChangeTrigger trigger : triggers.value()) {
-                        createThingStateChangeTrigger(triggerList, trigger);
+                if (a instanceof ThingStatusChangeTriggers triggers) {
+                    for (ThingStatusChangeTrigger trigger : triggers.value()) {
+                        createThingStatusChangeTrigger(triggerList, trigger);
                     }
                 }
 
@@ -264,11 +264,11 @@ public class RuleAnnotationParser {
         triggerList.add(trigger);
     }
 
-    private void createThingStateChangeTrigger(List<Trigger> triggers, ThingStateChangeTrigger triggerAnnot) {
+    private void createThingStatusChangeTrigger(List<Trigger> triggers, ThingStatusChangeTrigger triggerAnnot) {
         String id = triggerAnnot.id();
         String thingUID = triggerAnnot.thingUID();
 
-        logger.debug("ThingStateChangeTrigger: {}", thingUID);
+        logger.debug("ThingStatuseChangeTrigger: {}", thingUID);
 
         Trigger trigger;
 
@@ -283,11 +283,11 @@ public class RuleAnnotationParser {
         triggers.add(trigger);
     }
 
-    private void createThingStateUpdateTrigger(List<Trigger> triggers, ThingStateUpdateTrigger triggerAnnot) {
+    private void createThingStatusUpdateTrigger(List<Trigger> triggers, ThingStatusUpdateTrigger triggerAnnot) {
         String id = triggerAnnot.id();
         String thingUID = triggerAnnot.thingUID();
 
-        logger.debug("ThingStateUpdateTrigger: {}", thingUID);
+        logger.debug("ThingStatusUpdateTrigger: {}", thingUID);
 
         Trigger trigger;
 
