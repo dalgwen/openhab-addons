@@ -227,6 +227,7 @@ public class ManagerImpl implements Manager {
                         e.getClass().getSimpleName());
                 logger.debug("Full CDSI refresh failed", e);
             }
+            context.getAccountHelper().checkWhoAmiI();
         }
     }
 
@@ -1316,6 +1317,7 @@ public class ManagerImpl implements Manager {
         executor.shutdown();
 
         dependencies.getSignalWebSocket().disconnect();
+        dependencies.getPushServiceSocket().close();
         disposable.dispose();
 
         if (account != null) {
