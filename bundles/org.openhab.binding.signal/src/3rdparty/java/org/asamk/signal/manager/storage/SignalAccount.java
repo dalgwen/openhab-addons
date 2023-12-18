@@ -228,6 +228,7 @@ public class SignalAccount implements Closeable {
         signalAccount.pniAccountData.setIdentityKeyPair(pniIdentityKey);
         signalAccount.aciAccountData.setLocalRegistrationId(KeyHelper.generateRegistrationId(false));
         signalAccount.pniAccountData.setLocalRegistrationId(KeyHelper.generateRegistrationId(false));
+        signalAccount.initAllPreKeyIds();
         signalAccount.settings = settings;
 
         signalAccount.registered = false;
@@ -272,7 +273,8 @@ public class SignalAccount implements Closeable {
             final String encryptedDeviceName,
             final IdentityKeyPair aciIdentity,
             final IdentityKeyPair pniIdentity,
-            final ProfileKey profileKey
+            final ProfileKey profileKey,
+            final MasterKey masterKey
     ) {
         this.deviceId = 0;
         this.number = number;
@@ -281,14 +283,13 @@ public class SignalAccount implements Closeable {
         getRecipientTrustedResolver().resolveSelfRecipientTrusted(getSelfRecipientAddress());
         this.password = password;
         this.profileKey = profileKey;
-        getProfileStore().storeSelfProfileKey(getSelfRecipientId(), getProfileKey());
         this.encryptedDeviceName = encryptedDeviceName;
         this.aciAccountData.setIdentityKeyPair(aciIdentity);
         this.pniAccountData.setIdentityKeyPair(pniIdentity);
         this.registered = false;
         this.isMultiDevice = true;
         getKeyValueStore().storeEntry(lastReceiveTimestamp, 0L);
-        this.pinMasterKey = null;
+        this.pinMasterKey = masterKey;
         getKeyValueStore().storeEntry(storageManifestVersion, -1L);
         this.setStorageManifest(null);
         this.storageKey = null;
@@ -302,9 +303,13 @@ public class SignalAccount implements Closeable {
         save();
     }
 
-    public void finishLinking(final int deviceId) {
+    public void finishLinking(
+            final int deviceId, final PreKeyCollection aciPreKeys, final PreKeyCollection pniPreKeys
+    ) {
         this.registered = true;
         this.deviceId = deviceId;
+        setPreKeys(ServiceIdType.ACI, aciPreKeys);
+        setPreKeys(ServiceIdType.PNI, pniPreKeys);
         save();
     }
 
@@ -653,14 +658,11 @@ public class SignalAccount implements Closeable {
             // Old config file, creating new profile key
             setProfileKey(KeyUtils.createProfileKey());
         }
-        getProfileStore().storeProfileKey(getSelfRecipientId(), getProfileKey());
 
         if (previousStorageVersion < 5) {
             final var legacyRecipientsStoreFile = new File(userPath, "recipients-store");
             if (legacyRecipientsStoreFile.exists()) {
                 LegacyRecipientStore2.migrate(legacyRecipientsStoreFile, getRecipientStore());
-                // Ensure our profile key is stored in profile store
-                getProfileStore().storeSelfProfileKey(getSelfRecipientId(), getProfileKey());
             }
         }
         if (previousStorageVersion < 6) {
@@ -974,6 +976,13 @@ public class SignalAccount implements Closeable {
         clearAllPreKeys(ServiceIdType.PNI);
     }
 
+    private void initAllPreKeyIds() {
+        resetPreKeyOffsets(ServiceIdType.ACI);
+        resetPreKeyOffsets(ServiceIdType.PNI);
+        resetKyberPreKeyOffsets(ServiceIdType.ACI);
+        resetKyberPreKeyOffsets(ServiceIdType.PNI);
+    }
+
     private void clearAllPreKeys(ServiceIdType serviceIdType) {
         final var accountData = getAccountData(serviceIdType);
         resetPreKeyOffsets(serviceIdType);
@@ -1180,6 +1189,7 @@ public class SignalAccount implements Closeable {
         return getOrCreate(() -> recipientStore,
                 () -> recipientStore = new RecipientStore(this::mergeRecipients,
                         this::getSelfRecipientAddress,
+                        this::getProfileKey,
                         getAccountDatabase()));
     }
 
@@ -1537,7 +1547,6 @@ public class SignalAccount implements Closeable {
         }
         this.profileKey = profileKey;
         save();
-        getProfileStore().storeSelfProfileKey(getSelfRecipientId(), getProfileKey());
     }
 
     public byte[] getSelfUnidentifiedAccessKey() {

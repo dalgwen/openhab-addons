@@ -32,6 +32,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptM
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ViewOnceOpenMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ViewedMessage;
+import org.whispersystems.signalservice.api.push.ServiceId;
 
 import java.io.File;
 import java.io.IOException;
@@ -140,7 +141,9 @@ public record MessageEnvelope(
                     dataMessage.isProfileKeyUpdate(),
                     dataMessage.getProfileKey().isPresent(),
                     dataMessage.getReaction().map(r -> Reaction.from(r, recipientResolver, addressResolver)),
-                    dataMessage.getQuote().map(q -> Quote.from(q, recipientResolver, addressResolver, fileProvider)),
+                    dataMessage.getQuote()
+                            .filter(q -> q.getAuthor() != null && q.getAuthor().isValid())
+                            .map(q -> Quote.from(q, recipientResolver, addressResolver, fileProvider)),
                     dataMessage.getPayment().map(p -> p.getPaymentNotification().isPresent() ? Payment.from(p) : null),
                     dataMessage.getAttachments()
                             .map(a -> a.stream().map(as -> Attachment.from(as, fileProvider)).toList())
@@ -480,13 +483,13 @@ public record MessageEnvelope(
                 static Address from(org.whispersystems.signalservice.api.messages.shared.SharedContact.PostalAddress address) {
                     return new Address(Address.Type.from(address.getType()),
                             address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel(),
-                            address.getLabel());
+                            address.getStreet(),
+                            address.getPobox(),
+                            address.getNeighborhood(),
+                            address.getCity(),
+                            address.getRegion(),
+                            address.getPostcode(),
+                            address.getCountry());
                 }
 
                 public enum Type {
@@ -902,8 +905,9 @@ public record MessageEnvelope(
             final AttachmentFileProvider fileProvider,
             Exception exception
     ) {
-        final var source = !envelope.isUnidentifiedSender() && envelope.hasSourceServiceId()
-                ? recipientResolver.resolveRecipient(envelope.getSourceAddress())
+        final var serviceId = envelope.getSourceServiceId().map(ServiceId::parseOrNull).orElse(null);
+        final var source = !envelope.isUnidentifiedSender() && serviceId != null
+                ? recipientResolver.resolveRecipient(serviceId)
                 : envelope.isUnidentifiedSender() && content != null
                         ? recipientResolver.resolveRecipient(content.getSender())
                         : exception instanceof ProtocolException e

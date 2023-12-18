@@ -5,6 +5,6 @@
 
 	<type>binding</type>
 	<name>Signal Binding</name>
-	<description>This binding handle a connection to the Signal network.</description>
+	<description>This binding handles a connection to the Signal network.</description>
 
 </addon:addon>
