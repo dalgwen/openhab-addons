@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <features name="org.openhab.binding.signal-${project.version}" xmlns="http://karaf.apache.org/xmlns/features/v1.4.0">
+<!-- The feature name DOES NOT start with openhab, despite the coding rules. It is OK ! There is a weird behavior in the way openHAB handles KAR file
+(there is an autodeletion feature if the KAR file is not registered in the addon file). To avoid this we change the name.
+You have to build the project without the name check. Use -Dspotless.check.skip=true -DskipChecks=true -DskipTests -Dcheckstyle.skip -Dspotless.check.skip=true 
+ -->
 	<feature name="marketplace-openhab-binding-signal" description="Signal Binding" version="${project.version}">
 		<feature>openhab-runtime-base</feature>
 		<bundle start-level="80">mvn:org.xerial/sqlite-jdbc/3.42.0.0</bundle>
