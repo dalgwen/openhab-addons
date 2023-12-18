@@ -6,7 +6,6 @@ import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.internal.SignalDependencies;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.signal.core.util.Base64;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.signal.libsignal.usernames.Username;
 import org.slf4j.Logger;
@@ -66,10 +65,6 @@ public class RecipientHelper {
         return account.getRecipientAddressResolver()
                 .resolveRecipientAddress(account.getRecipientResolver().resolveRecipient(serviceId))
                 .toSignalServiceAddress();
-    }
-
-    public RecipientId resolveRecipient(final SignalServiceAddress address) {
-        return account.getRecipientResolver().resolveRecipient(address);
     }
 
     public Set<RecipientId> resolveRecipients(Collection<RecipientIdentifier.Single> recipients) throws UnregisteredRecipientException {
@@ -234,8 +229,7 @@ public class RecipientHelper {
     }
 
     private ACI getRegisteredUserByUsername(String username) throws IOException, BaseUsernameException {
-        return dependencies.getAccountManager()
-                .getAciByUsernameHash(Base64.encodeUrlSafeWithoutPadding(new Username(username).getHash()));
+        return dependencies.getAccountManager().getAciByUsername(new Username(username));
     }
 
     public record RegisteredUser(Optional<ACI> aci, Optional<PNI> pni) {
