@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <features name="org.openhab.binding.signal-${project.version}" xmlns="http://karaf.apache.org/xmlns/features/v1.4.0">
-	<feature name="openhab-binding-signal" description="Signal Binding" version="${project.version}">
+	<feature name="marketplace-openhab-binding-signal" description="Signal Binding" version="${project.version}">
 		<feature>openhab-runtime-base</feature>
 		<bundle start-level="80">mvn:org.xerial/sqlite-jdbc/3.42.0.0</bundle>
 		<bundle start-level="81">mvn:org.openhab.addons.bundles/org.openhab.binding.signal/${project.version}</bundle>
