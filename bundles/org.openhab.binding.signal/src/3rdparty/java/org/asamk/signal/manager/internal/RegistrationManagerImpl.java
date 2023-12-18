@@ -51,6 +51,8 @@ import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider
 import java.io.IOException;
 import java.util.function.Consumer;
 
+import static org.asamk.signal.manager.util.KeyUtils.generatePreKeysForType;
+
 public class RegistrationManagerImpl implements RegistrationManager {
 
     private final static Logger logger = LoggerFactory.getLogger(RegistrationManagerImpl.class);
@@ -60,6 +62,7 @@ public class RegistrationManagerImpl implements RegistrationManager {
     private final ServiceEnvironmentConfig serviceEnvironmentConfig;
     private final String userAgent;
     private final Consumer<Manager> newManagerListener;
+    private final GroupsV2Operations groupsV2Operations;
 
     private final SignalServiceAccountManager accountManager;
     private final PinHelper pinHelper;
@@ -80,13 +83,8 @@ public class RegistrationManagerImpl implements RegistrationManager {
         this.userAgent = userAgent;
         this.newManagerListener = newManagerListener;
 
-        GroupsV2Operations groupsV2Operations;
-        try {
-            groupsV2Operations = new GroupsV2Operations(ClientZkOperations.create(serviceEnvironmentConfig.signalServiceConfiguration()),
-                    ServiceConfig.GROUP_MAX_SIZE);
-        } catch (Throwable ignored) {
-            groupsV2Operations = null;
-        }
+        groupsV2Operations = new GroupsV2Operations(ClientZkOperations.create(serviceEnvironmentConfig.signalServiceConfiguration()),
+                ServiceConfig.GROUP_MAX_SIZE);
         this.accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.signalServiceConfiguration(),
                 new DynamicCredentialsProvider(
                         // Using empty UUID, because registering doesn't work otherwise
@@ -129,12 +127,16 @@ public class RegistrationManagerImpl implements RegistrationManager {
     public void verifyAccount(
             String verificationCode, String pin
     ) throws IOException, PinLockedException, IncorrectPinException {
+        if (account.isRegistered()) {
+            throw new IOException("Account is already registered");
+        }
+
         if (account.getPniIdentityKeyPair() == null) {
             account.setPniIdentityKeyPair(KeyUtils.generateIdentityKeyPair());
         }
 
-        final var aciPreKeys = generatePreKeysForType(ServiceIdType.ACI);
-        final var pniPreKeys = generatePreKeysForType(ServiceIdType.PNI);
+        final var aciPreKeys = generatePreKeysForType(account.getAccountData(ServiceIdType.ACI));
+        final var pniPreKeys = generatePreKeysForType(account.getAccountData(ServiceIdType.PNI));
         final var result = NumberVerificationUtils.verifyNumber(account.getSessionId(account.getNumber()),
                 verificationCode,
                 pin,
@@ -206,7 +208,7 @@ public class RegistrationManagerImpl implements RegistrationManager {
             final var accountManager = new SignalServiceAccountManager(serviceEnvironmentConfig.signalServiceConfiguration(),
                     account.getCredentialsProvider(),
                     userAgent,
-                    null,
+                    groupsV2Operations,
                     ServiceConfig.AUTOMATIC_NETWORK_RETRY);
             accountManager.setAccountAttributes(account.getAccountAttributes(null));
             account.setRegistered(true);
@@ -246,21 +248,6 @@ public class RegistrationManagerImpl implements RegistrationManager {
                 pniPreKeys,
                 null,
                 true));
-    }
-
-    private PreKeyCollection generatePreKeysForType(ServiceIdType serviceIdType) {
-        final var accountData = account.getAccountData(serviceIdType);
-        final var keyPair = accountData.getIdentityKeyPair();
-        final var preKeyMetadata = accountData.getPreKeyMetadata();
-
-        final var nextSignedPreKeyId = preKeyMetadata.getNextSignedPreKeyId();
-        final var signedPreKey = KeyUtils.generateSignedPreKeyRecord(nextSignedPreKeyId, keyPair.getPrivateKey());
-
-        final var privateKey = keyPair.getPrivateKey();
-        final var kyberPreKeyIdOffset = preKeyMetadata.getNextKyberPreKeyId();
-        final var lastResortKyberPreKey = KeyUtils.generateKyberPreKeyRecord(kyberPreKeyIdOffset, privateKey);
-
-        return new PreKeyCollection(keyPair.getPublicKey(), signedPreKey, lastResortKyberPreKey);
     }
 
     @Override
