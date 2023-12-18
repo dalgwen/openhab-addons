@@ -24,7 +24,7 @@
     <dependency>
       <artifactId>signal-service-java</artifactId>
       <groupId>com.github.turasa</groupId>
-      <version>2.15.3_unofficial_86</version>
+      <version>2.15.3_unofficial_90</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -41,7 +41,7 @@
     <dependency>
       <groupId>org.signal</groupId>
       <artifactId>libsignal-client</artifactId>
-      <version>0.32.1</version>
+      <version>0.36.1</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -52,7 +52,7 @@
     <dependency>
       <groupId>com.zaxxer</groupId>
       <artifactId>HikariCP</artifactId>
-      <version>5.0.1</version>
+      <version>5.1.0</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -64,7 +64,7 @@
     <dependency>
       <artifactId>bcpkix-jdk18on</artifactId>
       <groupId>org.bouncycastle</groupId>
-      <version>1.76</version>
+      <version>1.77</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
