@@ -83,13 +83,11 @@ Bundle your code as OSGI bundle as in this sample: https://github.com/weberjn/or
 
 ${H2} 2nd method : Library annotation
 
-You can also annotate a class with `@org.openhab.automation.javascripting.annotations.Library`. By doing so, the class will be available to all your other java scripts. The library class can still extends the `Script` base class to access its facilities.
+You can also put java files in the `conf/automation/lib/java` directory. By doing so, these libraries will be available to all your java scripts. The library class can still extends the `Script` base class to access its facilities.
 
-You then can access it statically, or you can inject it in your script by using the same annotation on a class member.
+You can then use it normally, or you can even inject it in your script by using the annotation `@org.openhab.automation.javascripting.annotations.Library` on a class member. This injection also allows the library to be instanciated by openHAB and to use all the `Script` facilities, such as access to registries, etc.
 
-Be aware that library instance are not shared between scripts. If you want to share data you should find another way.
-Pay attention to the script load order : a library class must be loaded before being used in another class.
-
+Be aware that a library instance is not shared between scripts. If you want to share data you should find another way.
 
 # Building the Addon
 
