@@ -77,8 +77,10 @@ public class ScriptWrappingStategy implements ScriptInterceptorStrategy {
         StringBuilder modifiedScript = new StringBuilder();
         modifiedScript.append(packageDeclarationLine + "\n");
         modifiedScript.append(String.join("\n", importLines));
+        modifiedScript.append("\n");
         modifiedScript.append(BOILERPLATE_CODE_BEFORE);
         modifiedScript.append(String.join("\n", scriptLines));
+        modifiedScript.append("\n");
         if (!returnIsPresent) {
             modifiedScript.append("return null;");
         }

@@ -26,15 +26,23 @@ It makes heavy use of Eric Obermühlner's Java JSR 223 ScriptEngine [java-script
   it is loaded, compiled into memory and its onLoad() method is executed.
   Then it is parsed for @Rule annotations and the rules are activated.
   
-* You can use a raw script with no "boilerplate" code and direct instructions by NOT specifiying a class in your script (not putting a `public class` declaration). Your script will automatically be wrapped in a Class and an onLoad method. You obviously cannot declare any method within this raw script (because it is itself contained in the onLoad method), but you can use import or package declarations (they will be extracted and put in the  start of the resulting script).
+* You can use a raw script with no "boilerplate" code and direct instructions by NOT specifiying a class in your script (not putting a `public class` declaration). Your script will automatically be wrapped in a Class and an onLoad method. You obviously cannot declare any method within this raw script (because it is itself contained in the onLoad method), but you can use import or package declarations (they will be extracted and put in the start of the resulting script).
 
-* Java script classes do not see other script classes. Each one has its own ClassLoader. This is a consequence of the way openHAB JSR223 and the Java ScriptEngine works, each script is loaded separately and so has its own memory ClassLoader. You can use the Library annotation to circumvent this limitation : each script will still have its own ClassLoader, but all @Library annotated classes will also be compiled with each of them.
+* Java script classes do not see other script classes. Each one has its own ClassLoader. This is a consequence of the way openHAB JSR223 and the Java ScriptEngine works : each script is loaded separately and so has its own memory ClassLoader. You can use create libraries (see below) to circumvent this limitation : each script will still have its own ClassLoader, but all annotated classes will also be compiled with each of them.
 
-* you can also use libraries if you package them as [OSGI bundles](#library-code).
+* you can also use libraries packaged as [OSGI bundles](#library-code), or with the library directory (see below)
 
 * you can use openHAB classes from the packages listed in [bnd.bnd](bnd.bnd).
 
 * openHAB Java Scripting requires openHAB 3.3.0 or later
+
+# Generated helper classes
+
+On startup, and on every item/thing modifications, this plugin will generate helper classes files in the conf/automation/lib/java directory :
+* Items.java List all items in your openHAB instance
+* Things.java List all thing in your openHAB instance
+* One class for each addon Action available
+All theses classes, because they are in the lib directory, are compiled alongside your custom scripts and automatically available.
 
 # Remote Debugging
 
@@ -62,10 +70,10 @@ To have a script compile without errors in Eclipse, it should be in a Java proje
 
 * create a folder with a Maven project:
 * use this [src/doc/pom.xml](src/doc/pom.xml) as template 
-* adapt parent relativePath
 * change groupId and artifactId
 * import the folder as maven project into Eclipse
-* create the Java scripts in src/main/java in the default package 
+* create the Java scripts in src/main/java in the default package (or link to your openhab `conf/automation/jsr223` directory)
+* (optional) link your openhab folder `conf/automation/lib/java` as a source directory to use the generated helper classes.
 * if the source compiles without errors, copy it to conf/automation/jsr223
 
 ```sh
@@ -81,11 +89,11 @@ Java Rules has `DynamicImport-Package: *` so it can access code in other bundles
 
 Bundle your code as OSGI bundle as in this sample: https://github.com/weberjn/org.openhab.automation.javascripting.ext 
 
-${H2} 2nd method : Library annotation
+${H2} 2nd method : Library directory
 
 You can also put java files in the `conf/automation/lib/java` directory. By doing so, these libraries will be available to all your java scripts. The library class can still extends the `Script` base class to access its facilities.
 
-You can then use it normally, or you can even inject it in your script by using the annotation `@org.openhab.automation.javascripting.annotations.Library` on a class member. This injection also allows the library to be instanciated by openHAB and to use all the `Script` facilities, such as access to registries, etc.
+You can then use it normally (import, new, use static method), or you can even inject it in your script by using the annotation `@org.openhab.automation.javascripting.annotations.Library` on a class member. This injection also allows the library to be instanciated by openHAB and to use all the `Script` facilities, such as access to registries, etc.
 
 Be aware that a library instance is not shared between scripts. If you want to share data you should find another way.
 
@@ -142,6 +150,12 @@ ${H2} Addon Actions
 
 ```java
 #include("src/script/java/SendMail.java")
+```
+
+${H2} Addon Actions with helper class
+
+```java
+#include("src/script/java/SendMailHelperAction.java")
 ```
 
 ${H2} Static Actions

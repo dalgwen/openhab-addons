@@ -10,7 +10,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-
 package org.openhab.automation.javascripting.scriptsupport;
 
 import java.lang.reflect.Method;
@@ -22,16 +21,16 @@ import java.util.Map;
 import org.openhab.automation.javascripting.annotation.RuleAnnotationParser;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.automation.Trigger;
+import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
+import org.openhab.core.automation.module.script.defaultscope.ScriptBusEvent;
+import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
 import org.openhab.core.automation.util.TriggerBuilder;
 import org.openhab.core.config.core.Configuration;
-import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.binding.ThingActions;
-import org.openhab.core.types.Command;
-import org.openhab.core.types.State;
 import org.openhab.core.voice.VoiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,11 +49,11 @@ public abstract class Script {
 
     protected ScriptedAutomationManager automationManager;
 
-    protected ScriptThingActionsProxy actions;
+    protected ScriptThingActions actions;
 
-    protected ScriptBusEventProxy events;
+    protected ScriptBusEvent events;
 
-    protected ScriptExtensionManagerWrapperProxy self;
+    protected ScriptExtensionManagerWrapper se;
 
     protected Map<String, Object> ruleSupport;
 
@@ -63,7 +62,7 @@ public abstract class Script {
 
     protected ItemRegistry itemRegistry;
 
-    protected ThingRegistry thingRegistry;
+    protected ThingRegistry things;
 
     protected VoiceManager voice;
 
@@ -71,170 +70,9 @@ public abstract class Script {
 
     protected Object input;
 
-    // ScriptExtensionManagerWrapper is in the bundle private
-    // org.openhab.core.automation.module.script.internal.ScriptExtensionManagerWrapper
-    // which we can only access by reflection (Java is not Groovy)
-
-    protected static class ScriptExtensionManagerWrapperProxy {
-
-        Object scriptExtensionManagerRef;
-
-        ScriptExtensionManagerWrapperProxy(Object scriptExtensionManagerRef) {
-            this.scriptExtensionManagerRef = scriptExtensionManagerRef;
-        }
-
-        @SuppressWarnings("unchecked")
-        public Map<String, Object> importPreset(String preset) {
-
-            Object o;
-            Map<String, Object> presets = null;
-
-            try {
-                Method m = scriptExtensionManagerRef.getClass().getMethod("importPreset", String.class);
-                o = m.invoke(scriptExtensionManagerRef, preset);
-                presets = (Map<String, Object>) o;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-            return presets;
-        }
-    }
-
-    protected static class ScriptBusEventProxy {
-
-        Object scriptBusEvent;
-
-        ScriptBusEventProxy(Object scriptBusEvent) {
-            this.scriptBusEvent = scriptBusEvent;
-        }
-
-        public Object sendCommand(String itemName, String commandString) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("sendCommand", String.class, String.class);
-                return m.invoke(scriptBusEvent, itemName, commandString);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object sendCommand(Item item, Number number) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("sendCommand", Item.class, Number.class);
-                return m.invoke(scriptBusEvent, item, number);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object sendCommand(Item item, String commandString) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("sendCommand", Item.class, String.class);
-                return m.invoke(scriptBusEvent, item, commandString);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object sendCommand(Item item, Command command) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("sendCommand", Item.class, Command.class);
-                return m.invoke(scriptBusEvent, item, command);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object postUpdate(Item item, Number state) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("postUpdate", Item.class, Number.class);
-                return m.invoke(scriptBusEvent, item, state);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object postUpdate(Item item, String stateAsString) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("postUpdate", Item.class, String.class);
-                return m.invoke(scriptBusEvent, item, stateAsString);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object postUpdate(String itemName, String stateString) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("postUpdate", String.class, String.class);
-                return m.invoke(scriptBusEvent, itemName, stateString);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Object postUpdate(Item item, State state) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("postUpdate", Item.class, String.class);
-                return m.invoke(scriptBusEvent, item, state);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        public Map<Item, State> storeStates(Item... items) {
-            try {
-                Method m = scriptBusEvent.getClass().getMethod("storeStates", Item[].class);
-                return (Map<Item, State>) m.invoke(scriptBusEvent, items);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    protected static class ScriptThingActionsProxy {
-
-        Object scriptThingActionsRef;
-
-        ScriptThingActionsProxy(Object scriptThingActionsRef) {
-            this.scriptThingActionsRef = scriptThingActionsRef;
-        }
-
-        public ThingActions get(String scope, String thingUid) {
-
-            Object o;
-            ThingActions actions = null;
-
-            try {
-                Method m = scriptThingActionsRef.getClass().getMethod("get", String.class, String.class);
-                o = m.invoke(scriptThingActionsRef, scope, thingUid);
-                actions = (ThingActions) o;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-            return actions;
-        }
-
-        public void invoke(ThingActions thingActions, String method, Object... params) {
-            Class<?>[] paramClasses = new Class<?>[params.length];
-
-            for (int i = 0; i < params.length; i++) {
-                paramClasses[i] = params[i].getClass();
-            }
-            try {
-
-                Method m = thingActions.getClass().getMethod(method, paramClasses);
-                m.invoke(thingActions, params);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    /*
-     * called by JavaRuleEngine on script load
+    /**
+     * called on the script load
      */
-
     public Object eval() throws Exception {
 
         logger.trace("eval()");
@@ -256,25 +94,19 @@ public abstract class Script {
 
     public void makeShortcuts() {
 
-        Object se = bindings.get("se");
+        this.se = (ScriptExtensionManagerWrapper) bindings.get("se");
 
-        self = new ScriptExtensionManagerWrapperProxy(se);
+        ruleSupport = se.importPreset("RuleSupport");
 
-        ruleSupport = self.importPreset("RuleSupport");
+        this.actions = (ScriptThingActions) bindings.get("actions");
 
-        Object actions = bindings.get("actions");
-
-        this.actions = new ScriptThingActionsProxy(actions);
-
-        Object events = bindings.get("events");
-
-        this.events = new ScriptBusEventProxy(events);
+        this.events = (ScriptBusEvent) bindings.get("events");
 
         automationManager = (ScriptedAutomationManager) ruleSupport.get("automationManager");
 
         itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
 
-        thingRegistry = (ThingRegistry) bindings.get("things");
+        things = (ThingRegistry) bindings.get("things");
 
         voice = (VoiceManager) bindings.get("voice");
 
@@ -311,7 +143,6 @@ public abstract class Script {
     // Utility methods
     // very inspired by pravussum's groovy rules
     // https://community.openhab.org/t/examples-for-groovy-scripts/131121/9
-
     public Trigger createSystemStartlevelTrigger(String triggerId, String startlevel) {
 
         Map<String, Object> configuration = new HashMap<String, Object>();
@@ -553,6 +384,21 @@ public abstract class Script {
             sr.setName(name);
             sr.setTriggers(triggers);
             automationManager.addRule(sr);
+        }
+    }
+
+    public void invokeAction(ThingActions thingActions, String method, Object... params) {
+        Class<?>[] paramClasses = new Class<?>[params.length];
+
+        for (int i = 0; i < params.length; i++) {
+            paramClasses[i] = params[i].getClass();
+        }
+        try {
+
+            Method m = thingActions.getClass().getMethod(method, paramClasses);
+            m.invoke(thingActions, params);
+        } catch (Exception e) {
+            throw new JavaScriptingException("Cannot invoke action for " + method);
         }
     }
 

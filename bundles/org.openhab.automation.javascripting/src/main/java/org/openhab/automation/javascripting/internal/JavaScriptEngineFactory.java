@@ -18,17 +18,30 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.script.ScriptEngine;
-import javax.script.ScriptException;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.javascripting.internal.codegeneration.ClassGenerator;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.automation.module.script.AbstractScriptEngineFactory;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
+import org.openhab.core.events.Event;
+import org.openhab.core.events.EventSubscriber;
+import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.items.events.ItemAddedEvent;
+import org.openhab.core.items.events.ItemRemovedEvent;
 import org.openhab.core.service.WatchService;
 import org.openhab.core.service.WatchService.Kind;
+import org.openhab.core.thing.ThingRegistry;
+import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.events.ThingAddedEvent;
+import org.openhab.core.thing.events.ThingRemovedEvent;
+import org.openhab.core.thing.events.ThingStatusInfoChangedEvent;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.service.component.annotations.Activate;
@@ -48,8 +61,9 @@ import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStr
  *
  * @author Jürgen Weber - Initial contribution
  */
-@Component(service = { ScriptEngineFactory.class, JavaScriptEngineFactory.class })
-public class JavaScriptEngineFactory extends AbstractScriptEngineFactory implements WatchService.WatchEventListener {
+@Component(service = { ScriptEngineFactory.class, JavaScriptEngineFactory.class, EventSubscriber.class })
+public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
+        implements EventSubscriber, WatchService.WatchEventListener {
 
     public static final Path LIB_DIR = Path.of(OpenHAB.getConfigFolder(), "automation", "lib",
             JavaScriptingConstants.JAVA_FILE_TYPE);
@@ -66,9 +80,20 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory impleme
 
     private final WatchService watchService;
 
+    private ClassGenerator classGenerator;
+
+    private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
+            ThingStatus.UNKNOWN);
+    private static final Set<String> ACTION_EVENTS = Set.of(ThingStatusInfoChangedEvent.TYPE);
+    private static final Set<String> ITEM_EVENTS = Set.of(ItemAddedEvent.TYPE, ItemRemovedEvent.TYPE);
+    private static final Set<String> THING_EVENTS = Set.of(ThingAddedEvent.TYPE, ThingRemovedEvent.TYPE);
+    private static final Set<String> EVENTS = Stream.of(ACTION_EVENTS, ITEM_EVENTS, THING_EVENTS).flatMap(Set::stream)
+            .collect(Collectors.toSet());
+
     @Activate
     public JavaScriptEngineFactory(BundleContext bundleContext,
-            @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService) {
+            @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
+            @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry) {
         this.watchService = watchService;
 
         osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
@@ -87,6 +112,15 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory impleme
         } catch (IOException e) {
             logger.warn("Failed to create directory '{}': {}", LIB_DIR, e.getMessage());
             throw new IllegalStateException("Failed to initialize lib folder.");
+        }
+
+        try {
+            this.classGenerator = new ClassGenerator(LIB_DIR, itemRegistry, thingRegistry, bundleContext);
+            classGenerator.generateItems();
+            classGenerator.generateThings();
+            classGenerator.generateThingActions();
+        } catch (IOException e) {
+            logger.error("Cannot create helper class file in library dir", e);
         }
 
         scanLibDirectory();
@@ -146,7 +180,7 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory impleme
             Stream<Path> javaFileWalk = Files.walk(LIB_DIR).filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith("." + JavaScriptingConstants.JAVA_FILE_TYPE));
             withLibrariesCompilationStrategy.setLibraries(javaFileWalk.toList());
-        } catch (IOException | ScriptException e) {
+        } catch (IOException e) {
             logger.error("Cannot use libraries", e);
         }
     }
@@ -159,6 +193,45 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory impleme
             scanLibDirectory();
         } else {
             logger.trace("Received '{}' for path '{}' - ignoring (wrong extension)", kind, fullPath);
+        }
+    }
+
+    @Override
+    public @NonNull Set<@NonNull String> getSubscribedEventTypes() {
+        return EVENTS;
+    }
+
+    @Override
+    public void receive(Event event) {
+        String eventType = event.getType();
+        if (ACTION_EVENTS.contains(eventType)) {
+            ThingStatusInfoChangedEvent event1 = (ThingStatusInfoChangedEvent) event;
+            if ((ThingStatus.INITIALIZING.equals(event1.getOldStatusInfo().getStatus())
+                    && INITIALIZED.contains(event1.getStatusInfo().getStatus()))
+                    || (ThingStatus.UNINITIALIZED.equals(event1.getStatusInfo().getStatus())
+                            && INITIALIZED.contains(event1.getOldStatusInfo().getStatus()))) {
+                // only regenerate jar if things are changing to or from an initialized
+                try {
+                    if (classGenerator.generateThingActions()) {
+                    }
+                } catch (IOException e) {
+                    logger.warn("Failed to (re-)build thing action classes: {}", e.getMessage());
+                }
+            }
+        } else if (ITEM_EVENTS.contains(eventType)) {
+            logger.debug("Added/updated item: {}", event);
+            try {
+                classGenerator.generateItems();
+            } catch (IOException e) {
+                logger.warn("Failed to (re-)build item class: {}", e.getMessage());
+            }
+        } else if (THING_EVENTS.contains(eventType)) {
+            logger.debug("Added/updated thing: {}", event);
+            try {
+                classGenerator.generateThings();
+            } catch (IOException e) {
+                logger.warn("Failed to (re-)build thing class: {}", e.getMessage());
+            }
         }
     }
 }

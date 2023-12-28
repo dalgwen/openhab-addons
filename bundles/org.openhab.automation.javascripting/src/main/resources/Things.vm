@@ -1,0 +1,34 @@
+package $HELPER_PACKAGE;
+
+import org.openhab.core.thing.ThingUID;
+import org.openhab.core.thing.Thing;
+
+import org.openhab.automation.javascripting.scriptsupport.Script;
+import org.openhab.automation.javascripting.scriptsupport.JavaScriptingException;
+
+public class Things extends Script {
+ 
+#foreach($thing in $things)
+#if( $thing.getLabel() )
+    /** $thing.getLabel() */
+#end
+    public static final String $thing.getUID().toString().replace(":", "_").replace("-", "_") = "$thing.getUID()";
+
+#end
+
+#foreach($thing in $things)
+#if( $thing.getLabel() )
+    /** $thing.getLabel() */
+#end
+    public Thing $thing.getUID().toString().replace(":", "_").replace("-", "_")() {
+        if (things != null) {
+            return things.get(new ThingUID("$thing.getUID()"));
+        } else {
+            throw new JavaScriptingException("Things class not properly initialized. Use injection with the @Library annotation in your custom script");
+        }
+        
+    }
+
+#end
+
+}
