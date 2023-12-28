@@ -28,7 +28,6 @@ import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 /**
  * @author Jürgen Weber - Initial contribution
  */
-
 public class BulkBindingStrategy implements BindingStrategy {
 
     private static Logger logger = LoggerFactory.getLogger(BulkBindingStrategy.class);

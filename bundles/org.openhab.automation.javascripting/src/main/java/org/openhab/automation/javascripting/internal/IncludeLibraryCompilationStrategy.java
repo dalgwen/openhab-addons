@@ -17,10 +17,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.script.ScriptException;
 import javax.tools.JavaFileObject;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.MemoryFileManager;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
@@ -33,14 +38,23 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
  * @author Gwendal Roulleau - Initial contribution
  */
 public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
-    Collection<JavaFileObject> keepCompilingMap;
+
+    private static Logger logger = LoggerFactory.getLogger(IncludeLibraryCompilationStrategy.class);
+
+    Map<String, JavaFileObject> keepCompilingMap = new HashMap<>();
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
 
-    public void setLibraries(Collection<Path> librariesFile) throws IOException, ScriptException {
-        keepCompilingMap = new ArrayList<>();
+    public void setLibraries(Collection<Path> librariesFile) throws IOException {
+        keepCompilingMap = new HashMap<>();
         for (Path path : librariesFile) {
-            keepCompilingMap.add(getJavaFileObject(path));
+            try {
+                JavaFileObject javaFileObject = getJavaFileObject(path);
+                keepCompilingMap.put(javaFileObject.getName(), javaFileObject);
+            } catch (ScriptException e) {
+                logger.info("Cannot get the file {} as a valid java object. Cause: {}", path.toString(),
+                        e.getMessage());
+            }
         }
     }
 
@@ -55,7 +69,7 @@ public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
     public List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource) {
         JavaFileObject currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName,
                 currentSource);
-        List<JavaFileObject> sumFileObjects = new ArrayList<>(keepCompilingMap);
+        List<JavaFileObject> sumFileObjects = new ArrayList<>(keepCompilingMap.values());
         sumFileObjects.add(currentJavaFileObject);
         return sumFileObjects;
     }
