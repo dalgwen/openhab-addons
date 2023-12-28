@@ -53,7 +53,8 @@ public class BulkBindingStrategy implements BindingStrategy {
                     field.set(compiledInstance, libraryInstance);
                 } catch (InstantiationException | InvocationTargetException | NoSuchMethodException | SecurityException
                         | IllegalArgumentException | IllegalAccessException e) {
-                    logger.error("Cannot inject library into {}", field.getName(), e);
+                    logger.error("Cannot inject library instance into {}. Do you have an empty constructor ?",
+                            field.getName(), e);
                 }
             }
         }

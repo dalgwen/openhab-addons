@@ -12,41 +12,55 @@
  */
 package org.openhab.automation.javascripting.internal;
 
-import java.util.HashMap;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Stream;
 
+import javax.script.ScriptException;
 import javax.tools.JavaFileObject;
-
-import org.openhab.automation.javascripting.annotations.Library;
 
 import ch.obermuhlner.scriptengine.java.MemoryFileManager;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
+import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
+import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
+ * With this strategy, we compile the script alongside previously registered libraries
+ *
  * @author Gwendal Roulleau - Initial contribution
  */
 public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
-    Map<String, JavaFileObject> previousFileObject = new HashMap<>();
+    Collection<JavaFileObject> keepCompilingMap;
 
-    JavaFileObject currentJavaFileObject;
+    NameStrategy nameStrategy = new DefaultNameStrategy();
+
+    public void setLibraries(Collection<Path> librariesFile) throws IOException, ScriptException {
+        keepCompilingMap = new ArrayList<>();
+        for (Path path : librariesFile) {
+            keepCompilingMap.add(getJavaFileObject(path));
+        }
+    }
+
+    private JavaFileObject getJavaFileObject(Path path) throws IOException, ScriptException {
+        String readString = Files.readString(path);
+        String fullName = nameStrategy.getFullName(readString);
+        String simpleClassName = NameStrategy.extractSimpleName(fullName);
+        return MemoryFileManager.createSourceFileObject(null, simpleClassName, readString);
+    }
 
     @Override
     public List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource) {
-        currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName, currentSource);
-        Stream<JavaFileObject> previousFileObjects = previousFileObject.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(simpleClassName)) // do no keep the old file
-                .map(Entry::getValue);
-        return Stream.concat(previousFileObjects, Stream.of(currentJavaFileObject)).toList();
+        JavaFileObject currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName,
+                currentSource);
+        List<JavaFileObject> sumFileObjects = new ArrayList<>(keepCompilingMap);
+        sumFileObjects.add(currentJavaFileObject);
+        return sumFileObjects;
     }
 
     @Override
     public void compilationResult(Class<?> clazz) {
-        JavaFileObject currentJavaFileObjectLocal = currentJavaFileObject;
-        if (clazz.isAnnotationPresent(Library.class) && currentJavaFileObjectLocal != null) {
-            previousFileObject.put(clazz.getSimpleName(), currentJavaFileObjectLocal);
-        }
     }
 }
