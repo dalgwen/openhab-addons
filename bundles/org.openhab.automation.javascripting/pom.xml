@@ -20,6 +20,13 @@
       <groupId>ch.obermuhlner</groupId>
       <artifactId>java-scriptengine</artifactId>
       <version>2.1.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.velocity</groupId>
+      <artifactId>velocity-engine-core</artifactId>
+      <version>2.3</version>
+      <scope>compile</scope>
     </dependency>
   </dependencies>
 
@@ -58,26 +65,6 @@
           <sourceDirectories>${project.build.sourceDirectory}</sourceDirectories>
         </configuration>
       </plugin>
-
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-script-sources</id>
-            <phase>generate-test-sources</phase>
-            <goals>
-              <goal>add-test-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>src/script/java</source>
-              </sources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
     </plugins>
   </build>
 

@@ -12,41 +12,69 @@
  */
 package org.openhab.automation.javascripting.internal;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Stream;
 
+import javax.script.ScriptException;
 import javax.tools.JavaFileObject;
 
-import org.openhab.automation.javascripting.annotations.Library;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.MemoryFileManager;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
+import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
+import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
+ * With this strategy, we compile the script alongside previously registered libraries
+ *
  * @author Gwendal Roulleau - Initial contribution
  */
 public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
-    Map<String, JavaFileObject> previousFileObject = new HashMap<>();
 
-    JavaFileObject currentJavaFileObject;
+    private static Logger logger = LoggerFactory.getLogger(IncludeLibraryCompilationStrategy.class);
+
+    Map<String, JavaFileObject> keepCompilingMap = new HashMap<>();
+
+    NameStrategy nameStrategy = new DefaultNameStrategy();
+
+    public void setLibraries(Collection<Path> librariesFile) throws IOException {
+        keepCompilingMap = new HashMap<>();
+        for (Path path : librariesFile) {
+            try {
+                JavaFileObject javaFileObject = getJavaFileObject(path);
+                keepCompilingMap.put(javaFileObject.getName(), javaFileObject);
+            } catch (ScriptException e) {
+                logger.info("Cannot get the file {} as a valid java object. Cause: {}", path.toString(),
+                        e.getMessage());
+            }
+        }
+    }
+
+    private JavaFileObject getJavaFileObject(Path path) throws IOException, ScriptException {
+        String readString = Files.readString(path);
+        String fullName = nameStrategy.getFullName(readString);
+        String simpleClassName = NameStrategy.extractSimpleName(fullName);
+        return MemoryFileManager.createSourceFileObject(null, simpleClassName, readString);
+    }
 
     @Override
     public List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource) {
-        currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName, currentSource);
-        Stream<JavaFileObject> previousFileObjects = previousFileObject.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(simpleClassName)) // do no keep the old file
-                .map(Entry::getValue);
-        return Stream.concat(previousFileObjects, Stream.of(currentJavaFileObject)).toList();
+        JavaFileObject currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName,
+                currentSource);
+        List<JavaFileObject> sumFileObjects = new ArrayList<>(keepCompilingMap.values());
+        sumFileObjects.add(currentJavaFileObject);
+        return sumFileObjects;
     }
 
     @Override
     public void compilationResult(Class<?> clazz) {
-        JavaFileObject currentJavaFileObjectLocal = currentJavaFileObject;
-        if (clazz.isAnnotationPresent(Library.class) && currentJavaFileObjectLocal != null) {
-            previousFileObject.put(clazz.getSimpleName(), currentJavaFileObjectLocal);
-        }
     }
 }

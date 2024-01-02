@@ -1,0 +1,31 @@
+package $HELPER_PACKAGE;
+
+import org.openhab.core.items.Item;
+import org.openhab.automation.javascripting.scriptsupport.Script;
+import org.openhab.automation.javascripting.scriptsupport.JavaScriptingException;
+
+public class Items extends Script {
+
+#foreach($item in $items)
+#if( $item.getLabel() )
+    /** $item.getLabel() */
+#end
+    public static final String $item.getName() = "$item.getName()";
+
+#end
+
+#foreach($item in $items)
+#if( $item.getLabel() )
+    /** $item.getLabel() */
+#end
+    public Item $item.getName()() {
+        if (itemRegistry != null) {
+            return itemRegistry.get( $item.getName() );
+        } else {
+            throw new JavaScriptingException("Things class not properly initialized. Use injection with the @Library annotation in your custom script");
+        }
+    }
+
+#end   
+
+}
