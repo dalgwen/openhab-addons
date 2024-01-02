@@ -25,6 +25,6 @@ import java.lang.annotation.Target;
 
 @Retention(RUNTIME)
 @Target({ ElementType.FIELD, ElementType.METHOD })
-public @interface ThingStateUpdateTriggers {
-    ThingStateUpdateTrigger[] value();
+public @interface ThingStatusUpdateTriggers {
+    ThingStatusUpdateTrigger[] value();
 }
