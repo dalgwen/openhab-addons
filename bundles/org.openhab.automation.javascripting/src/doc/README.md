@@ -155,7 +155,7 @@ ${H2} Addon Actions
 ${H2} Addon Actions with helper class
 
 ```java
-#include("src/script/java/SendMailHelperAction.java")
+#include("src/script/java/SendMailHelperAction.jav")
 ```
 
 ${H2} Static Actions

@@ -18,16 +18,19 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.script.ScriptEngine;
 
+import org.apache.velocity.exception.VelocityException;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.javascripting.internal.codegeneration.ClassGenerator;
 import org.openhab.core.OpenHAB;
+import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.AbstractScriptEngineFactory;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
 import org.openhab.core.events.Event;
@@ -52,6 +55,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
+import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
+import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
+import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
 
 /**
@@ -65,22 +71,28 @@ import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStr
 public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
         implements EventSubscriber, WatchService.WatchEventListener {
 
+    private static final Logger logger = LoggerFactory.getLogger(JavaScriptEngineFactory.class);
+
     public static final Path LIB_DIR = Path.of(OpenHAB.getConfigFolder(), "automation", "lib",
             JavaScriptingConstants.JAVA_FILE_TYPE);
 
-    private static final Logger logger = LoggerFactory.getLogger(JavaScriptEngineFactory.class);
-
-    BundleWiring bundleWiring;
+    private BundleWiring bundleWiring;
+    private BundleContext bundleContext;
 
     private ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory javaScriptEngineFactory;
-
-    private IncludeLibraryCompilationStrategy withLibrariesCompilationStrategy = new IncludeLibraryCompilationStrategy();
-
+    private IncludeLibraryCompilationStrategy withLibrariesCompilationStrategy;
     private PackageResourceListingStrategy osgiPackageResourceListingStrategy;
+    private BindingStrategy bulkBindingStrategy;
+    private ExecutionStrategyFactory entryExecutionStrategy;
+    private ScriptInterceptorStrategy scriptWrappingStrategy;
 
     private final WatchService watchService;
 
     private ClassGenerator classGenerator;
+
+    private JavaScriptEngine scriptEngineInstance;
+
+    private static final boolean REUSE_SCRIPT_ENGINE = true;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
             ThingStatus.UNKNOWN);
@@ -94,18 +106,6 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
     public JavaScriptEngineFactory(BundleContext bundleContext,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry) {
-        this.watchService = watchService;
-
-        osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
-            @Override
-            public Collection<String> listResources(String packageName) {
-                return listClassResources(packageName);
-            }
-        };
-
-        javaScriptEngineFactory = new ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory();
-
-        bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -114,15 +114,31 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
             throw new IllegalStateException("Failed to initialize lib folder.");
         }
 
+        this.bundleContext = bundleContext;
+        this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
+
+        osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
+            @Override
+            public Collection<String> listResources(String packageName) {
+                return listClassResources(packageName);
+            }
+        };
+        javaScriptEngineFactory = new ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory();
+        withLibrariesCompilationStrategy = new IncludeLibraryCompilationStrategy();
+        bulkBindingStrategy = new BulkBindingStrategy(getAdditionalBindings());
+        entryExecutionStrategy = new EntryExecutionStrategyFactory();
+        scriptWrappingStrategy = new ScriptWrappingStategy();
+
         try {
             this.classGenerator = new ClassGenerator(LIB_DIR, itemRegistry, thingRegistry, bundleContext);
             classGenerator.generateItems();
             classGenerator.generateThings();
             classGenerator.generateThingActions();
-        } catch (IOException e) {
-            logger.error("Cannot create helper class file in library dir", e);
+        } catch (IOException | VelocityException e) {
+            logger.error("Cannot create helper class file in library dir. " + e.getMessage());
         }
 
+        this.watchService = watchService;
         scanLibDirectory();
         watchService.registerListener(this, LIB_DIR);
 
@@ -144,23 +160,29 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
     public @Nullable ScriptEngine createScriptEngine(String scriptType) {
         if (getScriptTypes().contains(scriptType)) {
 
-            JavaScriptEngine engine = (JavaScriptEngine) javaScriptEngineFactory.getScriptEngine();
+            if (this.scriptEngineInstance == null || !REUSE_SCRIPT_ENGINE) {
+                JavaScriptEngine engine = (JavaScriptEngine) javaScriptEngineFactory.getScriptEngine();
 
-            engine.setExecutionStrategyFactory(new EntryExecutionStrategyFactory());
+                engine.setExecutionStrategyFactory(entryExecutionStrategy);
+                engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
+                engine.setBindingStrategy(bulkBindingStrategy);
+                engine.setCompilationStrategy(withLibrariesCompilationStrategy);
+                engine.setScriptInterceptorStrategy(scriptWrappingStrategy);
 
-            engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
+                engine.setCompilationOptions(Arrays.asList("-g"));
 
-            engine.setBindingStrategy(new BulkBindingStrategy());
-
-            engine.setCompilationStrategy(withLibrariesCompilationStrategy);
-
-            engine.setScriptInterceptorStrategy(new ScriptWrappingStategy());
-
-            engine.setCompilationOptions(Arrays.asList("-g"));
-
-            return engine;
+                this.scriptEngineInstance = engine;
+                return engine;
+            } else {
+                return scriptEngineInstance;
+            }
         }
         return null;
+    }
+
+    private Map<String, Object> getAdditionalBindings() {
+        RuleManager ruleManager = bundleContext.getService(bundleContext.getServiceReference(RuleManager.class));
+        return Map.of("ruleManager", ruleManager);
     }
 
     // Compiler wants classes in used packages
