@@ -25,7 +25,6 @@ import java.util.stream.Stream;
 
 import javax.script.ScriptEngine;
 
-import org.apache.velocity.exception.VelocityException;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.javascripting.internal.codegeneration.ClassGenerator;
