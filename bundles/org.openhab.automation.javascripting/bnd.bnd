@@ -1,6 +1,8 @@
 Bundle-SymbolicName: ${project.artifactId}
 DynamicImport-Package: *
 Import-Package: \
+javax.measure,\
+javax.measure.quantity,\
 org.openhab.core.audio,\
 org.openhab.core.automation,\
 org.openhab.core.automation.util,\
@@ -14,6 +16,7 @@ org.openhab.core.config.core,\
 org.openhab.core.items,\
 org.openhab.core.library.types,\
 org.openhab.core.library.items,\
+org.openhab.core.library.dimension,\
 org.openhab.core.model.script,\
 org.openhab.core.model.script.actions,\
 org.openhab.core.model.rule,\
@@ -23,4 +26,5 @@ org.openhab.core.thing.binding,\
 org.openhab.core.transform,\
 org.openhab.core.transform.actions,\
 org.openhab.core.types,\
+org.openhab.core.voice,\
 com.google.gson
