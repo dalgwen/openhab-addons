@@ -36,14 +36,20 @@ public class ${simpleClassName} {
             Class<?> thingActionClass = thingActions.getClass();
             Method method = thingActionClass.getMethod("${method.name()}");
 <#if (method.parameterTypes()?size > 0)>
-            method.invoke(thingActions, <#list 1..method.parameterTypes()?size as i>p${i}<#sep>,</#list>);
+            Object returnValue = method.invoke(thingActions, <#list 1..method.parameterTypes()?size as i>p${i}<#sep>,</#list>);
 <#else>
-            method.invoke(thingActions);
+            Object returnValue = method.invoke(thingActions);
 </#if>
+<#if (method.returnValueType() != "void")>
+            return (${method.returnValueType()}) returnValue;
+</#if>            
         } catch (NoSuchMethodException | SecurityException | IllegalAccessException
                 | IllegalArgumentException | InvocationTargetException e) {
             logger.error("Error running action {}", "${method.name()}", e);
         }
+<#if (method.returnValueType() != "void")>
+        return null;
+</#if>  
     }
 
 </#list>
