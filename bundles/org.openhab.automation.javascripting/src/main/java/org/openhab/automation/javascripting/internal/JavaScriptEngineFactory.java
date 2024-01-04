@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
+import freemarker.template.TemplateException;
 
 /**
  * This is an implementation of a {@link ScriptEngineFactory} for Java, based on
@@ -119,7 +120,7 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
             classGenerator.generateItems();
             classGenerator.generateThings();
             classGenerator.generateThingActions();
-        } catch (IOException e) {
+        } catch (IOException | TemplateException e) {
             logger.error("Cannot create helper class file in library dir", e);
         }
 
@@ -214,7 +215,7 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
                 try {
                     if (classGenerator.generateThingActions()) {
                     }
-                } catch (IOException e) {
+                } catch (IOException | TemplateException e) {
                     logger.warn("Failed to (re-)build thing action classes: {}", e.getMessage());
                 }
             }
@@ -222,14 +223,14 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
             logger.debug("Added/updated item: {}", event);
             try {
                 classGenerator.generateItems();
-            } catch (IOException e) {
+            } catch (IOException | TemplateException e) {
                 logger.warn("Failed to (re-)build item class: {}", e.getMessage());
             }
         } else if (THING_EVENTS.contains(eventType)) {
             logger.debug("Added/updated thing: {}", event);
             try {
                 classGenerator.generateThings();
-            } catch (IOException e) {
+            } catch (IOException | TemplateException e) {
                 logger.warn("Failed to (re-)build thing class: {}", e.getMessage());
             }
         }
