@@ -20,6 +20,7 @@ import java.util.Map;
 
 import org.openhab.automation.javascripting.annotation.RuleAnnotationParser;
 import org.openhab.core.audio.AudioManager;
+import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
 import org.openhab.core.automation.module.script.defaultscope.ScriptBusEvent;
@@ -70,6 +71,8 @@ public abstract class Script {
 
     protected Object input;
 
+    protected RuleManager ruleManager;
+
     /**
      * called on the script load
      */
@@ -96,25 +99,27 @@ public abstract class Script {
 
         this.se = (ScriptExtensionManagerWrapper) bindings.get("se");
 
-        ruleSupport = se.importPreset("RuleSupport");
+        this.ruleSupport = se.importPreset("RuleSupport");
 
         this.actions = (ScriptThingActions) bindings.get("actions");
 
         this.events = (ScriptBusEvent) bindings.get("events");
 
-        automationManager = (ScriptedAutomationManager) ruleSupport.get("automationManager");
+        this.automationManager = (ScriptedAutomationManager) ruleSupport.get("automationManager");
 
-        itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
+        this.ruleManager = (RuleManager) bindings.get("ruleManager");
 
-        things = (ThingRegistry) bindings.get("things");
+        this.itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
 
-        voice = (VoiceManager) bindings.get("voice");
+        this.things = (ThingRegistry) bindings.get("things");
 
-        audio = (AudioManager) bindings.get("audio");
+        this.voice = (VoiceManager) bindings.get("voice");
+
+        this.audio = (AudioManager) bindings.get("audio");
 
         // input is set for transformations
 
-        input = bindings.get("input");
+        this.input = bindings.get("input");
     }
 
     /*

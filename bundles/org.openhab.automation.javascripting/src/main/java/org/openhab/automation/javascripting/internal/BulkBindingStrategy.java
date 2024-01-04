@@ -32,8 +32,16 @@ public class BulkBindingStrategy implements BindingStrategy {
 
     private static Logger logger = LoggerFactory.getLogger(BulkBindingStrategy.class);
 
+    private Map<String, Object> additionalBindings;
+
+    public BulkBindingStrategy(Map<String, Object> additionalBindings) {
+        super();
+        this.additionalBindings = additionalBindings;
+    }
+
     @Override
     public void associateBindings(Class<?> compiledClass, Object compiledInstance, Map<String, Object> mergedBindings) {
+        mergedBindings.putAll(additionalBindings);
         if (compiledInstance instanceof Script script) {
             script.setBindings(mergedBindings);
             script.makeShortcuts();
@@ -67,6 +75,8 @@ public class BulkBindingStrategy implements BindingStrategy {
         } else {
             bindings = new HashMap<String, Object>();
         }
+        var bindingsFinal = bindings;
+        additionalBindings.keySet().stream().forEach(k -> bindingsFinal.remove(k));
         return bindings;
     }
 }

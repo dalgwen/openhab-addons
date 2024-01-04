@@ -12,10 +12,10 @@ public class SendMail extends Script {
     protected Object onLoad() {
 
         ThingActions thingActions = actions.get("mail", "mail:smtp:mailSender");
-        invokeActions(thingActions, "mail_at_receiver", "a subject", "mailcontent Java script onload()");
+        invokeAction(thingActions, "mail_at_receiver", "a subject", "mailcontent Java script onload()");
 
         logger.info("mail sent");
-        
+
         return null;
     }
 }
