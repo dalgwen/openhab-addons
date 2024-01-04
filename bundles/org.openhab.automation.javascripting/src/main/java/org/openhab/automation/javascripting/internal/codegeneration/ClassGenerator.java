@@ -32,9 +32,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.apache.velocity.Template;
-import org.apache.velocity.VelocityContext;
-import org.apache.velocity.app.VelocityEngine;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.javascripting.internal.JavaScriptingConstants;
 import org.openhab.core.automation.annotation.RuleAction;
@@ -42,12 +39,19 @@ import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingRegistry;
+import org.openhab.core.thing.UID;
 import org.openhab.core.thing.binding.ThingActions;
 import org.openhab.core.thing.binding.ThingActionsScope;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+import freemarker.template.TemplateExceptionHandler;
+import freemarker.template.TemplateMethodModelEx;
 
 /**
  * The {@link ClassGenerator} is responsible for generating the additional classes for rule development
@@ -68,7 +72,8 @@ public class ClassGenerator {
     private final ItemRegistry itemRegistry;
     private final ThingRegistry thingRegistry;
     private final BundleContext bundleContext;
-    VelocityEngine velocityEngine = new VelocityEngine();
+
+    Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
 
     public ClassGenerator(Path folder, ItemRegistry itemRegistry, ThingRegistry thingRegistry,
             BundleContext bundleContext) throws IOException {
@@ -81,12 +86,13 @@ public class ClassGenerator {
         Path scopeJavaFile = folder.resolve(helperPackageFolderS);
         Files.createDirectories(scopeJavaFile);
 
-        velocityEngine.setProperty("resource.loaders", "customclasspath");
-        velocityEngine.setProperty("resource.loader.customclasspath.class", VelocityResourceLoader.class.getName());
-        velocityEngine.init();
+        cfg.setClassForTemplateLoading(ClassGenerator.class, "/");
+        cfg.setDefaultEncoding("UTF-8");
+        cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
+
     }
 
-    public boolean generateThingActions() throws IOException {
+    public boolean generateThingActions() throws IOException, TemplateException {
         List<ThingActions> thingActions;
         try {
             Set<Class<?>> classes = new HashSet<>();
@@ -102,7 +108,7 @@ public class ClassGenerator {
 
         boolean changed = false;
 
-        Template thingActionTemplate = velocityEngine.getTemplate("/ThingAction.vm");
+        Template template = cfg.getTemplate("/ThingAction.ftl");
 
         for (ThingActions thingAction : thingActions) {
             Class<? extends ThingActions> clazz = thingAction.getClass();
@@ -145,7 +151,7 @@ public class ClassGenerator {
                 methodsDTO.add(methodDTO);
             }
 
-            VelocityContext context = new VelocityContext();
+            Map<String, Object> context = new HashMap<>();
             context.put("packageName", HELPER_PACKAGE);
             context.put("scope", scope);
             context.put("classesToImport", classesToImport);
@@ -153,7 +159,7 @@ public class ClassGenerator {
             context.put("methods", methodsDTO);
 
             StringWriter writer = new StringWriter();
-            thingActionTemplate.merge(context, writer);
+            template.process(context, writer);
 
             if (replaceIfNotEqual(simpleClassName, writer.toString())) {
                 changed = true;
@@ -192,31 +198,33 @@ public class ClassGenerator {
                 : type.getTypeName();
     }
 
-    public void generateItems() throws IOException {
+    public void generateItems() throws IOException, TemplateException {
         Collection<Item> items = itemRegistry.getItems();
 
-        Template t = velocityEngine.getTemplate("/Items.vm");
-        VelocityContext context = new VelocityContext();
+        Template template = cfg.getTemplate("/Items.ftl");
+        Map<String, Object> context = new HashMap<>();
         context.put("HELPER_PACKAGE", HELPER_PACKAGE);
         context.put("items", items);
 
         StringWriter writer = new StringWriter();
-        t.merge(context, writer);
+        template.process(context, writer);
 
         writeHelperFile("Items", writer.toString());
     }
 
-    public void generateThings() throws IOException {
+    public void generateThings() throws IOException, TemplateException {
         Collection<Thing> things = thingRegistry.getAll();
 
-        Template t = velocityEngine.getTemplate("/Things.vm");
-        VelocityContext context = new VelocityContext();
+        Template template = cfg.getTemplate("/Things.ftl");
+        Map<String, Object> context = new HashMap<>();
         context.put("HELPER_PACKAGE", HELPER_PACKAGE);
 
         context.put("things", things);
+        TemplateMethodModelEx tmm = (args) -> escapeName(args);
+        context.put("escapeName", tmm);
 
         StringWriter writer = new StringWriter();
-        t.merge(context, writer);
+        template.process(context, writer);
 
         writeHelperFile("Things", writer.toString());
     }
@@ -230,5 +238,9 @@ public class ClassGenerator {
             outFile.write(generatedClass.getBytes(StandardCharsets.UTF_8));
             logger.debug("Wrote generated class: {}", javaFile.toAbsolutePath());
         }
+    }
+
+    private String escapeName(List<freemarker.ext.beans.StringModel> textToEscape) {
+        return ((UID) (textToEscape.get(0).getWrappedObject())).toString().replace(":", "_").replace("-", "_");
     }
 }
