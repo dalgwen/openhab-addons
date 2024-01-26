@@ -205,6 +205,8 @@ public class ClassGenerator {
         Map<String, Object> context = new HashMap<>();
         context.put("HELPER_PACKAGE", HELPER_PACKAGE);
         context.put("items", items);
+        context.put("itemImports",
+                items.stream().map(item -> item.getClass().getCanonicalName()).collect(Collectors.toSet()));
 
         StringWriter writer = new StringWriter();
         template.process(context, writer);

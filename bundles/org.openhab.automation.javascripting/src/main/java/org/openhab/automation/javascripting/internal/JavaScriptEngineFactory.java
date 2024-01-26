@@ -28,6 +28,7 @@ import javax.script.ScriptEngine;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.javascripting.internal.codegeneration.ClassGenerator;
+import org.openhab.automation.javascripting.internal.codegeneration.DependencyGenerator;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.AbstractScriptEngineFactory;
@@ -103,7 +104,7 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
             .collect(Collectors.toSet());
 
     @Activate
-    public JavaScriptEngineFactory(BundleContext bundleContext,
+    public JavaScriptEngineFactory(BundleContext bundleContext, Map<String, Object> properties,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry) {
 
@@ -116,6 +117,8 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
 
         this.bundleContext = bundleContext;
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
+
+        String additionalBundlesConfig = (String) properties.getOrDefault("additionalBundles", "");
 
         osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
             @Override
@@ -134,6 +137,7 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
             classGenerator.generateItems();
             classGenerator.generateThings();
             classGenerator.generateThingActions();
+            new DependencyGenerator().createCoreDependencies(LIB_DIR, additionalBundlesConfig, bundleContext);
         } catch (IOException | TemplateException e) {
             logger.error("Cannot create helper class file in library dir. " + e.getMessage());
         }
