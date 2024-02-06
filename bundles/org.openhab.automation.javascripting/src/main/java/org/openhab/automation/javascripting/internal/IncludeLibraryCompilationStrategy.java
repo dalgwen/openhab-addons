@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.script.ScriptException;
 import javax.tools.JavaFileObject;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
- * With this strategy, we compile the script alongside previously registered libraries
+ * With this strategy, we compile the script alongside registered libraries
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -66,7 +67,8 @@ public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
     }
 
     @Override
-    public List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource) {
+    public List<JavaFileObject> getJavaFileObjectsToCompile(@Nullable String simpleClassName,
+            @Nullable String currentSource) {
         JavaFileObject currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName,
                 currentSource);
         List<JavaFileObject> sumFileObjects = new ArrayList<>(keepCompilingMap.values());
@@ -75,6 +77,6 @@ public class IncludeLibraryCompilationStrategy implements CompilationStrategy {
     }
 
     @Override
-    public void compilationResult(Class<?> clazz) {
+    public void compilationResult(@Nullable Class<?> clazz) {
     }
 }

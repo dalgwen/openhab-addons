@@ -18,24 +18,41 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingUID;
+import org.openhab.core.thing.events.ThingStatusInfoChangedEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ThingStatusChange implements EventInfo {
+public class ThingStatusChange extends EventInfo {
 
     @Nullable
-    public ThingUID thingUID;
+    protected final ThingUID thingUID;
     @Nullable
-    public ThingStatus previousStatus;
+    protected final ThingStatus oldStatus;
     @Nullable
-    public ThingStatus status;
+    protected final ThingStatus newStatus;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.thingUID = (ThingUID) inputs.get("thingUID");
-        this.previousStatus = (ThingStatus) inputs.get("previousStatus");
-        this.status = (ThingStatus) inputs.get("status");
+    public ThingStatusChange(Map<String, ?> inputs) {
+        super(inputs);
+        ThingStatusInfoChangedEvent event = (ThingStatusInfoChangedEvent) shouldNotBeNull("event");
+        this.thingUID = shouldNotBeNull(event.getThingUID(), "event.thingUID");
+        this.oldStatus = (ThingStatus) shouldNotBeNull("oldStatus");
+        this.newStatus = (ThingStatus) shouldNotBeNull("newStatus");
+    }
+
+    @Nullable
+    public ThingUID getThingUID() {
+        return thingUID;
+    }
+
+    @Nullable
+    public ThingStatus getOldStatus() {
+        return oldStatus;
+    }
+
+    @Nullable
+    public ThingStatus getNewStatus() {
+        return newStatus;
     }
 }

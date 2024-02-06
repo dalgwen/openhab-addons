@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
 @Repeatable(ChannelEventTriggers.class)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface ChannelEventTrigger {
-    String id();
+    String id() default "";
 
     String channelUID();
 

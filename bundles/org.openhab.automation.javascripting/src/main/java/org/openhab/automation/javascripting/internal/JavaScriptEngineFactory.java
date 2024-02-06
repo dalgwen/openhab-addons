@@ -27,6 +27,7 @@ import javax.script.ScriptEngine;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.javascripting.common.JavaScriptingConstants;
 import org.openhab.automation.javascripting.internal.codegeneration.ClassGenerator;
 import org.openhab.automation.javascripting.internal.codegeneration.DependencyGenerator;
 import org.openhab.core.OpenHAB;
@@ -36,6 +37,7 @@ import org.openhab.core.automation.module.script.ScriptEngineFactory;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
 import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.items.MetadataRegistry;
 import org.openhab.core.items.events.ItemAddedEvent;
 import org.openhab.core.items.events.ItemRemovedEvent;
 import org.openhab.core.service.WatchService;
@@ -55,7 +57,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
-import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
@@ -83,14 +84,16 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
     private ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory javaScriptEngineFactory;
     private IncludeLibraryCompilationStrategy withLibrariesCompilationStrategy;
     private PackageResourceListingStrategy osgiPackageResourceListingStrategy;
-    private BindingStrategy bulkBindingStrategy;
+    private BulkBindingStrategy bulkBindingStrategy;
     private ExecutionStrategyFactory entryExecutionStrategy;
     private ScriptInterceptorStrategy scriptWrappingStrategy;
 
     private final WatchService watchService;
 
+    @Nullable
     private ClassGenerator classGenerator;
 
+    @Nullable
     private JavaScriptEngine scriptEngineInstance;
 
     private static final boolean REUSE_SCRIPT_ENGINE = true;
@@ -133,10 +136,15 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
         scriptWrappingStrategy = new ScriptWrappingStategy();
 
         try {
-            this.classGenerator = new ClassGenerator(LIB_DIR, itemRegistry, thingRegistry, bundleContext);
-            classGenerator.generateItems();
-            classGenerator.generateThings();
-            classGenerator.generateThingActions();
+            ClassGenerator localClassGenerator = new ClassGenerator(LIB_DIR, itemRegistry, thingRegistry,
+                    bundleContext);
+            this.classGenerator = localClassGenerator;
+            String itemClass = localClassGenerator.generateItems();
+            bulkBindingStrategy.setLibraryClassList("Items", List.of(itemClass));
+            String thingClass = localClassGenerator.generateThings();
+            bulkBindingStrategy.setLibraryClassList("Things", List.of(thingClass));
+            List<String> thingActionsClasses = localClassGenerator.generateThingActions();
+            bulkBindingStrategy.setLibraryClassList("Actions", thingActionsClasses);
             new DependencyGenerator().createCoreDependencies(LIB_DIR, additionalBundlesConfig, bundleContext);
         } catch (IOException | TemplateException e) {
             logger.error("Cannot create helper class file in library dir. " + e.getMessage());
@@ -186,7 +194,10 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
 
     private Map<String, Object> getAdditionalBindings() {
         RuleManager ruleManager = bundleContext.getService(bundleContext.getServiceReference(RuleManager.class));
-        return Map.of("ruleManager", ruleManager);
+        MetadataRegistry metadataRegistry = bundleContext
+                .getService(bundleContext.getServiceReference(MetadataRegistry.class));
+        return Map.of(JavaScriptingConstants.RULE_MANAGER, ruleManager, JavaScriptingConstants.METADATA_REGISTRY,
+                metadataRegistry);
     }
 
     // Compiler wants classes in used packages
@@ -230,16 +241,22 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
     @Override
     public void receive(Event event) {
         String eventType = event.getType();
+
+        ClassGenerator localClassGenerator = classGenerator;
+        if (localClassGenerator == null) {
+            logger.error("Cannot use the class generator, as its initialization was in error");
+            return;
+        }
+
         if (ACTION_EVENTS.contains(eventType)) {
             ThingStatusInfoChangedEvent event1 = (ThingStatusInfoChangedEvent) event;
             if ((ThingStatus.INITIALIZING.equals(event1.getOldStatusInfo().getStatus())
                     && INITIALIZED.contains(event1.getStatusInfo().getStatus()))
                     || (ThingStatus.UNINITIALIZED.equals(event1.getStatusInfo().getStatus())
                             && INITIALIZED.contains(event1.getOldStatusInfo().getStatus()))) {
-                // only regenerate jar if things are changing to or from an initialized
                 try {
-                    if (classGenerator.generateThingActions()) {
-                    }
+                    List<@NonNull String> generateThingActions = localClassGenerator.generateThingActions();
+                    bulkBindingStrategy.setLibraryClassList("Actions", generateThingActions);
                 } catch (IOException | TemplateException e) {
                     logger.warn("Failed to (re-)build thing action classes: {}", e.getMessage());
                 }
@@ -247,14 +264,16 @@ public class JavaScriptEngineFactory extends AbstractScriptEngineFactory
         } else if (ITEM_EVENTS.contains(eventType)) {
             logger.debug("Added/updated item: {}", event);
             try {
-                classGenerator.generateItems();
+                String itemClassName = localClassGenerator.generateItems();
+                bulkBindingStrategy.setLibraryClassList("Items", List.of(itemClassName));
             } catch (IOException | TemplateException e) {
                 logger.warn("Failed to (re-)build item class: {}", e.getMessage());
             }
         } else if (THING_EVENTS.contains(eventType)) {
             logger.debug("Added/updated thing: {}", event);
             try {
-                classGenerator.generateThings();
+                String thingsClassName = localClassGenerator.generateThings();
+                bulkBindingStrategy.setLibraryClassList("Things", List.of(thingsClassName));
             } catch (IOException | TemplateException e) {
                 logger.warn("Failed to (re-)build thing class: {}", e.getMessage());
             }

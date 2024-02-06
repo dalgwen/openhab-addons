@@ -1,14 +1,17 @@
 package ${HELPER_PACKAGE};
 
-import org.openhab.core.items.Item;
-import org.openhab.automation.javascripting.scriptsupport.Script;
+import java.util.Map;
 import org.openhab.automation.javascripting.scriptsupport.JavaScriptingException;
+import org.openhab.core.items.Item;
+import org.openhab.core.items.ItemRegistry;
 
 <#list itemImports as itemImport>
 import ${itemImport};
 </#list>
 
-public class Items extends Script {
+public class Items {
+
+    private static ItemRegistry itemRegistry;
 
 <#list items as item>
 <#if item.getLabel()??>
@@ -18,17 +21,24 @@ public class Items extends Script {
 
 </#list>
 
+    public static void setBindings(Map<String, ?> bindings) {
+        Items.itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
+    }
+
 <#list items as item>
 <#if item.getLabel()??>
     /** $item.getLabel() */
 </#if>
-    public ${item.getClass().getSimpleName()} ${item.getName()}() {
-        if (itemRegistry != null) {
-            return (${item.getClass().getCanonicalName()}) itemRegistry.get( ${item.getName()} );
-        } else {
-            throw new JavaScriptingException("Things class not properly initialized. Use injection with the @Library annotation in your custom script");
-        }
+    public static ${item.getClass().getSimpleName()} ${item.getName()}() {
+        return (${item.getClass().getSimpleName()}) getItem(${item.getName()});
     }
 
 </#list>
+    protected static Item getItem(String itemId) {
+        if (itemRegistry != null) {
+            return itemRegistry.get(NewItem);
+        } else {
+            throw new JavaScriptingException("Items class not properly initialized");
+        }
+    }
 }

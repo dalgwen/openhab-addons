@@ -10,24 +10,23 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
+package org.openhab.automation.javascripting.scriptsupport;
 
-package org.openhab.automation.javascripting.annotation;
+import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
+ * A script class that can be executed
+ *
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class RuleParserException extends Exception {
+public interface Scriptable {
 
-    private static final long serialVersionUID = 5744217657057910494L;
+    @Nullable
+    Object eval() throws Exception;
 
-    RuleParserException(String message, Throwable e) {
-        super(message, e);
-    }
-
-    RuleParserException(String message) {
-        super(message);
-    }
+    void setBindings(Map<String, Object> mergedBindings);
 }

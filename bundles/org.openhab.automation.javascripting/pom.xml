@@ -27,6 +27,13 @@
             <version>2.3.32</version>
             <scope>compile</scope>
         </dependency>
+        <!-- jdt annotation classes are included because we want to be able to export them to the dependencies jar -->
+        <dependency>
+            <groupId>org.eclipse.jdt</groupId>
+            <artifactId>org.eclipse.jdt.annotation</artifactId>
+            <version>2.2.600</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 

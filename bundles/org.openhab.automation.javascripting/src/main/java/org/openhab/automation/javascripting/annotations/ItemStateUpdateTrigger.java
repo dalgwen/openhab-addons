@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
 @Repeatable(ItemStateUpdateTriggers.class)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface ItemStateUpdateTrigger {
-    String id();
+    String id() default "";
 
     String item();
 

@@ -26,7 +26,8 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface Rule {
-    String name();
+
+    String name() default "";
 
     String description() default "";
 }

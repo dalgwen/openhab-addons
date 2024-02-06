@@ -29,6 +29,7 @@ import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.wiring.BundleWiring;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * @author Jan N. Klug - Initial contribution
  * @author Gwendal Roulleau
  */
+@NonNullByDefault
 public class DependencyGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyGenerator.class);
@@ -56,7 +58,8 @@ public class DependencyGenerator {
             "org.openhab.core.persistence", "org.openhab.core.persistence.extensions", "org.openhab.core.thing",
             "org.openhab.core.thing.binding", "org.openhab.core.transform", "org.openhab.core.transform.actions",
             "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson",
-            "org.openhab.automation.javascripting.annotations", "org.openhab.automation.javascripting.scriptsupport");
+            "org.openhab.automation.javascripting.annotations", "org.openhab.automation.javascripting.scriptsupport",
+            "org.openhab.automation.javascripting.eventinfo", "org.eclipse.jdt.annotation");
 
     public Set<String> dependencies = new HashSet<>();
 
@@ -84,9 +87,30 @@ public class DependencyGenerator {
                 }
             }
 
+            exportJdtNullAnnotation(target);
+
             target.close();
         } catch (IOException e) {
             logger.warn("Failed to create dependencies jar in '{}': {}", libDir, e.getMessage());
+        }
+    }
+
+    private void exportJdtNullAnnotation(JarOutputStream target) {
+
+        List<String> classesToExtract = List.of("org.eclipse.jdt.annotation.NonNull",
+                "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable");
+        for (String classToExtract : classesToExtract) {
+            String path = classToExtract.replaceAll("\\.", "/") + ".class";
+            try (InputStream stream = this.getClass().getClassLoader().getResourceAsStream(path)) {
+                if (stream != null) {
+                    addEntryToJar(target, path, 0, stream);
+                } else {
+                    logger.warn("InputStream {} from classpath is null", classToExtract);
+                }
+            } catch (IOException e) {
+                logger.warn("Failed to copy null annotation classes '{}' from classpath : {}", classToExtract,
+                        e.getMessage());
+            }
         }
     }
 
@@ -118,7 +142,9 @@ public class DependencyGenerator {
                             if (urlEntry == null) {
                                 logger.warn("URL for {} is empty, skipping", classFile);
                             } else {
-                                addEntryToJar(target, classFile, 0, urlEntry.openStream());
+                                try (InputStream stream = urlEntry.openStream()) {
+                                    addEntryToJar(target, classFile, 0, stream);
+                                }
                             }
                         }
                     } catch (IOException e) {

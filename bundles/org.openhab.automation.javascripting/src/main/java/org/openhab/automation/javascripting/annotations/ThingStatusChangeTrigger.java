@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
 @Repeatable(ThingStatusChangeTriggers.class)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface ThingStatusChangeTrigger {
-    String id();
+    String id() default "";
 
     String thingUID();
 
