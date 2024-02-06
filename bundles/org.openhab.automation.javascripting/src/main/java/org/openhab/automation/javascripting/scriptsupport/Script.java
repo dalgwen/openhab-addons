@@ -13,70 +13,73 @@
 package org.openhab.automation.javascripting.scriptsupport;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import org.openhab.automation.javascripting.annotation.RuleAnnotationParser;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.javascripting.common.JavaScriptingConstants;
+import org.openhab.automation.javascripting.ruleparser.RuleAnnotationParser;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.automation.RuleManager;
-import org.openhab.core.automation.Trigger;
+import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
 import org.openhab.core.automation.module.script.defaultscope.ScriptBusEvent;
 import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
-import org.openhab.core.automation.util.TriggerBuilder;
-import org.openhab.core.config.core.Configuration;
 import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.items.MetadataRegistry;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.binding.ThingActions;
+import org.openhab.core.types.State;
 import org.openhab.core.voice.VoiceManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base Class for all Java Scripts
  *
  * @author Jürgen Weber - Initial contribution
  */
+@NonNullByDefault
+public abstract class Script implements Scriptable {
 
-public abstract class Script {
+    protected Logger logger = Logger.getLogger(this.getClass());
 
-    protected static Logger logger = LoggerFactory.getLogger(Script.class);
+    protected @NonNullByDefault({}) Map<String, Object> bindings;
 
-    protected Map<String, Object> bindings;
+    // default preset
+    protected @NonNullByDefault({}) Map<String, State> items;
+    protected @NonNullByDefault({}) ItemRegistry ir;
+    protected @NonNullByDefault({}) ItemRegistry itemRegistry;
+    protected @NonNullByDefault({}) ThingRegistry things;
+    protected @NonNullByDefault({}) RuleRegistry rules;
+    protected @NonNullByDefault({}) ScriptBusEvent events;
+    protected @NonNullByDefault({}) ScriptThingActions actions;
+    protected @NonNullByDefault({}) ScriptExtensionManagerWrapper scriptExtension;
+    protected @NonNullByDefault({}) ScriptExtensionManagerWrapper se;
+    protected @NonNullByDefault({}) VoiceManager voice;
+    protected @NonNullByDefault({}) AudioManager audio;
 
-    protected ScriptedAutomationManager automationManager;
+    // RuleSupport preset
+    protected @NonNullByDefault({}) Map<String, Object> ruleSupport;
+    protected @NonNullByDefault({}) ScriptedAutomationManager automationManager;
 
-    protected ScriptThingActions actions;
+    // some static shortcut
+    protected OnOffType ON = OnOffType.ON;
+    protected OnOffType OFF = OnOffType.OFF;
 
-    protected ScriptBusEvent events;
+    // for transformation support
+    protected @Nullable Object input;
 
-    protected ScriptExtensionManagerWrapper se;
-
-    protected Map<String, Object> ruleSupport;
-
-    protected String ON = "ON";
-    protected String OFF = "OFF";
-
-    protected ItemRegistry itemRegistry;
-
-    protected ThingRegistry things;
-
-    protected VoiceManager voice;
-
-    protected AudioManager audio;
-
-    protected Object input;
-
-    protected RuleManager ruleManager;
+    // additional useful class :
+    protected @NonNullByDefault({}) RuleManager ruleManager;
+    protected @NonNullByDefault({}) MetadataRegistry metadataRegistry;
 
     /**
      * called on the script load
      */
-    public Object eval() throws Exception {
+    @Override
+    public @Nullable Object eval() throws Exception {
 
         logger.trace("eval()");
 
@@ -85,48 +88,46 @@ public abstract class Script {
             Object result;
 
             result = onLoad();
-            parseAnnotations();
+            RuleAnnotationParser.parse(this, automationManager);
 
             return result;
 
         } catch (Exception e) {
-            logger.error("Script eval", e);
+            logger.error("Script eval error", e);
             throw e;
         }
-    }
-
-    public void makeShortcuts() {
-
-        this.se = (ScriptExtensionManagerWrapper) bindings.get("se");
-
-        this.ruleSupport = se.importPreset("RuleSupport");
-
-        this.actions = (ScriptThingActions) bindings.get("actions");
-
-        this.events = (ScriptBusEvent) bindings.get("events");
-
-        this.automationManager = (ScriptedAutomationManager) ruleSupport.get("automationManager");
-
-        this.ruleManager = (RuleManager) bindings.get("ruleManager");
-
-        this.itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
-
-        this.things = (ThingRegistry) bindings.get("things");
-
-        this.voice = (VoiceManager) bindings.get("voice");
-
-        this.audio = (AudioManager) bindings.get("audio");
-
-        // input is set for transformations
-
-        this.input = bindings.get("input");
     }
 
     /*
      * called by JavaRuleEngine before eval()
      */
+    @Override
     public void setBindings(Map<String, Object> bindings) {
         this.bindings = bindings;
+
+        // default presets
+        this.items = (Map<String, State>) bindings.get("items");
+        this.itemRegistry = (ItemRegistry) bindings.get("itemRegistry");
+        this.ir = itemRegistry;
+        this.things = (ThingRegistry) bindings.get("things");
+        this.rules = (RuleRegistry) bindings.get("rules");
+        this.events = (ScriptBusEvent) bindings.get("events");
+        this.actions = (ScriptThingActions) bindings.get("actions");
+        this.scriptExtension = (ScriptExtensionManagerWrapper) bindings.get("scriptExtension");
+        this.se = scriptExtension;
+        this.voice = (VoiceManager) bindings.get("voice");
+        this.audio = (AudioManager) bindings.get("audio");
+
+        // automatically import the additional rulesupport preset to get the automation manager and make simple rules
+        this.ruleSupport = scriptExtension.importPreset("RuleSupport");
+        this.automationManager = (ScriptedAutomationManager) ruleSupport.get("automationManager");
+
+        // input is set for transformations
+        this.input = bindings.get("input");
+
+        // retrieve other custom bindings injected by the JavaScriptEngineFactory
+        this.ruleManager = (RuleManager) bindings.get(JavaScriptingConstants.RULE_MANAGER);
+        this.metadataRegistry = (MetadataRegistry) bindings.get(JavaScriptingConstants.METADATA_REGISTRY);
     }
 
     /*
@@ -136,262 +137,18 @@ public abstract class Script {
         return bindings;
     }
 
-    // to be implemented by the concrete script class
-    protected Object onLoad() {
+    // hook for the concrete script class to be called after initialization
+    protected @Nullable Object onLoad() {
         return null;
     }
 
-    private void parseAnnotations() throws Exception {
-        new RuleAnnotationParser(this).parse();
-    }
-
-    // Utility methods
-    // very inspired by pravussum's groovy rules
-    // https://community.openhab.org/t/examples-for-groovy-scripts/131121/9
-    public Trigger createSystemStartlevelTrigger(String triggerId, String startlevel) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("startlevel", startlevel);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.SystemStartlevelTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createGenericCronTrigger(String triggerId, String cronExpression) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("cronExpression", cronExpression);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("timer.GenericCronTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateChangeTrigger(String triggerId, String itemName) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateChangeTrigger(String triggerId, String itemName, String newState) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-        configuration.put("state", newState);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateChangeTrigger(String triggerId, String itemName, String previousState,
-            String newState) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-        configuration.put("previousState", previousState);
-        configuration.put("state", newState);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateUpdateTrigger(String triggerId, String itemName) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateUpdateTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateUpdateTrigger(String triggerId, String itemName, String state) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-        configuration.put("command", state);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateUpdateTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemStateUpdateTrigger(String triggerId, String itemName, String previousState,
-            String newState) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-        configuration.put("previousState", previousState);
-        configuration.put("state", newState);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemStateUpdateTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createItemCommandTrigger(String triggerId, String itemName, String command) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("itemName", itemName);
-        configuration.put("command", command);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ItemCommandTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createChannelEventTrigger(String triggerId, String channelUID) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("channelUID", channelUID);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ChannelEventTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    public Trigger createThingChangeTrigger(String triggerId, String thingUID) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusChangeTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createThingChangeTrigger(String triggerId, String thingUID, String status) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-        configuration.put("status", status);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusChangeTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createThingChangeTrigger(String triggerId, String thingUID, String status, String previousStatus) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-        configuration.put("status", status);
-        configuration.put("previousStatus", previousStatus);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusChangeTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createThingUpdateTrigger(String triggerId, String thingUID) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusUpdateTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createThingUpdateTrigger(String triggerId, String thingUID, String status) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-        configuration.put("status", status);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusUpdateTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createThingUpdateTrigger(String triggerId, String thingUID, String status, String previousStatus) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("thingUID", thingUID);
-        configuration.put("status", status);
-        configuration.put("previousStatus", previousStatus);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ThingStatusUpdateTrigger").withConfiguration(new Configuration(configuration))
-                .build();
-
-        return trigger;
-    }
-
-    public Trigger createChannelEventTrigger(String triggerId, String channelUID, String event) {
-
-        Map<String, Object> configuration = new HashMap<String, Object>();
-        configuration.put("channelUID", channelUID);
-        configuration.put("event", event);
-
-        Trigger trigger = TriggerBuilder.create().withLabel(triggerId).withId(triggerId)
-                .withTypeUID("core.ChannelEventTrigger").withConfiguration(new Configuration(configuration)).build();
-
-        return trigger;
-    }
-
-    protected static class RuleBuilder {
-
-        private ScriptedAutomationManager automationManager;
-        private SimpleRule sr = null;
-        private List<Trigger> triggers = new ArrayList<Trigger>();
-        private String name;
-
-        private RuleBuilder(ScriptedAutomationManager automationManager, SimpleRule sr) {
-            this.automationManager = automationManager;
-            this.sr = sr;
-        }
-
-        public RuleBuilder withName(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public RuleBuilder withTrigger(Trigger trigger) {
-            triggers.add(trigger);
-            return this;
-        }
-
-        public RuleBuilder withTriggers(List<Trigger> triggers) {
-            this.triggers.addAll(triggers);
-            return this;
-        }
-
-        public void activate() {
-            sr.setName(name);
-            sr.setTriggers(triggers);
-            automationManager.addRule(sr);
-        }
-    }
-
+    /**
+     * Helper method to call action. You should use the dedicated generated class if possible
+     *
+     * @param thingActions
+     * @param method
+     * @param params
+     */
     public void invokeAction(ThingActions thingActions, String method, Object... params) {
         Class<?>[] paramClasses = new Class<?>[params.length];
 
@@ -407,11 +164,7 @@ public abstract class Script {
         }
     }
 
-    protected RuleBuilder ruleBuilder(SimpleRule sr) {
-        return new RuleBuilder(automationManager, sr);
-    }
-
-    public void activateRule(String name, SimpleRule sr, List<Trigger> triggers) {
-        ruleBuilder(sr).withName(name).withTriggers(triggers).activate();
+    protected RuleBuilder getNewRuleBuilder(SimpleRule sr, String name) {
+        return new RuleBuilder(automationManager);
     }
 }

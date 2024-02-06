@@ -16,25 +16,42 @@ import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.items.events.ItemStateChangedEvent;
 import org.openhab.core.types.State;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ItemStateChange implements EventInfo {
+public class ItemStateChange extends EventInfo {
 
     @Nullable
-    public String itemName;
+    protected final String itemName;
     @Nullable
-    public State previousState;
+    protected final State oldState;
     @Nullable
-    public State state;
+    protected final State newState;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.itemName = (String) inputs.get("itemName");
-        this.previousState = (State) inputs.get("previousState");
-        this.state = (State) inputs.get("state");
+    public ItemStateChange(Map<String, ?> inputs) {
+        super(inputs);
+        ItemStateChangedEvent event = (ItemStateChangedEvent) shouldNotBeNull("event");
+        this.itemName = shouldNotBeNull(event.getItemName(), "event.itemName");
+        this.oldState = (State) shouldNotBeNull("oldState");
+        this.newState = (State) shouldNotBeNull("newState");
+    }
+
+    @Nullable
+    public String getItemName() {
+        return itemName;
+    }
+
+    @Nullable
+    public State getOldState() {
+        return oldState;
+    }
+
+    @Nullable
+    public State getNewState() {
+        return newState;
     }
 }

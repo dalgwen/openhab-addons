@@ -18,21 +18,33 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingUID;
+import org.openhab.core.thing.events.ThingStatusInfoEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ThingStatusUpdate implements EventInfo {
+public class ThingStatusUpdate extends EventInfo {
 
     @Nullable
-    public ThingUID thingUID;
+    protected final ThingUID thingUID;
     @Nullable
-    public ThingStatus status;
+    protected final ThingStatus status;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.thingUID = (ThingUID) inputs.get("thingUID");
-        this.status = (ThingStatus) inputs.get("status");
+    public ThingStatusUpdate(Map<String, ?> inputs) {
+        super(inputs);
+        ThingStatusInfoEvent event = (ThingStatusInfoEvent) shouldNotBeNull("event");
+        this.thingUID = shouldNotBeNull(event.getThingUID(), "event.thingUID");
+        this.status = (ThingStatus) shouldNotBeNull("status");
+    }
+
+    @Nullable
+    public ThingUID getThingUID() {
+        return thingUID;
+    }
+
+    @Nullable
+    public ThingStatus getStatus() {
+        return status;
     }
 }

@@ -28,9 +28,9 @@ import java.lang.annotation.Target;
 @Repeatable(ItemCommandTriggers.class)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface ItemCommandTrigger {
-    String id();
+    String id() default "";
 
     String item();
 
-    String command();
+    String command() default "";
 }

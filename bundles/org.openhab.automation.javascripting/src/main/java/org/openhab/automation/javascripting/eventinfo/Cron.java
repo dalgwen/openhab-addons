@@ -16,18 +16,25 @@ import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.automation.events.TimerEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class Cron implements EventInfo {
+public class Cron extends EventInfo {
 
     @Nullable
-    public String cronExpression;
+    protected final String cronId;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.cronExpression = (String) inputs.get("cronExpression");
+    public Cron(Map<String, ?> inputs) {
+        super(inputs);
+        TimerEvent timerEvent = (TimerEvent) shouldNotBeNull("event");
+        this.cronId = shouldNotBeNull(timerEvent.getSource(), "event.source");
+    }
+
+    @Nullable
+    public String getCronId() {
+        return cronId;
     }
 }

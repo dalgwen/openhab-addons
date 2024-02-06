@@ -16,22 +16,34 @@ import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.items.events.ItemCommandEvent;
 import org.openhab.core.types.Command;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ItemCommand implements EventInfo {
+public class ItemCommand extends EventInfo {
 
     @Nullable
-    public String itemName;
+    protected final String itemName;
     @Nullable
-    public Command command;
+    protected final Command command;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.itemName = (String) inputs.get("itemName");
-        this.command = (Command) inputs.get("command");
+    public ItemCommand(Map<String, ?> inputs) {
+        super(inputs);
+        ItemCommandEvent event = (ItemCommandEvent) shouldNotBeNull("event");
+        this.itemName = shouldNotBeNull(event.getItemName(), "event.itemName");
+        this.command = (Command) shouldNotBeNull("command");
+    }
+
+    @Nullable
+    public String getItemName() {
+        return itemName;
+    }
+
+    @Nullable
+    public Command getCommand() {
+        return command;
     }
 }

@@ -11,7 +11,7 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
-package org.openhab.automation.javascripting.annotation;
+package org.openhab.automation.javascripting.ruleparser;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -43,14 +43,15 @@ public class SimpleMethodRule extends SimpleRule {
         this.method = method;
 
         Parameter[] parameters = method.getParameters();
-        if (parameters.length != 1) {
-            throw new RuleParserException("We should have only one argument in method " + method.getName());
+        if (parameters.length > 1) {
+            throw new RuleParserException("We should have at max one argument in method " + method.getName());
         }
 
         Parameter parameter = parameters[0];
         this.eventInfoType = parameter.getType();
         if (!EventInfo.class.isAssignableFrom(eventInfoType) && !Map.class.isAssignableFrom(eventInfoType)) {
-            throw new RuleParserException("Argument of method " + method.getName() + "must be a map or an EventInfo");
+            throw new RuleParserException(
+                    "Argument of method " + method.getName() + "must be null, a map or an EventInfo");
         }
     }
 
@@ -60,13 +61,16 @@ public class SimpleMethodRule extends SimpleRule {
         try {
             Object methodParameter = inputs;
             if (EventInfo.class.isAssignableFrom(eventInfoType)) {
-                methodParameter = eventInfoType.getDeclaredConstructor().newInstance();
-                ((EventInfo) methodParameter).fill(inputs);
+                methodParameter = eventInfoType.getDeclaredConstructor(Map.class).newInstance(inputs);
             }
-            returnObject = method.invoke(script, methodParameter);
+            if (method.getParameters().length == 0) {
+                returnObject = method.invoke(script);
+            } else {
+                returnObject = method.invoke(script, methodParameter);
+            }
         } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | InstantiationException
                 | NoSuchMethodException | SecurityException e) {
-            logger.error("Cannot execute rule {}", method.getName(), e);
+            logger.error("Cannot execute method named \"{}\" (rule trigger {})", method.getName(), module.getId(), e);
         }
         return returnObject == null ? "" : returnObject;
     }

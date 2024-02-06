@@ -13,16 +13,23 @@
 
 package org.openhab.automation.javascripting.internal;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
 import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.automation.javascripting.scriptsupport.Script;
+import org.openhab.automation.javascripting.scriptsupport.Scriptable;
 
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
 
 /**
+ * Run a java file by searching a suitable entry point
+ * Suitable entry point are the following method : eval, main, run,
+ *
  * @author Jürgen Weber - Initial contribution
  */
 @NonNullByDefault
@@ -32,7 +39,6 @@ public class EntryExecutionStrategyFactory implements ExecutionStrategyFactory {
 
     @Override
     public ExecutionStrategy create(@Nullable Class<?> clazz) throws ScriptException {
-
         return scriptExecutionStrategy;
     }
 
@@ -40,19 +46,37 @@ public class EntryExecutionStrategyFactory implements ExecutionStrategyFactory {
 
         @Override
         public @Nullable Object execute(@Nullable Object instance) throws ScriptException {
+            if (instance == null) {
+                throw new ScriptException("Cannot run null class/instance");
+            }
             try {
-                if (instance instanceof Script) {
-                    Script script = (Script) instance;
+                if (instance instanceof Scriptable script) {
                     return script.eval();
                 } else {
-                    String simpleName = instance == null ? "unknown" : instance.getClass().getSimpleName();
-                    throw new ScriptException(
-                            String.format("cannot execute: %s not instance of %s", simpleName, Script.class.getName()));
+                    return searchAndRunEntryPointByReflection(instance);
                 }
-
             } catch (Exception e) {
                 throw new ScriptException(e);
             }
+        }
+
+        @Nullable
+        private static Object searchAndRunEntryPointByReflection(Object instance) throws ScriptException {
+            for (String methodName : Arrays.asList("eval", "main", "run")) {
+                try {
+                    Method evalMethod = instance.getClass().getMethod(methodName);
+                    return evalMethod.invoke(instance);
+                } catch (NoSuchMethodException nse) {
+                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                    String simpleName = instance.getClass().getSimpleName();
+                    throw new ScriptException(
+                            String.format("Error executing entry point %s in %s", methodName, simpleName, e));
+                }
+            }
+            String simpleName = instance.getClass().getSimpleName();
+            throw new ScriptException(
+                    String.format("cannot execute: %s not instance of %s or didn't have an eval method", simpleName,
+                            Scriptable.class.getName()));
         }
     }
 }

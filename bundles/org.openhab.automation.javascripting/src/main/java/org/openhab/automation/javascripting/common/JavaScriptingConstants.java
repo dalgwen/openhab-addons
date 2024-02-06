@@ -10,25 +10,19 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.automation.javascripting.eventinfo;
-
-import java.util.Map;
+package org.openhab.automation.javascripting.common;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.osgi.service.startlevel.StartLevel;
 
 /**
- * @author Gwendal Roulleau - Initial contribution
+ *
+ * @author Gwendal Roulleau - initial contribution
+ *
  */
 @NonNullByDefault
-public class System implements EventInfo {
+public class JavaScriptingConstants {
 
-    @Nullable
-    public StartLevel startLevel;
-
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.startLevel = (StartLevel) inputs.get("startLevel");
-    }
+    public static final String JAVA_FILE_TYPE = "java";
+    public static final String METADATA_REGISTRY = "metadataRegistry";
+    public static final String RULE_MANAGER = "ruleManager";
 }

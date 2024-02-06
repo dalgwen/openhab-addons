@@ -21,16 +21,27 @@ import org.eclipse.jdt.annotation.Nullable;
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ChannelEvent implements EventInfo {
+public class ChannelEvent extends EventInfo {
 
     @Nullable
-    public String channelUUID;
+    protected final String channelUUID;
     @Nullable
-    public String event;
+    protected final String event;
 
-    @Override
-    public void fill(Map<String, ?> inputs) {
-        this.channelUUID = (String) inputs.get("channelUUID");
-        this.event = (String) inputs.get("event");
+    public ChannelEvent(Map<String, ?> inputs) {
+        super(inputs);
+        this.event = (String) shouldNotBeNull("event");
+        this.channelUUID = (String) shouldNotBeNull("channelUUID");
     }
+
+    @Nullable
+    public String getChannelUUID() {
+        return channelUUID;
+    }
+
+    @Nullable
+    public String getEvent() {
+        return event;
+    }
+
 }

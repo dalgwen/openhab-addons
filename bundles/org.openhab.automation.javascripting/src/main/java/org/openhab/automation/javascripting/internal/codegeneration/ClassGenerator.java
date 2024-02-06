@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,7 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.openhab.automation.javascripting.internal.JavaScriptingConstants;
+import org.openhab.automation.javascripting.common.JavaScriptingConstants;
 import org.openhab.core.automation.annotation.RuleAction;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
@@ -57,7 +58,7 @@ import freemarker.template.TemplateMethodModelEx;
  * The {@link ClassGenerator} is responsible for generating the additional classes for rule development
  *
  * @author Jan N. Klug - Initial contribution
- * @author Gwendal Roulleau - Refactor using velocity
+ * @author Gwendal Roulleau - Refactor using freemarker
  */
 @NonNullByDefault
 public class ClassGenerator {
@@ -66,7 +67,7 @@ public class ClassGenerator {
 
     private final Logger logger = LoggerFactory.getLogger(ClassGenerator.class);
 
-    private final Map<String, String> scopeClasses = new HashMap<>();
+    private final Map<String, String> generatedClasses = new HashMap<>();
 
     private final Path folder;
     private final ItemRegistry itemRegistry;
@@ -89,10 +90,9 @@ public class ClassGenerator {
         cfg.setClassForTemplateLoading(ClassGenerator.class, "/");
         cfg.setDefaultEncoding("UTF-8");
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-
     }
 
-    public boolean generateThingActions() throws IOException, TemplateException {
+    public List<String> generateThingActions() throws IOException, TemplateException {
         List<ThingActions> thingActions;
         try {
             Set<Class<?>> classes = new HashSet<>();
@@ -101,25 +101,22 @@ public class ClassGenerator {
                     .collect(Collectors.toList());
         } catch (InvalidSyntaxException e) {
             logger.warn("Failed to get thing actions: {}", e.getMessage());
-            return false;
+            return Collections.emptyList();
         }
-
-        Set<String> scopes = new HashSet<>();
-
-        boolean changed = false;
 
         Template template = cfg.getTemplate("/ThingAction.ftl");
 
+        List<String> packageAndClassNameList = new ArrayList<>();
         for (ThingActions thingAction : thingActions) {
             Class<? extends ThingActions> clazz = thingAction.getClass();
 
             String packageName = clazz.getPackageName();
 
-            String scope = clazz.getAnnotation(ThingActionsScope.class).name().toString();
-            if (scope == null) {
-                logger.warn("Found ThingActions class '{}' but no scope, ignoring", clazz.getName());
+            ThingActionsScope scopeAnnotation = clazz.getAnnotation(ThingActionsScope.class);
+            if (scopeAnnotation == null) {
                 continue;
             }
+            String scope = scopeAnnotation.name().toString();
 
             String simpleClassName = scope.substring(0, 1).toUpperCase() + scope.substring(1, scope.length())
                     + clazz.getSimpleName();
@@ -135,7 +132,7 @@ public class ClassGenerator {
 
             for (Method method : methods) {
                 String name = method.getName();
-                String returnValue = method.getGenericReturnType().getTypeName();
+                String returnValue = lastName(method.getGenericReturnType().getTypeName());
 
                 classesToImport.addAll(
                         Arrays.asList(method.getParameterTypes()).stream().map(pt -> classToImport(pt)).toList());
@@ -161,17 +158,22 @@ public class ClassGenerator {
             StringWriter writer = new StringWriter();
             template.process(context, writer);
 
-            if (replaceIfNotEqual(simpleClassName, writer.toString())) {
-                changed = true;
-            }
+            packageAndClassNameList.add(HELPER_PACKAGE + "." + simpleClassName);
+
+            replaceIfNotEqual(simpleClassName, writer.toString());
         }
 
-        return changed;
+        return packageAndClassNameList;
+    }
+
+    private String lastName(String fullName) {
+        int lastDotIndex = fullName.lastIndexOf('.');
+        return lastDotIndex == -1 ? fullName : fullName.substring(lastDotIndex + 1);
     }
 
     private boolean replaceIfNotEqual(String className, String generatedClass) throws IOException {
         String key = HELPER_PACKAGE + "." + className;
-        if (!generatedClass.equals(scopeClasses.put(key, generatedClass))) {
+        if (!generatedClass.equals(generatedClasses.put(key, generatedClass))) {
             writeHelperFile(className, generatedClass);
             return true;
         } else {
@@ -194,11 +196,12 @@ public class ClassGenerator {
 
     private String typeToParameter(Type type) {
         return type instanceof GenericArrayType
-                ? Objects.requireNonNull(((GenericArrayType) type).getGenericComponentType()).getTypeName() + "[]"
-                : type.getTypeName();
+                ? lastName(Objects.requireNonNull(((GenericArrayType) type).getGenericComponentType()).getTypeName())
+                        + "[]"
+                : lastName(type.getTypeName());
     }
 
-    public void generateItems() throws IOException, TemplateException {
+    public String generateItems() throws IOException, TemplateException {
         Collection<Item> items = itemRegistry.getItems();
 
         Template template = cfg.getTemplate("/Items.ftl");
@@ -211,10 +214,11 @@ public class ClassGenerator {
         StringWriter writer = new StringWriter();
         template.process(context, writer);
 
-        writeHelperFile("Items", writer.toString());
+        replaceIfNotEqual("Items", writer.toString());
+        return HELPER_PACKAGE + ".Items";
     }
 
-    public void generateThings() throws IOException, TemplateException {
+    public String generateThings() throws IOException, TemplateException {
         Collection<Thing> things = thingRegistry.getAll();
 
         Template template = cfg.getTemplate("/Things.ftl");
@@ -228,7 +232,8 @@ public class ClassGenerator {
         StringWriter writer = new StringWriter();
         template.process(context, writer);
 
-        writeHelperFile("Things", writer.toString());
+        replaceIfNotEqual("Things", writer.toString());
+        return HELPER_PACKAGE + ".Things";
     }
 
     private void writeHelperFile(String className, String generatedClass) throws IOException {

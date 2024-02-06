@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
 @Repeatable(SystemTriggers.class)
 @Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface SystemTrigger {
-    String id();
+    String id() default "";
 
     String startlevel();
 }

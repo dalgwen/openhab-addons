@@ -10,18 +10,24 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.automation.javascripting.internal.codegeneration;
 
-import java.util.List;
+package org.openhab.automation.javascripting.ruleparser;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * A DTO passing method data to the freemarker template
- *
- * @author Gwendal Roulleau - Refactor using velocity
+ * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
+public class RuleParserException extends Exception {
 
+    private static final long serialVersionUID = 5744217657057910494L;
+
+    RuleParserException(String message, Throwable e) {
+        super(message, e);
+    }
+
+    RuleParserException(String message) {
+        super(message);
+    }
 }
