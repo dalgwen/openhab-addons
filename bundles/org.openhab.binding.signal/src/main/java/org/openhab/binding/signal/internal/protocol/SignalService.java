@@ -78,7 +78,7 @@ public class SignalService {
 
     private static final String SIGNAL_DIRECTORY = "signal";
     private static final int MAX_BACKOFF_COUNTER = 9;
-    private static final String USER_AGENT = "Signal-Android/5.51.7 signal-cli";
+    private static final String USER_AGENT = "Signal-Android/6.46.0 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
     private static final ServiceEnvironment SERVICE_ENVIRONMENT = ServiceEnvironment.LIVE;
 
