@@ -43,6 +43,11 @@
 				<description>Received by SMS or vocal message upon ongoing registration.</description>
 				<default></default>
 			</parameter>
+			<parameter name="userAgent" type="text" required="false">
+			     <label>User Agent</label>
+			     <description>Overwrite the user agent sent to Signal Server</description>
+			     <advanced>true</advanced>
+			</parameter>
 		</config-description>
 	</bridge-type>
 
