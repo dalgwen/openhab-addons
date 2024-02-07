@@ -114,7 +114,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
                 : ProvisionType.MAIN;
         try {
             this.signalService = new SignalService(this, this, config.phoneNumber, config.captcha,
-                    config.verificationCode, config.verificationCodeMethod, config.deviceName, provisionType);
+                    config.verificationCode, config.verificationCodeMethod, config.deviceName, provisionType,
+                    config.userAgent);
         } catch (IOException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Error during initialization : " + e.getMessage());
