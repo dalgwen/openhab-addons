@@ -143,6 +143,8 @@ When using the linked bridge thing, you can use the special recipient "self" to 
 
 If you want notification when sending message to your own account, use the send action with your full number.
 
+Each "send" action returns a map with one key : "RESULT", which has either "OK" or "KO" as a value.
+
 ## Full Example
 
 ### Thing configuration
