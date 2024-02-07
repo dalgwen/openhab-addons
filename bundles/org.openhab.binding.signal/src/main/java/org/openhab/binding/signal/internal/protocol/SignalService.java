@@ -78,7 +78,7 @@ public class SignalService {
 
     private static final String SIGNAL_DIRECTORY = "signal";
     private static final int MAX_BACKOFF_COUNTER = 9;
-    private static final String USER_AGENT = "Signal-Android/6.46.0 signal-cli";
+    public static final String DEFAULT_USER_AGENT = "Signal-Android/6.46.0 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
     private static final ServiceEnvironment SERVICE_ENVIRONMENT = ServiceEnvironment.LIVE;
 
@@ -111,8 +111,8 @@ public class SignalService {
 
     public SignalService(MessageListener messageListener, StateListener connectionStateListener, String phoneNumber,
             @Nullable String captcha, @Nullable String verificationCode,
-            @Nullable RegistrationType verificationCodeMethod, String deviceName, ProvisionType provisionType)
-            throws IOException {
+            @Nullable RegistrationType verificationCodeMethod, String deviceName, ProvisionType provisionType,
+            @Nullable String userAgent) throws IOException {
         this.messageListener = messageListener;
         this.connectionStateListener = connectionStateListener;
         this.phoneNumber = phoneNumber;
@@ -123,12 +123,13 @@ public class SignalService {
                 : verificationCodeMethod;
         this.deviceName = deviceName;
         this.provisionType = provisionType;
+        String resovedUserAgent = userAgent != null && !userAgent.isBlank() ? userAgent : DEFAULT_USER_AGENT;
 
         initializeLock.lock(); // class wide lock. init this just once :
         try {
             if (signalAccountsFiles == null) {
                 signalAccountsFiles = new SignalAccountFiles(new File(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY),
-                        SERVICE_ENVIRONMENT, USER_AGENT, SETTINGS);
+                        SERVICE_ENVIRONMENT, resovedUserAgent, SETTINGS);
             }
         } finally {
             initializeLock.unlock();

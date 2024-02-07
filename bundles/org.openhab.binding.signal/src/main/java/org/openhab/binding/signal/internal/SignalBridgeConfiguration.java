@@ -14,6 +14,7 @@ package org.openhab.binding.signal.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.signal.internal.protocol.RegistrationType;
+import org.openhab.binding.signal.internal.protocol.SignalService;
 
 /**
  * The {@link SignalBridgeConfiguration} class contains fields mapping bridge configuration parameters.
@@ -28,6 +29,7 @@ public class SignalBridgeConfiguration {
     public String captcha = "";
     public RegistrationType verificationCodeMethod = RegistrationType.PhoneCall;
     public String verificationCode = "";
+    public String userAgent = SignalService.DEFAULT_USER_AGENT;
 
     // linked bridge configuration
     public String deviceName = "";

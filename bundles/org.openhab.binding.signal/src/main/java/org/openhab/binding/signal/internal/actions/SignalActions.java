@@ -12,9 +12,13 @@
  */
 package org.openhab.binding.signal.internal.actions;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.handler.SignalBridgeHandler;
+import org.openhab.binding.signal.internal.protocol.DeliveryReport;
 import org.openhab.core.automation.annotation.ActionInput;
 import org.openhab.core.automation.annotation.RuleAction;
 import org.openhab.core.thing.binding.ThingActions;
@@ -47,41 +51,70 @@ public class SignalActions implements ThingActions {
     }
 
     @RuleAction(label = "Send Message With Signal", description = "Send a message with Signal")
-    public void sendSignal(
+    public Map<String, Object> sendSignal(
             @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
             @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
+        Map<String, Object> resultMap = new HashMap<>();
         if (recipient != null && !recipient.isEmpty() && message != null) {
-            handler.send(recipient, message);
+            DeliveryReport report = handler.send(recipient, message);
+            switch (report.deliveryStatus) {
+                case DELIVERED:
+                case READ:
+                case SENT:
+                    resultMap.put("RESULT", "OK");
+                    break;
+                case FAILED:
+                case UNKNOWN:
+                    resultMap.put("RESULT", "KO");
+                    break;
+            }
         } else {
+            resultMap.put("RESULT", "KO");
             logger.error("Signal cannot send a message with no recipient or text");
         }
+        return resultMap;
     }
 
-    public static void sendSignal(@Nullable ThingActions actions, @Nullable String recipient,
+    public static Map<String, Object> sendSignal(@Nullable ThingActions actions, @Nullable String recipient,
             @Nullable String message) {
         if (actions instanceof SignalActions) {
-            ((SignalActions) actions).sendSignal(recipient, message);
+            return ((SignalActions) actions).sendSignal(recipient, message);
         } else {
             throw new IllegalArgumentException("Instance is not an SignalActions class.");
         }
     }
 
     @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
-    public void sendSignalImage(
+    public Map<String, Object> sendSignalImage(
             @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
             @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
             @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
+        Map<String, Object> resultMap = new HashMap<>();
+
         if (recipient != null && !recipient.isEmpty() && image != null) {
-            handler.sendImage(recipient, image, text);
+            DeliveryReport report = handler.sendImage(recipient, image, text);
+            switch (report.deliveryStatus) {
+                case DELIVERED:
+                case READ:
+                case SENT:
+                    resultMap.put("RESULT", "OK");
+                    break;
+                case FAILED:
+                case UNKNOWN:
+                    resultMap.put("RESULT", "KO");
+                    break;
+            }
         } else {
             logger.error("Signal cannot send a photo with no recipient or text");
+            resultMap.put("RESULT", "KO");
         }
+        return resultMap;
     }
 
-    public static void sendSignalImage(@Nullable ThingActions actions, @Nullable String recipient,
+    public static Map<String, Object> sendSignalImage(@Nullable ThingActions actions, @Nullable String recipient,
             @Nullable String image, @Nullable String text) {
         if (actions instanceof SignalActions) {
-            ((SignalActions) actions).sendSignalImage(recipient, image, text);
+            return ((SignalActions) actions).sendSignalImage(recipient, image, text);
         } else {
             throw new IllegalArgumentException("Instance is not an SignalActions class.");
         }
