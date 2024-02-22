@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.transform.multilongpress.profiles;
+package org.openhab.transform.timedevent.profiles;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -39,17 +39,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Profile to offer the MultiLongPressProfile on an ItemChannelLink
+ * Profile to offer the timedeventProfile on an ItemChannelLink
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
-public class MultiLongPressProfile implements TriggerProfile, StateProfile {
+public class TimedEventMultiAndLongProfile extends TimedEventProfile implements TriggerProfile, StateProfile {
 
-    private final Logger logger = LoggerFactory.getLogger(MultiLongPressProfile.class);
+    private final Logger logger = LoggerFactory.getLogger(TimedEventMultiAndLongProfile.class);
 
     public static final ProfileTypeUID PROFILE_TYPE_UID = new ProfileTypeUID(
-            TransformationService.TRANSFORM_PROFILE_SCOPE, "multilongpress-to-string");
+            TransformationService.TRANSFORM_PROFILE_SCOPE, "timedevent");
     public static final String PARAM_HAS_RELEASEEVENT = "hasReleaseEvent";
     public static final String PARAM_BUTTON1_NAME = "button1";
     public static final String PARAM_BUTTON2_NAME = "button2";
@@ -83,7 +83,7 @@ public class MultiLongPressProfile implements TriggerProfile, StateProfile {
             Set.of(CommonTriggerEvents.DIR1_RELEASED, CommonTriggerEvents.RELEASED, OnOffType.OFF.toString(),
                     OpenClosedType.CLOSED.toString(), PlayPauseType.PAUSE.toString(), UpDownType.DOWN.toString()));
 
-    MultiLongPressProfile(ProfileCallback callback, ProfileContext context) {
+    TimedEventMultiAndLongProfile(ProfileCallback callback, ProfileContext context) {
         this.callback = callback;
         this.context = context;
 

@@ -2,7 +2,7 @@
 # Multi / Long Press Transformation Service
 
 Transforms button press to a detailed character string. Handle multi press and long press.
-Long press is available only for devices that can send another event besides the "activation" event. This second event can be a standard "release" event, or even an "off" event if you want to use a switch as this.
+Long press is available only for devices that can send another event besides the "activation" event. This second event can be a standard "release" event, or even an "off" event if you want to use a switch for this.
 
 Consult this table to see what this profile can do:
 

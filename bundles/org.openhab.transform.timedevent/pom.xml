@@ -6,11 +6,11 @@
   <parent>
     <groupId>org.openhab.addons.bundles</groupId>
     <artifactId>org.openhab.addons.reactor.bundles</artifactId>
-    <version>4.1.0-SNAPSHOT</version>
+    <version>4.2.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>org.openhab.transform.multilongpress</artifactId>
+  <artifactId>org.openhab.transform.timedevent</artifactId>
 
-  <name>openHAB Add-ons :: Bundles :: Profile Service :: multilongpress</name>
+  <name>openHAB Add-ons :: Bundles :: Profile Service :: timedevent</name>
 
 </project>

@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.transform.multilongpress.profiles;
+package org.openhab.transform.timedevent.profiles;
 
 import java.util.Collection;
 import java.util.List;
@@ -36,37 +36,37 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * {@link ProfileFactory} that creates the transformation profile for the {@link MultiLongPressProfile}.
+ * {@link ProfileFactory} that creates the transformation profile for the {@link TimedEventMultiAndLongProfile}.
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
 @Component(service = { ProfileFactory.class, ProfileTypeProvider.class })
-public class MultiLongPressProfileFactory implements ProfileFactory, ProfileTypeProvider, ProfileAdvisor {
+public class TimedEventProfileFactory implements ProfileFactory, ProfileTypeProvider, ProfileAdvisor {
 
     private ChannelTypeRegistry channelTypeRegistry;
 
     @Activate
-    public MultiLongPressProfileFactory(final @Reference ChannelTypeRegistry channelTypeRegistry) {
+    public TimedEventProfileFactory(final @Reference ChannelTypeRegistry channelTypeRegistry) {
         this.channelTypeRegistry = channelTypeRegistry;
     }
 
     @Override
     public Collection<ProfileType> getProfileTypes(@Nullable Locale locale) {
         return List.of(ProfileTypeBuilder
-                .newTrigger(MultiLongPressProfile.PROFILE_TYPE_UID, "Button Press to Multi / Long Press String")
+                .newTrigger(TimedEventMultiAndLongProfile.PROFILE_TYPE_UID, "Button Press to Multi / Long Press String")
                 .build());
     }
 
     @Override
     public @Nullable Profile createProfile(ProfileTypeUID profileTypeUID, ProfileCallback callback,
             ProfileContext profileContext) {
-        return new MultiLongPressProfile(callback, profileContext);
+        return new TimedEventMultiAndLongProfile(callback, profileContext);
     }
 
     @Override
     public Collection<ProfileTypeUID> getSupportedProfileTypeUIDs() {
-        return List.of(MultiLongPressProfile.PROFILE_TYPE_UID);
+        return List.of(TimedEventMultiAndLongProfile.PROFILE_TYPE_UID);
     }
 
     @Override
@@ -75,7 +75,7 @@ public class MultiLongPressProfileFactory implements ProfileFactory, ProfileType
         if (channelType == null || !CoreItemFactory.STRING.equalsIgnoreCase(itemType)) {
             return null;
         }
-        return MultiLongPressProfile.PROFILE_TYPE_UID;
+        return TimedEventMultiAndLongProfile.PROFILE_TYPE_UID;
     }
 
     @Override
