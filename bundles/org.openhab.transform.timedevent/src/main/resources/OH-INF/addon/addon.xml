@@ -4,9 +4,8 @@
 	xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
 
 	<type>transformation</type>
-	<name>Multiple And Long Press On Button</name>
-	<description>Transform button presses to a detailed String with occurrence information. Handle multiple press, or long
-		press.</description>
+	<name>Timed Event</name>
+	<description>Several profiles using time to transform inputs (long press, multi press, debounce)</description>
 	<connection>local</connection>
 
 </addon:addon>
