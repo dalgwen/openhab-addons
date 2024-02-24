@@ -34,6 +34,7 @@ import org.asamk.signal.manager.api.RecipientIdentifier;
 import org.asamk.signal.manager.api.SendGroupMessageResults;
 import org.asamk.signal.manager.api.SendMessageResults;
 import org.asamk.signal.manager.api.StickerPack;
+import org.asamk.signal.manager.api.StickerPackId;
 import org.asamk.signal.manager.api.StickerPackInvalidException;
 import org.asamk.signal.manager.api.StickerPackUrl;
 import org.asamk.signal.manager.api.TypingAction;
@@ -41,6 +42,7 @@ import org.asamk.signal.manager.api.UnregisteredRecipientException;
 import org.asamk.signal.manager.api.UpdateGroup;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.api.UserStatus;
+import org.asamk.signal.manager.api.UsernameLinkUrl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
@@ -88,7 +90,12 @@ public interface Manager extends Closeable {
      */
     Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException, RateLimitException;
 
-    void updateAccountAttributes(String deviceName) throws IOException;
+    void updateAccountAttributes(
+            String deviceName,
+            Boolean unrestrictedUnidentifiedSender,
+            final Boolean discoverableByNumber,
+            final Boolean numberSharing
+    ) throws IOException;
 
     Configuration getConfiguration();
 
@@ -100,11 +107,15 @@ public interface Manager extends Closeable {
      */
     void updateProfile(UpdateProfile updateProfile) throws IOException;
 
+    String getUsername();
+
+    UsernameLinkUrl getUsernameLink();
+
     /**
      * Set a username for the account.
      * If the username is null, it will be deleted.
      */
-    String setUsername(String username) throws IOException, InvalidUsernameException;
+    void setUsername(String username) throws IOException, InvalidUsernameException;
 
     /**
      * Set a username for the account.
@@ -167,7 +178,7 @@ public interface Manager extends Closeable {
     );
 
     SendMessageResults sendMessage(
-            Message message, Set<RecipientIdentifier> recipients
+            Message message, Set<RecipientIdentifier> recipients, boolean notifySelf
     ) throws IOException, AttachmentInvalidException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException, InvalidStickerException;
 
     SendMessageResults sendEditMessage(
@@ -192,6 +203,12 @@ public interface Manager extends Closeable {
     ) throws IOException;
 
     SendMessageResults sendEndSessionMessage(Set<RecipientIdentifier.Single> recipients) throws IOException;
+
+    SendMessageResults sendMessageRequestResponse(
+            MessageEnvelope.Sync.MessageRequestResponse.Type type, Set<RecipientIdentifier> recipientIdentifiers
+    );
+
+    void hideRecipient(RecipientIdentifier.Single recipient);
 
     void deleteRecipient(RecipientIdentifier.Single recipient);
 
@@ -255,6 +272,8 @@ public interface Manager extends Closeable {
             Optional<Duration> timeout, Optional<Integer> maxMessages, ReceiveMessageHandler handler
     ) throws IOException, AlreadyReceivingException;
 
+    void stopReceiveMessages();
+
     void setReceiveConfig(ReceiveConfig receiveConfig);
 
     boolean isContactBlocked(RecipientIdentifier.Single recipient);
@@ -297,6 +316,14 @@ public interface Manager extends Closeable {
     void addClosedListener(Runnable listener);
 
     InputStream retrieveAttachment(final String id) throws IOException;
+
+    InputStream retrieveContactAvatar(final RecipientIdentifier.Single recipient) throws IOException, UnregisteredRecipientException;
+
+    InputStream retrieveProfileAvatar(final RecipientIdentifier.Single recipient) throws IOException, UnregisteredRecipientException;
+
+    InputStream retrieveGroupAvatar(final GroupId groupId) throws IOException;
+
+    InputStream retrieveSticker(final StickerPackId stickerPackId, final int stickerId) throws IOException;
 
     @Override
     void close();

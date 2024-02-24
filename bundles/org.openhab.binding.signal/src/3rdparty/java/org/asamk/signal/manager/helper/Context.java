@@ -9,7 +9,7 @@ import org.asamk.signal.manager.storage.stickerPacks.StickerPackStore;
 
 import java.util.function.Supplier;
 
-public class Context {
+public class Context implements AutoCloseable {
 
     private final Object LOCK = new Object();
 
@@ -80,7 +80,7 @@ public class Context {
         return attachmentStore;
     }
 
-    JobExecutor getJobExecutor() {
+    public JobExecutor getJobExecutor() {
         return jobExecutor;
     }
 
@@ -168,6 +168,11 @@ public class Context {
             creator.call();
             return supplier.get();
         }
+    }
+
+    @Override
+    public void close() {
+        jobExecutor.close();
     }
 
     private interface Callable {

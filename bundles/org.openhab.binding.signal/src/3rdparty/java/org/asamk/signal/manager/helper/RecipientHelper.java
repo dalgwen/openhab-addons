@@ -2,6 +2,7 @@ package org.asamk.signal.manager.helper;
 
 import org.asamk.signal.manager.api.RecipientIdentifier;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
+import org.asamk.signal.manager.api.UsernameLinkUrl;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.internal.SignalDependencies;
 import org.asamk.signal.manager.storage.SignalAccount;
@@ -29,7 +30,7 @@ import static org.asamk.signal.manager.config.ServiceConfig.MAXIMUM_ONE_OFF_REQU
 
 public class RecipientHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(RecipientHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(RecipientHelper.class);
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -89,10 +90,23 @@ public class RecipientHelper {
                 }
             });
         } else if (recipient instanceof RecipientIdentifier.Username usernameRecipient) {
-            final var username = usernameRecipient.username();
-            return account.getRecipientStore().resolveRecipientByUsername(username, () -> {
+            var username = usernameRecipient.username();
+            try {
+                UsernameLinkUrl usernameLinkUrl = UsernameLinkUrl.fromUri(username);
+                final var components = usernameLinkUrl.getComponents();
+                final var encryptedUsername = dependencies.getAccountManager()
+                        .getEncryptedUsernameFromLinkServerId(components.getServerId());
+                final var link = new Username.UsernameLink(components.getEntropy(), encryptedUsername);
+
+                username = Username.fromLink(link).getUsername();
+            } catch (UsernameLinkUrl.InvalidUsernameLinkException e) {
+            } catch (IOException | BaseUsernameException e) {
+                throw new RuntimeException(e);
+            }
+            final String finalUsername = username;
+            return account.getRecipientStore().resolveRecipientByUsername(finalUsername, () -> {
                 try {
-                    return getRegisteredUserByUsername(username);
+                    return getRegisteredUserByUsername(finalUsername);
                 } catch (Exception e) {
                     return null;
                 }
@@ -144,11 +158,15 @@ public class RecipientHelper {
     private Map<String, RegisteredUser> getRegisteredUsers(
             final Set<String> numbers, final boolean isPartialRefresh
     ) throws IOException {
-        Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, isPartialRefresh, true);
+        Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, isPartialRefresh);
 
         // Store numbers as recipients, so we have the number/uuid association
         registeredUsers.forEach((number, u) -> account.getRecipientTrustedResolver()
                 .resolveRecipientTrusted(u.aci, u.pni, Optional.of(number)));
+
+        final var unregisteredUsers = new HashSet<>(numbers);
+        unregisteredUsers.removeAll(registeredUsers.keySet());
+        account.getRecipientStore().markUnregistered(unregisteredUsers);
 
         return registeredUsers;
     }
@@ -168,7 +186,7 @@ public class RecipientHelper {
     }
 
     private Map<String, RegisteredUser> getRegisteredUsersV2(
-            final Set<String> numbers, boolean isPartialRefresh, boolean useCompat
+            final Set<String> numbers, boolean isPartialRefresh
     ) throws IOException {
         final var previousNumbers = isPartialRefresh ? Set.<String>of() : account.getCdsiStore().getAllNumbers();
         final var newNumbers = new HashSet<>(numbers) {{
@@ -192,7 +210,6 @@ public class RecipientHelper {
                     .getRegisteredUsersWithCdsi(previousNumbers,
                             newNumbers,
                             account.getRecipientStore().getServiceIdToProfileKeyMap(),
-                            useCompat,
                             token,
                             serviceEnvironmentConfig.cdsiMrenclave(),
                             null,

@@ -2,14 +2,17 @@ package org.asamk.signal.manager.helper;
 
 import org.asamk.signal.manager.api.Contact;
 import org.asamk.signal.manager.api.GroupId;
+import org.asamk.signal.manager.api.MessageEnvelope.Sync.MessageRequestResponse;
 import org.asamk.signal.manager.api.TrustLevel;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.groups.GroupInfoV1;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
+import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.asamk.signal.manager.storage.stickers.StickerPack;
 import org.asamk.signal.manager.util.AttachmentUtils;
 import org.asamk.signal.manager.util.IOUtils;
 import org.asamk.signal.manager.util.MimeUtils;
+import org.jetbrains.annotations.NotNull;
 import org.signal.libsignal.protocol.IdentityKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +29,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroup;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroupsInputStream;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroupsOutputStream;
 import org.whispersystems.signalservice.api.messages.multidevice.KeysMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.MessageRequestResponseMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.StickerPackOperationMessage;
@@ -47,7 +51,7 @@ import java.util.stream.Stream;
 
 public class SyncHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(SyncHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(SyncHelper.class);
 
     private final Context context;
     private final SignalAccount account;
@@ -77,6 +81,11 @@ public class SyncHelper {
     public SendMessageResult sendSyncFetchProfileMessage() {
         return context.getSendHelper()
                 .sendSyncMessage(SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.LOCAL_PROFILE));
+    }
+
+    public void sendSyncFetchStorageMessage() {
+        context.getSendHelper()
+                .sendSyncMessage(SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.STORAGE_MANIFEST));
     }
 
     public void sendGroups() throws IOException {
@@ -133,42 +142,17 @@ public class SyncHelper {
                 for (var contactPair : account.getContactStore().getContacts()) {
                     final var recipientId = contactPair.first();
                     final var contact = contactPair.second();
-                    final var address = context.getRecipientHelper().resolveSignalServiceAddress(recipientId);
+                    final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
 
-                    var currentIdentity = account.getIdentityKeyStore().getIdentityInfo(address.getServiceId());
-                    VerifiedMessage verifiedMessage = null;
-                    if (currentIdentity != null) {
-                        verifiedMessage = new VerifiedMessage(address,
-                                currentIdentity.getIdentityKey(),
-                                currentIdentity.getTrustLevel().toVerifiedState(),
-                                currentIdentity.getDateAddedTimestamp());
-                    }
-
-                    var profileKey = account.getProfileStore().getProfileKey(recipientId);
-                    out.write(new DeviceContact(address,
-                            Optional.ofNullable(contact.getName()),
-                            createContactAvatarAttachment(new RecipientAddress(address)),
-                            Optional.ofNullable(contact.getColor()),
-                            Optional.ofNullable(verifiedMessage),
-                            Optional.ofNullable(profileKey),
-                            contact.isBlocked(),
-                            Optional.of(contact.getMessageExpirationTime()),
-                            Optional.empty(),
-                            contact.isArchived()));
+                    out.write(getDeviceContact(address, recipientId, contact));
                 }
 
                 if (account.getProfileKey() != null) {
                     // Send our own profile key as well
-                    out.write(new DeviceContact(account.getSelfAddress(),
-                            Optional.empty(),
-                            Optional.empty(),
-                            Optional.empty(),
-                            Optional.empty(),
-                            Optional.of(account.getProfileKey()),
-                            false,
-                            Optional.empty(),
-                            Optional.empty(),
-                            false));
+                    final var address = account.getSelfRecipientAddress();
+                    final var recipientId = account.getSelfRecipientId();
+                    final var contact = account.getContactStore().getContact(recipientId);
+                    out.write(getDeviceContact(address, recipientId, contact));
                 }
             }
 
@@ -192,6 +176,35 @@ public class SyncHelper {
                 logger.warn("Failed to delete contacts temp file “{}”, ignoring: {}", contactsFile, e.getMessage());
             }
         }
+    }
+
+    @NotNull
+    private DeviceContact getDeviceContact(
+            final RecipientAddress address, final RecipientId recipientId, final Contact contact
+    ) throws IOException {
+        var currentIdentity = address.serviceId().isEmpty()
+                ? null
+                : account.getIdentityKeyStore().getIdentityInfo(address.serviceId().get());
+        VerifiedMessage verifiedMessage = null;
+        if (currentIdentity != null) {
+            verifiedMessage = new VerifiedMessage(address.toSignalServiceAddress(),
+                    currentIdentity.getIdentityKey(),
+                    currentIdentity.getTrustLevel().toVerifiedState(),
+                    currentIdentity.getDateAddedTimestamp());
+        }
+
+        var profileKey = account.getProfileStore().getProfileKey(recipientId);
+        return new DeviceContact(address.aci(),
+                address.number(),
+                Optional.ofNullable(contact == null ? null : contact.getName()),
+                createContactAvatarAttachment(address),
+                Optional.ofNullable(contact == null ? null : contact.color()),
+                Optional.ofNullable(verifiedMessage),
+                Optional.ofNullable(profileKey),
+                contact != null && contact.isBlocked(),
+                Optional.ofNullable(contact == null ? null : contact.messageExpirationTime()),
+                Optional.empty(),
+                contact != null && contact.isArchived());
     }
 
     public SendMessageResult sendBlockedList() {
@@ -222,7 +235,7 @@ public class SyncHelper {
     }
 
     public SendMessageResult sendKeysMessage() {
-        var keysMessage = new KeysMessage(Optional.ofNullable(account.getStorageKey()),
+        var keysMessage = new KeysMessage(Optional.ofNullable(account.getOrCreateStorageKey()),
                 Optional.ofNullable(account.getOrCreatePinMasterKey()));
         return context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forKeys(keysMessage));
     }
@@ -310,16 +323,21 @@ public class SyncHelper {
                     throw e;
                 }
             }
-            if (c == null) {
+            if (c == null || (c.getAci().isEmpty() && c.getE164().isEmpty())) {
                 break;
             }
-            if (c.getAddress().matches(account.getSelfAddress()) && c.getProfileKey().isPresent()) {
+            final var address = new RecipientAddress(c.getAci(), Optional.empty(), c.getE164(), Optional.empty());
+            if (address.matches(account.getSelfRecipientAddress()) && c.getProfileKey().isPresent()) {
                 account.setProfileKey(c.getProfileKey().get());
             }
-            final var recipientId = account.getRecipientTrustedResolver().resolveRecipientTrusted(c.getAddress());
+            final var recipientId = account.getRecipientTrustedResolver().resolveRecipientTrusted(address);
             var contact = account.getContactStore().getContact(recipientId);
             final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
-            if (c.getName().isPresent()) {
+            if (c.getName().isPresent() && (
+                    contact == null || (
+                            contact.givenName() == null && contact.familyName() == null
+                    )
+            )) {
                 builder.withGivenName(c.getName().get());
                 builder.withFamilyName(null);
             }
@@ -339,14 +357,37 @@ public class SyncHelper {
             if (c.getExpirationTimer().isPresent()) {
                 builder.withMessageExpirationTime(c.getExpirationTimer().get());
             }
-            builder.withBlocked(c.isBlocked());
-            builder.withArchived(c.isArchived());
+            builder.withIsBlocked(c.isBlocked());
+            builder.withIsArchived(c.isArchived());
             account.getContactStore().storeContact(recipientId, builder.build());
 
             if (c.getAvatar().isPresent()) {
-                downloadContactAvatar(c.getAvatar().get(), new RecipientAddress(c.getAddress()));
+                downloadContactAvatar(c.getAvatar().get(), address);
             }
         }
+    }
+
+    public SendMessageResult sendMessageRequestResponse(
+            final MessageRequestResponse.Type type, final GroupId groupId
+    ) {
+        final var response = MessageRequestResponseMessage.forGroup(groupId.serialize(), localToRemoteType(type));
+        return context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forMessageRequestResponse(response));
+    }
+
+    public SendMessageResult sendMessageRequestResponse(
+            final MessageRequestResponse.Type type, final RecipientId recipientId
+    ) {
+        final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
+        if (address.serviceId().isEmpty()) {
+            return null;
+        }
+        context.getContactHelper()
+                .setContactProfileSharing(recipientId,
+                        type == MessageRequestResponse.Type.ACCEPT
+                                || type == MessageRequestResponse.Type.UNBLOCK_AND_ACCEPT);
+        final var response = MessageRequestResponseMessage.forIndividual(address.serviceId().get(),
+                localToRemoteType(type));
+        return context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forMessageRequestResponse(response));
     }
 
     private SendMessageResult requestSyncData(final SyncMessage.Request.Type type) {
@@ -372,5 +413,18 @@ public class SyncHelper {
         } catch (IOException e) {
             logger.warn("Failed to download avatar for contact {}, ignoring: {}", address, e.getMessage());
         }
+    }
+
+    private MessageRequestResponseMessage.Type localToRemoteType(final MessageRequestResponse.Type type) {
+        return switch (type) {
+            case UNKNOWN -> MessageRequestResponseMessage.Type.UNKNOWN;
+            case ACCEPT -> MessageRequestResponseMessage.Type.ACCEPT;
+            case DELETE -> MessageRequestResponseMessage.Type.DELETE;
+            case BLOCK -> MessageRequestResponseMessage.Type.BLOCK;
+            case BLOCK_AND_DELETE -> MessageRequestResponseMessage.Type.BLOCK_AND_DELETE;
+            case UNBLOCK_AND_ACCEPT -> MessageRequestResponseMessage.Type.UNBLOCK_AND_ACCEPT;
+            case SPAM -> MessageRequestResponseMessage.Type.SPAM;
+            case BLOCK_AND_SPAM -> MessageRequestResponseMessage.Type.BLOCK_AND_SPAM;
+        };
     }
 }

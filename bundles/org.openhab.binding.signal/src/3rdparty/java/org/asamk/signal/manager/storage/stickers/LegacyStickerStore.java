@@ -5,17 +5,13 @@ import org.asamk.signal.manager.api.StickerPackId;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class LegacyStickerStore {
 
     public static void migrate(Storage storage, StickerStore stickerStore) {
         final var packIds = new HashSet<StickerPackId>();
-        @SuppressWarnings("null")
-        final var stickers = storage.stickers.stream().map(s -> {
-            @SuppressWarnings("null")
+        final List<StickerPack> stickers = (List<StickerPack>) storage.stickers.stream().map(s -> {
             var packId = StickerPackId.deserialize(Base64.getDecoder().decode(s.packId));
             if (packIds.contains(packId)) {
                 // Remove legacy duplicate packIds ...
@@ -24,8 +20,8 @@ public class LegacyStickerStore {
             packIds.add(packId);
             var packKey = Base64.getDecoder().decode(s.packKey);
             var installed = s.installed;
-            return Optional.of(new StickerPack(-1, packId, packKey, installed));
-        }).map(Optional::get).filter(Objects::nonNull).collect(Collectors.toList());
+            return Optional.<StickerPack>of(new StickerPack(-1, packId, packKey, installed));
+        }).filter(Optional::isPresent).map(Optional::get).toList();
 
         stickerStore.addLegacyStickers(stickers);
     }

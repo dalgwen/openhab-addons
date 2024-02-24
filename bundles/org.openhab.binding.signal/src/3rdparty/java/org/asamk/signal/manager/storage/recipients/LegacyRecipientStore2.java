@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 public class LegacyRecipientStore2 {
 
-    private final static Logger logger = LoggerFactory.getLogger(LegacyRecipientStore2.class);
+    private static final Logger logger = LoggerFactory.getLogger(LegacyRecipientStore2.class);
 
     public static void migrate(File file, RecipientStore recipientStore) {
         final var objectMapper = Utils.createStorageObjectMapper();
@@ -40,11 +40,16 @@ public class LegacyRecipientStore2 {
                 if (r.contact != null) {
                     contact = new Contact(r.contact.name,
                             null,
+                            null,
                             r.contact.color,
                             r.contact.messageExpirationTime,
+                            0,
+                            false,
                             r.contact.blocked,
                             r.contact.archived,
-                            r.contact.profileSharingEnabled);
+                            r.contact.profileSharingEnabled,
+                            false,
+                            null);
                 }
 
                 ProfileKey profileKey = null;
@@ -82,7 +87,13 @@ public class LegacyRecipientStore2 {
                                     .collect(Collectors.toSet()));
                 }
 
-                return new Recipient(recipientId, address, contact, profileKey, expiringProfileKeyCredential, profile);
+                return new Recipient(recipientId,
+                        address,
+                        contact,
+                        profileKey,
+                        expiringProfileKeyCredential,
+                        profile,
+                        null);
             }).collect(Collectors.toMap(Recipient::getRecipientId, r -> r));
 
             recipientStore.addLegacyRecipients(recipients);

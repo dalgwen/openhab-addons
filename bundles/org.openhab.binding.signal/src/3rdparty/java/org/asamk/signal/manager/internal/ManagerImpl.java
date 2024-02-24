@@ -38,11 +38,13 @@ import org.asamk.signal.manager.api.InvalidUsernameException;
 import org.asamk.signal.manager.api.LastGroupAdminException;
 import org.asamk.signal.manager.api.Message;
 import org.asamk.signal.manager.api.MessageEnvelope;
+import org.asamk.signal.manager.api.MessageEnvelope.Sync.MessageRequestResponse;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotPrimaryDeviceException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PendingAdminApprovalException;
+import org.asamk.signal.manager.api.PhoneNumberSharingMode;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.Profile;
 import org.asamk.signal.manager.api.RateLimitException;
@@ -61,15 +63,19 @@ import org.asamk.signal.manager.api.UnregisteredRecipientException;
 import org.asamk.signal.manager.api.UpdateGroup;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.api.UserStatus;
+import org.asamk.signal.manager.api.UsernameLinkUrl;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.Context;
 import org.asamk.signal.manager.helper.RecipientHelper.RegisteredUser;
+import org.asamk.signal.manager.jobs.RefreshRecipientsJob;
+import org.asamk.signal.manager.jobs.SyncStorageJob;
 import org.asamk.signal.manager.storage.AttachmentStore;
 import org.asamk.signal.manager.storage.AvatarStore;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.groups.GroupInfo;
 import org.asamk.signal.manager.storage.identities.IdentityInfo;
+import org.asamk.signal.manager.storage.recipients.RecipientAddress;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.asamk.signal.manager.storage.stickerPacks.JsonStickerPack;
 import org.asamk.signal.manager.storage.stickerPacks.StickerPackStore;
@@ -100,6 +106,7 @@ import org.whispersystems.signalservice.internal.util.Util;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -123,10 +130,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class ManagerImpl implements Manager {
 
-    private final static Logger logger = LoggerFactory.getLogger(ManagerImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(ManagerImpl.class);
 
     private SignalAccount account;
     private final SignalDependencies dependencies;
@@ -191,22 +199,25 @@ public class ManagerImpl implements Manager {
                 this.notifyAll();
             }
         });
-        disposable.add(account.getIdentityKeyStore().getIdentityChanges().subscribe(serviceId -> {
-            logger.trace("Archiving old sessions for {}", serviceId);
-            account.getAccountData(ServiceIdType.ACI).getSessionStore().archiveSessions(serviceId);
-            account.getAccountData(ServiceIdType.PNI).getSessionStore().archiveSessions(serviceId);
-            account.getSenderKeyStore().deleteSharedWith(serviceId);
-            final var recipientId = account.getRecipientResolver().resolveRecipient(serviceId);
-            final var profile = account.getProfileStore().getProfile(recipientId);
-            if (profile != null) {
-                account.getProfileStore()
-                        .storeProfile(recipientId,
-                                Profile.newBuilder(profile)
-                                        .withUnidentifiedAccessMode(Profile.UnidentifiedAccessMode.UNKNOWN)
-                                        .withLastUpdateTimestamp(0)
-                                        .build());
-            }
-        }));
+        disposable.add(account.getIdentityKeyStore()
+                .getIdentityChanges()
+                .observeOn(Schedulers.from(executor))
+                .subscribe(serviceId -> {
+                    logger.trace("Archiving old sessions for {}", serviceId);
+                    account.getAccountData(ServiceIdType.ACI).getSessionStore().archiveSessions(serviceId);
+                    account.getAccountData(ServiceIdType.PNI).getSessionStore().archiveSessions(serviceId);
+                    account.getSenderKeyStore().deleteSharedWith(serviceId);
+                    final var recipientId = account.getRecipientResolver().resolveRecipient(serviceId);
+                    final var profile = account.getProfileStore().getProfile(recipientId);
+                    if (profile != null) {
+                        account.getProfileStore()
+                                .storeProfile(recipientId,
+                                        Profile.newBuilder(profile)
+                                                .withUnidentifiedAccessMode(Profile.UnidentifiedAccessMode.UNKNOWN)
+                                                .withLastUpdateTimestamp(0)
+                                                .build());
+                    }
+                }));
     }
 
     @Override
@@ -219,14 +230,7 @@ public class ManagerImpl implements Manager {
         final var lastRecipientsRefresh = account.getLastRecipientsRefresh();
         if (lastRecipientsRefresh == null
                 || lastRecipientsRefresh < System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)) {
-            try {
-                context.getRecipientHelper().refreshUsers();
-            } catch (Exception e) {
-                logger.warn("Full CDSI recipients refresh failed, ignoring: {} ({})",
-                        e.getMessage(),
-                        e.getClass().getSimpleName());
-                logger.debug("Full CDSI refresh failed", e);
-            }
+            context.getJobExecutor().enqueueJob(new RefreshRecipientsJob());
             context.getAccountHelper().checkWhoAmiI();
         }
     }
@@ -275,9 +279,26 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void updateAccountAttributes(String deviceName) throws IOException {
+    public void updateAccountAttributes(
+            String deviceName,
+            Boolean unrestrictedUnidentifiedSender,
+            final Boolean discoverableByNumber,
+            final Boolean numberSharing
+    ) throws IOException {
         if (deviceName != null) {
             context.getAccountHelper().setDeviceName(deviceName);
+        }
+        if (unrestrictedUnidentifiedSender != null) {
+            account.setUnrestrictedUnidentifiedAccess(unrestrictedUnidentifiedSender);
+        }
+        if (discoverableByNumber != null) {
+            account.getConfigurationStore().setPhoneNumberUnlisted(!discoverableByNumber);
+        }
+        if (numberSharing != null) {
+            account.getConfigurationStore()
+                    .setPhoneNumberSharingMode(numberSharing
+                            ? PhoneNumberSharingMode.EVERYBODY
+                            : PhoneNumberSharingMode.NOBODY);
         }
         context.getAccountHelper().updateAccountAttributes();
         context.getAccountHelper().checkWhoAmiI();
@@ -290,13 +311,7 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void updateConfiguration(
-            Configuration configuration
-    ) throws NotPrimaryDeviceException {
-        if (!account.isPrimaryDevice()) {
-            throw new NotPrimaryDeviceException();
-        }
-
+    public void updateConfiguration(Configuration configuration) {
         final var configurationStore = account.getConfigurationStore();
         if (configuration.readReceipts().isPresent()) {
             configurationStore.setReadReceipts(configuration.readReceipts().get());
@@ -311,6 +326,7 @@ public class ManagerImpl implements Manager {
             configurationStore.setLinkPreviews(configuration.linkPreviews().get());
         }
         context.getSyncHelper().sendConfigurationMessage();
+        syncRemoteStorage();
     }
 
     @Override
@@ -332,9 +348,19 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public String setUsername(final String username) throws IOException, InvalidUsernameException {
+    public String getUsername() {
+        return account.getUsername();
+    }
+
+    @Override
+    public UsernameLinkUrl getUsernameLink() {
+        return new UsernameLinkUrl(account.getUsernameLink());
+    }
+
+    @Override
+    public void setUsername(final String username) throws IOException, InvalidUsernameException {
         try {
-            return context.getAccountHelper().reserveUsername(username);
+            context.getAccountHelper().reserveUsername(username);
         } catch (BaseUsernameException e) {
             throw new InvalidUsernameException(e.getMessage() + " (" + e.getClass().getSimpleName() + ")", e);
         }
@@ -517,21 +543,31 @@ public class ManagerImpl implements Manager {
     }
 
     private SendMessageResults sendMessage(
-            SignalServiceDataMessage.Builder messageBuilder, Set<RecipientIdentifier> recipients
+            SignalServiceDataMessage.Builder messageBuilder, Set<RecipientIdentifier> recipients, boolean notifySelf
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
-        return sendMessage(messageBuilder, recipients, Optional.empty());
+        return sendMessage(messageBuilder, recipients, notifySelf, Optional.empty());
     }
 
     private SendMessageResults sendMessage(
             SignalServiceDataMessage.Builder messageBuilder,
             Set<RecipientIdentifier> recipients,
+            boolean notifySelf,
             Optional<Long> editTargetTimestamp
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
         var results = new HashMap<RecipientIdentifier, List<SendMessageResult>>();
         long timestamp = System.currentTimeMillis();
         messageBuilder.withTimestamp(timestamp);
         for (final var recipient : recipients) {
-            if (recipient instanceof RecipientIdentifier.Single single) {
+            if (recipient instanceof RecipientIdentifier.NoteToSelf || (
+                    recipient instanceof RecipientIdentifier.Single single
+                            && new RecipientAddress(single.toPartialRecipientAddress()).matches(account.getSelfRecipientAddress())
+            )) {
+                final var result = notifySelf
+                        ? context.getSendHelper()
+                        .sendMessage(messageBuilder, account.getSelfRecipientId(), editTargetTimestamp)
+                        : context.getSendHelper().sendSelfMessage(messageBuilder, editTargetTimestamp);
+                results.put(recipient, List.of(toSendMessageResult(result)));
+            } else if (recipient instanceof RecipientIdentifier.Single single) {
                 try {
                     final var recipientId = context.getRecipientHelper().resolveRecipient(single);
                     final var result = context.getSendHelper()
@@ -541,12 +577,9 @@ public class ManagerImpl implements Manager {
                     results.put(recipient,
                             List.of(SendMessageResult.unregisteredFailure(single.toPartialRecipientAddress())));
                 }
-            } else if (recipient instanceof RecipientIdentifier.NoteToSelf) {
-                final var result = context.getSendHelper().sendSelfMessage(messageBuilder, editTargetTimestamp);
-                results.put(recipient, List.of(toSendMessageResult(result)));
             } else if (recipient instanceof RecipientIdentifier.Group group) {
                 final var result = context.getSendHelper()
-                        .sendAsGroupMessage(messageBuilder, group.groupId(), editTargetTimestamp);
+                        .sendAsGroupMessage(messageBuilder, group.groupId(), notifySelf, editTargetTimestamp);
                 results.put(recipient, result.stream().map(this::toSendMessageResult).toList());
             }
         }
@@ -631,7 +664,7 @@ public class ManagerImpl implements Manager {
 
     @Override
     public SendMessageResults sendMessage(
-            Message message, Set<RecipientIdentifier> recipients
+            Message message, Set<RecipientIdentifier> recipients, boolean notifySelf
     ) throws IOException, AttachmentInvalidException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException, InvalidStickerException {
         final var selfProfile = context.getProfileHelper().getSelfProfile();
         if (selfProfile == null || selfProfile.getDisplayName().isEmpty()) {
@@ -640,7 +673,7 @@ public class ManagerImpl implements Manager {
         }
         final var messageBuilder = SignalServiceDataMessage.newBuilder();
         applyMessage(messageBuilder, message);
-        return sendMessage(messageBuilder, recipients);
+        return sendMessage(messageBuilder, recipients, notifySelf);
     }
 
     @Override
@@ -649,7 +682,7 @@ public class ManagerImpl implements Manager {
     ) throws IOException, AttachmentInvalidException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException, InvalidStickerException {
         final var messageBuilder = SignalServiceDataMessage.newBuilder();
         applyMessage(messageBuilder, message);
-        return sendMessage(messageBuilder, recipients, Optional.of(editTargetTimestamp));
+        return sendMessage(messageBuilder, recipients, false, Optional.of(editTargetTimestamp));
     }
 
     private void applyMessage(
@@ -774,7 +807,7 @@ public class ManagerImpl implements Manager {
                 account.getMessageSendLogStore().deleteEntryForGroup(targetSentTimestamp, r.groupId());
             }
         }
-        return sendMessage(messageBuilder, recipients);
+        return sendMessage(messageBuilder, recipients, false);
     }
 
     @Override
@@ -796,7 +829,7 @@ public class ManagerImpl implements Manager {
             messageBuilder.withStoryContext(new SignalServiceDataMessage.StoryContext(authorServiceId,
                     targetSentTimestamp));
         }
-        return sendMessage(messageBuilder, recipients);
+        return sendMessage(messageBuilder, recipients, false);
     }
 
     @Override
@@ -807,7 +840,7 @@ public class ManagerImpl implements Manager {
         final var payment = new SignalServiceDataMessage.Payment(paymentNotification, null);
         final var messageBuilder = SignalServiceDataMessage.newBuilder().withPayment(payment);
         try {
-            return sendMessage(messageBuilder, Set.of(recipient));
+            return sendMessage(messageBuilder, Set.of(recipient), false);
         } catch (NotAGroupMemberException | GroupNotFoundException | GroupSendingNotAllowedException e) {
             throw new AssertionError(e);
         }
@@ -819,7 +852,8 @@ public class ManagerImpl implements Manager {
 
         try {
             return sendMessage(messageBuilder,
-                    recipients.stream().map(RecipientIdentifier.class::cast).collect(Collectors.toSet()));
+                    recipients.stream().map(RecipientIdentifier.class::cast).collect(Collectors.toSet()),
+                    false);
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
             throw new AssertionError(e);
         } finally {
@@ -842,10 +876,56 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
+    public SendMessageResults sendMessageRequestResponse(
+            final MessageRequestResponse.Type type, final Set<RecipientIdentifier> recipients
+    ) {
+        var results = new HashMap<RecipientIdentifier, List<SendMessageResult>>();
+        for (final var recipient : recipients) {
+            if (recipient instanceof RecipientIdentifier.NoteToSelf || (
+                    recipient instanceof RecipientIdentifier.Single single
+                            && new RecipientAddress(single.toPartialRecipientAddress()).matches(account.getSelfRecipientAddress())
+            )) {
+                final var result = context.getSyncHelper()
+                        .sendMessageRequestResponse(type, account.getSelfRecipientId());
+                if (result != null) {
+                    results.put(recipient, List.of(toSendMessageResult(result)));
+                }
+                results.put(recipient, List.of(toSendMessageResult(result)));
+            } else if (recipient instanceof RecipientIdentifier.Single single) {
+                try {
+                    final var recipientId = context.getRecipientHelper().resolveRecipient(single);
+                    final var result = context.getSyncHelper().sendMessageRequestResponse(type, recipientId);
+                    if (result != null) {
+                        results.put(recipient, List.of(toSendMessageResult(result)));
+                    }
+                } catch (UnregisteredRecipientException e) {
+                    results.put(recipient,
+                            List.of(SendMessageResult.unregisteredFailure(single.toPartialRecipientAddress())));
+                }
+            } else if (recipient instanceof RecipientIdentifier.Group group) {
+                final var result = context.getSyncHelper().sendMessageRequestResponse(type, group.groupId());
+                results.put(recipient, List.of(toSendMessageResult(result)));
+            }
+        }
+        return new SendMessageResults(0, results);
+    }
+
+    @Override
+    public void hideRecipient(final RecipientIdentifier.Single recipient) {
+        final var recipientIdOptional = context.getRecipientHelper().resolveRecipientOptional(recipient);
+        if (recipientIdOptional.isPresent()) {
+            context.getContactHelper().setContactHidden(recipientIdOptional.get(), true);
+            account.removeRecipient(recipientIdOptional.get());
+            syncRemoteStorage();
+        }
+    }
+
+    @Override
     public void deleteRecipient(final RecipientIdentifier.Single recipient) {
         final var recipientIdOptional = context.getRecipientHelper().resolveRecipientOptional(recipient);
         if (recipientIdOptional.isPresent()) {
             account.removeRecipient(recipientIdOptional.get());
+            syncRemoteStorage();
         }
     }
 
@@ -854,6 +934,7 @@ public class ManagerImpl implements Manager {
         final var recipientIdOptional = context.getRecipientHelper().resolveRecipientOptional(recipient);
         if (recipientIdOptional.isPresent()) {
             account.getContactStore().deleteContact(recipientIdOptional.get());
+            syncRemoteStorage();
         }
     }
 
@@ -866,15 +947,13 @@ public class ManagerImpl implements Manager {
         }
         context.getContactHelper()
                 .setContactName(context.getRecipientHelper().resolveRecipient(recipient), givenName, familyName);
+        syncRemoteStorage();
     }
 
     @Override
     public void setContactsBlocked(
             Collection<RecipientIdentifier.Single> recipients, boolean blocked
-    ) throws NotPrimaryDeviceException, IOException, UnregisteredRecipientException {
-        if (!account.isPrimaryDevice()) {
-            throw new NotPrimaryDeviceException();
-        }
+    ) throws IOException, UnregisteredRecipientException {
         if (recipients.isEmpty()) {
             return;
         }
@@ -886,6 +965,10 @@ public class ManagerImpl implements Manager {
                 continue;
             }
             context.getContactHelper().setContactBlocked(recipientId, blocked);
+            context.getSyncHelper()
+                    .sendMessageRequestResponse(blocked
+                            ? MessageRequestResponse.Type.BLOCK
+                            : MessageRequestResponse.Type.UNBLOCK_AND_ACCEPT, recipientId);
             // if we don't have a common group with the blocked contact we need to rotate the profile key
             shouldRotateProfileKey = blocked && (
                     shouldRotateProfileKey || account.getGroupStore()
@@ -898,15 +981,13 @@ public class ManagerImpl implements Manager {
             context.getProfileHelper().rotateProfileKey();
         }
         context.getSyncHelper().sendBlockedList();
+        syncRemoteStorage();
     }
 
     @Override
     public void setGroupsBlocked(
             final Collection<GroupId> groupIds, final boolean blocked
-    ) throws GroupNotFoundException, NotPrimaryDeviceException, IOException {
-        if (!account.isPrimaryDevice()) {
-            throw new NotPrimaryDeviceException();
-        }
+    ) throws GroupNotFoundException, IOException {
         if (groupIds.isEmpty()) {
             return;
         }
@@ -916,12 +997,17 @@ public class ManagerImpl implements Manager {
                 continue;
             }
             context.getGroupHelper().setGroupBlocked(groupId, blocked);
+            context.getSyncHelper()
+                    .sendMessageRequestResponse(blocked
+                            ? MessageRequestResponse.Type.BLOCK
+                            : MessageRequestResponse.Type.UNBLOCK_AND_ACCEPT, groupId);
             shouldRotateProfileKey = blocked;
         }
         if (shouldRotateProfileKey) {
             context.getProfileHelper().rotateProfileKey();
         }
         context.getSyncHelper().sendBlockedList();
+        syncRemoteStorage();
     }
 
     @Override
@@ -932,10 +1018,11 @@ public class ManagerImpl implements Manager {
         context.getContactHelper().setExpirationTimer(recipientId, messageExpirationTimer);
         final var messageBuilder = SignalServiceDataMessage.newBuilder().asExpirationUpdate();
         try {
-            sendMessage(messageBuilder, Set.of(recipient));
+            sendMessage(messageBuilder, Set.of(recipient), false);
         } catch (NotAGroupMemberException | GroupNotFoundException | GroupSendingNotAllowedException e) {
             throw new AssertionError(e);
         }
+        syncRemoteStorage();
     }
 
     @Override
@@ -993,13 +1080,13 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void requestAllSyncData() throws IOException {
+    public void requestAllSyncData() {
         context.getSyncHelper().requestAllSyncData();
-        retrieveRemoteStorage();
+        syncRemoteStorage();
     }
 
-    void retrieveRemoteStorage() throws IOException {
-        context.getStorageHelper().readDataFromStorage();
+    void syncRemoteStorage() {
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }
 
     @Override
@@ -1033,9 +1120,7 @@ public class ManagerImpl implements Manager {
                     startReceiveThreadIfRequired();
                 }
             }
-        });
-        receiveThread.setName("receive-" + threadNumber.getAndIncrement());
-
+        }, "receive-" + threadNumber.getAndIncrement());
         receiveThread.start();
     }
 
@@ -1093,6 +1178,20 @@ public class ManagerImpl implements Manager {
             Optional<Duration> timeout, Optional<Integer> maxMessages, ReceiveMessageHandler handler
     ) throws IOException, AlreadyReceivingException {
         receiveMessages(timeout.orElse(Duration.ofMinutes(1)), timeout.isPresent(), maxMessages.orElse(null), handler);
+    }
+
+    @Override
+    public void stopReceiveMessages() {
+        Thread thread = null;
+        synchronized (messageHandlers) {
+            if (isReceivingSynchronous) {
+                thread = receiveThread;
+                receiveThread = null;
+            }
+        }
+        if (thread != null) {
+            stopReceiveThread(thread);
+        }
     }
 
     private void receiveMessages(
@@ -1303,6 +1402,58 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
+    public InputStream retrieveContactAvatar(final RecipientIdentifier.Single recipient) throws IOException, UnregisteredRecipientException {
+        final var recipientId = context.getRecipientHelper().resolveRecipient(recipient);
+        final var address = account.getRecipientStore().resolveRecipientAddress(recipientId);
+        final var streamDetails = context.getAvatarStore().retrieveContactAvatar(address);
+        if (streamDetails == null) {
+            throw new FileNotFoundException();
+        }
+        return streamDetails.getStream();
+    }
+
+    @Override
+    public InputStream retrieveProfileAvatar(final RecipientIdentifier.Single recipient) throws IOException, UnregisteredRecipientException {
+        final var recipientId = context.getRecipientHelper().resolveRecipient(recipient);
+        context.getProfileHelper().getRecipientProfile(recipientId);
+        final var address = account.getRecipientStore().resolveRecipientAddress(recipientId);
+        final var streamDetails = context.getAvatarStore().retrieveProfileAvatar(address);
+        if (streamDetails == null) {
+            throw new FileNotFoundException();
+        }
+        return streamDetails.getStream();
+    }
+
+    @Override
+    public InputStream retrieveGroupAvatar(final GroupId groupId) throws IOException {
+        final var streamDetails = context.getAvatarStore().retrieveGroupAvatar(groupId);
+        context.getGroupHelper().getGroup(groupId);
+        if (streamDetails == null) {
+            throw new FileNotFoundException();
+        }
+        return streamDetails.getStream();
+    }
+
+    @Override
+    public InputStream retrieveSticker(final StickerPackId stickerPackId, final int stickerId) throws IOException {
+        var streamDetails = context.getStickerPackStore().retrieveSticker(stickerPackId, stickerId);
+        if (streamDetails == null) {
+            final var pack = account.getStickerStore().getStickerPack(stickerPackId);
+            if (pack != null) {
+                try {
+                    context.getStickerHelper().retrieveStickerPack(stickerPackId, pack.packKey());
+                } catch (InvalidMessageException e) {
+                    logger.warn("Failed to download sticker pack");
+                }
+            }
+        }
+        if (streamDetails == null) {
+            throw new FileNotFoundException();
+        }
+        return streamDetails.getStream();
+    }
+
+    @Override
     public void close() {
         Thread thread;
         synchronized (messageHandlers) {
@@ -1314,6 +1465,7 @@ public class ManagerImpl implements Manager {
         if (thread != null) {
             stopReceiveThread(thread);
         }
+        context.close();
         executor.shutdown();
 
         dependencies.getSignalWebSocket().disconnect();

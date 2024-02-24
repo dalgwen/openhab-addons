@@ -56,7 +56,7 @@ import okio.ByteString;
 
 public class SendHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(SendHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(SendHelper.class);
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -78,13 +78,13 @@ public class SendHelper {
             Optional<Long> editTargetTimestamp
     ) {
         var contact = account.getContactStore().getContact(recipientId);
-        if (contact == null || !contact.isProfileSharingEnabled()) {
+        if (contact == null || !contact.isProfileSharingEnabled() || contact.isHidden()) {
             final var contactBuilder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
-            contact = contactBuilder.withProfileSharingEnabled(true).build();
+            contact = contactBuilder.withIsProfileSharingEnabled(true).withIsHidden(false).build();
             account.getContactStore().storeContact(recipientId, contact);
         }
 
-        final var expirationTime = contact.getMessageExpirationTime();
+        final var expirationTime = contact.messageExpirationTime();
         messageBuilder.withExpiration(expirationTime);
 
         if (!contact.isBlocked()) {
@@ -101,10 +101,13 @@ public class SendHelper {
      * The message is extended with the current expiration timer for the group and the group context.
      */
     public List<SendMessageResult> sendAsGroupMessage(
-            SignalServiceDataMessage.Builder messageBuilder, GroupId groupId, Optional<Long> editTargetTimestamp
+            final SignalServiceDataMessage.Builder messageBuilder,
+            final GroupId groupId,
+            final boolean includeSelf,
+            final Optional<Long> editTargetTimestamp
     ) throws IOException, GroupNotFoundException, NotAGroupMemberException, GroupSendingNotAllowedException {
         final var g = getGroupForSending(groupId);
-        return sendAsGroupMessage(messageBuilder, g, editTargetTimestamp);
+        return sendAsGroupMessage(messageBuilder, g, includeSelf, editTargetTimestamp);
     }
 
     /**
@@ -124,10 +127,10 @@ public class SendHelper {
     ) {
         final var messageSendLogStore = account.getMessageSendLogStore();
         final var result = handleSendMessage(recipientId,
-                (messageSender, address, unidentifiedAccess) -> messageSender.sendReceipt(address,
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendReceipt(address,
                         unidentifiedAccess,
                         receiptMessage,
-                        false));
+                        includePniSignature));
         messageSendLogStore.insertIfPossible(receiptMessage.getWhen(), result, ContentHint.IMPLICIT, false);
         handleSendMessageResult(result);
         return result;
@@ -141,13 +144,14 @@ public class SendHelper {
                 .withProfileKey(profileKey)
                 .build();
         return handleSendMessage(recipientId,
-                (messageSender, address, unidentifiedAccess) -> messageSender.sendDataMessage(address,
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendDataMessage(
+                        address,
                         unidentifiedAccess,
                         ContentHint.IMPLICIT,
                         message,
                         SignalServiceMessageSender.IndividualSendEvents.EMPTY,
                         false,
-                        false));
+                        includePniSignature));
     }
 
     public SendMessageResult sendRetryReceipt(
@@ -158,7 +162,8 @@ public class SendHelper {
                 recipientId,
                 errorMessage.getDeviceId());
         final var result = handleSendMessage(recipientId,
-                (messageSender, address, unidentifiedAccess) -> messageSender.sendRetryReceipt(address,
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendRetryReceipt(
+                        address,
                         unidentifiedAccess,
                         groupId.map(GroupId::serialize),
                         errorMessage));
@@ -167,7 +172,10 @@ public class SendHelper {
     }
 
     public SendMessageResult sendNullMessage(RecipientId recipientId) {
-        final var result = handleSendMessage(recipientId, SignalServiceMessageSender::sendNullMessage);
+        final var result = handleSendMessage(recipientId,
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendNullMessage(
+                        address,
+                        unidentifiedAccess));
         handleSendMessageResult(result);
         return result;
     }
@@ -177,7 +185,7 @@ public class SendHelper {
     ) {
         final var recipientId = account.getSelfRecipientId();
         final var contact = account.getContactStore().getContact(recipientId);
-        final var expirationTime = contact != null ? contact.getMessageExpirationTime() : 0;
+        final var expirationTime = contact != null ? contact.messageExpirationTime() : 0;
         messageBuilder.withExpiration(expirationTime);
 
         var message = messageBuilder.build();
@@ -217,10 +225,8 @@ public class SendHelper {
             SignalServiceTypingMessage message, RecipientId recipientId
     ) {
         final var result = handleSendMessage(recipientId,
-                (messageSender, address, unidentifiedAccess) -> messageSender.sendTyping(List.of(address),
-                        List.of(unidentifiedAccess),
-                        message,
-                        null).get(0));
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendTyping(List.of(
+                        address), List.of(unidentifiedAccess), message, null).get(0));
         handleSendMessageResult(result);
         return result;
     }
@@ -244,7 +250,8 @@ public class SendHelper {
         logger.trace("Resending message {} to {}", timestamp, recipientId);
         if (messageSendLogEntry.groupId().isEmpty()) {
             return handleSendMessage(recipientId,
-                    (messageSender, address, unidentifiedAccess) -> messageSender.resendContent(address,
+                    (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.resendContent(
+                            address,
                             unidentifiedAccess,
                             timestamp,
                             messageSendLogEntry.content(),
@@ -274,7 +281,7 @@ public class SendHelper {
                 .build();
 
         final var result = handleSendMessage(recipientId,
-                (messageSender, address, unidentifiedAccess) -> messageSender.resendContent(address,
+                (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.resendContent(address,
                         unidentifiedAccess,
                         timestamp,
                         contentToSend,
@@ -297,13 +304,16 @@ public class SendHelper {
     }
 
     private List<SendMessageResult> sendAsGroupMessage(
-            final SignalServiceDataMessage.Builder messageBuilder, final GroupInfo g, Optional<Long> editTargetTimestamp
+            final SignalServiceDataMessage.Builder messageBuilder,
+            final GroupInfo g,
+            final boolean includeSelf,
+            final Optional<Long> editTargetTimestamp
     ) throws IOException, GroupSendingNotAllowedException {
         GroupUtils.setGroupContext(messageBuilder, g);
         messageBuilder.withExpiration(g.getMessageExpirationTimer());
 
         final var message = messageBuilder.build();
-        final var recipients = g.getMembersWithout(account.getSelfRecipientId());
+        final var recipients = includeSelf ? g.getMembers() : g.getMembersWithout(account.getSelfRecipientId());
 
         if (g.isAnnouncementGroup() && !g.isAdmin(account.getSelfRecipientId())) {
             if (message.getBody().isPresent()
@@ -447,6 +457,10 @@ public class SendHelper {
         }
         if (!g.isMember(account.getSelfRecipientId())) {
             throw new NotAGroupMemberException(groupId, g.getTitle());
+        }
+        if (!g.isProfileSharingEnabled()) {
+            g.setProfileSharingEnabled(true);
+            account.getGroupStore().updateGroup(g);
         }
         return g;
     }
@@ -650,17 +664,18 @@ public class SendHelper {
     ) {
         final var messageSendLogStore = account.getMessageSendLogStore();
         final var urgent = true;
-        final var includePniSignature = false;
         final var result = handleSendMessage(recipientId,
                 editTargetTimestamp.isEmpty()
-                        ? (messageSender, address, unidentifiedAccess) -> messageSender.sendDataMessage(address,
+                        ? (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendDataMessage(
+                        address,
                         unidentifiedAccess,
                         ContentHint.RESENDABLE,
                         message,
                         SignalServiceMessageSender.IndividualSendEvents.EMPTY,
                         urgent,
                         includePniSignature)
-                        : (messageSender, address, unidentifiedAccess) -> messageSender.sendEditMessage(address,
+                        : (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendEditMessage(
+                                address,
                                 unidentifiedAccess,
                                 ContentHint.RESENDABLE,
                                 message,
@@ -677,8 +692,12 @@ public class SendHelper {
 
         var address = context.getRecipientHelper().resolveSignalServiceAddress(recipientId);
         try {
+            final boolean includePniSignature = account.getRecipientStore().needsPniSignature(recipientId);
             try {
-                return s.send(messageSender, address, context.getUnidentifiedAccessHelper().getAccessFor(recipientId));
+                return s.send(messageSender,
+                        address,
+                        context.getUnidentifiedAccessHelper().getAccessFor(recipientId),
+                        includePniSignature);
             } catch (UnregisteredUserException e) {
                 final RecipientId newRecipientId;
                 try {
@@ -689,7 +708,8 @@ public class SendHelper {
                 address = context.getRecipientHelper().resolveSignalServiceAddress(newRecipientId);
                 return s.send(messageSender,
                         address,
-                        context.getUnidentifiedAccessHelper().getAccessFor(newRecipientId));
+                        context.getUnidentifiedAccessHelper().getAccessFor(newRecipientId),
+                        includePniSignature);
             }
         } catch (UnregisteredUserException e) {
             return SendMessageResult.unregisteredFailure(address);
@@ -764,7 +784,8 @@ public class SendHelper {
         SendMessageResult send(
                 SignalServiceMessageSender messageSender,
                 SignalServiceAddress address,
-                Optional<UnidentifiedAccessPair> unidentifiedAccess
+                Optional<UnidentifiedAccessPair> unidentifiedAccess,
+                boolean includePniSignature
         ) throws IOException, UnregisteredUserException, ProofRequiredException, RateLimitException, org.whispersystems.signalservice.api.crypto.UntrustedIdentityException;
     }
 
