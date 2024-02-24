@@ -2,9 +2,11 @@ package org.asamk.signal.manager.helper;
 
 import org.asamk.signal.manager.api.GroupNotFoundException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
+import org.asamk.signal.manager.api.PhoneNumberSharingMode;
 import org.asamk.signal.manager.api.Profile;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.internal.SignalDependencies;
+import org.asamk.signal.manager.jobs.SyncStorageJob;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.groups.GroupInfoV2;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
@@ -47,7 +49,7 @@ import io.reactivex.rxjava3.core.Single;
 
 public final class ProfileHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(ProfileHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(ProfileHelper.class);
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -66,7 +68,8 @@ public final class ProfileHelper {
         account.setProfileKey(profileKey);
         context.getAccountHelper().updateAccountAttributes();
         setProfile(true, true, null, null, null, null, null, null);
-        // TODO update profile key in storage
+        account.getRecipientStore().rotateSelfStorageId();
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
 
         final var recipientIds = account.getRecipientStore().getRecipientIdsWithEnabledProfileSharing();
         for (final var recipientId : recipientIds) {
@@ -77,7 +80,7 @@ public final class ProfileHelper {
         final var activeGroupIds = account.getGroupStore()
                 .getGroups()
                 .stream()
-                .filter(g -> g instanceof GroupInfoV2 && g.isMember(selfRecipientId))
+                .filter(g -> g instanceof GroupInfoV2 && g.isMember(selfRecipientId) && g.isProfileSharingEnabled())
                 .map(g -> (GroupInfoV2) g)
                 .map(GroupInfoV2::getGroupId)
                 .toList();
@@ -202,7 +205,9 @@ public final class ProfileHelper {
                                 newProfile.getAboutEmoji() == null ? "" : newProfile.getAboutEmoji(),
                                 paymentsAddress,
                                 avatarUploadParams,
-                                List.of(/* TODO implement support for badges */));
+                                List.of(/* TODO implement support for badges */),
+                                account.getConfigurationStore().getPhoneNumberSharingMode()
+                                        == PhoneNumberSharingMode.EVERYBODY);
                 if (!avatarUploadParams.keepTheSame) {
                     builder.withAvatarUrlPath(avatarPath.orElse(null));
                 }
@@ -324,6 +329,13 @@ public final class ProfileHelper {
             }
 
             final var profile = account.getProfileStore().getProfile(recipientId);
+
+            if (recipientId.equals(account.getSelfRecipientId())) {
+                final var isUnrestricted = encryptedProfile.isUnrestrictedUnidentifiedAccess();
+                if (account.isUnrestrictedUnidentifiedAccess() != isUnrestricted) {
+                    account.setUnrestrictedUnidentifiedAccess(isUnrestricted);
+                }
+            }
 
             Profile newProfile = null;
             if (profileKey.isPresent()) {
