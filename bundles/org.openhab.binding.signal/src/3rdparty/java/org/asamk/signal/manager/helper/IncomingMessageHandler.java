@@ -6,7 +6,6 @@ import org.asamk.signal.manager.actions.RefreshPreKeysAction;
 import org.asamk.signal.manager.actions.RenewSessionAction;
 import org.asamk.signal.manager.actions.ResendMessageAction;
 import org.asamk.signal.manager.actions.RetrieveProfileAction;
-import org.asamk.signal.manager.actions.RetrieveStorageDataAction;
 import org.asamk.signal.manager.actions.SendGroupInfoAction;
 import org.asamk.signal.manager.actions.SendGroupInfoRequestAction;
 import org.asamk.signal.manager.actions.SendProfileKeyAction;
@@ -17,6 +16,7 @@ import org.asamk.signal.manager.actions.SendSyncConfigurationAction;
 import org.asamk.signal.manager.actions.SendSyncContactsAction;
 import org.asamk.signal.manager.actions.SendSyncGroupsAction;
 import org.asamk.signal.manager.actions.SendSyncKeysAction;
+import org.asamk.signal.manager.actions.SyncStorageDataAction;
 import org.asamk.signal.manager.actions.UpdateAccountAttributesAction;
 import org.asamk.signal.manager.api.GroupId;
 import org.asamk.signal.manager.api.GroupNotFoundException;
@@ -64,6 +64,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSy
 import org.whispersystems.signalservice.api.messages.multidevice.StickerPackOperationMessage;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.ServiceId.ACI;
+import org.whispersystems.signalservice.api.push.ServiceIdType;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.Envelope;
 import org.whispersystems.signalservice.internal.push.UnsupportedDataMessageException;
@@ -75,7 +76,7 @@ import java.util.stream.Collectors;
 
 public final class IncomingMessageHandler {
 
-    private final static Logger logger = LoggerFactory.getLogger(IncomingMessageHandler.class);
+    private static final Logger logger = LoggerFactory.getLogger(IncomingMessageHandler.class);
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -100,8 +101,10 @@ public final class IncomingMessageHandler {
         SignalServiceContent content = null;
         if (!envelope.isReceipt()) {
             account.getIdentityKeyStore().setRetryingDecryption(true);
+            final var destination = getDestination(envelope).serviceId();
             try {
-                final var cipherResult = dependencies.getCipher()
+                final var cipherResult = dependencies.getCipher(destination == null
+                                || destination.equals(account.getAci()) ? ServiceIdType.ACI : ServiceIdType.PNI)
                         .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp());
                 content = validate(envelope.getProto(), cipherResult, envelope.getServerDeliveredTimestamp());
                 if (content == null) {
@@ -136,8 +139,10 @@ public final class IncomingMessageHandler {
                 // uuid in envelope is sent by server
                 .ifPresent(serviceId -> account.getRecipientResolver().resolveRecipient(serviceId));
         if (!envelope.isReceipt()) {
+            final var destination = getDestination(envelope).serviceId();
             try {
-                final var cipherResult = dependencies.getCipher()
+                final var cipherResult = dependencies.getCipher(destination == null
+                                || destination.equals(account.getAci()) ? ServiceIdType.ACI : ServiceIdType.PNI)
                         .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp());
                 content = validate(envelope.getProto(), cipherResult, envelope.getServerDeliveredTimestamp());
                 if (content == null) {
@@ -173,7 +178,6 @@ public final class IncomingMessageHandler {
                                 .contains(Profile.Capability.senderKey);
                         final var isSelfSenderKeyCapable = selfProfile != null && selfProfile.getCapabilities()
                                 .contains(Profile.Capability.senderKey);
-                        final var destination = getDestination(envelope).serviceId();
                         if (!isSelf && isSenderSenderKeyCapable && isSelfSenderKeyCapable) {
                             logger.debug("Received invalid message, requesting message resend.");
                             actions.add(new SendRetryMessageRequestAction(sender, serviceId, e, envelope, destination));
@@ -298,6 +302,12 @@ public final class IncomingMessageHandler {
         final var senderServiceId = senderDeviceAddress.serviceId();
         final var senderDeviceId = senderDeviceAddress.deviceId();
         final var destination = getDestination(envelope);
+
+        if (account.getPni().equals(destination.serviceId)) {
+            account.getRecipientStore().markNeedsPniSignature(destination.recipientId, true);
+        } else if (account.getAci().equals(destination.serviceId)) {
+            account.getRecipientStore().markNeedsPniSignature(destination.recipientId, false);
+        }
 
         if (content.getReceiptMessage().isPresent()) {
             final var message = content.getReceiptMessage().get();
@@ -511,6 +521,7 @@ public final class IncomingMessageHandler {
             if (rm.isConfigurationRequest()) {
                 actions.add(SendSyncConfigurationAction.create());
             }
+            actions.add(SyncStorageDataAction.create());
         }
         if (syncMessage.getGroups().isPresent()) {
             try {
@@ -578,7 +589,7 @@ public final class IncomingMessageHandler {
         if (syncMessage.getFetchType().isPresent()) {
             switch (syncMessage.getFetchType().get()) {
                 case LOCAL_PROFILE -> actions.add(new RetrieveProfileAction(account.getSelfRecipientId()));
-                case STORAGE_MANIFEST -> actions.add(RetrieveStorageDataAction.create());
+                case STORAGE_MANIFEST -> actions.add(SyncStorageDataAction.create());
             }
         }
         if (syncMessage.getKeys().isPresent()) {
@@ -586,7 +597,12 @@ public final class IncomingMessageHandler {
             if (keysMessage.getStorageService().isPresent()) {
                 final var storageKey = keysMessage.getStorageService().get();
                 account.setStorageKey(storageKey);
-                actions.add(RetrieveStorageDataAction.create());
+                actions.add(SyncStorageDataAction.create());
+            }
+            if (keysMessage.getMaster().isPresent()) {
+                final var masterKey = keysMessage.getMaster().get();
+                account.setMasterKey(masterKey);
+                actions.add(SyncStorageDataAction.create());
             }
         }
         if (syncMessage.getConfiguration().isPresent()) {
@@ -941,16 +957,12 @@ public final class IncomingMessageHandler {
     }
 
     private DeviceAddress getDestination(SignalServiceEnvelope envelope) {
-        if (!envelope.hasDestinationUuid()) {
+        final var destination = envelope.getDestinationServiceId();
+        if (destination == null) {
             return new DeviceAddress(account.getSelfRecipientId(), account.getAci(), account.getDeviceId());
         }
-        final var addressOptional = SignalServiceAddress.fromRaw(envelope.getDestinationServiceId(), null);
-        if (addressOptional.isEmpty()) {
-            return new DeviceAddress(account.getSelfRecipientId(), account.getAci(), account.getDeviceId());
-        }
-        final var address = addressOptional.get();
-        return new DeviceAddress(account.getRecipientResolver().resolveRecipient(address),
-                address.getServiceId(),
+        return new DeviceAddress(account.getRecipientResolver().resolveRecipient(destination),
+                destination,
                 account.getDeviceId());
     }
 

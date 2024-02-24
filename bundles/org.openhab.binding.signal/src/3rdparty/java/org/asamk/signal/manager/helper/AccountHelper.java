@@ -8,6 +8,7 @@ import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.internal.SignalDependencies;
+import org.asamk.signal.manager.jobs.SyncStorageJob;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.NumberVerificationUtils;
@@ -33,6 +34,9 @@ import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.push.exceptions.AlreadyVerifiedException;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
 import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
+import org.whispersystems.signalservice.api.push.exceptions.UsernameIsNotReservedException;
+import org.whispersystems.signalservice.api.push.exceptions.UsernameMalformedException;
+import org.whispersystems.signalservice.api.push.exceptions.UsernameTakenException;
 import org.whispersystems.signalservice.api.util.DeviceNameUtil;
 import org.whispersystems.signalservice.internal.push.KyberPreKeyEntity;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
@@ -54,7 +58,7 @@ import static org.whispersystems.signalservice.internal.util.Util.isEmpty;
 
 public class AccountHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(AccountHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(AccountHelper.class);
 
     private final Context context;
     private final SignalAccount account;
@@ -86,7 +90,11 @@ public class AccountHelper {
         }
         try {
             updateAccountAttributes();
-            context.getPreKeyHelper().refreshPreKeysIfNecessary();
+            if (account.getPreviousStorageVersion() < 9) {
+                context.getPreKeyHelper().forceRefreshPreKeys();
+            } else {
+                context.getPreKeyHelper().refreshPreKeysIfNecessary();
+            }
             if (account.getAci() == null || account.getPni() == null) {
                 checkWhoAmiI();
             }
@@ -97,6 +105,13 @@ public class AccountHelper {
                     && account.isPrimaryDevice()
                     && account.getRegistrationLockPin() != null) {
                 migrateRegistrationPin();
+            }
+            if (account.getUsername() != null && account.getUsernameLink() == null) {
+                try {
+                    tryToSetUsernameLink(new Username(account.getUsername()));
+                } catch (BaseUsernameException e) {
+                    logger.debug("Invalid local username");
+                }
             }
         } catch (DeprecatedVersionException e) {
             logger.debug("Signal-Server returned deprecated version exception", e);
@@ -127,11 +142,11 @@ public class AccountHelper {
             account.setPniIdentityKeyPair(KeyUtils.generateIdentityKeyPair());
         }
         account.getRecipientTrustedResolver().resolveSelfRecipientTrusted(account.getSelfRecipientAddress());
-        // TODO check and update remote storage
         context.getUnidentifiedAccessHelper().rotateSenderCertificates();
         dependencies.resetAfterAddressChange();
         context.getGroupV2Helper().clearAuthCredentialCache();
         context.getAccountFileUpdater().updateAccountIdentifiers(account.getNumber(), account.getAci());
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }
 
     public void setPni(
@@ -305,13 +320,17 @@ public class AccountHelper {
     public static final int USERNAME_MIN_LENGTH = 3;
     public static final int USERNAME_MAX_LENGTH = 32;
 
-    public String reserveUsername(String nickname) throws IOException, BaseUsernameException {
+    public void reserveUsername(String nickname) throws IOException, BaseUsernameException {
         final var currentUsername = account.getUsername();
         if (currentUsername != null) {
             final var currentNickname = currentUsername.substring(0, currentUsername.indexOf('.'));
             if (currentNickname.equals(nickname)) {
-                refreshCurrentUsername();
-                return currentUsername;
+                try {
+                    refreshCurrentUsername();
+                } catch (IOException | BaseUsernameException e) {
+                    logger.warn("[reserveUsername] Failed to refresh current username, trying to claim new username");
+                }
+                return;
             }
         }
 
@@ -329,14 +348,13 @@ public class AccountHelper {
         }
 
         logger.debug("[reserveUsername] Successfully reserved username.");
-        final var username = candidates.get(hashIndex).getUsername();
+        final var username = candidates.get(hashIndex);
 
-        dependencies.getAccountManager().confirmUsername(username, response);
-        account.setUsername(username);
+        final var linkComponents = dependencies.getAccountManager().confirmUsernameAndCreateNewLink(username);
+        account.setUsername(username.getUsername());
+        account.setUsernameLink(linkComponents);
         account.getRecipientStore().resolveSelfRecipientTrusted(account.getSelfRecipientAddress());
         logger.debug("[confirmUsername] Successfully confirmed username.");
-
-        return username;
     }
 
     public void refreshCurrentUsername() throws IOException, BaseUsernameException {
@@ -348,7 +366,8 @@ public class AccountHelper {
         final var whoAmIResponse = dependencies.getAccountManager().getWhoAmI();
         final var serverUsernameHash = whoAmIResponse.getUsernameHash();
         final var hasServerUsername = !isEmpty(serverUsernameHash);
-        final var localUsernameHash = Base64.encodeUrlSafeWithoutPadding(new Username(localUsername).getHash());
+        final var username = new Username(localUsername);
+        final var localUsernameHash = Base64.encodeUrlSafeWithoutPadding(username.getHash());
 
         if (!hasServerUsername) {
             logger.debug("No remote username is set.");
@@ -360,17 +379,48 @@ public class AccountHelper {
 
         if (!hasServerUsername || !Objects.equals(localUsernameHash, serverUsernameHash)) {
             logger.debug("Attempting to resynchronize username.");
-            tryReserveConfirmUsername(localUsername, localUsernameHash);
+            try {
+                tryReserveConfirmUsername(username);
+            } catch (UsernameMalformedException | UsernameTakenException | UsernameIsNotReservedException e) {
+                logger.debug("[confirmUsername] Failed to reserve confirm username: {} ({})",
+                        e.getMessage(),
+                        e.getClass().getSimpleName());
+                account.setUsername(null);
+                account.setUsernameLink(null);
+                throw e;
+            }
         } else {
             logger.debug("Username already set, not refreshing.");
         }
     }
 
-    private void tryReserveConfirmUsername(final String username, String localUsernameHash) throws IOException {
-        final var response = dependencies.getAccountManager().reserveUsername(List.of(localUsernameHash));
-        logger.debug("[reserveUsername] Successfully reserved existing username.");
-        dependencies.getAccountManager().confirmUsername(username, response);
-        logger.debug("[confirmUsername] Successfully confirmed existing username.");
+    private void tryReserveConfirmUsername(final Username username) throws IOException {
+        final var usernameLink = account.getUsernameLink();
+
+        if (usernameLink == null) {
+            dependencies.getAccountManager()
+                    .reserveUsername(List.of(Base64.encodeUrlSafeWithoutPadding(username.getHash())));
+            logger.debug("[reserveUsername] Successfully reserved existing username.");
+            final var linkComponents = dependencies.getAccountManager().confirmUsernameAndCreateNewLink(username);
+            account.setUsernameLink(linkComponents);
+            logger.debug("[confirmUsername] Successfully confirmed existing username.");
+        } else {
+            final var linkComponents = dependencies.getAccountManager().reclaimUsernameAndLink(username, usernameLink);
+            account.setUsernameLink(linkComponents);
+            logger.debug("[confirmUsername] Successfully reclaimed existing username and link.");
+        }
+    }
+
+    private void tryToSetUsernameLink(Username username) {
+        for (var i = 1; i < 4; i++) {
+            try {
+                final var linkComponents = dependencies.getAccountManager().createUsernameLink(username);
+                account.setUsernameLink(linkComponents);
+                break;
+            } catch (IOException e) {
+                logger.debug("[tryToSetUsernameLink] Failed with IOException on attempt {}/3", i, e);
+            }
+        }
     }
 
     public void deleteUsername() throws IOException {
@@ -405,6 +455,7 @@ public class AccountHelper {
             throw new InvalidDeviceLinkException("Invalid device link", e);
         }
         account.setMultiDevice(true);
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }
 
     public void removeLinkedDevices(int deviceId) throws IOException {
