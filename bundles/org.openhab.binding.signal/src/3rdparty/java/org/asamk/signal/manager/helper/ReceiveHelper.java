@@ -5,6 +5,7 @@ import org.asamk.signal.manager.actions.HandleAction;
 import org.asamk.signal.manager.api.ReceiveConfig;
 import org.asamk.signal.manager.api.UntrustedIdentityException;
 import org.asamk.signal.manager.internal.SignalDependencies;
+import org.asamk.signal.manager.jobs.CleanOldPreKeysJob;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.messageCache.CachedMessage;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
@@ -32,8 +33,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class ReceiveHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(ReceiveHelper.class);
-    private final static int MAX_BACKOFF_COUNTER = 9;
+    private static final Logger logger = LoggerFactory.getLogger(ReceiveHelper.class);
+    private static final int MAX_BACKOFF_COUNTER = 9;
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -176,6 +177,7 @@ public class ReceiveHelper {
                     handleQueuedActions(queuedActions.keySet());
                     queuedActions.clear();
 
+                    context.getJobExecutor().enqueueJob(new CleanOldPreKeysJob());
                     hasCaughtUpWithOldMessages = true;
                     caughtUpWithOldMessagesListener.call();
 

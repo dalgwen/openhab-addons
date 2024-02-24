@@ -19,6 +19,7 @@ import org.asamk.signal.manager.api.SendMessageResult;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.groups.GroupUtils;
 import org.asamk.signal.manager.internal.SignalDependencies;
+import org.asamk.signal.manager.jobs.SyncStorageJob;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.groups.GroupInfo;
 import org.asamk.signal.manager.storage.groups.GroupInfoV1;
@@ -62,7 +63,7 @@ import java.util.Set;
 
 public class GroupHelper {
 
-    private final static Logger logger = LoggerFactory.getLogger(GroupHelper.class);
+    private static final Logger logger = LoggerFactory.getLogger(GroupHelper.class);
 
     private final SignalAccount account;
     private final SignalDependencies dependencies;
@@ -107,23 +108,8 @@ public class GroupHelper {
     ) {
         final var groupSecretParams = GroupSecretParams.deriveFromMasterKey(groupMasterKey);
 
-        var groupId = GroupUtils.getGroupIdV2(groupSecretParams);
-        var groupInfo = getGroup(groupId);
-        final GroupInfoV2 groupInfoV2;
-        if (groupInfo instanceof GroupInfoV1) {
-            // Received a v2 group message for a v1 group, we need to locally migrate the group
-            account.getGroupStore().deleteGroup(((GroupInfoV1) groupInfo).getGroupId());
-            groupInfoV2 = new GroupInfoV2(groupId, groupMasterKey, account.getRecipientResolver());
-            groupInfoV2.setBlocked(groupInfo.isBlocked());
-            account.getGroupStore().updateGroup(groupInfoV2);
-            logger.info("Locally migrated group {} to group v2, id: {}",
-                    groupInfo.getGroupId().toBase64(),
-                    groupInfoV2.getGroupId().toBase64());
-        } else if (groupInfo instanceof GroupInfoV2) {
-            groupInfoV2 = (GroupInfoV2) groupInfo;
-        } else {
-            groupInfoV2 = new GroupInfoV2(groupId, groupMasterKey, account.getRecipientResolver());
-        }
+        final var groupId = GroupUtils.getGroupIdV2(groupSecretParams);
+        final var groupInfoV2 = account.getGroupStore().getGroupOrPartialMigrate(groupMasterKey, groupId);
 
         if (groupInfoV2.getGroup() == null || groupInfoV2.getGroup().revision < revision) {
             DecryptedGroup group = null;
@@ -158,6 +144,7 @@ public class GroupHelper {
             }
             groupInfoV2.setGroup(group);
             account.getGroupStore().updateGroup(groupInfoV2);
+            context.getJobExecutor().enqueueJob(new SyncStorageJob());
         }
 
         return groupInfoV2;
@@ -179,6 +166,7 @@ public class GroupHelper {
         if (gv2Pair == null) {
             // Failed to create v2 group, creating v1 group instead
             var gv1 = new GroupInfoV1(GroupIdV1.createRandom());
+            gv1.setProfileSharingEnabled(true);
             gv1.addMembers(List.of(selfRecipientId));
             final var result = updateGroupV1(gv1, name, members, avatarBytes);
             return new Pair<>(gv1.getGroupId(), result);
@@ -188,6 +176,7 @@ public class GroupHelper {
         final var decryptedGroup = gv2Pair.second();
 
         gv2.setGroup(decryptedGroup);
+        gv2.setProfileSharingEnabled(true);
         if (avatarBytes != null) {
             context.getAvatarStore()
                     .storeGroupAvatar(gv2.getGroupId(), outputStream -> outputStream.write(avatarBytes));
@@ -200,6 +189,7 @@ public class GroupHelper {
         final var result = sendGroupMessage(messageBuilder,
                 gv2.getMembersIncludingPendingWithout(selfRecipientId),
                 gv2.getDistributionId());
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
         return new Pair<>(gv2.getGroupId(), result);
     }
 
@@ -224,9 +214,10 @@ public class GroupHelper {
         var group = getGroupForUpdating(groupId);
         final var avatarBytes = readAvatarBytes(avatarFile);
 
-        if (group instanceof GroupInfoV2) {
+        SendGroupMessageResults results;
+        if (group instanceof GroupInfoV2 gv2) {
             try {
-                return updateGroupV2((GroupInfoV2) group,
+                results = updateGroupV2(gv2,
                         name,
                         description,
                         members,
@@ -245,7 +236,7 @@ public class GroupHelper {
             } catch (ConflictException e) {
                 // Detected conflicting update, refreshing group and trying again
                 group = getGroup(groupId, true);
-                return updateGroupV2((GroupInfoV2) group,
+                results = updateGroupV2((GroupInfoV2) group,
                         name,
                         description,
                         members,
@@ -262,14 +253,15 @@ public class GroupHelper {
                         expirationTimer,
                         isAnnouncementGroup);
             }
+        } else {
+            GroupInfoV1 gv1 = (GroupInfoV1) group;
+            results = updateGroupV1(gv1, name, members, avatarBytes);
+            if (expirationTimer != null) {
+                setExpirationTimer(gv1, expirationTimer);
+            }
         }
-
-        final var gv1 = (GroupInfoV1) group;
-        final var result = updateGroupV1(gv1, name, members, avatarBytes);
-        if (expirationTimer != null) {
-            setExpirationTimer(gv1, expirationTimer);
-        }
-        return result;
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
+        return results;
     }
 
     public void updateGroupProfileKey(GroupIdV2 groupId) throws GroupNotFoundException, NotAGroupMemberException, IOException {
@@ -316,6 +308,7 @@ public class GroupHelper {
 
         final var result = sendUpdateGroupV2Message(group, group.getGroup(), groupChange);
 
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
         return new Pair<>(group.getGroupId(), result);
     }
 
@@ -339,6 +332,7 @@ public class GroupHelper {
     public void deleteGroup(GroupId groupId) throws IOException {
         account.getGroupStore().deleteGroup(groupId);
         context.getAvatarStore().deleteGroupAvatar(groupId);
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }
 
     public void setGroupBlocked(final GroupId groupId, final boolean blocked) throws GroupNotFoundException {
@@ -349,6 +343,7 @@ public class GroupHelper {
 
         group.setBlocked(blocked);
         account.getGroupStore().updateGroup(group);
+        context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }
 
     public SendGroupMessageResults sendGroupInfoRequest(
@@ -563,7 +558,7 @@ public class GroupHelper {
 
     private void sendExpirationTimerUpdate(GroupIdV1 groupId) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
         final var messageBuilder = SignalServiceDataMessage.newBuilder().asExpirationUpdate();
-        context.getSendHelper().sendAsGroupMessage(messageBuilder, groupId, Optional.empty());
+        context.getSendHelper().sendAsGroupMessage(messageBuilder, groupId, false, Optional.empty());
     }
 
     private SendGroupMessageResults updateGroupV2(

@@ -1,5 +1,14 @@
 package org.asamk.signal.manager.storage.sessions;
 
+import org.asamk.signal.manager.api.Pair;
+import org.asamk.signal.manager.helper.RecipientAddressResolver;
+import org.asamk.signal.manager.storage.recipients.RecipientId;
+import org.asamk.signal.manager.storage.recipients.RecipientResolver;
+import org.asamk.signal.manager.util.IOUtils;
+import org.signal.libsignal.protocol.state.SessionRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -12,21 +21,16 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.asamk.signal.manager.api.Pair;
-import org.asamk.signal.manager.helper.RecipientAddressResolver;
-import org.asamk.signal.manager.storage.recipients.RecipientId;
-import org.asamk.signal.manager.storage.recipients.RecipientResolver;
-import org.asamk.signal.manager.util.IOUtils;
-import org.signal.libsignal.protocol.state.SessionRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class LegacySessionStore {
 
-    private final static Logger logger = LoggerFactory.getLogger(LegacySessionStore.class);
+    private static final Logger logger = LoggerFactory.getLogger(LegacySessionStore.class);
 
-    public static void migrate(final File sessionsPath, final RecipientResolver resolver,
-            final RecipientAddressResolver addressResolver, final SessionStore sessionStore) {
+    public static void migrate(
+            final File sessionsPath,
+            final RecipientResolver resolver,
+            final RecipientAddressResolver addressResolver,
+            final SessionStore sessionStore
+    ) {
         final var keys = getKeysLocked(sessionsPath, resolver);
         final var sessions = keys.stream().map(key -> {
             final var record = loadSessionLocked(key, sessionsPath);
@@ -70,16 +74,20 @@ public class LegacySessionStore {
 
     static final Pattern sessionFileNamePattern = Pattern.compile("(\\d+)_(\\d+)");
 
-    @SuppressWarnings("null")
     private static List<Key> parseFileNames(final File[] files, final RecipientResolver resolver) {
-        return Arrays.stream(files).map(f -> sessionFileNamePattern.matcher(f.getName())).filter(Matcher::matches)
+        return (List<Key>) Arrays.stream(files)
+                .map(f -> sessionFileNamePattern.matcher(f.getName()))
+                .filter(Matcher::matches)
                 .map(matcher -> {
                     final var recipientId = resolver.resolveRecipient(Long.parseLong(matcher.group(1)));
                     if (recipientId == null) {
                         return Optional.<Key>empty();
                     }
-                    return Optional.of(new Key(recipientId, Integer.parseInt(matcher.group(2))));
-                }).map(Optional::get).filter(Objects::nonNull).toList();
+                    return Optional.<Key>of(new Key(recipientId, Integer.parseInt(matcher.group(2))));
+                })
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
     }
 
     private static File getSessionFile(Key key, final File sessionsPath) {
@@ -104,6 +112,5 @@ public class LegacySessionStore {
         }
     }
 
-    record Key(RecipientId recipientId, int deviceId) {
-    }
+    record Key(RecipientId recipientId, int deviceId) {}
 }

@@ -20,6 +20,7 @@ public class ContactHelper {
     public void setContactName(final RecipientId recipientId, final String givenName, final String familyName) {
         var contact = account.getContactStore().getContact(recipientId);
         final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
+        builder.withIsHidden(false);
         if (givenName != null) {
             builder.withGivenName(givenName);
         }
@@ -31,7 +32,7 @@ public class ContactHelper {
 
     public void setExpirationTimer(RecipientId recipientId, int messageExpirationTimer) {
         var contact = account.getContactStore().getContact(recipientId);
-        if (contact != null && contact.getMessageExpirationTime() == messageExpirationTimer) {
+        if (contact != null && contact.messageExpirationTime() == messageExpirationTimer) {
             return;
         }
         final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
@@ -43,8 +44,21 @@ public class ContactHelper {
         var contact = account.getContactStore().getContact(recipientId);
         final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
         if (blocked) {
-            builder.withProfileSharingEnabled(false);
+            builder.withIsProfileSharingEnabled(false);
         }
-        account.getContactStore().storeContact(recipientId, builder.withBlocked(blocked).build());
+        account.getContactStore().storeContact(recipientId, builder.withIsBlocked(blocked).build());
+    }
+
+    public void setContactProfileSharing(RecipientId recipientId, boolean profileSharing) {
+        var contact = account.getContactStore().getContact(recipientId);
+        final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
+        builder.withIsProfileSharingEnabled(profileSharing);
+        account.getContactStore().storeContact(recipientId, builder.build());
+    }
+
+    public void setContactHidden(RecipientId recipientId, boolean hidden) {
+        var contact = account.getContactStore().getContact(recipientId);
+        final var builder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
+        account.getContactStore().storeContact(recipientId, builder.withIsHidden(hidden).build());
     }
 }

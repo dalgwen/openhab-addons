@@ -10,11 +10,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Objects;
 
 public class KeyValueStore {
 
     private static final String TABLE_KEY_VALUE = "key_value";
-    private final static Logger logger = LoggerFactory.getLogger(KeyValueStore.class);
+    private static final Logger logger = LoggerFactory.getLogger(KeyValueStore.class);
 
     private final Database database;
 
@@ -36,6 +37,22 @@ public class KeyValueStore {
     }
 
     public <T> T getEntry(KeyValueEntry<T> key) {
+        try (final var connection = database.getConnection()) {
+            return getEntry(connection, key);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed read from pre_key store", e);
+        }
+    }
+
+    public <T> boolean storeEntry(KeyValueEntry<T> key, T value) {
+        try (final var connection = database.getConnection()) {
+            return storeEntry(connection, key, value);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed update key_value store", e);
+        }
+    }
+
+    private <T> T getEntry(final Connection connection, final KeyValueEntry<T> key) throws SQLException {
         final var sql = (
                 """
                 SELECT key, value
@@ -43,24 +60,27 @@ public class KeyValueStore {
                 WHERE p.key = ?
                 """
         ).formatted(TABLE_KEY_VALUE);
-        try (final var connection = database.getConnection()) {
-            try (final var statement = connection.prepareStatement(sql)) {
-                statement.setString(1, key.key());
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, key.key());
 
-                final var result = Utils.executeQueryForOptional(statement,
-                        resultSet -> readValueFromResultSet(key, resultSet)).orElse(null);
+            final var result = Utils.executeQueryForOptional(statement,
+                    resultSet -> readValueFromResultSet(key, resultSet)).orElse(null);
 
-                if (result == null) {
-                    return key.defaultValue();
-                }
-                return result;
+            if (result == null) {
+                return key.defaultValue();
             }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed read from pre_key store", e);
+            return result;
         }
     }
 
-    public <T> void storeEntry(KeyValueEntry<T> key, T value) {
+    public <T> boolean storeEntry(
+            final Connection connection, final KeyValueEntry<T> key, final T value
+    ) throws SQLException {
+        final var entry = getEntry(key);
+        if (Objects.equals(entry, value)) {
+            return false;
+        }
+
         final var sql = (
                 """
                 INSERT INTO %s (key, value)
@@ -68,15 +88,12 @@ public class KeyValueStore {
                 ON CONFLICT (key) DO UPDATE SET value=excluded.value
                 """
         ).formatted(TABLE_KEY_VALUE);
-        try (final var connection = database.getConnection()) {
-            try (final var statement = connection.prepareStatement(sql)) {
-                statement.setString(1, key.key());
-                setParameterValue(statement, 2, key.clazz(), value);
-                statement.executeUpdate();
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed update key_value store", e);
+        try (final var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, key.key());
+            setParameterValue(statement, 2, key.clazz(), value);
+            statement.executeUpdate();
         }
+        return true;
     }
 
     @SuppressWarnings("unchecked")

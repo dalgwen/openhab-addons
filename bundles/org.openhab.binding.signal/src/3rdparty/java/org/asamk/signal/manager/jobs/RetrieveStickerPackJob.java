@@ -11,7 +11,7 @@ import java.io.IOException;
 
 public class RetrieveStickerPackJob implements Job {
 
-    private final static Logger logger = LoggerFactory.getLogger(RetrieveStickerPackJob.class);
+    private static final Logger logger = LoggerFactory.getLogger(RetrieveStickerPackJob.class);
 
     private final StickerPackId packId;
     private final byte[] packKey;
@@ -23,6 +23,7 @@ public class RetrieveStickerPackJob implements Job {
 
     @Override
     public void run(Context context) {
+        logger.trace("Downloading sticker pack {}", packId);
         try {
             context.getStickerHelper().retrieveStickerPack(packId, packKey);
         } catch (IOException e) {

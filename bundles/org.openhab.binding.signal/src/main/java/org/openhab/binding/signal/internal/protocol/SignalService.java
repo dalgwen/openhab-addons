@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2023 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -279,12 +279,15 @@ public class SignalService {
             return new DeliveryReport(DeliveryStatus.FAILED, address);
         }
 
+        boolean notify;
         RecipientIdentifier recipient;
         if (NOTE_TO_SELF.equalsIgnoreCase(address.trim())) {
             recipient = RecipientIdentifier.NoteToSelf.INSTANCE;
+            notify = false;
         } else {
             try {
                 recipient = RecipientIdentifier.Single.fromString(address, address);
+                notify = true;
             } catch (InvalidNumberException e) {
                 logger.warn("Cannot send message to {}, cause {}", address, e.getMessage());
                 return new DeliveryReport(DeliveryStatus.FAILED, address);
@@ -293,11 +296,10 @@ public class SignalService {
         SendMessageResults sendResults;
         try {
             List<String> attachments = attachment == null ? List.of() : List.of(attachment);
-            sendResults = managerFinal
-                    .sendMessage(
-                            new Message(message, attachments, Collections.emptyList(), Optional.empty(),
-                                    Optional.empty(), Collections.emptyList(), Optional.empty(), List.of()),
-                            Collections.singleton(recipient));
+            sendResults = managerFinal.sendMessage(
+                    new Message(message, attachments, Collections.emptyList(), Optional.empty(), Optional.empty(),
+                            Collections.emptyList(), Optional.empty(), List.of()),
+                    Collections.singleton(recipient), notify);
         } catch (IOException | AttachmentInvalidException | NotAGroupMemberException | GroupNotFoundException
                 | GroupSendingNotAllowedException | UnregisteredRecipientException | InvalidStickerException e) {
             logger.warn("Cannot send message to {}, cause {}", address, e.getMessage());

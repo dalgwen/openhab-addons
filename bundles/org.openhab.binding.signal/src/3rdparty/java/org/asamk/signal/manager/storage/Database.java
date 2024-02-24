@@ -1,16 +1,16 @@
 package org.asamk.signal.manager.storage;
 
-import java.io.File;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.function.Function;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 import org.slf4j.Logger;
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteDataSource;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import java.io.File;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.function.Function;
 
 public abstract class Database implements AutoCloseable {
 
