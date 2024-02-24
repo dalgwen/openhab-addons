@@ -2,50 +2,34 @@ package org.asamk.signal.manager.api;
 
 import org.whispersystems.signalservice.internal.util.Util;
 
-import java.util.Objects;
-
-public class Contact {
-
-    private final String givenName;
-
-    private final String familyName;
-
-    private final String color;
-
-    private final int messageExpirationTime;
-
-    private final boolean blocked;
-
-    private final boolean archived;
-
-    private final boolean profileSharingEnabled;
-
-    public Contact(
-            final String givenName,
-            final String familyName,
-            final String color,
-            final int messageExpirationTime,
-            final boolean blocked,
-            final boolean archived,
-            final boolean profileSharingEnabled
-    ) {
-        this.givenName = givenName;
-        this.familyName = familyName;
-        this.color = color;
-        this.messageExpirationTime = messageExpirationTime;
-        this.blocked = blocked;
-        this.archived = archived;
-        this.profileSharingEnabled = profileSharingEnabled;
-    }
+public record Contact(
+        String givenName,
+        String familyName,
+        String nickName,
+        String color,
+        int messageExpirationTime,
+        long muteUntil,
+        boolean hideStory,
+        boolean isBlocked,
+        boolean isArchived,
+        boolean isProfileSharingEnabled,
+        boolean isHidden,
+        Long unregisteredTimestamp
+) {
 
     private Contact(final Builder builder) {
-        givenName = builder.givenName;
-        familyName = builder.familyName;
-        color = builder.color;
-        messageExpirationTime = builder.messageExpirationTime;
-        blocked = builder.blocked;
-        archived = builder.archived;
-        profileSharingEnabled = builder.profileSharingEnabled;
+        this(builder.givenName,
+                builder.familyName,
+                builder.nickName,
+                builder.color,
+                builder.messageExpirationTime,
+                builder.muteUntil,
+                builder.hideStory,
+                builder.isBlocked,
+                builder.isArchived,
+                builder.isProfileSharingEnabled,
+                builder.isHidden,
+                builder.unregisteredTimestamp);
     }
 
     public static Builder newBuilder() {
@@ -54,13 +38,18 @@ public class Contact {
 
     public static Builder newBuilder(final Contact copy) {
         Builder builder = new Builder();
-        builder.givenName = copy.getGivenName();
-        builder.familyName = copy.getFamilyName();
-        builder.color = copy.getColor();
-        builder.messageExpirationTime = copy.getMessageExpirationTime();
-        builder.blocked = copy.isBlocked();
-        builder.archived = copy.isArchived();
-        builder.profileSharingEnabled = copy.isProfileSharingEnabled();
+        builder.givenName = copy.givenName();
+        builder.familyName = copy.familyName();
+        builder.nickName = copy.nickName();
+        builder.color = copy.color();
+        builder.messageExpirationTime = copy.messageExpirationTime();
+        builder.muteUntil = copy.muteUntil();
+        builder.hideStory = copy.hideStory();
+        builder.isBlocked = copy.isBlocked();
+        builder.isArchived = copy.isArchived();
+        builder.isProfileSharingEnabled = copy.isProfileSharingEnabled();
+        builder.isHidden = copy.isHidden();
+        builder.unregisteredTimestamp = copy.unregisteredTimestamp();
         return builder;
     }
 
@@ -79,70 +68,26 @@ public class Contact {
         return givenName + " " + familyName;
     }
 
-    public String getGivenName() {
-        return givenName;
-    }
-
-    public String getFamilyName() {
-        return familyName;
-    }
-
-    public String getColor() {
-        return color;
-    }
-
-    public int getMessageExpirationTime() {
-        return messageExpirationTime;
-    }
-
-    public boolean isBlocked() {
-        return blocked;
-    }
-
-    public boolean isArchived() {
-        return archived;
-    }
-
-    public boolean isProfileSharingEnabled() {
-        return profileSharingEnabled;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        final Contact contact = (Contact) o;
-        return messageExpirationTime == contact.messageExpirationTime
-                && blocked == contact.blocked
-                && archived == contact.archived
-                && profileSharingEnabled == contact.profileSharingEnabled
-                && Objects.equals(givenName, contact.givenName)
-                && Objects.equals(familyName, contact.familyName)
-                && Objects.equals(color, contact.color);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(givenName,
-                familyName,
-                color,
-                messageExpirationTime,
-                blocked,
-                archived,
-                profileSharingEnabled);
-    }
-
     public static final class Builder {
 
         private String givenName;
         private String familyName;
+        private String nickName;
         private String color;
         private int messageExpirationTime;
-        private boolean blocked;
-        private boolean archived;
-        private boolean profileSharingEnabled;
+        private long muteUntil;
+        private boolean hideStory;
+        private boolean isBlocked;
+        private boolean isArchived;
+        private boolean isProfileSharingEnabled;
+        private boolean isHidden;
+        private Long unregisteredTimestamp;
 
         private Builder() {
+        }
+
+        public static Builder newBuilder() {
+            return new Builder();
         }
 
         public Builder withGivenName(final String val) {
@@ -152,6 +97,11 @@ public class Contact {
 
         public Builder withFamilyName(final String val) {
             familyName = val;
+            return this;
+        }
+
+        public Builder withNickName(final String val) {
+            nickName = val;
             return this;
         }
 
@@ -165,18 +115,38 @@ public class Contact {
             return this;
         }
 
-        public Builder withBlocked(final boolean val) {
-            blocked = val;
+        public Builder withMuteUntil(final long val) {
+            muteUntil = val;
             return this;
         }
 
-        public Builder withArchived(final boolean val) {
-            archived = val;
+        public Builder withHideStory(final boolean val) {
+            hideStory = val;
             return this;
         }
 
-        public Builder withProfileSharingEnabled(final boolean val) {
-            profileSharingEnabled = val;
+        public Builder withIsBlocked(final boolean val) {
+            isBlocked = val;
+            return this;
+        }
+
+        public Builder withIsArchived(final boolean val) {
+            isArchived = val;
+            return this;
+        }
+
+        public Builder withIsProfileSharingEnabled(final boolean val) {
+            isProfileSharingEnabled = val;
+            return this;
+        }
+
+        public Builder withIsHidden(final boolean val) {
+            isHidden = val;
+            return this;
+        }
+
+        public Builder withUnregisteredTimestamp(final Long val) {
+            unregisteredTimestamp = val;
             return this;
         }
 
