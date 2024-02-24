@@ -55,9 +55,9 @@ public class MessageSendLogStore implements AutoCloseable {
                 logger.debug("Stopping msl cleanup thread");
             }
         });
-        cleanupThread.setName("msl-cleanup");
-        cleanupThread.setDaemon(true);
-        cleanupThread.start();
+        this.cleanupThread.setName("msl-cleanup");
+        this.cleanupThread.setDaemon(true);
+        this.cleanupThread.start();
     }
 
     public static void createSql(Connection connection) throws SQLException {
