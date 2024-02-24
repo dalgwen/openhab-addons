@@ -23,7 +23,9 @@ public final class GroupInfoV2 extends GroupInfo {
     private final GroupMasterKey masterKey;
     private final DistributionId distributionId;
     private boolean blocked;
+    private boolean profileSharingEnabled;
     private DecryptedGroup group;
+    private byte[] storageRecord;
     private boolean permissionDenied;
 
     private final RecipientResolver recipientResolver;
@@ -43,7 +45,9 @@ public final class GroupInfoV2 extends GroupInfo {
             final DecryptedGroup group,
             final DistributionId distributionId,
             final boolean blocked,
+            final boolean profileSharingEnabled,
             final boolean permissionDenied,
+            final byte[] storageRecord,
             final RecipientResolver recipientResolver
     ) {
         this.groupId = groupId;
@@ -51,7 +55,9 @@ public final class GroupInfoV2 extends GroupInfo {
         this.group = group;
         this.distributionId = distributionId;
         this.blocked = blocked;
+        this.profileSharingEnabled = profileSharingEnabled;
         this.permissionDenied = permissionDenied;
+        this.storageRecord = storageRecord;
         this.recipientResolver = recipientResolver;
     }
 
@@ -62,6 +68,10 @@ public final class GroupInfoV2 extends GroupInfo {
 
     public GroupMasterKey getMasterKey() {
         return masterKey;
+    }
+
+    public byte[] getStorageRecord() {
+        return storageRecord;
     }
 
     public DistributionId getDistributionId() {
@@ -174,6 +184,16 @@ public final class GroupInfoV2 extends GroupInfo {
     @Override
     public void setBlocked(final boolean blocked) {
         this.blocked = blocked;
+    }
+
+    @Override
+    public boolean isProfileSharingEnabled() {
+        return profileSharingEnabled;
+    }
+
+    @Override
+    public void setProfileSharingEnabled(final boolean profileSharingEnabled) {
+        this.profileSharingEnabled = profileSharingEnabled;
     }
 
     @Override
