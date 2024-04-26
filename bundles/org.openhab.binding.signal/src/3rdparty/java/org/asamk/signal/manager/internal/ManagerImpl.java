@@ -19,6 +19,7 @@ package org.asamk.signal.manager.internal;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
+import org.asamk.signal.manager.api.CaptchaRejectedException;
 import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.Configuration;
 import org.asamk.signal.manager.api.Device;
@@ -64,6 +65,8 @@ import org.asamk.signal.manager.api.UpdateGroup;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.api.UserStatus;
 import org.asamk.signal.manager.api.UsernameLinkUrl;
+import org.asamk.signal.manager.api.UsernameStatus;
+import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.Context;
@@ -279,6 +282,33 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
+    public Map<String, UsernameStatus> getUsernameStatus(Set<String> usernames) {
+        final var registeredUsers = new HashMap<String, RecipientAddress>();
+        for (final var username : usernames) {
+            try {
+                final var recipientId = context.getRecipientHelper().resolveRecipientByUsernameOrLink(username, true);
+                final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
+                registeredUsers.put(username, address);
+            } catch (UnregisteredRecipientException e) {
+                // ignore
+            }
+        }
+
+        return usernames.stream().collect(Collectors.toMap(n -> n, username -> {
+            final var user = registeredUsers.get(username);
+            final var serviceId = user == null ? null : user.serviceId().orElse(null);
+            final var profile = serviceId == null
+                    ? null
+                    : context.getProfileHelper()
+                            .getRecipientProfile(account.getRecipientResolver().resolveRecipient(serviceId));
+            return new UsernameStatus(username,
+                    serviceId == null ? null : serviceId.getRawUuid(),
+                    profile != null
+                            && profile.getUnidentifiedAccessMode() == Profile.UnidentifiedAccessMode.UNRESTRICTED);
+        }));
+    }
+
+    @Override
     public void updateAccountAttributes(
             String deviceName,
             Boolean unrestrictedUnidentifiedSender,
@@ -360,7 +390,11 @@ public class ManagerImpl implements Manager {
     @Override
     public void setUsername(final String username) throws IOException, InvalidUsernameException {
         try {
-            context.getAccountHelper().reserveUsername(username);
+            if (username.contains(".")) {
+                context.getAccountHelper().reserveExactUsername(username);
+            } else {
+                context.getAccountHelper().reserveUsernameFromNickname(username);
+            }
         } catch (BaseUsernameException e) {
             throw new InvalidUsernameException(e.getMessage() + " (" + e.getClass().getSimpleName() + ")", e);
         }
@@ -374,7 +408,7 @@ public class ManagerImpl implements Manager {
     @Override
     public void startChangeNumber(
             String newNumber, boolean voiceVerification, String captcha
-    ) throws RateLimitException, IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, NotPrimaryDeviceException {
+    ) throws RateLimitException, IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, NotPrimaryDeviceException, VerificationMethodNotAvailableException {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
@@ -402,10 +436,16 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void submitRateLimitRecaptchaChallenge(String challenge, String captcha) throws IOException {
+    public void submitRateLimitRecaptchaChallenge(
+            String challenge, String captcha
+    ) throws IOException, CaptchaRejectedException {
         captcha = captcha == null ? null : captcha.replace("signalcaptcha://", "");
 
-        dependencies.getAccountManager().submitRateLimitRecaptchaChallenge(challenge, captcha);
+        try {
+            dependencies.getAccountManager().submitRateLimitRecaptchaChallenge(challenge, captcha);
+        } catch (org.whispersystems.signalservice.internal.push.exceptions.CaptchaRejectedException ignored) {
+            throw new CaptchaRejectedException();
+        }
     }
 
     @Override
@@ -431,7 +471,10 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void removeLinkedDevices(int deviceId) throws IOException {
+    public void removeLinkedDevices(int deviceId) throws IOException, NotPrimaryDeviceException {
+        if (!account.isPrimaryDevice()) {
+            throw new NotPrimaryDeviceException();
+        }
         context.getAccountHelper().removeLinkedDevices(deviceId);
     }
 
@@ -1268,7 +1311,8 @@ public class ManagerImpl implements Manager {
                         s.getContact(),
                         s.getProfileKey(),
                         s.getExpiringProfileKeyCredential(),
-                        s.getProfile()))
+                        s.getProfile(),
+                        s.getDiscoverable()))
                 .toList();
     }
 
@@ -1323,7 +1367,7 @@ public class ManagerImpl implements Manager {
         final var scannableFingerprint = context.getIdentityHelper()
                 .computeSafetyNumberForScanning(identityInfo.getServiceId(), identityInfo.getIdentityKey());
         return new Identity(address.toApiRecipientAddress(),
-                identityInfo.getIdentityKey(),
+                identityInfo.getIdentityKey().getPublicKey().serialize(),
                 context.getIdentityHelper()
                         .computeSafetyNumber(identityInfo.getServiceId(), identityInfo.getIdentityKey()),
                 scannableFingerprint == null ? null : scannableFingerprint.getSerialized(),
@@ -1377,7 +1421,7 @@ public class ManagerImpl implements Manager {
         final var recipientId = context.getRecipientHelper().resolveRecipient(recipient);
         final var updated = trustMethod.apply(recipientId);
         if (updated && this.isReceiving()) {
-            context.getReceiveHelper().setNeedsToRetryFailedMessages(true);
+            account.setNeedsToRetryFailedMessages(true);
         }
         return updated;
     }

@@ -7,6 +7,7 @@ import org.asamk.signal.manager.api.InvalidDeviceLinkException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
+import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
 import org.asamk.signal.manager.internal.SignalDependencies;
 import org.asamk.signal.manager.jobs.SyncStorageJob;
 import org.asamk.signal.manager.storage.SignalAccount;
@@ -164,7 +165,7 @@ public class AccountHelper {
 
     public void startChangeNumber(
             String newNumber, boolean voiceVerification, String captcha
-    ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException {
+    ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException, VerificationMethodNotAvailableException {
         final var accountManager = dependencies.createUnauthenticatedAccountManager(newNumber, account.getPassword());
         String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
                 account.getSessionId(newNumber),
@@ -320,21 +321,42 @@ public class AccountHelper {
     public static final int USERNAME_MIN_LENGTH = 3;
     public static final int USERNAME_MAX_LENGTH = 32;
 
-    public void reserveUsername(String nickname) throws IOException, BaseUsernameException {
+    public void reserveUsernameFromNickname(String nickname) throws IOException, BaseUsernameException {
         final var currentUsername = account.getUsername();
         if (currentUsername != null) {
             final var currentNickname = currentUsername.substring(0, currentUsername.indexOf('.'));
             if (currentNickname.equals(nickname)) {
                 try {
                     refreshCurrentUsername();
+                    return;
                 } catch (IOException | BaseUsernameException e) {
                     logger.warn("[reserveUsername] Failed to refresh current username, trying to claim new username");
                 }
-                return;
             }
         }
 
         final var candidates = Username.candidatesFrom(nickname, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH);
+        reserveUsername(candidates);
+    }
+
+    public void reserveExactUsername(String username) throws IOException, BaseUsernameException {
+        final var currentUsername = account.getUsername();
+        if (currentUsername != null) {
+            if (currentUsername.equals(username)) {
+                try {
+                    refreshCurrentUsername();
+                    return;
+                } catch (IOException | BaseUsernameException e) {
+                    logger.warn("[reserveUsername] Failed to refresh current username, trying to claim new username");
+                }
+            }
+        }
+
+        final var candidates = List.of(new Username(username));
+        reserveUsername(candidates);
+    }
+
+    private void reserveUsername(final List<Username> candidates) throws IOException {
         final var candidateHashes = new ArrayList<String>();
         for (final var candidate : candidates) {
             candidateHashes.add(Base64.encodeUrlSafeWithoutPadding(candidate.getHash()));
@@ -478,6 +500,7 @@ public class AccountHelper {
         dependencies.getAccountManager().enableRegistrationLock(masterKey);
 
         account.setRegistrationLockPin(pin);
+        updateAccountAttributes();
     }
 
     public void removeRegistrationPin() throws IOException {
