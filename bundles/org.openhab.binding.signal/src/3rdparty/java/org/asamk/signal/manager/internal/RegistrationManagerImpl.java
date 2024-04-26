@@ -24,6 +24,7 @@ import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.UpdateProfile;
+import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
@@ -103,8 +104,8 @@ public class RegistrationManagerImpl implements RegistrationManager {
 
     @Override
     public void register(
-            boolean voiceVerification, String captcha
-    ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException {
+            boolean voiceVerification, String captcha, final boolean forceRegister
+    ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException, VerificationMethodNotAvailableException {
         if (account.isRegistered()
                 && account.getServiceEnvironment() != null
                 && account.getServiceEnvironment() != serviceEnvironmentConfig.type()) {
@@ -112,12 +113,18 @@ public class RegistrationManagerImpl implements RegistrationManager {
         }
 
         try {
-            final var recoveryPassword = account.getRecoveryPassword();
-            if (recoveryPassword != null && account.isPrimaryDevice() && attemptReregisterAccount(recoveryPassword)) {
-                return;
+            if (!forceRegister) {
+                if (account.isRegistered()) {
+                    throw new IOException("Account is already registered");
+                }
+
+                if (account.getAci() != null && attemptReactivateAccount()) {
+                    return;
+                }
             }
 
-            if (account.getAci() != null && attemptReactivateAccount()) {
+            final var recoveryPassword = account.getRecoveryPassword();
+            if (recoveryPassword != null && account.isPrimaryDevice() && attemptReregisterAccount(recoveryPassword)) {
                 return;
             }
 
@@ -127,6 +134,7 @@ public class RegistrationManagerImpl implements RegistrationManager {
                     voiceVerification,
                     captcha);
             NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
+            account.setRegistered(false);
         } catch (DeprecatedVersionException e) {
             logger.debug("Signal-Server returned deprecated version exception", e);
             throw e;
