@@ -149,6 +149,9 @@ public class SignalAccount implements Closeable {
     private final KeyValueEntry<Long> lastReceiveTimestamp = new KeyValueEntry<>("last-receive-timestamp",
             long.class,
             0L);
+    private final KeyValueEntry<Boolean> needsToRetryFailedMessages = new KeyValueEntry<>("retry-failed-messages",
+            Boolean.class,
+            true);
     private final KeyValueEntry<byte[]> cdsiToken = new KeyValueEntry<>("cdsi-token", byte[].class);
     private final KeyValueEntry<Long> lastRecipientsRefresh = new KeyValueEntry<>("last-recipients-refresh",
             long.class);
@@ -297,7 +300,7 @@ public class SignalAccount implements Closeable {
         this.pniAccountData.setIdentityKeyPair(pniIdentity);
         this.registered = false;
         this.isMultiDevice = true;
-        getKeyValueStore().storeEntry(lastReceiveTimestamp, 0L);
+        setLastReceiveTimestamp(0L);
         this.pinMasterKey = masterKey;
         getKeyValueStore().storeEntry(storageManifestVersion, -1L);
         this.setStorageManifest(null);
@@ -342,7 +345,7 @@ public class SignalAccount implements Closeable {
         this.pniAccountData.setServiceId(pni);
         init();
         this.registrationLockPin = pin;
-        getKeyValueStore().storeEntry(lastReceiveTimestamp, 0L);
+        setLastReceiveTimestamp(0L);
         save();
 
         setPreKeys(ServiceIdType.ACI, aciPreKeys);
@@ -590,7 +593,7 @@ public class SignalAccount implements Closeable {
             isMultiDevice = rootNode.get("isMultiDevice").asBoolean();
         }
         if (rootNode.hasNonNull("lastReceiveTimestamp")) {
-            getKeyValueStore().storeEntry(lastReceiveTimestamp, rootNode.get("lastReceiveTimestamp").asLong());
+            setLastReceiveTimestamp(rootNode.get("lastReceiveTimestamp").asLong());
         }
         int registrationId = 0;
         if (rootNode.hasNonNull("registrationId")) {
@@ -856,6 +859,9 @@ public class SignalAccount implements Closeable {
                         new Contact(contact.name,
                                 null,
                                 null,
+                                null,
+                                null,
+                                null,
                                 contact.color,
                                 contact.messageExpirationTime,
                                 0,
@@ -892,9 +898,6 @@ public class SignalAccount implements Closeable {
                 if (profile != null) {
                     final var capabilities = new HashSet<Profile.Capability>();
                     if (profile.getCapabilities() != null) {
-                        if (profile.getCapabilities().gv1Migration) {
-                            capabilities.add(Profile.Capability.gv1Migration);
-                        }
                         if (profile.getCapabilities().storage) {
                             capabilities.add(Profile.Capability.storage);
                         }
@@ -911,7 +914,8 @@ public class SignalAccount implements Closeable {
                                     : profile.getUnidentifiedAccess() != null
                                             ? Profile.UnidentifiedAccessMode.ENABLED
                                             : Profile.UnidentifiedAccessMode.DISABLED,
-                            capabilities);
+                            capabilities,
+                            null);
                     getProfileStore().storeProfile(recipientId, newProfile);
                 }
             }
@@ -955,6 +959,7 @@ public class SignalAccount implements Closeable {
         synchronized (fileChannel) {
             final var base64 = Base64.getEncoder();
             final var storage = new Storage(CURRENT_STORAGE_VERSION,
+                    System.currentTimeMillis(),
                     serviceEnvironment.name(),
                     registered,
                     number,
@@ -1650,6 +1655,14 @@ public class SignalAccount implements Closeable {
         getKeyValueStore().storeEntry(lastReceiveTimestamp, value);
     }
 
+    public void setNeedsToRetryFailedMessages(final boolean value) {
+        getKeyValueStore().storeEntry(needsToRetryFailedMessages, value);
+    }
+
+    public boolean getNeedsToRetryFailedMessages() {
+        return getKeyValueStore().getEntry(needsToRetryFailedMessages);
+    }
+
     public boolean isUnrestrictedUnidentifiedAccess() {
         return Boolean.TRUE.equals(getKeyValueStore().getEntry(unrestrictedUnidentifiedAccess));
     }
@@ -1846,6 +1859,7 @@ public class SignalAccount implements Closeable {
 
     public record Storage(
             int version,
+            long timestamp,
             String serviceEnvironment,
             boolean registered,
             String number,
