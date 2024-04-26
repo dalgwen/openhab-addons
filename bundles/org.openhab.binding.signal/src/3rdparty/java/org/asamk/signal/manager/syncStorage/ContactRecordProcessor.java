@@ -180,7 +180,10 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                 ? local.getSystemFamilyName().orElse("")
                 : remote.getSystemFamilyName().orElse("");
         final var systemNickname = remote.getSystemNickname().orElse("");
+        final var nicknameGivenName = remote.getNicknameGivenName().orElse("");
+        final var nicknameFamilyName = remote.getNicknameFamilyName().orElse("");
         final var pniSignatureVerified = remote.isPniSignatureVerified() || local.isPniSignatureVerified();
+        final var note = remote.getNote().or(local::getNote).orElse("");
 
         final var mergedBuilder = new SignalContactRecord.Builder(remote.getId().getRaw(), aci, unknownFields).setE164(
                         e164)
@@ -202,7 +205,10 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                 .setHideStory(hideStory)
                 .setUnregisteredTimestamp(unregisteredTimestamp)
                 .setHidden(hidden)
-                .setPniSignatureVerified(pniSignatureVerified);
+                .setPniSignatureVerified(pniSignatureVerified)
+                .setNicknameGivenName(nicknameGivenName)
+                .setNicknameFamilyName(nicknameFamilyName)
+                .setNote(note);
         final var merged = mergedBuilder.build();
 
         final var matchesRemote = doProtosMatch(merged, remote);
@@ -244,6 +250,9 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
         final var contactGivenName = contact == null ? null : contact.givenName();
         final var contactFamilyName = contact == null ? null : contact.familyName();
         final var contactNickName = contact == null ? null : contact.nickName();
+        final var contactNickGivenName = contact == null ? null : contact.nickNameGivenName();
+        final var contactNickFamilyName = contact == null ? null : contact.nickNameFamilyName();
+        final var contactNote = contact == null ? null : contact.note();
         if (blocked != contactRecord.isBlocked()
                 || profileShared != contactRecord.isProfileSharingEnabled()
                 || archived != contactRecord.isArchived()
@@ -253,7 +262,10 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                 || unregisteredTimestamp != contactRecord.getUnregisteredTimestamp()
                 || !Objects.equals(contactRecord.getSystemGivenName().orElse(null), contactGivenName)
                 || !Objects.equals(contactRecord.getSystemFamilyName().orElse(null), contactFamilyName)
-                || !Objects.equals(contactRecord.getSystemNickname().orElse(null), contactNickName)) {
+                || !Objects.equals(contactRecord.getSystemNickname().orElse(null), contactNickName)
+                || !Objects.equals(contactRecord.getNicknameGivenName().orElse(null), contactNickGivenName)
+                || !Objects.equals(contactRecord.getNicknameFamilyName().orElse(null), contactNickFamilyName)
+                || !Objects.equals(contactRecord.getNote().orElse(null), contactNote)) {
             logger.debug("Storing new or updated contact {}", recipientId);
             final var contactBuilder = contact == null ? Contact.newBuilder() : Contact.newBuilder(contact);
             final var newContact = contactBuilder.withIsBlocked(contactRecord.isBlocked())
@@ -265,6 +277,9 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                     .withGivenName(contactRecord.getSystemGivenName().orElse(null))
                     .withFamilyName(contactRecord.getSystemFamilyName().orElse(null))
                     .withNickName(contactRecord.getSystemNickname().orElse(null))
+                    .withNickNameGivenName(contactRecord.getNicknameGivenName().orElse(null))
+                    .withNickNameFamilyName(contactRecord.getNicknameFamilyName().orElse(null))
+                    .withNote(contactRecord.getNote().orElse(null))
                     .withUnregisteredTimestamp(contactRecord.getUnregisteredTimestamp() == 0
                             ? null
                             : contactRecord.getUnregisteredTimestamp());
