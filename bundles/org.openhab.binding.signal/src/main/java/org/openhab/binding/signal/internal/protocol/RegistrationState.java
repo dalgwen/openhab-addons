@@ -27,5 +27,6 @@ public enum RegistrationState {
     VERIFICATION_CODE_NEEDED,
     QR_CODE_NEEDED,
     REGISTER_NEEDED,
+    ERROR,
     REGISTERED;
 }
