@@ -43,6 +43,11 @@
 				<description>Received by SMS or vocal message upon ongoing registration.</description>
 				<default></default>
 			</parameter>
+			<parameter name="enableReaction" type="boolean" required="false">
+                <label>Enable Reaction</label>
+                <description>If true, also receive reaction emoji.</description>
+                <default>false</default>
+            </parameter>
 			<parameter name="userAgent" type="text" required="false">
 			     <label>User Agent</label>
 			     <description>Overwrite the user agent sent to Signal Server</description>
@@ -75,6 +80,11 @@
 				<description>Scan this QR Code with your Signal application on your primary device to enable the linked account.</description>
 				<context>qrcode</context>
 			</parameter>
+            <parameter name="enableReaction" type="boolean" required="false">
+                <label>Enable Reaction</label>
+                <description>If true, also receive reaction emoji.</description>
+                <default>false</default>
+            </parameter>
 		</config-description>
 	</bridge-type>
 

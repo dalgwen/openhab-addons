@@ -30,6 +30,7 @@ public class SignalBridgeConfiguration {
     public RegistrationType verificationCodeMethod = RegistrationType.PhoneCall;
     public String verificationCode = "";
     public String userAgent = SignalService.DEFAULT_USER_AGENT;
+    public Boolean enableReaction = false;
 
     // linked bridge configuration
     public String deviceName = "";

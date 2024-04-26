@@ -6,6 +6,7 @@ This binding rely on a binary library compiled for specific architecture. These 
 
 * amd64 for Windows
 * amd64 for Linux
+* amd64 for Linux (musl linked lib for distrib like alpine) - use the env variable `org.osgi.framework.os.libc=musl` to select this version
 * arm for Linux
 * aarch64/arm64 for Linux
 * aarch64 for OSX
@@ -65,6 +66,7 @@ For a *signalaccount*, the following parameters are available:
 |captcha| text | Probably | See dedicated section |
 |verificationCodeMethod| text | no | You can set this value to "TextMessage" (default) to get a SMS or "PhoneCall" to get a voice call|
 |verificationCode| text | At first no, then yes | The verification code Signal sent you |
+|reactionEnabled| boolean | no | If true, also receive reaction emoji |
 
 ### Linked Signal Account
 
@@ -78,7 +80,7 @@ This is also a several steps registration process.
 |----------------|------|----------|----------------|
 |deviceName| text | no | A friendly name for display|
 |phoneNumber| text | yes | The shared phone number |
-
+|reactionEnabled| boolean | no | If true, also receive reaction emoji |
 
 ### Conversation
 

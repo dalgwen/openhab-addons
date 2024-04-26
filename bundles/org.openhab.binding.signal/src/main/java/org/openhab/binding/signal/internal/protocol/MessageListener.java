@@ -12,6 +12,7 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
+import org.asamk.signal.manager.api.MessageEnvelope.Data.Reaction;
 import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -25,6 +26,8 @@ import org.eclipse.jdt.annotation.Nullable;
 public interface MessageListener {
 
     public void messageReceived(@Nullable RecipientAddress sender, String messageData);
+
+    public void reactionReceived(@Nullable RecipientAddress sender, Reaction reaction);
 
     public void deliveryStatusReceived(DeliveryReport deliveryStatus);
 }

@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.asamk.signal.manager.api.MessageEnvelope.Data.Reaction;
 import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -87,12 +88,15 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
      */
     private @NonNullByDefault({}) ScheduledFuture<?> checkScheduled;
 
+    private @NonNullByDefault({}) SignalBridgeConfiguration config;
+
     // we keep a list of sender for autodiscovery
     private Set<String> senders = new HashSet<String>();
     private @Nullable SignalConversationDiscoveryService discoveryService;
 
     private boolean shouldRun = false;
     private AtomicBoolean isStarting = new AtomicBoolean(false);
+
 
     @Override
     public void dispose() {
@@ -108,7 +112,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
 
     @Override
     public void initialize() {
-        SignalBridgeConfiguration config = getConfigAs(SignalBridgeConfiguration.class);
+        config = getConfigAs(SignalBridgeConfiguration.class);
         ProvisionType provisionType = thingTypeUID.equals(SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE)
                 ? ProvisionType.LINKED
                 : ProvisionType.MAIN;
@@ -212,6 +216,19 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
             if (finalDiscoveryService != null) {
                 finalDiscoveryService.buildByAutoDiscovery(sender);
             }
+        }
+    }
+
+    @Override
+    public void reactionReceived(@Nullable RecipientAddress sender, Reaction reaction) {
+        if (config.enableReaction) {
+            String newMessageBody;
+            if (reaction.isRemove() == false) {
+                newMessageBody = "#REACTION_ADDED#" + reaction.emoji();
+            } else {
+                newMessageBody = "#REACTION_REMOVED#" + reaction.emoji();
+            }
+            messageReceived(sender, newMessageBody);
         }
     }
 

@@ -227,20 +227,24 @@ public class GroupStore {
 
     public GroupInfoV1 getOrCreateGroupV1(GroupIdV1 groupId) {
         try (final var connection = database.getConnection()) {
-            var group = getGroup(connection, groupId);
-
-            if (group != null) {
-                return group;
-            }
-
-            if (getGroupV2ByV1Id(connection, groupId) == null) {
-                return new GroupInfoV1(groupId);
-            }
-
-            return null;
+            return getOrCreateGroupV1(connection, groupId);
         } catch (SQLException e) {
             throw new RuntimeException("Failed read from group store", e);
         }
+    }
+
+    public GroupInfoV1 getOrCreateGroupV1(final Connection connection, final GroupIdV1 groupId) throws SQLException {
+        var group = getGroup(connection, groupId);
+
+        if (group != null) {
+            return group;
+        }
+
+        if (getGroupV2ByV1Id(connection, groupId) == null) {
+            return new GroupInfoV1(groupId);
+        }
+
+        return null;
     }
 
     public GroupInfoV2 getGroupOrPartialMigrate(
@@ -729,7 +733,7 @@ public class GroupStore {
         final var expirationTime = resultSet.getInt("expiration_time");
         final var blocked = resultSet.getBoolean("blocked");
         final var archived = resultSet.getBoolean("archived");
-        final var storagRecord = resultSet.getBytes("storage_record");
+        final var storageRecord = resultSet.getBytes("storage_record");
         return new GroupInfoV1(GroupId.v1(groupId),
                 groupIdV2 == null ? null : GroupId.v2(groupIdV2),
                 name,
@@ -738,7 +742,7 @@ public class GroupStore {
                 expirationTime,
                 blocked,
                 archived,
-                storagRecord);
+                storageRecord);
     }
 
     private GroupInfoV2 getGroupV2ByV1Id(final Connection connection, final GroupIdV1 groupId) throws SQLException {

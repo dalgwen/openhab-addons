@@ -40,6 +40,7 @@ import org.asamk.signal.manager.api.InvalidNumberException;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.Message;
 import org.asamk.signal.manager.api.MessageEnvelope;
+import org.asamk.signal.manager.api.MessageEnvelope.Data.Reaction;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotRegisteredException;
@@ -56,6 +57,7 @@ import org.asamk.signal.manager.api.TrustNewIdentity;
 import org.asamk.signal.manager.api.UnregisteredRecipientException;
 import org.asamk.signal.manager.api.UpdateProfile;
 import org.asamk.signal.manager.api.UserAlreadyExistsException;
+import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -239,11 +241,11 @@ public class SignalService {
                 }
             } else {
                 if (this.verificationCodeMethod == RegistrationType.PhoneCall) {
-                    registrationManager.register(false, this.captcha);
+                    registrationManager.register(false, this.captcha, true);
                     Thread.sleep(62000);
-                    registrationManager.register(true, this.captcha);
+                    registrationManager.register(true, this.captcha, true);
                 } else {
-                    registrationManager.register(false, this.captcha);
+                    registrationManager.register(false, this.captcha, true);
                 }
                 throw new IncompleteRegistrationException(RegistrationState.VERIFICATION_CODE_NEEDED);
             }
@@ -256,8 +258,8 @@ public class SignalService {
         } catch (AuthorizationFailedException e) {
             throw new IncompleteRegistrationException(RegistrationState.VERIFICATION_CODE_NEEDED,
                     e.getMessage() + ". Incorrect code ? Delete it to request another one.");
-        } catch (InterruptedException e) {
-            throw new IncompleteRegistrationException(RegistrationState.RATE_LIMIT, "interrupted");
+        } catch (InterruptedException | VerificationMethodNotAvailableException e) {
+            throw new IncompleteRegistrationException(RegistrationState.ERROR, "Error: " + e.getMessage());
         }
     }
 
@@ -310,10 +312,12 @@ public class SignalService {
             if (resultsForRecipient != null) {
                 SendMessageResult result = resultsForRecipient.get(0);
                 if (!result.isSuccess()) {
-                    logger.warn("Cannot send message to {}, cause {}", address, result.isIdentityFailure() ? "identity"
+                    logger.warn("Cannot send message to {}, cause {}", address,
+                            result.isIdentityFailure() ? "identity"
+                            : result.isInvalidPreKeyFailure() ? "prekey"
                             : result.isNetworkFailure() ? "network"
-                                    : result.isRateLimitFailure() ? "rate"
-                                            : result.isUnregisteredFailure() ? "recipient unregistered" : "unknown");
+                            : result.isRateLimitFailure() ? "rate"
+                            : result.isUnregisteredFailure() ? "recipient unregistered" : "unknown");
                     return new DeliveryReport(DeliveryStatus.FAILED, address);
                 }
             }
@@ -406,6 +410,11 @@ public class SignalService {
                     MessageEnvelope.Data message = envelope.data().get();
                     if (message.body().isPresent()) {
                         messageListener.messageReceived(source, message.body().get());
+                    } else if (message.reaction().isPresent()) {
+                        Reaction reaction = message.reaction().get();
+                        if (reaction.emoji().length() > 0) {
+                            messageListener.reactionReceived(source, reaction);
+                        }
                     } else {
                         logger.debug("empty message from {}",
                                 source != null ? source.getLegacyIdentifier() : "unknown");

@@ -33,7 +33,7 @@ import java.util.UUID;
 public class AccountDatabase extends Database {
 
     private static final Logger logger = LoggerFactory.getLogger(AccountDatabase.class);
-    private static final long DATABASE_VERSION = 24;
+    private static final long DATABASE_VERSION = 26;
 
     private AccountDatabase(final HikariDataSource dataSource) {
         super(logger, DATABASE_VERSION, dataSource);
@@ -556,7 +556,7 @@ public class AccountDatabase extends Database {
                                           profile_capabilities TEXT
                                         ) STRICT;
                                         INSERT INTO recipient2 (_id, aci, pni, storage_id, storage_record, number, username, unregistered_timestamp, profile_key, profile_key_credential, given_name, family_name, color, expiration_time, blocked, archived, profile_sharing, hidden, profile_last_update_timestamp, profile_given_name, profile_family_name, profile_about, profile_about_emoji, profile_avatar_url_path, profile_mobile_coin_address, profile_unidentified_access_mode, profile_capabilities)
-                                          SELECT r._id, (SELECT t.address FROM tmp_mapping_table t WHERE t.uuid = r.uuid AND t.address not like 'PNI:%') aci, (SELECT t.address FROM tmp_mapping_table t WHERE t.uuid = r.pni AND t.address like 'PNI:%') pni, storage_id, storage_record, number, username, unregistered_timestamp, profile_key, profile_key_credential, given_name, family_name, color, expiration_time, blocked, archived, profile_sharing, hidden, profile_last_update_timestamp, profile_given_name, profile_family_name, profile_about, profile_about_emoji, profile_avatar_url_path, profile_mobile_coin_address, profile_unidentified_access_mode, profile_capabilities
+                                          SELECT r._id, (SELECT t.address FROM tmp_mapping_table t WHERE t.uuid = r.uuid AND t.address not like 'PNI:%') aci, (SELECT t.address FROM tmp_mapping_table t WHERE t.uuid = r.pni AND t.address like 'PNI:%' AND (SELECT COUNT(pni) FROM recipient WHERE pni = r.pni) = 1) pni, storage_id, storage_record, number, username, unregistered_timestamp, profile_key, profile_key_credential, given_name, family_name, color, expiration_time, blocked, archived, profile_sharing, hidden, profile_last_update_timestamp, profile_given_name, profile_family_name, profile_about, profile_about_emoji, profile_avatar_url_path, profile_mobile_coin_address, profile_unidentified_access_mode, profile_capabilities
                                           FROM recipient r;
                                         DROP TABLE recipient;
                                         ALTER TABLE recipient2 RENAME TO recipient;
@@ -578,6 +578,25 @@ public class AccountDatabase extends Database {
             try (final var statement = connection.createStatement()) {
                 statement.executeUpdate("""
                                         ALTER TABLE recipient ADD needs_pni_signature INTEGER NOT NULL DEFAULT FALSE;
+                                        """);
+            }
+        }
+        if (oldVersion < 25) {
+            logger.debug("Updating database: Create nick_name and note columns");
+            try (final var statement = connection.createStatement()) {
+                statement.executeUpdate("""
+                                        ALTER TABLE recipient ADD nick_name_given_name TEXT;
+                                        ALTER TABLE recipient ADD nick_name_family_name TEXT;
+                                        ALTER TABLE recipient ADD note TEXT;
+                                        """);
+            }
+        }
+        if (oldVersion < 26) {
+            logger.debug("Updating database: Create discoverabel and profile_phone_number_sharing columns");
+            try (final var statement = connection.createStatement()) {
+                statement.executeUpdate("""
+                                        ALTER TABLE recipient ADD discoverable INTEGER;
+                                        ALTER TABLE recipient ADD profile_phone_number_sharing TEXT;
                                         """);
             }
         }
