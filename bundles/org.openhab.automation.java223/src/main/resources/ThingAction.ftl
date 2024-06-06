@@ -5,8 +5,8 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
 import org.openhab.core.thing.binding.ThingActions;
-import org.openhab.automation.java223.scriptsupport.Logger;
-import org.openhab.automation.java223.scriptsupport.Java223Exception;
+import org.openhab.automation.java223.helper.Logger;
+import org.openhab.automation.java223.helper.Java223Exception;
  
 <#list classesToImport as classToImport>
 <#if classToImport?has_content>
@@ -31,12 +31,7 @@ public class ${simpleClassName} {
         }
         thingActions = scriptThingActions.get(SCOPE, thingUID);
     }
-    
-    public static void setBindings(Map<String, ?> bindings) {
-        logger.debug("Injecting actions from bindings into {}", ${simpleClassName}.class.getName());
-        ${simpleClassName}.scriptThingActions = (ScriptThingActions) bindings.get("actions");
-    }
-    
+
 <#list methods as method>
     public ${method.returnValueType()} ${method.name()}(<#list method.parameterTypes() as parameter>${parameter} p${parameter?counter}<#sep>, </#list>) {
         try {
@@ -55,13 +50,9 @@ public class ${simpleClassName} {
 </#if>            
         } catch (NoSuchMethodException | SecurityException | IllegalAccessException
                 | IllegalArgumentException | InvocationTargetException e) {
-            logger.error("Error running action ${method.name()}", e);
+            throw new Java223Exception("Error running action ${method.name()}", e);
         }
-<#if (method.returnValueType() != "void")>
-        return null;
-</#if>  
     }
 
 </#list>
-
 }

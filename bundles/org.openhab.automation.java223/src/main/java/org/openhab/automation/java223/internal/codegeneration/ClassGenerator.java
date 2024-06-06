@@ -12,6 +12,9 @@
  */
 package org.openhab.automation.java223.internal.codegeneration;
 
+import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
+
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -24,7 +27,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +40,8 @@ import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.core.automation.annotation.RuleAction;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.service.WatchService;
+import org.openhab.core.service.WatchService.Kind;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.UID;
@@ -61,7 +65,7 @@ import freemarker.template.TemplateMethodModelEx;
  * @author Gwendal Roulleau - Refactor using freemarker
  */
 @NonNullByDefault
-public class ClassGenerator {
+public class ClassGenerator implements WatchService.WatchEventListener {
 
     public static final String HELPER_PACKAGE = "helper";
 
@@ -84,15 +88,49 @@ public class ClassGenerator {
         this.bundleContext = bundleContext;
 
         String helperPackageFolder = HELPER_PACKAGE.replaceAll("\\.", "/");
-        Path scopeJavaFile = folder.resolve(helperPackageFolder);
-        Files.createDirectories(scopeJavaFile);
+        Files.createDirectories(folder.resolve(helperPackageFolder));
 
         cfg.setClassForTemplateLoading(ClassGenerator.class, "/");
         cfg.setDefaultEncoding("UTF-8");
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
     }
 
-    public List<String> generateThingActions() throws IOException, TemplateException {
+    private String lastName(String fullName) {
+        int lastDotIndex = fullName.lastIndexOf('.');
+        return lastDotIndex == -1 ? fullName : fullName.substring(lastDotIndex + 1);
+    }
+
+    private boolean replaceIfNotEqual(String packageName, String className, String generatedClass) throws IOException {
+        String key = packageName + "." + className;
+        if (!generatedClass.equals(generatedClasses.put(key, generatedClass))) {
+            writeHelperFile(packageName, className, generatedClass);
+            return true;
+        } else {
+            logger.debug("{} has not changed.", key);
+            return false;
+        }
+    }
+
+    private String classToImport(Class<?> clazz) {
+        if ((clazz.isPrimitive())
+                || (clazz.isArray() && Objects.requireNonNull(clazz.getComponentType()).isPrimitive())) {
+            return "";
+        }
+        if (clazz.isArray()) {
+            return Objects.requireNonNull(clazz.getComponentType()).getName();
+        } else {
+            return clazz.getName();
+        }
+    }
+
+    private String typeToParameter(Type type) {
+        return type instanceof GenericArrayType
+                ? lastName(Objects.requireNonNull(((GenericArrayType) type).getGenericComponentType()).getTypeName())
+                        + "[]"
+                : lastName(type.getTypeName());
+    }
+
+    public void generateActions() throws IOException, TemplateException {
         List<ThingActions> thingActions;
         try {
             Set<Class<?>> classes = new HashSet<>();
@@ -101,27 +139,23 @@ public class ClassGenerator {
                     .collect(Collectors.toList());
         } catch (InvalidSyntaxException e) {
             logger.warn("Failed to get thing actions: {}", e.getMessage());
-            return Collections.emptyList();
+            return;
         }
 
         Template template = cfg.getTemplate("/ThingAction.ftl");
 
-        List<String> packageAndClassNameList = new ArrayList<>();
         for (ThingActions thingAction : thingActions) {
             Class<? extends ThingActions> clazz = thingAction.getClass();
-
-            String packageName = clazz.getPackageName();
 
             ThingActionsScope scopeAnnotation = clazz.getAnnotation(ThingActionsScope.class);
             if (scopeAnnotation == null) {
                 continue;
             }
             String scope = scopeAnnotation.name().toString();
+            String simpleClassName = clazz.getSimpleName();
+            String packageName = getPackageName("generated", "action", scope);
 
-            String simpleClassName = scope.substring(0, 1).toUpperCase() + scope.substring(1, scope.length())
-                    + clazz.getSimpleName();
-
-            logger.trace("Processing class '{}' in package '{}'", simpleClassName, packageName);
+            logger.trace("Processing class '{}' in package '{}'", simpleClassName, clazz.getPackageName());
 
             List<Method> methods = Arrays.stream(clazz.getDeclaredMethods())
                     .filter(method -> method.getDeclaredAnnotation(RuleAction.class) != null)
@@ -149,7 +183,7 @@ public class ClassGenerator {
             }
 
             Map<String, Object> context = new HashMap<>();
-            context.put("packageName", HELPER_PACKAGE);
+            context.put("packageName", packageName);
             context.put("scope", scope);
             context.put("classesToImport", classesToImport);
             context.put("simpleClassName", simpleClassName);
@@ -158,55 +192,17 @@ public class ClassGenerator {
             StringWriter writer = new StringWriter();
             template.process(context, writer);
 
-            packageAndClassNameList.add(HELPER_PACKAGE + "." + simpleClassName);
-
-            replaceIfNotEqual(simpleClassName, writer.toString());
-        }
-
-        return packageAndClassNameList;
-    }
-
-    private String lastName(String fullName) {
-        int lastDotIndex = fullName.lastIndexOf('.');
-        return lastDotIndex == -1 ? fullName : fullName.substring(lastDotIndex + 1);
-    }
-
-    private boolean replaceIfNotEqual(String className, String generatedClass) throws IOException {
-        String key = HELPER_PACKAGE + "." + className;
-        if (!generatedClass.equals(generatedClasses.put(key, generatedClass))) {
-            writeHelperFile(className, generatedClass);
-            return true;
-        } else {
-            logger.debug("{} has not changed.", key);
-            return false;
+            replaceIfNotEqual(packageName, simpleClassName, writer.toString());
         }
     }
 
-    private String classToImport(Class<?> clazz) {
-        if ((clazz.isPrimitive())
-                || (clazz.isArray() && Objects.requireNonNull(clazz.getComponentType()).isPrimitive())) {
-            return "";
-        }
-        if (clazz.isArray()) {
-            return Objects.requireNonNull(clazz.getComponentType()).getName();
-        } else {
-            return clazz.getName();
-        }
-    }
-
-    private String typeToParameter(Type type) {
-        return type instanceof GenericArrayType
-                ? lastName(Objects.requireNonNull(((GenericArrayType) type).getGenericComponentType()).getTypeName())
-                        + "[]"
-                : lastName(type.getTypeName());
-    }
-
-    public String generateItems() throws IOException, TemplateException {
+    public void generateItems() throws IOException, TemplateException {
         Collection<Item> items = itemRegistry.getItems();
+        String packageName = getPackageName("generated");
 
         Template template = cfg.getTemplate("/Items.ftl");
         Map<String, Object> context = new HashMap<>();
-        context.put("HELPER_PACKAGE", HELPER_PACKAGE);
+        context.put("packageName", packageName);
         context.put("items", items);
         context.put("itemImports",
                 items.stream().map(item -> item.getClass().getCanonicalName()).collect(Collectors.toSet()));
@@ -214,16 +210,16 @@ public class ClassGenerator {
         StringWriter writer = new StringWriter();
         template.process(context, writer);
 
-        replaceIfNotEqual("Items", writer.toString());
-        return HELPER_PACKAGE + ".Items";
+        replaceIfNotEqual(packageName, "Items", writer.toString());
     }
 
-    public String generateThings() throws IOException, TemplateException {
+    public void generateThings() throws IOException, TemplateException {
         Collection<Thing> things = thingRegistry.getAll();
+        String packageName = getPackageName("generated");
 
         Template template = cfg.getTemplate("/Things.ftl");
         Map<String, Object> context = new HashMap<>();
-        context.put("HELPER_PACKAGE", HELPER_PACKAGE);
+        context.put("packageName", packageName);
 
         context.put("things", things);
         TemplateMethodModelEx tmm = (args) -> escapeName(args);
@@ -232,12 +228,15 @@ public class ClassGenerator {
         StringWriter writer = new StringWriter();
         template.process(context, writer);
 
-        replaceIfNotEqual("Things", writer.toString());
-        return HELPER_PACKAGE + ".Things";
+        replaceIfNotEqual(packageName, "Things", writer.toString());
     }
 
-    private void writeHelperFile(String className, String generatedClass) throws IOException {
-        String packageFolder = HELPER_PACKAGE.replaceAll("\\.", "/");
+    private static String getPackageName(String... packagePath) {
+        return HELPER_PACKAGE + "." + String.join(".", packagePath);
+    }
+
+    private void writeHelperFile(String packageName, String className, String generatedClass) throws IOException {
+        String packageFolder = packageName.replaceAll("\\.", "/");
         Path javaFile = folder.resolve(packageFolder + "/" + className + "." + Java223Constants.JAVA_FILE_TYPE);
 
         Files.createDirectories(javaFile.getParent());
@@ -249,5 +248,23 @@ public class ClassGenerator {
 
     private String escapeName(List<freemarker.ext.beans.StringModel> textToEscape) {
         return ((UID) (textToEscape.get(0).getWrappedObject())).toString().replace(":", "_").replace("-", "_");
+    }
+
+    @Override
+    public void processWatchEvent(Kind kind, Path path) {
+        Path fullPath = LIB_DIR.resolve(path);
+        if (fullPath.getFileName().toString().endsWith("." + Java223Constants.JAVA_FILE_TYPE)
+                && (kind == Kind.DELETE || kind == Kind.MODIFY)) {
+            // by intercepting delete or modify signal, we ensure that we remove java file from our internal database to
+            // regenerate them thereafter
+            String key = fullPath.toString().replace(File.separator, ".").substring(0, fullPath.toString().length());
+            generatedClasses.remove(key);
+        } else {
+            logger.trace("Received '{}' for path '{}' - ignoring (wrong extension)", kind, fullPath);
+        }
+    }
+
+    public static record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
+
     }
 }

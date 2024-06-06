@@ -58,19 +58,18 @@ public class DependencyGenerator {
             "org.openhab.core.persistence", "org.openhab.core.persistence.extensions", "org.openhab.core.thing",
             "org.openhab.core.thing.binding", "org.openhab.core.transform", "org.openhab.core.transform.actions",
             "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson",
-            "org.openhab.automation.java223.annotations", "org.openhab.automation.java223.scriptsupport",
+            "org.openhab.automation.java223.annotations", "org.openhab.automation.java223.helper",
+            "org.openhab.automation.java223.helper.eventinfo", "org.openhab.automation.java223.helper.annotations",
             "org.openhab.automation.java223.eventinfo", "org.eclipse.jdt.annotation");
 
-    public Set<String> dependencies = new HashSet<>();
-
-    public synchronized void createCoreDependencies(Path libDir, String additionalBundlesConfig,
+    public static synchronized void createCoreDependencies(Path libDir, String additionalBundlesConfig,
             BundleContext bundleContext) {
         try (FileOutputStream outFile = new FileOutputStream(libDir.resolve("dependencies.jar").toFile())) {
             Manifest manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             JarOutputStream target = new JarOutputStream(outFile, manifest);
 
-            dependencies = new HashSet<>(DEFAULT_DEPENDENCIES);
+            Set<String> dependencies = new HashSet<>(DEFAULT_DEPENDENCIES);
             dependencies.addAll(Arrays.asList(additionalBundlesConfig.split(",")));
 
             Set<String> searchIn = new HashSet<>();
@@ -83,7 +82,7 @@ public class DependencyGenerator {
 
             for (Bundle bundle : bundleContext.getBundles()) {
                 if (searchIn.contains(bundle.getSymbolicName())) {
-                    copyExportedClasses(bundle, target);
+                    copyExportedClasses(dependencies, bundle, target);
                 }
             }
 
@@ -95,13 +94,19 @@ public class DependencyGenerator {
         }
     }
 
-    private void exportJdtNullAnnotation(JarOutputStream target) {
+    private static void exportJdtNullAnnotation(JarOutputStream target) {
 
         List<String> classesToExtract = List.of("org.eclipse.jdt.annotation.NonNull",
                 "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable");
         for (String classToExtract : classesToExtract) {
             String path = classToExtract.replaceAll("\\.", "/") + ".class";
-            try (InputStream stream = this.getClass().getClassLoader().getResourceAsStream(path)) {
+            ClassLoader classLoader = DependencyGenerator.class.getClassLoader();
+            if (classLoader == null) {
+                logger.warn("Failed (no classloader) to copy null annotation classes '{}' from classpath : {}",
+                        classToExtract);
+                return;
+            }
+            try (InputStream stream = classLoader.getResourceAsStream(path)) {
                 if (stream != null) {
                     addEntryToJar(target, path, 0, stream);
                 } else {
@@ -114,7 +119,7 @@ public class DependencyGenerator {
         }
     }
 
-    private void copyExportedClasses(Bundle bundle, JarOutputStream target) {
+    private static void copyExportedClasses(Set<String> dependencies, Bundle bundle, JarOutputStream target) {
         String exportPackage = bundle.getHeaders().get("Export-Package");
         if (exportPackage == null) {
             logger.warn("Bundle '{}' does not export any package!", bundle.getSymbolicName());

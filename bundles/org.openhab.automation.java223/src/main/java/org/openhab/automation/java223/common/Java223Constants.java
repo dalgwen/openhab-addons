@@ -12,7 +12,10 @@
  */
 package org.openhab.automation.java223.common;
 
+import java.nio.file.Path;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.core.OpenHAB;
 
 /**
  *
@@ -27,4 +30,7 @@ public class Java223Constants {
     public static final String RULE_MANAGER = "ruleManager";
 
     public static final String ANNOTATION_DEFAULT = "\u0002\u0003";
+
+    public static final Path LIB_DIR = Path.of(OpenHAB.getConfigFolder(), "automation", "lib", JAVA_FILE_TYPE);
+
 }

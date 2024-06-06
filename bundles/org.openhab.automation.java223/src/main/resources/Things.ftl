@@ -1,7 +1,7 @@
-package ${HELPER_PACKAGE};
+package ${packageName};
 
 import java.util.Map;
-import org.openhab.automation.java223.scriptsupport.Java223Exception;
+import org.openhab.automation.java223.helper.Java223Exception;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingRegistry;
@@ -17,9 +17,6 @@ public class Things {
     public static final String ${escapeName(thing.getUID())} = "${thing.getUID()}";
 
 </#list>
-    public static void setBindings(Map<String, ?> bindings) {
-        Things.things = (ThingRegistry) bindings.get("things");
-    }
 
 <#list things as thing>
 <#if thing.getLabel()??>
