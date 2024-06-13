@@ -1,5 +1,28 @@
 package ch.obermuhlner.scriptengine.java;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.Reader;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.script.Bindings;
+import javax.script.Compilable;
+import javax.script.CompiledScript;
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineFactory;
+import javax.script.ScriptException;
+import javax.script.SimpleBindings;
+import javax.script.SimpleScriptContext;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.StandardLocation;
+import javax.tools.ToolProvider;
+
 import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.DefaultCompilationStrategy;
@@ -10,17 +33,9 @@ import ch.obermuhlner.scriptengine.java.construct.DefaultConstructorStrategy;
 import ch.obermuhlner.scriptengine.java.execution.DefaultExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
+import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
-import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
-
-import javax.script.*;
-import javax.tools.*;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Script engine to compile and run a Java class on the fly.
@@ -204,8 +219,7 @@ public class JavaScriptEngine implements ScriptEngine, Compilable {
         JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics, compilationOptions,
                 null, toCompile);
         if (!task.call()) {
-            String message = diagnostics.getDiagnostics().stream()
-                    .map(d -> d.toString())
+            String message = diagnostics.getDiagnostics().stream().map(d -> d.toString())
                     .collect(Collectors.joining("\n"));
             throw new ScriptException(message);
         }

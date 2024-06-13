@@ -10,8 +10,17 @@
 	<config-description>
 		<parameter name="additionalBundles" type="text">
 			<label>Additional Bundles</label>
-			<description>Additional bundles for developing, concatenated by ",".</description>
+			<description>Additional bundles exported for developing, concatenated by ",".</description>
 		</parameter>
+        <parameter name="additionalClasses" type="text">
+            <label>Additional Classes</label>
+            <description>Additional classes exported for developing, concatenated by ",".</description>
+        </parameter>
+        <parameter name="initializationWaitTime" type="integer">
+            <label>Initialization Wait Time</label>
+            <description>Wait time (in ms) before initialization. Use this if there is script error at startup, before all actions or things are initialized.</description>
+            <default>0</default>
+        </parameter>
 	</config-description>
 
 </addon:addon>

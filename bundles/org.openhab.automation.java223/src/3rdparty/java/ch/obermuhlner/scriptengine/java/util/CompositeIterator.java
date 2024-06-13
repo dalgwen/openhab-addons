@@ -17,6 +17,7 @@ public class CompositeIterator<T> implements Iterator<T> {
      *
      * @param iterators the {@link Iterator}s
      */
+    @SafeVarargs
     public CompositeIterator(Iterator<? extends T>... iterators) {
         this.iterators = iterators;
     }

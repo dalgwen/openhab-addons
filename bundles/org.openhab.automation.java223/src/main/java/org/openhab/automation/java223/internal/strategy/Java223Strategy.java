@@ -17,10 +17,11 @@ import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
 
 import java.io.IOException;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,10 +41,10 @@ import javax.tools.JavaFileObject;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.automation.java223.common.Java223Constants;
-import org.openhab.automation.java223.helper.Java223Exception;
-import org.openhab.automation.java223.helper.annotations.InjectBinding;
-import org.openhab.automation.java223.helper.annotations.RunScript;
+import org.openhab.automation.java223.common.Java223Exception;
+import org.openhab.automation.java223.common.RunScript;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
 import org.openhab.core.service.WatchService;
 import org.slf4j.Logger;
@@ -67,14 +68,14 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
 
     private static Logger logger = LoggerFactory.getLogger(Java223Strategy.class);
 
-    private static List<String> METHOD_NAMES_TO_EXECUTE = Arrays.asList("eval", "main", "run");
+    private static final List<String> METHOD_NAMES_TO_EXECUTE = Arrays.asList("eval", "main", "run");
 
     // Additional bindings, not in the openhab JSR 223 specification
-    private Map<String, Object> additionalBindings;
+    private static Map<String, Object> additionalBindings;
 
     // Keeping a list of library class
-    private Map<String, JavaFileObject> librariesByFullClassName = new HashMap<>();
-    private Map<String, String> librariesFullClassNameByPath = new HashMap<>();
+    private static Map<String, JavaFileObject> librariesByFullClassName = new HashMap<>();
+    private static Map<String, String> librariesFullClassNameByPath = new HashMap<>();
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
 
@@ -83,7 +84,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
 
     public Java223Strategy(Map<String, Object> additionalBindings) {
         super();
-        this.additionalBindings = additionalBindings;
+        Java223Strategy.additionalBindings = additionalBindings;
     }
 
     @Override
@@ -103,19 +104,8 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         // storing bindings to be used as parameter in case of deferred execution
         bindingsStore.addBindings(compiledInstance, bindings);
 
-        // statically injecting bindings data into other libraries if necessary
-        try {
-            for (String libraryClass : librariesByFullClassName.keySet()) {
-                logger.debug("Injecting bindings into library {} for {} to use it", libraryClass,
-                        compiledClass.getName().toString());
-                injectBindingsInto(bindings, Class.forName(libraryClass, true, compiledClass.getClassLoader()));
-            }
-        } catch (ClassNotFoundException e) {
-            logger.error("Cannot initialize static libraries by injecting bindings into it. Should not happened ?!", e);
-        }
-
         // finally, inject bindings data in the script
-        injectBindingsInto(bindings, compiledInstance);
+        injectBindingsInto(bindings, compiledInstance, null);
     }
 
     @Override
@@ -131,22 +121,12 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                 if (METHOD_NAMES_TO_EXECUTE.contains(method.getName())
                         || method.getAnnotation(RunScript.class) != null) {
                     try {
-                        Parameter[] parameters = method.getParameters();
-                        Object[] parameterValues = new Object[parameters.length];
-                        Map<String, Object> bindings = bindingsStore.getBindings(instance);
-                        if (bindings == null && parameters.length > 0) {
-                            logger.error(
-                                    "Cannot found bindings data in store ! Does script preparation took too long ?");
-                            break;
-                        }
-                        for (int i = 0; i < parameters.length; i++) {
-                            parameterValues[i] = extractBindingValueForElement(bindings, parameters[i]);
-                        }
+                        Object[] parameterValues = getParameterValuesFor(method, bindingsStore.getBindings(instance));
                         returned = Optional.ofNullable(method.invoke(instance, parameterValues));
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                         String simpleName = instance.getClass().getSimpleName();
                         logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
-                        throw new Java223Exception(
+                        throw new ScriptException(
                                 String.format("Error executing entry point %s in %s", method.getName(), simpleName, e));
                     }
                 }
@@ -163,39 +143,74 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         }
     }
 
+    private static Object[] getParameterValuesFor(Executable executable, Map<String, Object> bindings) {
+        Parameter[] parameters = executable.getParameters();
+        Object[] parameterValues = new Object[parameters.length];
+        if (bindings == null && parameters.length > 0) {
+            logger.error("Cannot found bindings data in store ! Does script preparation took too long ?");
+            return null;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            parameterValues[i] = extractBindingValueForElement(bindings, parameters[i]);
+        }
+        return parameterValues;
+    }
+
     /**
      * Inject bindings into objetToInject
      *
      * @param bindings a bindings maps with value to inject
-     * @param objectToInject An instance, or a class (static injection). The fields will be filled with value from the
+     * @param objectToInject An object. Its fields will be filled with value from the
      *            bindings, if a match is found
+     * @param libAlreadyInstanciated A store of library, to avoid loop injection
+     * @throws ScriptException
      */
-    public static void injectBindingsInto(Map<String, Object> bindings, Object objectToInject) {
-        Object instance = null;
-        Class<?> clazz = null;
-        if (objectToInject instanceof Class<?> objetToInjectIsAStaticClass) {
-            clazz = objetToInjectIsAStaticClass;
-        } else {
-            clazz = objectToInject.getClass();
-            instance = objectToInject;
-        }
+    public static void injectBindingsInto(Map<String, Object> bindings, Object objectToInjectInto,
+            Map<Class<?>, Object> libAlreadyInstanciated) {
+
+        Class<?> clazz = objectToInjectInto.getClass();
+        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated == null ? new HashMap<>()
+                : libAlreadyInstanciated;
+
         for (Field field : getAllFields(clazz)) {
             try {
-                Object valueToInject = extractBindingValueForElement(bindings, field);
-                if (valueToInject != null && (instance != null || Modifier.isStatic(field.getModifiers()))) {
-                    field.setAccessible(true);
-                    field.set(instance, valueToInject);
+                Object valueToInject;
+                String fieldClassName = field.getType().getName();
+
+                // is the field a library ?
+                if (librariesByFullClassName.get(fieldClassName) != null) { // it's a library
+                    // has it already been instanciated and stored in the store?
+                    valueToInject = libAlreadyInstanciatedLocal.get(field.getType());
+                    if (valueToInject == null) { // not instanciated, create it
+                        Constructor<?>[] constructors = field.getType().getDeclaredConstructors();
+                        // use the empty constructor if available, or the first one
+                        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0)
+                                .findFirst().orElseGet(() -> constructors[0]);
+                        Object[] parameterValues = getParameterValuesFor(constructor, bindings);
+                        valueToInject = constructor.newInstance(parameterValues);
+                        // and then also use injection into it
+                        injectBindingsInto(bindings, valueToInject, libAlreadyInstanciated);
+                    }
+                } else { // it's not a library, try to find value in bindings
+                    valueToInject = extractBindingValueForElement(bindings, field);
                 }
-            } catch (IllegalAccessException | IllegalArgumentException e) {
-                logger.error("Cannot inject bindings {} into {}", field.getName(), clazz.getSimpleName(), e);
+                if (valueToInject != null) {
+                    field.setAccessible(true);
+                    field.set(objectToInjectInto, valueToInject);
+                }
+            } catch (IllegalAccessException | IllegalArgumentException | SecurityException | InstantiationException
+                    | InvocationTargetException e) {
+                logger.error("Cannot inject bindings or libs {} into {}", field.getName(), clazz.getSimpleName(), e);
             }
         }
     }
 
     /**
-     * extract a name from a possibly annotated element, or return other
+     * Compute a name to use as a key, then use this key to search a value in the bindings data
      *
      * @param bindings
+     * @param annotatedElement
+     * @throws ScriptException
      **/
     @SuppressWarnings({ "null", "unused" })
     public static @Nullable Object extractBindingValueForElement(Map<String, Object> bindings,
@@ -204,7 +219,9 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         // first choose a name to use as a key in the binding map
         String name;
         InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
-        if (injectBindingAnnotation != null
+        if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
+            return null;
+        } else if (injectBindingAnnotation != null
                 && !injectBindingAnnotation.named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
             name = injectBindingAnnotation.named();
         } else if (annotatedElement instanceof Parameter parameter && parameter.isNamePresent()) {
@@ -212,7 +229,9 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         } else if (annotatedElement instanceof Field field && field.getName() != null) {
             name = field.getName();
         } else {
-            logger.warn("Unknown name for parameter. We cannot found it in bindings an therefore cannot inject it");
+            logger.warn(
+                    "Unknown name for parameter of class {}. We cannot found it in bindings and therefore cannot inject it",
+                    annotatedElement.getClass().getName());
             return null;
         }
 

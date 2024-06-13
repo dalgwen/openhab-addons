@@ -9,7 +9,8 @@ import javax.script.ScriptException;
  * A {@link NameStrategy} that scans the Java script to determine the package name and class name defined in the script.
  */
 public class DefaultNameStrategy implements NameStrategy {
-    public static final Pattern NAME_PATTERN = Pattern.compile("public\\s+class\\s+([A-Za-z][A-Za-z0-9_$]*)");
+    public static final Pattern NAME_PATTERN = Pattern
+            .compile("public\\s+(abstract )?(class|interface|@interface)\\s+([A-Za-z][A-Za-z0-9_$]*)");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+([A-Za-z][A-Za-z0-9_$.]*)");
 
     @Override
@@ -22,7 +23,7 @@ public class DefaultNameStrategy implements NameStrategy {
 
         Matcher nameMatcher = NAME_PATTERN.matcher(script);
         if (nameMatcher.find()) {
-            String name = nameMatcher.group(1);
+            String name = nameMatcher.group(3);
             if (fullPackage == null) {
                 return name;
             } else {

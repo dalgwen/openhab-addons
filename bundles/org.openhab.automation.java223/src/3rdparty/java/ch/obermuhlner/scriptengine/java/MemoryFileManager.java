@@ -1,18 +1,29 @@
 package ch.obermuhlner.scriptengine.java;
 
-import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
-import ch.obermuhlner.scriptengine.java.util.CompositeIterator;
+import static javax.tools.StandardLocation.*;
 
-import javax.tools.*;
-
-
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static javax.tools.StandardLocation.CLASS_OUTPUT;
-import static javax.tools.StandardLocation.CLASS_PATH;
+import javax.tools.FileObject;
+import javax.tools.ForwardingJavaFileManager;
+import javax.tools.JavaFileManager;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+
+import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
+import ch.obermuhlner.scriptengine.java.util.CompositeIterator;
 
 /**
  * A {@link JavaFileManager} that manages some files in memory,
@@ -22,7 +33,7 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
 
     private final Map<String, ClassMemoryJavaFileObject> mapNameToClasses = new HashMap<>();
     private final ClassLoader parentClassLoader;
-    
+
     private PackageResourceListingStrategy packageResourceListingStrategy = null;
 
     /**
@@ -36,11 +47,10 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
 
         this.parentClassLoader = parentClassLoader;
     }
-    
-    public void setPackageResourceListingStrategy(PackageResourceListingStrategy packageResourceListingStrategy) {
-    	this.packageResourceListingStrategy = packageResourceListingStrategy;
-    }
 
+    public void setPackageResourceListingStrategy(PackageResourceListingStrategy packageResourceListingStrategy) {
+        this.packageResourceListingStrategy = packageResourceListingStrategy;
+    }
 
     private Collection<ClassMemoryJavaFileObject> memoryClasses() {
         return mapNameToClasses.values();
@@ -50,6 +60,7 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
         return new MemoryJavaFileObject(origin, name, JavaFileObject.Kind.SOURCE, code);
     }
 
+    @Override
     public ClassLoader getClassLoader(JavaFileManager.Location location) {
         ClassLoader classLoader = super.getClassLoader(location);
 
@@ -61,9 +72,7 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
             Map<String, byte[]> mapNameToBytes = new HashMap<>();
 
             for (ClassMemoryJavaFileObject outputMemoryJavaFileObject : memoryClasses()) {
-                mapNameToBytes.put(
-                        outputMemoryJavaFileObject.getName(),
-                        outputMemoryJavaFileObject.getBytes());
+                mapNameToBytes.put(outputMemoryJavaFileObject.getName(), outputMemoryJavaFileObject.getBytes());
             }
 
             return new MemoryClassLoader(mapNameToBytes, classLoader);
@@ -73,44 +82,34 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
     }
 
     @Override
-    public Iterable<JavaFileObject> list(
-            JavaFileManager.Location location,
-            String packageName,
-            Set<JavaFileObject.Kind> kinds,
-            boolean recurse) throws IOException {
+    public Iterable<JavaFileObject> list(JavaFileManager.Location location, String packageName,
+            Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
         Iterable<JavaFileObject> list = super.list(location, packageName, kinds, recurse);
 
         if (location == CLASS_OUTPUT) {
             Collection<? extends JavaFileObject> generatedClasses = memoryClasses();
-            return () -> new CompositeIterator<JavaFileObject>(
-                    list.iterator(),
-                    generatedClasses.iterator());
-        }
-        else if (location == CLASS_PATH)
-        {
-        	if (packageResourceListingStrategy != null)
-        	{
-        		Collection<String> resources = packageResourceListingStrategy.listResources(packageName);
-        		
+            return () -> new CompositeIterator<JavaFileObject>(list.iterator(), generatedClasses.iterator());
+        } else if (location == CLASS_PATH) {
+            if (packageResourceListingStrategy != null) {
+                Collection<String> resources = packageResourceListingStrategy.listResources(packageName);
+
                 List<JavaFileObject> classPathClasses = new ArrayList<JavaFileObject>();
-                
-                for (JavaFileObject jfo : list)
-                {
-                	classPathClasses.add(jfo);
+
+                for (JavaFileObject jfo : list) {
+                    classPathClasses.add(jfo);
                 }
 
                 for (String resource : resources) {
-                	if (resource.endsWith(".class")) {
-                		JavaFileObject javaFileObject = new ClasspathMemoryJavaFileObject(parentClassLoader, resource);
-                		classPathClasses.add(javaFileObject);
-                	}
+                    if (resource.endsWith(".class")) {
+                        JavaFileObject javaFileObject = new ClasspathMemoryJavaFileObject(parentClassLoader, resource);
+                        classPathClasses.add(javaFileObject);
+                    }
                 }
-                
+
                 return classPathClasses;
-        	}
+            }
         }
-        
-    
+
         return list;
     }
 
@@ -124,12 +123,8 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
     }
 
     @Override
-    public JavaFileObject getJavaFileForOutput(
-            JavaFileManager.Location location,
-            String className,
-            JavaFileObject.Kind kind,
-            FileObject sibling)
-            throws IOException {
+    public JavaFileObject getJavaFileForOutput(JavaFileManager.Location location, String className,
+            JavaFileObject.Kind kind, FileObject sibling) throws IOException {
         if (kind == JavaFileObject.Kind.CLASS) {
             ClassMemoryJavaFileObject file = new ClassMemoryJavaFileObject(className);
             mapNameToClasses.put(className, file);
@@ -141,9 +136,7 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
 
     static abstract class AbstractMemoryJavaFileObject extends SimpleJavaFileObject {
         public AbstractMemoryJavaFileObject(String name, JavaFileObject.Kind kind) {
-            super(URI.create("memory:///" +
-                    name.replace('.', '/') +
-                    kind.extension), kind);
+            super(URI.create("memory:///" + name.replace('.', '/') + kind.extension), kind);
         }
     }
 
@@ -192,6 +185,9 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
         @Override
         public InputStream openInputStream() throws IOException {
             URL url = classLoader.getResource(resource);
+            if (url == null) {
+                throw new IOException("url " + url + " is null");
+            }
             InputStream is = url.openStream();
             return is;
         }
@@ -202,7 +198,6 @@ public class MemoryFileManager extends ForwardingJavaFileManager<JavaFileManager
         }
     }
 
-    
     static class ClassMemoryJavaFileObject extends AbstractMemoryJavaFileObject {
 
         private ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
