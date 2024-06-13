@@ -24,6 +24,12 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 
 /**
  * Wrapps a script in boilerplate code if not present.
+ * Must respect some conditions to be wrapped correctly:
+ * - must not contains "public class"
+ * - line containing import must start with "import " (on their own line)
+ * - you can globally return a value, but take care to put the "return " keyword at the beginning of the line (on its
+ * own line)
+ * - you cannot declare method (in fact, your script is already wrapped inside a method)
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -35,9 +41,9 @@ public class ScriptWrappingStategy implements ScriptInterceptorStrategy {
     private static final Pattern IMPORT_PATTERN = Pattern.compile("import\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
 
     private static String BOILERPLATE_CODE_BEFORE = """
-            import org.openhab.automation.java223.helper.Script;
-            public class WrappedJavaScript extends Script {
-                protected Object onLoad() {
+            import helper.Java223Script;
+            public class WrappedJavaScript extends Java223Script {
+                public Object main() {
             """;
 
     private static String BOILERPLATE_CODE_AFTER = """

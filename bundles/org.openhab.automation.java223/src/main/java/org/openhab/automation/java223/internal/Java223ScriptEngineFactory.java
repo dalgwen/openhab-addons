@@ -31,7 +31,9 @@ import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.internal.codegeneration.ClassGenerator;
+import org.openhab.automation.java223.internal.codegeneration.ClassWriter;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
+import org.openhab.automation.java223.internal.codegeneration.SourceHelperCopier;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStategy;
 import org.openhab.core.automation.RuleManager;
@@ -53,6 +55,7 @@ import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +71,8 @@ import freemarker.template.TemplateException;
  *
  * @author Gwendal Roulleau - Initial contribution
  */
-@Component(service = { ScriptEngineFactory.class, Java223ScriptEngineFactory.class, EventSubscriber.class })
+@Component(service = { ScriptEngineFactory.class, Java223ScriptEngineFactory.class,
+        EventSubscriber.class }, configurationPid = "automation.java223")
 public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         implements ScriptEngineFactory, EventSubscriber {
 
@@ -85,11 +89,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     @Nullable
     private ClassGenerator classGenerator;
-
     @Nullable
-    private JavaScriptEngine scriptEngineInstance;
-
-    private static final boolean REUSE_SCRIPT_ENGINE = true;
+    private DependencyGenerator dependencyGenerator;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
             ThingStatus.UNKNOWN);
@@ -115,6 +116,16 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
 
         String additionalBundlesConfig = (String) properties.getOrDefault("additionalBundles", "");
+        String additionalClassesConfig = (String) properties.getOrDefault("additionalClasses", "");
+        Integer initializationWaitTime = (Integer) properties.getOrDefault("initializationWaitTime", 0);
+
+        if (initializationWaitTime != null && initializationWaitTime > 0) {
+            try {
+                Thread.sleep(initializationWaitTime);
+            } catch (InterruptedException e) {
+                logger.warn("Cannot wait for the java223 bundle to initialize");
+            }
+        }
 
         osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
             @Override
@@ -126,14 +137,17 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         scriptWrappingStrategy = new ScriptWrappingStategy();
 
         try {
-            ClassGenerator localClassGenerator = new ClassGenerator(LIB_DIR, itemRegistry, thingRegistry,
+            ClassWriter classWriter = new ClassWriter(LIB_DIR);
+            DependencyGenerator dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,
+                    additionalClassesConfig, bundleContext);
+            this.classGenerator = new ClassGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
                     bundleContext);
-            this.classGenerator = localClassGenerator;
-            generateActions();
+            SourceHelperCopier.copyFiles(classWriter);
             generateThings();
+            generateActions();
             generateItems();
-            watchService.registerListener(localClassGenerator, LIB_DIR);
-            DependencyGenerator.createCoreDependencies(LIB_DIR, additionalBundlesConfig, bundleContext);
+            dependencyGenerator.createCoreDependencies();
+            watchService.registerListener(classWriter, LIB_DIR);
         } catch (IOException | TemplateException e) {
             logger.error("Cannot create helper class file in library dir. " + e.getMessage());
         }
@@ -143,6 +157,16 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         watchService.registerListener(java223Strategy, LIB_DIR);
 
         logger.info("Bundle activated");
+    }
+
+    @Modified
+    protected void modified(Map<String, Object> properties) {
+        String additionalBundlesConfig = (String) properties.getOrDefault("additionalBundles", "");
+        String additionalClassesConfig = (String) properties.getOrDefault("additionalClasses", "");
+        dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig, additionalClassesConfig,
+                bundleContext);
+        dependencyGenerator.createCoreDependencies();
+        logger.debug("java223 configuration update received ({})", properties);
     }
 
     @Deactivate
@@ -166,32 +190,30 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     @Override
     public @Nullable ScriptEngine createScriptEngine(String scriptType) {
         if (getScriptTypes().contains(scriptType)) {
+            JavaScriptEngine engine = new Java223ScriptEngine();
 
-            if (this.scriptEngineInstance == null || !REUSE_SCRIPT_ENGINE) {
-                JavaScriptEngine engine = (JavaScriptEngine) getScriptEngine();
+            engine.setExecutionStrategyFactory(java223Strategy);
+            engine.setBindingStrategy(java223Strategy);
+            engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
+            engine.setCompilationStrategy(java223Strategy);
+            engine.setScriptInterceptorStrategy(scriptWrappingStrategy);
+            engine.setCompilationOptions(Arrays.asList("-g", "-parameters"));
 
-                engine.setExecutionStrategyFactory(java223Strategy);
-                engine.setBindingStrategy(java223Strategy);
-                engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
-                engine.setCompilationStrategy(java223Strategy);
-                engine.setScriptInterceptorStrategy(scriptWrappingStrategy);
-
-                engine.setCompilationOptions(Arrays.asList("-g"));
-
-                this.scriptEngineInstance = engine;
-                return engine;
-            } else {
-                return scriptEngineInstance;
-            }
+            return engine;
         }
         return null;
     }
 
     @Override
     public ScriptEngine getScriptEngine() {
-        return new JavaScriptEngine();
+        return createScriptEngine(Java223Constants.JAVA_FILE_TYPE);
     }
 
+    /**
+     * Additionnal data to put into bindings so the scripts could use them.
+     *
+     * @return
+     */
     private Map<String, Object> getAdditionalBindings() {
         RuleManager ruleManager = bundleContext.getService(bundleContext.getServiceReference(RuleManager.class));
         MetadataRegistry metadataRegistry = bundleContext

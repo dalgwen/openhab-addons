@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.wiring.BundleWiring;
@@ -37,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Create a JAR with some dependencies needed to design rule from an external project
+ * Create a JAR with some dependencies usefull to code from an external project
  *
  * @author Jan N. Klug - Initial contribution
  * @author Gwendal Roulleau
@@ -47,23 +49,41 @@ public class DependencyGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyGenerator.class);
 
-    private static final Set<String> DEFAULT_DEPENDENCIES = Set.of("javax.measure", "javax.measure.quantity",
-            "org.openhab.core.audio", "org.openhab.core.automation", "org.openhab.core.automation.util",
-            "org.openhab.core.automation.module.script", "org.openhab.core.automation.module.script.defaultscope",
+    private static final Set<String> DEFAULT_DEPENDENCIES = Set.of("org.openhab.automation.java223.common",
+            "org.openhab.core.audio", "org.openhab.core.automation", "org.openhab.core.automation.events",
+            "org.openhab.core.automation.util", "org.openhab.core.automation.module.script",
+            "org.openhab.core.automation.module.script.defaultscope",
             "org.openhab.core.automation.module.script.rulesupport.shared",
             "org.openhab.core.automation.module.script.rulesupport.shared.simple", "org.openhab.core.common",
-            "org.openhab.core.common.registry", "org.openhab.core.config.core", "org.openhab.core.items",
-            "org.openhab.core.library.types", "org.openhab.core.library.items", "org.openhab.core.library.dimension",
-            "org.openhab.core.model.script", "org.openhab.core.model.script.actions", "org.openhab.core.model.rule",
-            "org.openhab.core.persistence", "org.openhab.core.persistence.extensions", "org.openhab.core.thing",
+            "org.openhab.core.common.registry", "org.openhab.core.config.core", "org.openhab.core.events",
+            "org.openhab.core.items", "org.openhab.core.items.events", "org.openhab.core.library.types",
+            "org.openhab.core.library.items", "org.openhab.core.library.dimension", "org.openhab.core.model.script",
+            "org.openhab.core.model.script.actions", "org.openhab.core.model.rule", "org.openhab.core.persistence",
+            "org.openhab.core.persistence.extensions", "org.openhab.core.thing", "org.openhab.core.thing.events",
             "org.openhab.core.thing.binding", "org.openhab.core.transform", "org.openhab.core.transform.actions",
-            "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson",
-            "org.openhab.automation.java223.annotations", "org.openhab.automation.java223.helper",
-            "org.openhab.automation.java223.helper.eventinfo", "org.openhab.automation.java223.helper.annotations",
-            "org.openhab.automation.java223.eventinfo", "org.eclipse.jdt.annotation");
+            "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson");
 
-    public static synchronized void createCoreDependencies(Path libDir, String additionalBundlesConfig,
+    private static final Set<String> DEFAULT_CLASSES_DEPENDENCIES = Set.of("org.eclipse.jdt.annotation.NonNull",
+            "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable",
+            "org.slf4j.LoggerFactory", "org.slf4j.Logger", "org.slf4j.Marker");
+
+    private Path libDir;
+    private String additionalBundlesConfig;
+    private String additionalClassesConfig;
+    private BundleContext bundleContext;
+
+    private Set<String> additionalClassesToExport = new HashSet<>();
+
+    public DependencyGenerator(Path libDir, String additionalBundlesConfig, String additionalClassesConfig,
             BundleContext bundleContext) {
+        super();
+        this.libDir = libDir;
+        this.additionalBundlesConfig = additionalBundlesConfig;
+        this.additionalClassesConfig = additionalClassesConfig;
+        this.bundleContext = bundleContext;
+    }
+
+    public synchronized void createCoreDependencies() {
         try (FileOutputStream outFile = new FileOutputStream(libDir.resolve("dependencies.jar").toFile())) {
             Manifest manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -80,13 +100,23 @@ public class DependencyGenerator {
                 }
             }
 
+            Set<String> packagesSuccessfullyExported = new HashSet<>();
             for (Bundle bundle : bundleContext.getBundles()) {
                 if (searchIn.contains(bundle.getSymbolicName())) {
-                    copyExportedClasses(dependencies, bundle, target);
+                    copyExportedPackagesByBundleInspection(dependencies, bundle, target, packagesSuccessfullyExported);
                 }
             }
 
-            exportJdtNullAnnotation(target);
+            Set<String> packagesNotFound = new HashSet<>(DEFAULT_DEPENDENCIES);
+            packagesNotFound.removeAll(packagesSuccessfullyExported.stream().map(s -> s.replaceAll("/", ".")).toList());
+            for (String remainingPackage : packagesNotFound) {
+                logger.warn("Failed to found classes to export in package {}", remainingPackage);
+            }
+
+            Set<String> classesDependencies = new HashSet<>(DEFAULT_CLASSES_DEPENDENCIES);
+            classesDependencies.addAll(Arrays.asList(additionalClassesConfig.split(",")));
+            classesDependencies.addAll(additionalClassesToExport);
+            copyExportedClassesByClassLoader(classesDependencies, target);
 
             target.close();
         } catch (IOException e) {
@@ -94,11 +124,11 @@ public class DependencyGenerator {
         }
     }
 
-    private static void exportJdtNullAnnotation(JarOutputStream target) {
-
-        List<String> classesToExtract = List.of("org.eclipse.jdt.annotation.NonNull",
-                "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable");
+    private static void copyExportedClassesByClassLoader(Set<String> classesToExtract, JarOutputStream target) {
         for (String classToExtract : classesToExtract) {
+            if (classToExtract.isEmpty()) {
+                continue;
+            }
             String path = classToExtract.replaceAll("\\.", "/") + ".class";
             ClassLoader classLoader = DependencyGenerator.class.getClassLoader();
             if (classLoader == null) {
@@ -119,7 +149,8 @@ public class DependencyGenerator {
         }
     }
 
-    private static void copyExportedClasses(Set<String> dependencies, Bundle bundle, JarOutputStream target) {
+    private static void copyExportedPackagesByBundleInspection(Set<String> dependencies, Bundle bundle,
+            JarOutputStream target, Set<String> classesSuccessfullyExported) {
         String exportPackage = bundle.getHeaders().get("Export-Package");
         if (exportPackage == null) {
             logger.warn("Bundle '{}' does not export any package!", bundle.getSymbolicName());
@@ -149,6 +180,7 @@ public class DependencyGenerator {
                             } else {
                                 try (InputStream stream = urlEntry.openStream()) {
                                     addEntryToJar(target, classFile, 0, stream);
+                                    classesSuccessfullyExported.add(packageName);
                                 }
                             }
                         }
@@ -168,5 +200,60 @@ public class DependencyGenerator {
         jar.putNextEntry(jarEntry);
         jar.write(content.readAllBytes());
         jar.closeEntry();
+    }
+
+    private boolean excludeFromExport(String classToExport) {
+        return classToExport.startsWith("java.") || DEFAULT_DEPENDENCIES.stream() //
+                .filter(packageAlreadyExported -> classToExport.startsWith(packageAlreadyExported)) //
+                .findFirst() //
+                .isPresent();
+    }
+
+    private static void getAllInterfaces(@Nullable Class<?> cls, final Set<String> interfacesFound) {
+        @Nullable
+        Class<?> clsLocal = cls;
+        while (clsLocal != null) {
+            final Class<?>[] interfaces = clsLocal.getInterfaces();
+            for (final Class<?> i : interfaces) {
+                if (interfacesFound.add(i.getCanonicalName())) {
+                    getAllInterfaces(i, interfacesFound);
+                }
+            }
+            clsLocal = clsLocal.getSuperclass();
+        }
+    }
+
+    public static List<String> getAllSuperclasses(final Class<?> cls) {
+        final List<String> classes = new ArrayList<>();
+        Class<?> superclass = cls.getSuperclass();
+        while (superclass != null) {
+            classes.add(superclass.getCanonicalName());
+            superclass = superclass.getSuperclass();
+        }
+        return classes;
+    }
+
+    public void setClassesToAddToDependenciesLib(Set<String> allClassesToExport) {
+
+        Set<String> newAdditionalClassesToExport = new HashSet<>();
+        for (String clazzAsString : allClassesToExport) {
+            Class<?> clazz;
+            try {
+                clazz = Class.forName(clazzAsString);
+                newAdditionalClassesToExport.add(clazzAsString);
+                newAdditionalClassesToExport.addAll(getAllSuperclasses(clazz));
+                getAllInterfaces(clazz, newAdditionalClassesToExport);
+            } catch (ClassNotFoundException e) {
+                logger.warn("Cannot inspect class {} to add it as a dependancy", clazzAsString);
+            }
+        }
+
+        newAdditionalClassesToExport.removeIf(this::excludeFromExport);
+        // check if there is new classes :
+        newAdditionalClassesToExport.removeAll(additionalClassesToExport);
+        if (!newAdditionalClassesToExport.isEmpty()) {
+            additionalClassesToExport.addAll(newAdditionalClassesToExport);
+            createCoreDependencies();
+        }
     }
 }

@@ -12,9 +12,22 @@
  */
 package org.openhab.automation.java223.internal;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+import javax.script.Invocable;
+import javax.script.ScriptException;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.ScriptLoadedTrigger;
+import org.openhab.automation.java223.common.ScriptUnloadedTrigger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
+import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 
 /**
  * The {@link Java223ScriptEngine} is responsible for
@@ -22,89 +35,79 @@ import org.slf4j.LoggerFactory;
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
-public class Java223ScriptEngine { // extends JavaScriptEngine implements Invocable {
+public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     private final Logger logger = LoggerFactory.getLogger(Java223ScriptEngine.class);
-    //
-    // private final CompilerService compilerService;
-    // private @Nullable JavaRuleCompiledScript compiledScript;
-    //
-    // public Java223ScriptEngine(CompilerService compilerService) {
-    // this.compilerService = compilerService;
-    // }
-    //
-    // @Override
-    // public @Nullable Object eval(@Nullable String script, @Nullable Bindings bindings) throws ScriptException {
-    // if (bindings != null) {
-    // ScriptDependencyListener depListener = (ScriptDependencyListener) bindings.get("oh.dependency-listener");
-    // if (depListener != null) {
-    // depListener.accept(JAVARULE_DEPENDENCY_JAR.toString());
-    // } else {
-    // logger.warn("Could not get script dependency listener, dependency tracking might fail.");
-    // }
-    // }
-    //
-    // JavaRuleCompiledScript compiledScript = (JavaRuleCompiledScript) this.compile(script);
-    // compiledScript.eval(bindings);
-    // this.compiledScript = compiledScript;
-    // return compiledScript;
-    // }
-    //
-    // @Override
-    // public JavaCompiledScript compile(@Nullable String script) throws ScriptException {
-    // try {
-    // MemoryFileManager fileManager = compilerService.getMemoryFileManager();
-    // String fullClassName = new DefaultNameStrategy().getFullName(script);
-    // String simpleClassName = NameStrategy.extractSimpleName(fullClassName);
-    // JavaFileObject scriptSource = fileManager.createSourceFileObject(null, simpleClassName, script);
-    // compilerService.compile(List.of(scriptSource), fileManager, null);
-    // Class<?> clazz = fileManager.getClassLoader(StandardLocation.CLASS_OUTPUT).loadClass(fullClassName);
-    // return new JavaRuleCompiledScript(this, clazz);
-    // } catch (CompilerException | ClassNotFoundException e) {
-    // throw new ScriptException(e);
-    // }
-    // }
-    //
-    // @Override
-    // public @Nullable Object invokeMethod(@Nullable Object o, @Nullable String name, Object @Nullable... args)
-    // throws NoSuchMethodException {
-    // throw new NoSuchMethodException("not implemented");
-    // }
-    //
-    // @Override
-    // public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args) throws ScriptException {
-    // JavaRuleCompiledScript compiledScript = this.compiledScript;
-    // if (compiledScript == null || name == null) {
-    // return null;
-    // }
-    // JavaRule instance = (JavaRule) compiledScript.getCompiledInstance();
-    // switch (name) {
-    // case "scriptLoaded":
-    // if (args != null && args.length > 0 && args[0] instanceof String) {
-    // String engineIdentifier = (String) args[0];
-    // instance.scriptLoaded(engineIdentifier);
-    // } else {
-    // logger.debug("{} incompatible with required parameter String", args);
-    // }
-    // break;
-    // case "scriptUnloaded":
-    // instance.scriptUnloaded();
-    // break;
-    // default:
-    // throw new ScriptException(name + " is not an allowed method in JavaRule");
-    // }
-    //
-    // return null;
-    // }
-    //
-    // @Override
-    // @SuppressWarnings("null")
-    // public <T> T getInterface(@Nullable Class<T> clazz) {
-    // return null;
-    // }
-    //
-    // @Override
-    // @SuppressWarnings("null")
-    // public <T> T getInterface(@Nullable Object o, @Nullable Class<T> clazz) {
-    // return null;
-    // }
+
+    private @Nullable JavaCompiledScript lastCompiledScript;
+
+    @Override
+    public JavaCompiledScript compile(@Nullable String script) throws ScriptException {
+        JavaCompiledScript localLastCompiledScript = super.compile(script);
+        lastCompiledScript = localLastCompiledScript;
+        if (localLastCompiledScript != null) {
+            return localLastCompiledScript;
+        } else {
+            throw new ScriptException("Compile result is null. Should not happened");
+        }
+    }
+
+    @Override
+    public @Nullable Object invokeMethod(@Nullable Object o, @Nullable String name, Object @Nullable... args)
+            throws NoSuchMethodException {
+        throw new NoSuchMethodException("not implemented");
+    }
+
+    @Override
+    public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args) throws ScriptException {
+
+        // expect that the script engine serve only once and that the wanted compiled script is the last one
+        JavaCompiledScript compiledScript = this.lastCompiledScript;
+        if (compiledScript == null || name == null) {
+            return null;
+        }
+
+        Class<? extends Annotation> annotation;
+        switch (name) {
+            case "scriptLoaded":
+                annotation = ScriptLoadedTrigger.class;
+                break;
+            case "scriptUnloaded":
+                annotation = ScriptUnloadedTrigger.class;
+                break;
+            default:
+                throw new ScriptException(name + " is not an allowed method in java223");
+        }
+
+        Object compiledInstance = compiledScript.getCompiledInstance();
+        for (Method method : compiledInstance.getClass().getMethods()) {
+            Annotation scriptLoadedOrUnloadedAnnotation = method.getAnnotation(annotation);
+            if (scriptLoadedOrUnloadedAnnotation != null) {
+                if (method.getParameters().length != 0) {
+                    throw new ScriptException("Method " + method.getName()
+                            + " called by ScriptLoaded/ScriptUnloaded trigger should not have any argument");
+                } else {
+                    try {
+                        method.invoke(compiledInstance);
+                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                        logger.warn("Method " + method.getName()
+                                + " cannot be called by ScriptLoaded/ScriptUnloaded trigger");
+                        throw new ScriptException(e);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    @SuppressWarnings("null")
+    public <T> T getInterface(@Nullable Class<T> clazz) {
+        return null;
+    }
+
+    @Override
+    @SuppressWarnings("null")
+    public <T> T getInterface(@Nullable Object o, @Nullable Class<T> clazz) {
+        return null;
+    }
 }
