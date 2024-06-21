@@ -12,35 +12,26 @@
  */
 package helper.rules.eventinfo;
 
-import java.util.Map;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.InjectBinding;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
- * DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *         DTO object to facilitate input injection when used as an argument in a rule annotated method
  */
 @NonNullByDefault
 public class ChannelEvent extends EventInfo {
 
-    @Nullable
-    protected final String channelUUID;
-    @Nullable
-    protected final String event;
+    @InjectBinding
+    protected @NonNullByDefault({}) String channelUUID;
 
-    public ChannelEvent(Map<String, ?> inputs) {
-        super(inputs);
-        this.event = (String) shouldNotBeNull("event");
-        this.channelUUID = (String) shouldNotBeNull("channelUUID");
-    }
+    @InjectBinding
+    protected @NonNullByDefault({}) String event;
 
-    @Nullable
     public String getChannelUUID() {
         return channelUUID;
     }
 
-    @Nullable
     public String getEvent() {
         return event;
     }

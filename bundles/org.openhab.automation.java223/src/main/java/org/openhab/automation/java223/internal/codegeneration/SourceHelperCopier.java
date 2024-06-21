@@ -85,12 +85,12 @@ public class SourceHelperCopier {
         for (FileToCopy fileToCopy : FILES_TO_COPY) {
 
             String resourcePath = "/" + ClassWriter.HELPER_PACKAGE + "/" //
-                    + fileToCopy.packageName.replaceAll("\\.", "/") + "/" //
+                    + (fileToCopy.packageName.isEmpty() ? "" : (fileToCopy.packageName.replaceAll("\\.", "/") + "/")) //
                     + fileToCopy.fileName + ".java";
             InputStream inputStream = ClassWriter.class.getResourceAsStream(resourcePath);
 
-            String destPackageName = ClassWriter.HELPER_PACKAGE + "." //
-                    + fileToCopy.packageName;
+            String destPackageName = ClassWriter.HELPER_PACKAGE
+                    + (fileToCopy.packageName.isEmpty() ? "" : ("." +fileToCopy.packageName));
 
             StringBuilder resultStringBuilder = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {

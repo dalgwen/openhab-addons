@@ -27,7 +27,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
  * @author Gwendal Roulleau - tag field with an injection intent
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.PARAMETER })
+@Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.TYPE })
 @NonNullByDefault
 public @interface InjectBinding {
 

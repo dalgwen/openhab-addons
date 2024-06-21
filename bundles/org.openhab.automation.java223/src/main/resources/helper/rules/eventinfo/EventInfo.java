@@ -15,36 +15,18 @@ package helper.rules.eventinfo;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.automation.java223.common.Java223Exception;
+import org.openhab.automation.java223.common.InjectBinding;
 
 /**
- * @author Gwendal Roulleau - Initial contribution
  * Base class : DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *
+ * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public abstract class EventInfo {
 
-    protected final Map<String, ?> inputs;
-
-    public EventInfo(Map<String, ?> inputs) {
-        this.inputs = inputs;
-    }
-
-    protected Object shouldNotBeNull(String inputParameterName) {
-        return shouldNotBeNull(inputs.get(inputParameterName), inputParameterName);
-    }
-
-    protected <T> T shouldNotBeNull(@Nullable T inputParameter, String inputParameterName) {
-        if (inputParameter == null) {
-            throw new Java223Exception("Cannot create parameter object " + this.getClass().getName()
-                    + " because mandatory parameter " + inputParameterName
-                    + " is null. Do you use the right event info object as an argument of your rule ? inputs parameters of this event are : "
-                    + inputs.toString());
-        } else {
-            return inputParameter;
-        }
-    }
+    @InjectBinding()
+    protected @NonNullByDefault({}) Map<String, ?> inputs;
 
     public Map<String, ?> getAllInputs() {
         return inputs;

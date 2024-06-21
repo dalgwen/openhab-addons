@@ -1,5 +1,6 @@
 package ${packageName};
 
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
 
 <#list classesToImport as classToImport>
@@ -10,10 +11,11 @@ import ${classToImport};
 
 public class Actions {
 
-    private ScriptThingActions scriptThingActions;
+    @InjectBinding
+    private ScriptThingActions actions;
 
-    public Actions(ScriptThingActions scriptThingActions) {
-        this.scriptThingActions = scriptThingActions;
+    public Actions(ScriptThingActions actions) {
+        this.actions = actions;
     }
 
 <#list actionsByScope as scope, actions>
@@ -21,7 +23,7 @@ public class Actions {
     public class ${camelCase(scope)} {
 <#list actions as action>
         public ${lastName(action)} get${lastName(action)}(String thingUID) {
-            return new ${lastName(action)}(scriptThingActions, thingUID);
+            return new ${lastName(action)}(actions, thingUID);
         }
 </#list>
     }

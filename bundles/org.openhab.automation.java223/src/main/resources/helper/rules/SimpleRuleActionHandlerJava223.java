@@ -55,18 +55,11 @@ public class SimpleRuleActionHandlerJava223 implements SimpleRuleActionHandler {
                 } else {
                     Object[] parameterValues = new Object[parameters.length];
                     for (int i = 0; i < parameters.length; i++) {
-                        if (EventInfo.class.isAssignableFrom(parameters[i].getType())) { // special eventInfo parameter
-                                                                                         // case
-                            parameterValues[i] = parameters[i].getType().getDeclaredConstructor(Map.class)
-                                    .newInstance(inputs);
-                        } else {
-                            parameterValues[i] = BindingInjector.extractBindingValueForElement(inputs, parameters[i]);
-                        }
+                        parameterValues[i] = BindingInjector.extractBindingValueForElement(inputs, parameters[i]);
                     }
                     return method.invoke(script, parameterValues);
                 }
-            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                    | InstantiationException | NoSuchMethodException | SecurityException e) {
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | SecurityException e) {
                 throw new Java223Exception("Cannot execute method named " + method.getName(), e);
             }
         };

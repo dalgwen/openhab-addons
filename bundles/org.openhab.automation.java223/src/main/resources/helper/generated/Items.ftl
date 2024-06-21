@@ -1,5 +1,6 @@
 package ${packageName};
 
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
@@ -10,6 +11,7 @@ import ${itemImport};
 
 public class Items {
 
+    @InjectBinding
     private ItemRegistry itemRegistry;
 
 <#list items as item>

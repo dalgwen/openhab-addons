@@ -12,46 +12,34 @@
  */
 package helper.rules.eventinfo;
 
-import java.util.Map;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.items.events.ItemStateChangedEvent;
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.types.State;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
- * DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *         DTO object to facilitate input injection when used as an argument in a rule annotated method
  */
 @NonNullByDefault
 public class ItemStateChange extends EventInfo {
 
-    @Nullable
-    protected final String itemName;
-    @Nullable
-    protected final State oldState;
-    @Nullable
-    protected final State newState;
+    @InjectBinding(named = "event.itemName")
+    protected @NonNullByDefault({}) String itemName;
 
-    public ItemStateChange(Map<String, ?> inputs) {
-        super(inputs);
-        ItemStateChangedEvent event = (ItemStateChangedEvent) shouldNotBeNull("event");
-        this.itemName = shouldNotBeNull(event.getItemName(), "event.itemName");
-        this.oldState = (State) shouldNotBeNull("oldState");
-        this.newState = (State) shouldNotBeNull("newState");
-    }
+    @InjectBinding()
+    protected @NonNullByDefault({}) State oldState;
 
-    @Nullable
+    @InjectBinding()
+    protected @NonNullByDefault({}) State newState;
+
     public String getItemName() {
         return itemName;
     }
 
-    @Nullable
     public State getOldState() {
         return oldState;
     }
 
-    @Nullable
     public State getNewState() {
         return newState;
     }

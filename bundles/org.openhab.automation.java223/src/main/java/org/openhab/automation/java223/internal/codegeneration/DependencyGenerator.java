@@ -83,6 +83,11 @@ public class DependencyGenerator {
         this.bundleContext = bundleContext;
     }
 
+    public void setAdditionalConfig(String additionalBundlesConfig, String additionalClassesConfig) {
+        this.additionalBundlesConfig = additionalBundlesConfig;
+        this.additionalClassesConfig = additionalClassesConfig;
+    }
+
     public synchronized void createCoreDependencies() {
         try (FileOutputStream outFile = new FileOutputStream(libDir.resolve("dependencies.jar").toFile())) {
             Manifest manifest = new Manifest();

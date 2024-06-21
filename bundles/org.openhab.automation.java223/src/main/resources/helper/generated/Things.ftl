@@ -1,5 +1,6 @@
 package ${packageName};
 
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.Thing;
@@ -7,6 +8,7 @@ import org.openhab.core.thing.ThingRegistry;
 
 public class Things {
   
+    @InjectBinding
     public ThingRegistry things;
     
 <#list things as thing>

@@ -30,10 +30,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 
 import javax.script.ScriptException;
@@ -95,7 +97,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     @Override
     public void associateBindings(Class<?> compiledClass, Object compiledInstance, Map<String, Object> bindings) {
 
-        // adding a special shortcut : "bindings", to receive a map with all bindings
+        // adding a special self reference to bindings : "bindings", to receive a map with all bindings
         bindings.put("bindings", bindings);
 
         // adding some custom additional fields
@@ -121,7 +123,8 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                 if (METHOD_NAMES_TO_EXECUTE.contains(method.getName())
                         || method.getAnnotation(RunScript.class) != null) {
                     try {
-                        Object[] parameterValues = getParameterValuesFor(method, bindingsStore.getBindings(instance));
+                        Object[] parameterValues = getParameterValuesFor(method, bindingsStore.getBindings(instance),
+                                null);
                         returned = Optional.ofNullable(method.invoke(instance, parameterValues));
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                         String simpleName = instance.getClass().getSimpleName();
@@ -143,7 +146,9 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         }
     }
 
-    private static Object[] getParameterValuesFor(Executable executable, Map<String, Object> bindings) {
+    private static Object[] getParameterValuesFor(Executable executable, Map<String, Object> bindings,
+            Map<Class<?>, Object> libAlreadyInstanciatedLocal)
+            throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         Parameter[] parameters = executable.getParameters();
         Object[] parameterValues = new Object[parameters.length];
         if (bindings == null && parameters.length > 0) {
@@ -151,7 +156,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             return null;
         }
         for (int i = 0; i < parameters.length; i++) {
-            parameterValues[i] = extractBindingValueForElement(bindings, parameters[i]);
+            parameterValues[i] = extractBindingValueForElement(bindings, parameters[i], libAlreadyInstanciatedLocal);
         }
         return parameterValues;
     }
@@ -162,38 +167,16 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
      * @param bindings a bindings maps with value to inject
      * @param objectToInject An object. Its fields will be filled with value from the
      *            bindings, if a match is found
-     * @param libAlreadyInstanciated A store of library, to avoid loop injection
      * @throws ScriptException
      */
     public static void injectBindingsInto(Map<String, Object> bindings, Object objectToInjectInto,
-            Map<Class<?>, Object> libAlreadyInstanciated) {
+            @Nullable Map<Class<?>, Object> libAlreadyInstanciated) {
 
         Class<?> clazz = objectToInjectInto.getClass();
-        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated == null ? new HashMap<>()
-                : libAlreadyInstanciated;
 
         for (Field field : getAllFields(clazz)) {
             try {
-                Object valueToInject;
-                String fieldClassName = field.getType().getName();
-
-                // is the field a library ?
-                if (librariesByFullClassName.get(fieldClassName) != null) { // it's a library
-                    // has it already been instanciated and stored in the store?
-                    valueToInject = libAlreadyInstanciatedLocal.get(field.getType());
-                    if (valueToInject == null) { // not instanciated, create it
-                        Constructor<?>[] constructors = field.getType().getDeclaredConstructors();
-                        // use the empty constructor if available, or the first one
-                        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0)
-                                .findFirst().orElseGet(() -> constructors[0]);
-                        Object[] parameterValues = getParameterValuesFor(constructor, bindings);
-                        valueToInject = constructor.newInstance(parameterValues);
-                        // and then also use injection into it
-                        injectBindingsInto(bindings, valueToInject, libAlreadyInstanciated);
-                    }
-                } else { // it's not a library, try to find value in bindings
-                    valueToInject = extractBindingValueForElement(bindings, field);
-                }
+                Object valueToInject = extractBindingValueForElement(bindings, field, libAlreadyInstanciated);
                 if (valueToInject != null) {
                     field.setAccessible(true);
                     field.set(objectToInjectInto, valueToInject);
@@ -206,76 +189,150 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     }
 
     /**
-     * Compute a name to use as a key, then use this key to search a value in the bindings data
+     * Search what to inject into an element.
+     * Find a library, or compute a name to use as a key, then use this key to search a value in the bindings data
      *
-     * @param bindings
-     * @param annotatedElement
+     * @param bindings a map where to find the data to inject
+     * @param annotatedElement the field/parameter element to inject value into
+     * @param libAlreadyInstanciated A store of library instance, to avoid loop injection
+     * @throws InvocationTargetException
+     * @throws IllegalArgumentException
+     * @throws IllegalAccessException
+     * @throws InstantiationException
      * @throws ScriptException
      **/
     @SuppressWarnings({ "null", "unused" })
     public static @Nullable Object extractBindingValueForElement(Map<String, Object> bindings,
-            AnnotatedElement annotatedElement) {
+            AnnotatedElement annotatedElement, @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
+            throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 
-        // first choose a name to use as a key in the binding map
-        String name;
-        InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
-        if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
-            return null;
-        } else if (injectBindingAnnotation != null
-                && !injectBindingAnnotation.named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
-            name = injectBindingAnnotation.named();
-        } else if (annotatedElement instanceof Parameter parameter && parameter.isNamePresent()) {
-            name = parameter.getName();
-        } else if (annotatedElement instanceof Field field && field.getName() != null) {
-            name = field.getName();
+        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated == null ? new HashMap<>()
+                : libAlreadyInstanciated;
+
+        Class<?> fieldType;
+        String codeName;
+        if (annotatedElement instanceof Parameter parameter) {
+            fieldType = parameter.getType();
+            codeName = parameter.getName();
+        } else if (annotatedElement instanceof Field field) {
+            fieldType = field.getType();
+            codeName = field.getName();
         } else {
             logger.warn(
-                    "Unknown name for parameter of class {}. We cannot found it in bindings and therefore cannot inject it",
-                    annotatedElement.getClass().getName());
+                    "Cannot check target class for parameter. Only Parameter or Field accepted. We cannot inject it. Should not happened");
             return null;
         }
 
-        // second, find value in the binding maps
-        Object value = bindings.get(name);
-        // maybe find it in a preset :
+        // zero : exclusion case
+        InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
+        if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
+            return null;
+        }
+
+        // first, special case, is the field a library ?
+        if (librariesByFullClassName.get(fieldType.getName()) != null) { // it's a library
+            InjectBinding libraryAnnotation = fieldType.getAnnotation(InjectBinding.class);
+            if (libraryAnnotation != null && !libraryAnnotation.enable()) { // but it's disabled at class level
+                // no injection
+                return null;
+            }
+            // has it already been instantiated and stored in the store?
+            Object valueToInject = libAlreadyInstanciatedLocal.get(fieldType);
+            if (valueToInject == null) { // not instantiated, create it
+                Constructor<?>[] constructors = fieldType.getDeclaredConstructors();
+                // use the empty constructor if available, or the first one
+                Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0)
+                        .findFirst().orElseGet(() -> constructors[0]);
+                Object[] parameterValues = getParameterValuesFor(constructor, bindings, libAlreadyInstanciatedLocal);
+                valueToInject = constructor.newInstance(parameterValues);
+                // and then also use injection into it
+                injectBindingsInto(bindings, valueToInject, libAlreadyInstanciatedLocal);
+                return valueToInject;
+            }
+        }
+
+        // second. It's not a library, so search value in bindings map.
+        // Choose a name to use as a key in the binding map
+        // the name can be a path inside the object
+        Queue<String> namePath = new LinkedList<>();
+        String named;
+        if (injectBindingAnnotation != null
+                && !injectBindingAnnotation.named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
+            named = injectBindingAnnotation.named();
+        } else {
+            named = codeName;
+        }
+        Arrays.stream(named.split("\\.")).forEach(namePath::add);
+
+        // third, choose where to look : in bindings, or deeper, in a preset :
+        Object value = bindings;
         if (injectBindingAnnotation != null
                 && !injectBindingAnnotation.preset().equals(Java223Constants.ANNOTATION_DEFAULT)) {
             ScriptExtensionManagerWrapper se = (ScriptExtensionManagerWrapper) bindings.get("scriptExtension");
             if (se != null) {
                 Map<String, Object> presetMap = (Map<String, Object>) se.importPreset(injectBindingAnnotation.preset());
                 if (presetMap != null) {
-                    value = presetMap.get(name);
+                    value = presetMap;
                 } else {
                     logger.warn("Cannot find a preset named {} for the named parameter {}",
-                            injectBindingAnnotation.preset(), name);
+                            injectBindingAnnotation.preset(), named);
                 }
             } else {
                 logger.warn("Cannot find scriptExtension in bindings. Should not happen");
             }
         }
 
-        // third, check if it is mandatory
+        // fourth, browse deep inside the object if there is a path to traverse
+        while (!namePath.isEmpty()) {
+            if (value instanceof Map<?, ?> elementToParseAsMap) {
+                value = elementToParseAsMap.get(namePath.poll());
+            } else {
+                Field targetField;
+                try {
+                    String namePart = namePath.poll();
+                    if (namePart != null) {
+                        targetField = getFieldDeep(value.getClass(), namePart);
+                        targetField.setAccessible(true);
+                        value = targetField.get(value);
+                    } else {
+                        logger.debug("Cannot map a value to the path {}", named);
+                        value = null;
+                        break;
+                    }
+                } catch (NoSuchFieldException | SecurityException e) {
+                    logger.debug("Cannot map a value to the path {}", named);
+                    value = null;
+                    break;
+                }
+            }
+        }
+
+        // fifth, check if it is mandatory
         if (value == null && injectBindingAnnotation != null && injectBindingAnnotation.mandatory()) {
-            throw new Java223Exception("There is no binding value with name " + name + ". We cannot inject it");
+            throw new Java223Exception("There is no value found for parameter/field named " + named
+                    + ", but it is mandatory. We cannot inject it");
         } else if (value == null) {
             return null;
         }
 
-        // fourth, check class compatibility
-        Class<?> targetClass = null;
-        if (annotatedElement instanceof Field fieldd) {
-            targetClass = fieldd.getType();
-        } else if (annotatedElement instanceof Parameter parameter) {
-            targetClass = parameter.getType();
-        } else {
-            logger.warn("Cannot check target class for parameter {}. We cannot inject it", name);
-            return null;
-        }
-        if (!targetClass.isAssignableFrom(value.getClass())) {
-            logger.warn("Binding entry {} is of class {} and not assignable to type {}", name,
-                    value.getClass().getName(), targetClass.getName());
+        // six, check class compatibility
+        if (!fieldType.isAssignableFrom(value.getClass())) {
+            logger.warn("Parameter/field entry {} is of class {} and not assignable to type {}", named,
+                    value.getClass().getName(), fieldType.getName());
         }
         return value;
+    }
+
+    private static Field getFieldDeep(Class<?> _clazz, String fieldName) throws NoSuchFieldException {
+        Class<?> clazz = _clazz;
+        while (clazz != null && clazz != Object.class) {
+            try {
+                return clazz.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException | SecurityException e) {
+            }
+            clazz = clazz.getSuperclass();
+        }
+        throw new NoSuchFieldException();
     }
 
     private static Set<Field> getAllFields(Class<?> type) {

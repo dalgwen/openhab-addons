@@ -35,9 +35,10 @@ import org.openhab.automation.java223.internal.codegeneration.ClassWriter;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceHelperCopier;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
-import org.openhab.automation.java223.internal.strategy.ScriptWrappingStategy;
+import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
+import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
 import org.openhab.core.items.ItemRegistry;
@@ -89,7 +90,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     @Nullable
     private ClassGenerator classGenerator;
-    @Nullable
     private DependencyGenerator dependencyGenerator;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
@@ -115,17 +115,12 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.bundleContext = bundleContext;
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
 
-        String additionalBundlesConfig = (String) properties.getOrDefault("additionalBundles", "");
-        String additionalClassesConfig = (String) properties.getOrDefault("additionalClasses", "");
-        Integer initializationWaitTime = (Integer) properties.getOrDefault("initializationWaitTime", 0);
-
-        if (initializationWaitTime != null && initializationWaitTime > 0) {
-            try {
-                Thread.sleep(initializationWaitTime);
-            } catch (InterruptedException e) {
-                logger.warn("Cannot wait for the java223 bundle to initialize");
-            }
-        }
+        String additionalBundlesConfig = ConfigParser.valueAsOrElse(properties.get("additionalBundles"), String.class,
+                "");
+        String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
+                "");
+        Integer initializationWaitTime = ConfigParser.valueAsOrElse(properties.get("initializationWaitTime"),
+                Integer.class, 0);
 
         osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
             @Override
@@ -134,12 +129,15 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             }
         };
         java223Strategy = new Java223Strategy(getAdditionalBindings());
-        scriptWrappingStrategy = new ScriptWrappingStategy();
+        scriptWrappingStrategy = new ScriptWrappingStrategy();
 
         try {
+            dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig, additionalClassesConfig,
+                    bundleContext);
+            if (initializationWaitTime > 0) {
+                Thread.sleep(initializationWaitTime);
+            }
             ClassWriter classWriter = new ClassWriter(LIB_DIR);
-            DependencyGenerator dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,
-                    additionalClassesConfig, bundleContext);
             this.classGenerator = new ClassGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
                     bundleContext);
             SourceHelperCopier.copyFiles(classWriter);
@@ -148,7 +146,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             generateItems();
             dependencyGenerator.createCoreDependencies();
             watchService.registerListener(classWriter, LIB_DIR);
-        } catch (IOException | TemplateException e) {
+        } catch (IOException | TemplateException | InterruptedException e) {
             logger.error("Cannot create helper class file in library dir. " + e.getMessage());
         }
 
@@ -161,10 +159,11 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     @Modified
     protected void modified(Map<String, Object> properties) {
-        String additionalBundlesConfig = (String) properties.getOrDefault("additionalBundles", "");
-        String additionalClassesConfig = (String) properties.getOrDefault("additionalClasses", "");
-        dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig, additionalClassesConfig,
-                bundleContext);
+        String additionalBundlesConfig = ConfigParser.valueAsOrElse(properties.get("additionalBundles"), String.class,
+                "");
+        String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
+                "");
+        dependencyGenerator.setAdditionalConfig(additionalBundlesConfig, additionalClassesConfig);
         dependencyGenerator.createCoreDependencies();
         logger.debug("java223 configuration update received ({})", properties);
     }
