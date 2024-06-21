@@ -34,7 +34,7 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class ScriptWrappingStategy implements ScriptInterceptorStrategy {
+public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
     private static final Pattern NAME_PATTERN = Pattern.compile("public\\s+class\\s+.*");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");

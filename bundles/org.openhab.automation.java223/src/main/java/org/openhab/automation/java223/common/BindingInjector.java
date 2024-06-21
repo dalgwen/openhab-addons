@@ -13,6 +13,7 @@
 package org.openhab.automation.java223.common;
 
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -34,6 +35,11 @@ public class BindingInjector {
 
     public static @Nullable Object extractBindingValueForElement(Map<String, Object> bindings,
             AnnotatedElement annotatedElement) {
-        return Java223Strategy.extractBindingValueForElement(bindings, annotatedElement);
+        try {
+            return Java223Strategy.extractBindingValueForElement(bindings, annotatedElement, null);
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                | InvocationTargetException e) {
+            throw new Java223Exception("Cannot extract binding value for an element", e);
+        }
     }
 }

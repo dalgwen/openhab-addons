@@ -12,38 +12,27 @@
  */
 package helper.rules.eventinfo;
 
-import java.util.Map;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.items.events.ItemCommandEvent;
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.types.Command;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
- * DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *         DTO object to facilitate input injection when used as an argument in a rule annotated method
  */
 @NonNullByDefault
 public class ItemCommand extends EventInfo {
 
-    @Nullable
-    protected final String itemName;
-    @Nullable
-    protected final Command command;
+    @InjectBinding(named = "event.itemName")
+    protected @NonNullByDefault({}) String itemName;
 
-    public ItemCommand(Map<String, ?> inputs) {
-        super(inputs);
-        ItemCommandEvent event = (ItemCommandEvent) shouldNotBeNull("event");
-        this.itemName = shouldNotBeNull(event.getItemName(), "event.itemName");
-        this.command = (Command) shouldNotBeNull("command");
-    }
+    @InjectBinding
+    protected @NonNullByDefault({}) Command command;
 
-    @Nullable
     public String getItemName() {
         return itemName;
     }
 
-    @Nullable
     public Command getCommand() {
         return command;
     }

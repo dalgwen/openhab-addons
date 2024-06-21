@@ -12,47 +12,35 @@
  */
 package helper.rules.eventinfo;
 
-import java.util.Map;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingUID;
-import org.openhab.core.thing.events.ThingStatusInfoChangedEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
- * DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *         DTO object to facilitate input injection when used as an argument in a rule annotated method
  */
 @NonNullByDefault
 public class ThingStatusChange extends EventInfo {
 
-    @Nullable
-    protected final ThingUID thingUID;
-    @Nullable
-    protected final ThingStatus oldStatus;
-    @Nullable
-    protected final ThingStatus newStatus;
+    @InjectBinding(named = "event.thingUID")
+    protected @NonNullByDefault({}) ThingUID thingUID;
 
-    public ThingStatusChange(Map<String, ?> inputs) {
-        super(inputs);
-        ThingStatusInfoChangedEvent event = (ThingStatusInfoChangedEvent) shouldNotBeNull("event");
-        this.thingUID = shouldNotBeNull(event.getThingUID(), "event.thingUID");
-        this.oldStatus = (ThingStatus) shouldNotBeNull("oldStatus");
-        this.newStatus = (ThingStatus) shouldNotBeNull("newStatus");
-    }
+    @InjectBinding
+    protected @NonNullByDefault({}) ThingStatus oldStatus;
 
-    @Nullable
+    @InjectBinding
+    protected @NonNullByDefault({}) ThingStatus newStatus;
+
     public ThingUID getThingUID() {
         return thingUID;
     }
 
-    @Nullable
     public ThingStatus getOldStatus() {
         return oldStatus;
     }
 
-    @Nullable
     public ThingStatus getNewStatus() {
         return newStatus;
     }

@@ -60,7 +60,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     @Override
     public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args) throws ScriptException {
 
-        // expect that the script engine serve only once and that the wanted compiled script is the last one
+        // here we expect that the script engine served only once and that the wanted compiled script is the last one
         JavaCompiledScript compiledScript = this.lastCompiledScript;
         if (compiledScript == null || name == null) {
             return null;
