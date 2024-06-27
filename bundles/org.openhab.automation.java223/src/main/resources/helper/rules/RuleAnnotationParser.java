@@ -17,7 +17,6 @@ import static org.openhab.automation.java223.common.Java223Constants.ANNOTATION_
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AccessibleObject;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -34,13 +33,10 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Module;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
-import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
-import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRuleActionHandler;
 import org.openhab.core.automation.util.ModuleBuilder;
 import org.openhab.core.automation.util.TriggerBuilder;
 import org.openhab.core.config.core.Configuration;
@@ -73,9 +69,9 @@ import helper.rules.annotations.ThingStatusUpdateTrigger;
 import helper.rules.annotations.TimeOfDayCondition;
 import helper.rules.annotations.TimeOfDayTrigger;
 
-
 /**
  * Parse annotated method in a script and create rule accordingly
+ *
  * @author Gwendal Roulleau - Initial contribution, based on work from Jürgen Weber and Jan N. Klug
  */
 @NonNullByDefault
@@ -133,35 +129,17 @@ public class RuleAnnotationParser {
             }
 
             // extract an action from the annotated member
-            SimpleRuleActionHandler action;
+            Java223Rule simpleRule;
             String memberName;
             if (member instanceof Field fieldMember) {
-                Class<?> ftype = fieldMember.getType();
+                simpleRule = new Java223Rule(script, fieldMember);
                 memberName = fieldMember.getName();
-                if (ftype.isAssignableFrom(SimpleRuleActionHandler.class)) {
-                    action = (SimpleRuleActionHandler) fieldMember.get(script);
-                } else {
-                    try {
-                        Constructor<SimpleRuleActionHandlerJava223> constructor = SimpleRuleActionHandlerJava223.class
-                                .getDeclaredConstructor(ftype);
-                        action = constructor.newInstance(fieldMember.get(script));
-                    } catch (NoSuchMethodException | InstantiationException | InvocationTargetException nse) {
-                        logger.info("Cannot apply rule annotation on a member of type {}", ftype.getSimpleName(), nse);
-                        continue;
-                    }
-                }
             } else if (member instanceof Method methodMember) {
-                action = new SimpleRuleActionHandlerJava223(script, methodMember);
+                simpleRule = new Java223Rule(script, methodMember);
                 memberName = methodMember.getName();
             } else {
                 continue;
             }
-            SimpleRule simpleRule = new SimpleRule() {
-                @Override
-                public Object execute(Action module, Map<String, ?> inputs) {
-                    return action.execute(module, inputs);
-                }
-            };
 
             // name and description
             String ruleName = chooseFirstOk(ra.name(), memberName);

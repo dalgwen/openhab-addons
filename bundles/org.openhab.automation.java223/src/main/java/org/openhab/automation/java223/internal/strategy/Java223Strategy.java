@@ -61,7 +61,7 @@ import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
- * Multiple strategies sharing common goal : providing binding / execution / library to java223
+ * A one-for-all strategy for a goal : providing binding / execution / library compilation and management to java223
  *
  * @author Gwendal Roulleau
  */

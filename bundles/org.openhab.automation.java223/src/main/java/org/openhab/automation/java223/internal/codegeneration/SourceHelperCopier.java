@@ -31,7 +31,7 @@ public class SourceHelperCopier {
     private static List<FileToCopy> FILES_TO_COPY = List.of( //
             new FileToCopy("rules", "RuleAnnotationParser"), //
             new FileToCopy("rules", "RuleParserException"), //
-            new FileToCopy("rules", "SimpleRuleActionHandlerJava223"), //
+            new FileToCopy("rules", "Java223Rule"), //
             new FileToCopy("", "Java223Script"), //
             new FileToCopy("rules.annotations", "ChannelEventTrigger"), //
             new FileToCopy("rules.annotations", "ChannelEventTriggers"), //
@@ -52,6 +52,8 @@ public class SourceHelperCopier {
             new FileToCopy("rules.annotations", "GenericEventCondition"), //
             new FileToCopy("rules.annotations", "GenericEventTrigger"), //
             new FileToCopy("rules.annotations", "GenericEventTriggers"), //
+            new FileToCopy("rules.annotations", "GroupCommandTrigger"), //
+            new FileToCopy("rules.annotations", "GroupCommandTriggers"), //
             new FileToCopy("rules.annotations", "GroupStateChangeTrigger"), //
             new FileToCopy("rules.annotations", "GroupStateChangeTriggers"), //
             new FileToCopy("rules.annotations", "GroupStateUpdateTrigger"), //
@@ -90,7 +92,7 @@ public class SourceHelperCopier {
             InputStream inputStream = ClassWriter.class.getResourceAsStream(resourcePath);
 
             String destPackageName = ClassWriter.HELPER_PACKAGE
-                    + (fileToCopy.packageName.isEmpty() ? "" : ("." +fileToCopy.packageName));
+                    + (fileToCopy.packageName.isEmpty() ? "" : ("." + fileToCopy.packageName));
 
             StringBuilder resultStringBuilder = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
