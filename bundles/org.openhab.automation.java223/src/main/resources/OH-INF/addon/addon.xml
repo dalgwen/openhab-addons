@@ -16,10 +16,11 @@
             <label>Additional Classes</label>
             <description>Additional classes exported for developing, concatenated by ",".</description>
         </parameter>
-        <parameter name="initializationWaitTime" type="integer">
-            <label>Initialization Wait Time</label>
-            <description>Wait time (in ms) before initialization. Use this if there is script error at startup, before all actions or things are initialized.</description>
-            <default>0</default>
+        <parameter name="stabilityGenerationWaitTime" type="integer">
+            <advanced>true</advanced>
+            <label>Stability Generation Wait Time</label>
+            <description>Stability wait time (in ms) before writing generated classes. Prevent writing classes for each changes during an amount of time</description>
+            <default>10000</default>
         </parameter>
 	</config-description>
 

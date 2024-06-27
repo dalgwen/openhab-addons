@@ -20,11 +20,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.java223.common.Java223Constants;
+import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.service.WatchService;
 import org.openhab.core.service.WatchService.Kind;
 import org.slf4j.Logger;
@@ -32,21 +36,22 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Write java file in lib directory.
+ * Do not write if already the same (sha-256 comparison)
  *
  * @author Gwendal Roulleau
  */
 @NonNullByDefault
-public class ClassWriter implements WatchService.WatchEventListener {
+public class SourceWriter implements WatchService.WatchEventListener {
 
     public static final String HELPER_PACKAGE = "helper";
 
-    private final Logger logger = LoggerFactory.getLogger(ClassGenerator.class);
+    private final Logger logger = LoggerFactory.getLogger(SourceGenerator.class);
 
-    protected final Map<String, String> generatedClasses = new HashMap<>();
+    protected final Map<String, byte[]> generatedClassesHash = new HashMap<>();
 
     private final Path folder;
 
-    public ClassWriter(Path folder) throws IOException {
+    public SourceWriter(Path folder) throws IOException {
         this.folder = folder;
 
         String helperPackageFolder = HELPER_PACKAGE.replaceAll("\\.", "/");
@@ -61,16 +66,17 @@ public class ClassWriter implements WatchService.WatchEventListener {
             // by intercepting delete or modify signal, we ensure that we remove java file from our internal database to
             // regenerate them thereafter
             String key = fullPath.toString().replace(File.separator, ".").substring(0, fullPath.toString().length());
-            generatedClasses.remove(key);
+            generatedClassesHash.remove(key);
         } else {
             logger.trace("Received '{}' for path '{}' - ignoring (wrong extension)", kind, fullPath);
         }
     }
 
-    protected boolean replaceHelperFileIfNotEqual(String packageName, String className, String generatedClass)
-            throws IOException {
+    protected synchronized boolean replaceHelperFileIfNotEqual(String packageName, String className,
+            String generatedClass) throws IOException {
         String key = packageName + "." + className;
-        if (!generatedClass.equals(generatedClasses.put(key, generatedClass))) {
+
+        if (sourceHasChange(key, generatedClass)) {
             String packageFolder = packageName.replaceAll("\\.", "/");
             Path javaFile = folder.resolve(packageFolder + "/" + className + "." + Java223Constants.JAVA_FILE_TYPE);
 
@@ -83,6 +89,17 @@ public class ClassWriter implements WatchService.WatchEventListener {
         } else {
             logger.debug("{} has not changed.", key);
             return false;
+        }
+    }
+
+    protected boolean sourceHasChange(String key, String newSource) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(newSource.getBytes());
+            byte[] previousHash = generatedClassesHash.put(key, hash);
+            return !Arrays.equals(previousHash, hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new Java223Exception("SHA-256 not available ? Should not happen");
         }
     }
 

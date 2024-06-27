@@ -13,7 +13,7 @@ public class ClassGeneratorTest {
     @Test
     public void parseArgumentTypeFullClassNameTest() {
         Set<String> imports = new HashSet<>();
-        String className = ClassGenerator.parseArgumentType(new FakeType("org.junit.jupiter.api.Test"), imports);
+        String className = SourceGenerator.parseArgumentType(new FakeType("org.junit.jupiter.api.Test"), imports);
         assertEquals("Test", className);
         assertTrue(imports.contains("org.junit.jupiter.api.Test"), "Missing import statement");
     }
@@ -21,7 +21,7 @@ public class ClassGeneratorTest {
     @Test
     public void parseArgumentOneWordTypeTest() {
         Set<String> imports = new HashSet<>();
-        String className = ClassGenerator.parseArgumentType(new FakeType("oneword"), imports);
+        String className = SourceGenerator.parseArgumentType(new FakeType("oneword"), imports);
         assertEquals("oneword", className);
         assertTrue(imports.isEmpty(), "Too many import statement");
     }
@@ -29,7 +29,7 @@ public class ClassGeneratorTest {
     @Test
     public void parseArgumentTypeFullGenericClassNameTest() {
         Set<String> imports = new HashSet<>();
-        String className = ClassGenerator.parseArgumentType(
+        String className = SourceGenerator.parseArgumentType(
                 new FakeType("java.fake.Generic<org.openhab.core.automation.annotation.RuleAction>"), imports);
         assertEquals("Generic<RuleAction>", className);
         assertTrue(imports.contains("org.openhab.core.automation.annotation.RuleAction"), "Missing import statement");
@@ -40,7 +40,7 @@ public class ClassGeneratorTest {
     @Test
     public void parseArgumentTypeComplexGenericClassNameTest() {
         Set<String> imports = new HashSet<>();
-        String className = ClassGenerator.parseArgumentType(new FakeType(
+        String className = SourceGenerator.parseArgumentType(new FakeType(
                 "java.fake.DoubleGeneric<? super org.fake.First, fake.Set<org.openhab.core.automation.annotation.RuleAction extends Another >>"),
                 imports);
         assertEquals("DoubleGeneric<? super First, Set<RuleAction extends Another >>", className);

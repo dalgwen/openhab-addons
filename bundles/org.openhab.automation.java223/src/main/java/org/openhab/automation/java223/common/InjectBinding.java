@@ -22,9 +22,9 @@ import java.lang.annotation.Target;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link Inject}
+ * The {@link InjectBinding} tags field with an injection intent
  *
- * @author Gwendal Roulleau - tag field with an injection intent
+ * @author Gwendal Roulleau - Initial contribution
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD, ElementType.PARAMETER, ElementType.TYPE })
@@ -35,6 +35,11 @@ public @interface InjectBinding {
 
     public String named() default ANNOTATION_DEFAULT;
 
+    /**
+     * If set, instructs the framework to get value inside a preset
+     *
+     * @return
+     */
     public String preset() default ANNOTATION_DEFAULT;
 
     public boolean mandatory() default true;

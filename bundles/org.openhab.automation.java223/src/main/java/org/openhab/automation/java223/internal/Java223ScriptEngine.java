@@ -30,9 +30,11 @@ import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 
 /**
- * The {@link Java223ScriptEngine} is responsible for
+ * This class add the Invocable aspect to the JavaScriptEngine from obermuhlner's base class
+ * The Invocable aspect adds the ability to be called when loaded and unloaded script event
+ * are triggered.
  *
- * @author Jan N. Klug - Initial contribution
+ * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
@@ -60,7 +62,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     @Override
     public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args) throws ScriptException {
 
-        // here we expect that the script engine served only once and that the wanted compiled script is the last one
+        // here we assume that the script engine served only once and that the wanted compiled script is the last one
         JavaCompiledScript compiledScript = this.lastCompiledScript;
         if (compiledScript == null || name == null) {
             return null;

@@ -30,10 +30,11 @@ import javax.script.ScriptEngine;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
-import org.openhab.automation.java223.internal.codegeneration.ClassGenerator;
-import org.openhab.automation.java223.internal.codegeneration.ClassWriter;
+import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
+import org.openhab.automation.java223.internal.codegeneration.SourceGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceHelperCopier;
+import org.openhab.automation.java223.internal.codegeneration.SourceWriter;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.RuleManager;
@@ -65,7 +66,6 @@ import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory;
 import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
-import freemarker.template.TemplateException;
 
 /**
  * This is an implementation of a {@link ScriptEngineFactory} for Java
@@ -88,8 +88,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     private final WatchService watchService;
 
-    @Nullable
-    private ClassGenerator classGenerator;
+    private SourceGenerator classGenerator;
     private DependencyGenerator dependencyGenerator;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
@@ -119,8 +118,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                 "");
         String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
                 "");
-        Integer initializationWaitTime = ConfigParser.valueAsOrElse(properties.get("initializationWaitTime"),
-                Integer.class, 0);
+        Integer initializationWaitTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"),
+                Integer.class, 10000);
 
         osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
             @Override
@@ -134,20 +133,17 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         try {
             dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig, additionalClassesConfig,
                     bundleContext);
-            if (initializationWaitTime > 0) {
-                Thread.sleep(initializationWaitTime);
-            }
-            ClassWriter classWriter = new ClassWriter(LIB_DIR);
-            this.classGenerator = new ClassGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
-                    bundleContext);
+            SourceWriter classWriter = new SourceWriter(LIB_DIR);
             SourceHelperCopier.copyFiles(classWriter);
-            generateThings();
-            generateActions();
-            generateItems();
+            this.classGenerator = new SourceGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
+                    bundleContext, initializationWaitTime);
+            classGenerator.generateThings();
+            classGenerator.generateActions();
+            classGenerator.generateItems();
             dependencyGenerator.createCoreDependencies();
             watchService.registerListener(classWriter, LIB_DIR);
-        } catch (IOException | TemplateException | InterruptedException e) {
-            logger.error("Cannot create helper class file in library dir. " + e.getMessage());
+        } catch (IOException e) {
+            throw new Java223Exception("Cannot create helper class file in library directory", e);
         }
 
         this.watchService = watchService;
@@ -244,53 +240,14 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                     && INITIALIZED.contains(eventStatusInfoChange.getStatusInfo().getStatus()))
                     || (ThingStatus.UNINITIALIZED.equals(eventStatusInfoChange.getStatusInfo().getStatus())
                             && INITIALIZED.contains(eventStatusInfoChange.getOldStatusInfo().getStatus()))) {
-                try {
-                    generateActions();
-                } catch (IOException | TemplateException e) {
-                    logger.warn("Failed to (re-)build thing action classes", e);
-                }
+                classGenerator.generateActions();
             }
         } else if (ITEM_EVENTS.contains(eventType)) {
             logger.debug("Added/updated item: {}", event);
-            try {
-                generateItems();
-            } catch (IOException | TemplateException e) {
-                logger.warn("Failed to (re-)build item class", e);
-            }
+            classGenerator.generateItems();
         } else if (THING_EVENTS.contains(eventType)) {
             logger.debug("Added/updated thing: {}", event);
-            try {
-                generateThings();
-            } catch (IOException | TemplateException e) {
-                logger.warn("Failed to (re-)build thing class", e);
-            }
+            classGenerator.generateThings();
         }
-    }
-
-    private void generateItems() throws IOException, TemplateException {
-        ClassGenerator localClassGenerator = classGenerator;
-        if (localClassGenerator == null) {
-            logger.error("Cannot use the class generator, initialization error");
-            return;
-        }
-        localClassGenerator.generateItems();
-    }
-
-    private void generateThings() throws IOException, TemplateException {
-        ClassGenerator localClassGenerator = classGenerator;
-        if (localClassGenerator == null) {
-            logger.error("Cannot use the class generator, initialization error");
-            return;
-        }
-        localClassGenerator.generateThings();
-    }
-
-    private void generateActions() throws IOException, TemplateException {
-        ClassGenerator localClassGenerator = classGenerator;
-        if (localClassGenerator == null) {
-            logger.error("Cannot use the class generator, initialization error");
-            return;
-        }
-        localClassGenerator.generateActions();
     }
 }

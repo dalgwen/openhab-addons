@@ -41,8 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Create a JAR with some dependencies usefull to code from an external project
  *
- * @author Jan N. Klug - Initial contribution
- * @author Gwendal Roulleau
+ * @author Gwendal Roulleau - Initial contribution, based on work from Jan N. Klug
  */
 @NonNullByDefault
 public class DependencyGenerator {
@@ -65,7 +64,8 @@ public class DependencyGenerator {
 
     private static final Set<String> DEFAULT_CLASSES_DEPENDENCIES = Set.of("org.eclipse.jdt.annotation.NonNull",
             "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable",
-            "org.slf4j.LoggerFactory", "org.slf4j.Logger", "org.slf4j.Marker");
+            "org.eclipse.jdt.annotation.DefaultLocation", "org.slf4j.LoggerFactory", "org.slf4j.Logger",
+            "org.slf4j.Marker");
 
     private Path libDir;
     private String additionalBundlesConfig;
@@ -89,7 +89,8 @@ public class DependencyGenerator {
     }
 
     public synchronized void createCoreDependencies() {
-        try (FileOutputStream outFile = new FileOutputStream(libDir.resolve("dependencies.jar").toFile())) {
+        try (FileOutputStream outFile = new FileOutputStream(
+                libDir.resolve("jar").resolve("convenience-dependencies.jar").toFile())) {
             Manifest manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             JarOutputStream target = new JarOutputStream(outFile, manifest);

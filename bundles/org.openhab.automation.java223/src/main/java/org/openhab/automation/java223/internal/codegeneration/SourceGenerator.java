@@ -25,10 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.automation.annotation.RuleAction;
+import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.Thing;
@@ -47,41 +51,86 @@ import freemarker.template.TemplateExceptionHandler;
 import freemarker.template.TemplateMethodModelEx;
 
 /**
- * The {@link ClassGenerator} is responsible for generating the additional classes
- * helping for rule development
+ * The {@link SourceGenerator} is responsible for generating the additional classes
+ * helping for rule development.
+ * Include a delayed mechanism to prevent creating file multiple time when there is many
+ * modifications in the registry (especially usefull at startup)
  *
- * @author Jan N. Klug - Initial contribution
  * @author Gwendal Roulleau - Refactor using freemarker
  */
 @NonNullByDefault
-public class ClassGenerator {
+public class SourceGenerator {
 
-    private final Logger logger = LoggerFactory.getLogger(ClassGenerator.class);
+    private final Logger logger = LoggerFactory.getLogger(SourceGenerator.class);
 
     private final ItemRegistry itemRegistry;
     private final ThingRegistry thingRegistry;
     private final BundleContext bundleContext;
 
-    private ClassWriter classWriter;
+    private SourceWriter classWriter;
     private DependencyGenerator dependencyGenerator;
 
     Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
 
-    public ClassGenerator(ClassWriter classWriter, DependencyGenerator dependencyGenerator, ItemRegistry itemRegistry,
-            ThingRegistry thingRegistry, BundleContext bundleContext) {
+    private Integer stabilityGenerationWaitTime;
+    private InternalGenerator actionGeneration = this::internalGenerateActions;
+    private InternalGenerator itemGeneration = this::internalGenerateItems;
+    private InternalGenerator thingGeneration = this::internalGenerateThings;
+    private Map<InternalGenerator, ScheduledFuture<?>> futureGeneration = new HashMap<>();
+    private ScheduledExecutorService scheduledPool = ThreadPoolManager
+            .getScheduledPool(ThreadPoolManager.THREAD_POOL_NAME_COMMON);
+
+    public SourceGenerator(SourceWriter classWriter, DependencyGenerator dependencyGenerator, ItemRegistry itemRegistry,
+            ThingRegistry thingRegistry, BundleContext bundleContext, Integer stabilityGenerationWaitTime) {
         this.classWriter = classWriter;
         this.itemRegistry = itemRegistry;
         this.thingRegistry = thingRegistry;
         this.bundleContext = bundleContext;
         this.dependencyGenerator = dependencyGenerator;
+        this.stabilityGenerationWaitTime = stabilityGenerationWaitTime;
 
-        cfg.setClassForTemplateLoading(ClassGenerator.class, "/");
+        cfg.setClassForTemplateLoading(SourceGenerator.class, "/");
         cfg.setDefaultEncoding("UTF-8");
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
     }
 
+    /**
+     * Delaying generation is especially usefull during startup, when item and thing are not all properly initialized.
+     * Until there is no more item/thing/action activating, this code will delay code generation.
+     *
+     * @param generator
+     */
+    protected void delayWhenStable(InternalGenerator generator) {
+        ScheduledFuture<?> scheduledFuture = futureGeneration.get(generator);
+        if (scheduledFuture != null) {
+            scheduledFuture.cancel(false);
+        }
+        Runnable command = () -> {
+            try {
+                generator.generate();
+                futureGeneration.remove(generator);
+            } catch (IOException | TemplateException e) {
+                logger.warn("Cannot create helper class file in library directory", e);
+            }
+        };
+        futureGeneration.put(generator,
+                scheduledPool.schedule(command, stabilityGenerationWaitTime, TimeUnit.MILLISECONDS));
+    }
+
+    public void generateActions() {
+        delayWhenStable(actionGeneration);
+    }
+
+    public void generateItems() {
+        delayWhenStable(itemGeneration);
+    }
+
+    public void generateThings() {
+        delayWhenStable(thingGeneration);
+    }
+
     @SuppressWarnings({ "unused", "null" })
-    public synchronized void generateActions() throws IOException, TemplateException {
+    private void internalGenerateActions() throws IOException, TemplateException {
         List<ThingActions> thingActions;
         try {
             Set<Class<?>> classes = new HashSet<>();
@@ -157,8 +206,8 @@ public class ClassGenerator {
         context.put("packageName", classWriter.getPackageName("generated"));
         context.put("classesToImport", actionsByScope.values().stream().flatMap(s -> s.stream()).toList());
         @SuppressWarnings("unchecked")
-        TemplateMethodModelEx tmmLastName = (args) -> classNameSure(
-                ((List<freemarker.template.SimpleScalar>) args).get(0).getAsString());
+        TemplateMethodModelEx tmmLastName = (
+                args) -> className(((List<freemarker.template.SimpleScalar>) args).get(0).getAsString()).get();
         context.put("lastName", tmmLastName);
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmmCapitalize = (args) -> capitalize(
@@ -173,8 +222,7 @@ public class ClassGenerator {
 
     /**
      * Return a user friendly short readable name (without package details) and add the relevant full class name to the
-     * imports
-     * list
+     * imports list
      *
      * @param type
      * @param imports A set to add imports into
@@ -210,7 +258,7 @@ public class ClassGenerator {
         return friendlyFullType;
     }
 
-    public synchronized void generateItems() throws IOException, TemplateException {
+    private void internalGenerateItems() throws IOException, TemplateException {
         Collection<Item> items = itemRegistry.getItems();
         String packageName = classWriter.getPackageName("generated");
 
@@ -227,7 +275,7 @@ public class ClassGenerator {
         classWriter.replaceHelperFileIfNotEqual(packageName, "Items", writer.toString());
     }
 
-    public synchronized void generateThings() throws IOException, TemplateException {
+    private void internalGenerateThings() throws IOException, TemplateException {
         Collection<Thing> things = thingRegistry.getAll();
         String packageName = classWriter.getPackageName("generated");
 
@@ -261,10 +309,10 @@ public class ClassGenerator {
         return lastDotIndex == -1 ? Optional.empty() : Optional.of(fullName.substring(lastDotIndex + 1));
     }
 
-    private static String classNameSure(String fullName) {
-        return className(fullName).get();
+    public static record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
     }
 
-    public static record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
+    private static interface InternalGenerator {
+        public void generate() throws IOException, TemplateException;
     }
 }

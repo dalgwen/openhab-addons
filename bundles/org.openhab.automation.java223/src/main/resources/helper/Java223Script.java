@@ -47,7 +47,7 @@ import helper.rules.RuleParserException;
 /**
  * Base helper class for all Java223 Scripts.
  * Standard JSR223 openhab bindings already declared as mandatory
- * Helper genrated class included
+ * Helper generated class included
  * Auto execution of a parsing rule method
  * Additionnal shortcut to usefull services  
  *

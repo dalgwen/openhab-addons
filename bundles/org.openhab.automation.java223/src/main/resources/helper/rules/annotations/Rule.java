@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * @author Jürgen Weber - Initial contribution
+ * @author Gwendal Roulleau - Initial contribution
  */
 
 @Retention(RUNTIME)
