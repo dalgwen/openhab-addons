@@ -23,6 +23,7 @@ import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.UptimeSleepTimer;
 import org.whispersystems.signalservice.api.websocket.WebSocketFactory;
 import org.whispersystems.signalservice.internal.push.PushServiceSocket;
+import org.whispersystems.signalservice.internal.websocket.OkHttpWebSocketConnection;
 import org.whispersystems.signalservice.internal.websocket.WebSocketConnection;
 
 import java.util.List;
@@ -108,7 +109,7 @@ public class SignalDependencies {
 
     public Network getLibSignalNetwork() {
         return getOrCreate(() -> libSignalNetwork,
-                () -> libSignalNetwork = new Network(serviceEnvironmentConfig.netEnvironment()));
+                () -> libSignalNetwork = new Network(serviceEnvironmentConfig.netEnvironment(), userAgent));
     }
 
     public SignalServiceAccountManager getAccountManager() {
@@ -159,7 +160,7 @@ public class SignalDependencies {
             final var webSocketFactory = new WebSocketFactory() {
                 @Override
                 public WebSocketConnection createWebSocket() {
-                    return new WebSocketConnection("normal",
+                    return new OkHttpWebSocketConnection("normal",
                             serviceEnvironmentConfig.signalServiceConfiguration(),
                             Optional.of(credentialsProvider),
                             userAgent,
@@ -169,7 +170,7 @@ public class SignalDependencies {
 
                 @Override
                 public WebSocketConnection createUnidentifiedWebSocket() {
-                    return new WebSocketConnection("unidentified",
+                    return new OkHttpWebSocketConnection("unidentified",
                             serviceEnvironmentConfig.signalServiceConfiguration(),
                             Optional.empty(),
                             userAgent,
