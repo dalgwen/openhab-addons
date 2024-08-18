@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon:addon id="java223" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:addon="https://openhab.org/schemas/addon/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
+
+	<type>automation</type>
+	<name>Java223 Scripting Automation</name>
+	<description>This is the bundle for using Java in script</description>
+
+	<config-description>
+		<parameter name="additionalBundles" type="text">
+			<label>Additional Bundles</label>
+			<description>Additional bundles exported for developing, concatenated by ",".</description>
+		</parameter>
+        <parameter name="additionalClasses" type="text">
+            <label>Additional Classes</label>
+            <description>Additional classes exported for developing, concatenated by ",".</description>
+        </parameter>
+        <parameter name="stabilityGenerationWaitTime" type="integer">
+            <advanced>true</advanced>
+            <label>Stability Generation Wait Time</label>
+            <description>Stability wait time (in ms) before writing generated classes. Prevent writing classes for each changes during an amount of time</description>
+            <default>10000</default>
+        </parameter>
+	</config-description>
+
+</addon:addon>

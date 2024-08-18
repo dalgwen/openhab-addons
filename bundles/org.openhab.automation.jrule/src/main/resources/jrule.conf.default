@@ -1,0 +1,24 @@
+# Prefix to be used when generating items, files
+#org.openhab.automation.jrule.itemprefix=_
+
+# Working directory
+#org.openhab.automation.jrule.directory=/etc/openhab/automation/directory
+
+## Run rules in a separate threadpool
+#org.openhab.automation.jrule.engine.executors.enable=true
+
+## Minimum number of threads
+#org.openhab.automation.jrule.engine.executors.min=2
+
+## Maximum number of threads
+#org.openhab.automation.jrule.engine.executors.max=10
+
+## Number of seconds before jrule engine is initialized
+# org.openhab.automation.jrule.engine.initdelay=5
+
+## Number of seconds before rules from jar and source files are loaded 
+#org.openhab.automation.jrule.engine.rulesdelay=2
+
+# Number of seconds to wait after an item change or Java rule change before
+# recompilation and reloading starts
+# org.openhab.automation.jrule.engine.itemsrecompilationdelay=5
