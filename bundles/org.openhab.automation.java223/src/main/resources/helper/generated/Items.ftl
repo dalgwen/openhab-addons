@@ -35,6 +35,6 @@ public class Items {
         if (itemRegistry != null) {
             return itemRegistry.get(itemId);
         }
-        throw new Java223Exception("Items class not properly initialized");
+        throw new Java223Exception("Items class not properly initialized. Use automatic instanciation by injection.");
     }
 }

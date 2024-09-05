@@ -32,7 +32,7 @@ public class Things {
         if (things != null) {
             return things.get(new ThingUID(stringUID));
         } else {
-            throw new Java223Exception("Things class not properly initialized");
+            throw new Java223Exception("Things class not properly initialized. Use automatic instanciation by injection");
         }
     }
 

@@ -12,16 +12,17 @@
 			<label>Additional Bundles</label>
 			<description>Additional bundles exported for developing, concatenated by ",".</description>
 		</parameter>
-        <parameter name="additionalClasses" type="text">
-            <label>Additional Classes</label>
-            <description>Additional classes exported for developing, concatenated by ",".</description>
-        </parameter>
-        <parameter name="stabilityGenerationWaitTime" type="integer">
-            <advanced>true</advanced>
-            <label>Stability Generation Wait Time</label>
-            <description>Stability wait time (in ms) before writing generated classes. Prevent writing classes for each changes during an amount of time</description>
-            <default>10000</default>
-        </parameter>
+		<parameter name="additionalClasses" type="text">
+			<label>Additional Classes</label>
+			<description>Additional classes exported for developing, concatenated by ",".</description>
+		</parameter>
+		<parameter name="stabilityGenerationWaitTime" type="integer">
+			<advanced>true</advanced>
+			<label>Stability Generation Wait Time</label>
+			<description>Stability wait time (in ms) before writing generated classes. Prevent writing classes for each changes
+				during an amount of time</description>
+			<default>10000</default>
+		</parameter>
 	</config-description>
 
 </addon:addon>
