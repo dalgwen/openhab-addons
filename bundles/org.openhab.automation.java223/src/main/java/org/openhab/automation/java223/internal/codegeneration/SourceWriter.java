@@ -38,14 +38,14 @@ import org.slf4j.LoggerFactory;
  * Write java file in lib directory.
  * Do not write if already the same (sha-256 comparison)
  *
- * @author Gwendal Roulleau
+ * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public class SourceWriter implements WatchService.WatchEventListener {
 
     public static final String HELPER_PACKAGE = "helper";
 
-    private final Logger logger = LoggerFactory.getLogger(SourceGenerator.class);
+    private final Logger logger = LoggerFactory.getLogger(SourceWriter.class);
 
     protected final Map<String, byte[]> generatedClassesHash = new HashMap<>();
 

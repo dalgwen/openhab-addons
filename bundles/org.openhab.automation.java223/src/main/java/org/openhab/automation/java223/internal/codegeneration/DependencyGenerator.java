@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
 @NonNullByDefault
 public class DependencyGenerator {
 
+    public static final String CONVENIENCE_DEPENDENCIES_JAR = "convenience-dependencies.jar";
+
     private static final Logger logger = LoggerFactory.getLogger(DependencyGenerator.class);
 
     private static final Set<String> DEFAULT_DEPENDENCIES = Set.of("org.openhab.automation.java223.common",
@@ -89,8 +91,7 @@ public class DependencyGenerator {
     }
 
     public synchronized void createCoreDependencies() {
-        try (FileOutputStream outFile = new FileOutputStream(
-                libDir.resolve("jar").resolve("convenience-dependencies.jar").toFile())) {
+        try (FileOutputStream outFile = new FileOutputStream(libDir.resolve(CONVENIENCE_DEPENDENCIES_JAR).toFile())) {
             Manifest manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             JarOutputStream target = new JarOutputStream(outFile, manifest);
@@ -138,8 +139,7 @@ public class DependencyGenerator {
             String path = classToExtract.replaceAll("\\.", "/") + ".class";
             ClassLoader classLoader = DependencyGenerator.class.getClassLoader();
             if (classLoader == null) {
-                logger.warn("Failed (no classloader) to copy null annotation classes '{}' from classpath : {}",
-                        classToExtract);
+                logger.warn("Failed (no classloader) to copy from classpath : {}", classToExtract);
                 return;
             }
             try (InputStream stream = classLoader.getResourceAsStream(path)) {
@@ -149,8 +149,7 @@ public class DependencyGenerator {
                     logger.warn("InputStream {} from classpath is null", classToExtract);
                 }
             } catch (IOException e) {
-                logger.warn("Failed to copy null annotation classes '{}' from classpath : {}", classToExtract,
-                        e.getMessage());
+                logger.warn("Failed to copy classes '{}' from classpath : {}", classToExtract, e.getMessage());
             }
         }
     }
@@ -167,7 +166,7 @@ public class DependencyGenerator {
                 .map(s -> s.split(";")[0]) // get only package name and drop uses, version, etc.
                 .map(b -> b.replace(".", "/")).collect(Collectors.toList());
         Set<String> dependenciesWithSlash = dependencies.stream().map(b -> b.replace(".", "/"))
-                .collect(Collectors.<String>toSet());
+                .collect(Collectors.<String> toSet());
 
         bundle.adapt(BundleWiring.class).listResources("", "*.class", LISTRESOURCES_LOCAL + LISTRESOURCES_RECURSE)
                 .forEach(classFile -> {

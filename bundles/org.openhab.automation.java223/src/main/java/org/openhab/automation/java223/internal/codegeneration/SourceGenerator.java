@@ -56,10 +56,12 @@ import freemarker.template.TemplateMethodModelEx;
  * Include a delayed mechanism to prevent creating file multiple time when there is many
  * modifications in the registry (especially usefull at startup)
  *
- * @author Gwendal Roulleau - Refactor using freemarker
+ * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public class SourceGenerator {
+
+    private static final String GENERATED = "generated";
 
     private final Logger logger = LoggerFactory.getLogger(SourceGenerator.class);
 
@@ -69,6 +71,8 @@ public class SourceGenerator {
 
     private SourceWriter classWriter;
     private DependencyGenerator dependencyGenerator;
+
+    private static final String TPL_LOCATION = "/generated/";
 
     Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
 
@@ -100,7 +104,7 @@ public class SourceGenerator {
      *
      * @param generator
      */
-    protected void delayWhenStable(InternalGenerator generator) {
+    protected synchronized void delayWhenStable(InternalGenerator generator) {
         ScheduledFuture<?> scheduledFuture = futureGeneration.get(generator);
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
@@ -129,6 +133,23 @@ public class SourceGenerator {
         delayWhenStable(thingGeneration);
     }
 
+    public void generateJava223Script() {
+        String packageName = classWriter.getPackageName(GENERATED);
+
+        try {
+            Template template = cfg.getTemplate(TPL_LOCATION + "Java223Script.ftl");
+            Map<String, Object> context = new HashMap<>();
+            context.put("packageName", packageName);
+
+            StringWriter writer = new StringWriter();
+            template.process(context, writer);
+
+            classWriter.replaceHelperFileIfNotEqual(packageName, "Java223Script", writer.toString());
+        } catch (IOException | TemplateException e) {
+            logger.warn("Cannot create helper class file in library directory", e);
+        }
+    }
+
     @SuppressWarnings({ "unused", "null" })
     private void internalGenerateActions() throws IOException, TemplateException {
         List<ThingActions> thingActions;
@@ -142,7 +163,7 @@ public class SourceGenerator {
             return;
         }
 
-        Template templateAction = cfg.getTemplate("/helper/generated/ThingAction.ftl");
+        Template templateAction = cfg.getTemplate(TPL_LOCATION + "ThingAction.ftl");
         Map<String, Set<String>> actionsByScope = new HashMap<>();
         Set<String> allClassesToImport = new HashSet<>();
 
@@ -155,7 +176,7 @@ public class SourceGenerator {
             }
             String scope = scopeAnnotation.name().toString();
             String simpleClassName = clazz.getSimpleName();
-            String packageName = classWriter.getPackageName("generated", scope);
+            String packageName = classWriter.getPackageName(GENERATED, scope);
             actionsByScope.computeIfAbsent(scope, (key -> new HashSet<String>()))
                     .add(packageName + "." + simpleClassName);
 
@@ -201,9 +222,9 @@ public class SourceGenerator {
         dependencyGenerator.setClassesToAddToDependenciesLib(allClassesToImport);
 
         // now generate action factory :
-        Template templateActionFactory = cfg.getTemplate("/helper/generated/Actions.ftl");
+        Template templateActionFactory = cfg.getTemplate(TPL_LOCATION + "Actions.ftl");
         Map<String, Object> context = new HashMap<>();
-        context.put("packageName", classWriter.getPackageName("generated"));
+        context.put("packageName", classWriter.getPackageName(GENERATED));
         context.put("classesToImport", actionsByScope.values().stream().flatMap(s -> s.stream()).toList());
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmmLastName = (
@@ -217,7 +238,7 @@ public class SourceGenerator {
         StringWriter writer = new StringWriter();
         templateActionFactory.process(context, writer);
 
-        classWriter.replaceHelperFileIfNotEqual(classWriter.getPackageName("generated"), "Actions", writer.toString());
+        classWriter.replaceHelperFileIfNotEqual(classWriter.getPackageName(GENERATED), "Actions", writer.toString());
     }
 
     /**
@@ -260,9 +281,9 @@ public class SourceGenerator {
 
     private void internalGenerateItems() throws IOException, TemplateException {
         Collection<Item> items = itemRegistry.getItems();
-        String packageName = classWriter.getPackageName("generated");
+        String packageName = classWriter.getPackageName(GENERATED);
 
-        Template template = cfg.getTemplate("/helper/generated/Items.ftl");
+        Template template = cfg.getTemplate(TPL_LOCATION + "Items.ftl");
         Map<String, Object> context = new HashMap<>();
         context.put("packageName", packageName);
         context.put("items", items);
@@ -277,9 +298,9 @@ public class SourceGenerator {
 
     private void internalGenerateThings() throws IOException, TemplateException {
         Collection<Thing> things = thingRegistry.getAll();
-        String packageName = classWriter.getPackageName("generated");
+        String packageName = classWriter.getPackageName(GENERATED);
 
-        Template template = cfg.getTemplate("/helper/generated/Things.ftl");
+        Template template = cfg.getTemplate(TPL_LOCATION + "Things.ftl");
         Map<String, Object> context = new HashMap<>();
         context.put("packageName", packageName);
 

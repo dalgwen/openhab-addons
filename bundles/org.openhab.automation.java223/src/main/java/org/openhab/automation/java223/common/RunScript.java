@@ -10,7 +10,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-
 package org.openhab.automation.java223.common;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

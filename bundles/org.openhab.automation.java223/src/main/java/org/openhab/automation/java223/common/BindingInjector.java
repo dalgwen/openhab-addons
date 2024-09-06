@@ -26,8 +26,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import javax.script.ScriptException;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
@@ -47,7 +45,7 @@ public class BindingInjector {
 
     public static void injectBindingsInto(Map<String, Object> bindings, Object objectToInjectInto) {
         try {
-            injectBindingsInto(bindings, objectToInjectInto, null);
+            injectBindingsInto(bindings, objectToInjectInto, new HashMap<>());
         } catch (IllegalAccessException | IllegalArgumentException | SecurityException | InstantiationException
                 | InvocationTargetException e) {
             logger.error("Cannot inject bindings or libs", e);
@@ -57,7 +55,7 @@ public class BindingInjector {
     public static @Nullable Object extractBindingValueForElement(Map<String, Object> bindings,
             AnnotatedElement annotatedElement) {
         try {
-            return extractBindingValueForElement(bindings, annotatedElement, null);
+            return extractBindingValueForElement(bindings, annotatedElement, new HashMap<>());
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
                 | InvocationTargetException e) {
             throw new Java223Exception("Cannot extract binding value for an element", e);
@@ -77,7 +75,7 @@ public class BindingInjector {
      * @throws ScriptException
      */
     private static void injectBindingsInto(Map<String, Object> bindings, Object objectToInjectInto,
-            @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
+            Map<Class<?>, Object> libAlreadyInstanciated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 
         Class<?> clazz = objectToInjectInto.getClass();
@@ -102,15 +100,11 @@ public class BindingInjector {
      * @throws IllegalArgumentException
      * @throws IllegalAccessException
      * @throws InstantiationException
-     * @throws ScriptException
      **/
     @SuppressWarnings({ "null", "unused" })
     private static @Nullable Object extractBindingValueForElement(Map<String, Object> bindings,
-            AnnotatedElement annotatedElement, @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
+            AnnotatedElement annotatedElement, Map<Class<?>, Object> libAlreadyInstanciated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-
-        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated == null ? new HashMap<>()
-                : libAlreadyInstanciated;
 
         Class<?> fieldType;
         String codeName;
@@ -121,8 +115,7 @@ public class BindingInjector {
             fieldType = field.getType();
             codeName = field.getName();
         } else {
-            logger.warn(
-                    "Cannot check target class for parameter. Only Parameter or Field accepted. We cannot inject it. Should not happened");
+            logger.warn("Cannot check target class for parameter. Only Parameter or Field accepted. Cannot inject.");
             return null;
         }
 
@@ -140,22 +133,24 @@ public class BindingInjector {
                 return null;
             }
             // has it already been instantiated and stored in the store?
-            Object valueToInject = libAlreadyInstanciatedLocal.get(fieldType);
+            Object valueToInject = libAlreadyInstanciated.get(fieldType);
             if (valueToInject == null) { // not instantiated, create it
                 Constructor<?>[] constructors = fieldType.getDeclaredConstructors();
                 // use the empty constructor if available, or the first one
                 Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0)
                         .findFirst().orElseGet(() -> constructors[0]);
-                Object[] parameterValues = getParameterValuesFor(constructor, bindings, libAlreadyInstanciatedLocal);
+                Object[] parameterValues = getParameterValuesFor(constructor, bindings, libAlreadyInstanciated);
                 valueToInject = constructor.newInstance(parameterValues);
                 // and then also use injection into it
-                injectBindingsInto(bindings, valueToInject, libAlreadyInstanciatedLocal);
+                if (valueToInject != null) {
+                    injectBindingsInto(bindings, valueToInject, libAlreadyInstanciated);
+                }
                 return valueToInject;
             }
         }
 
         // second. It's not a library, so search value in bindings map.
-        // Choose a name to use as a key in the binding map
+        // Choose a name to search as a key in the binding map
         // the name can be a path inside the object
         Queue<String> namePath = new LinkedList<>();
         String named;
@@ -227,10 +222,12 @@ public class BindingInjector {
     }
 
     public static Object[] getParameterValuesFor(Executable executable, Map<String, Object> bindings,
-            @Nullable Map<Class<?>, Object> libAlreadyInstanciatedLocal)
+            @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         Parameter[] parameters = executable.getParameters();
         Object[] parameterValues = new Object[parameters.length];
+        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated != null ? libAlreadyInstanciated
+                : new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
             parameterValues[i] = extractBindingValueForElement(bindings, parameters[i], libAlreadyInstanciatedLocal);
         }
@@ -256,5 +253,4 @@ public class BindingInjector {
         }
         return fields;
     }
-
 }

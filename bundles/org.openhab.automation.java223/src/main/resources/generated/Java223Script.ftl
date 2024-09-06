@@ -1,16 +1,4 @@
-/**
- * Copyright (c) 2010-2024 Contributors to the openHAB project
- *
- * See the NOTICE file(s) distributed with this work for additional
- * information.
- *
- * This program and the accompanying materials are made available under the
- * terms of the Eclipse Public License 2.0 which is available at
- * http://www.eclipse.org/legal/epl-2.0
- *
- * SPDX-License-Identifier: EPL-2.0
- */
-package helper;
+package ${packageName};
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -38,26 +26,25 @@ import org.openhab.core.voice.VoiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import helper.generated.Actions;
-import helper.generated.Items;
-import helper.generated.Things;
 import helper.rules.RuleAnnotationParser;
 import helper.rules.RuleParserException;
 
 /**
  * Base helper class for all Java223 Scripts.
  * Standard JSR223 openhab bindings already declared as mandatory
- * Helper generated class included
  * Auto execution of a parsing rule method
- * Additionnal shortcut to usefull services  
+ * Additionnal shortcut to usefull services
+ * Include other generated helper classes
  *
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public abstract class Java223Script {
 
+    // warning : default openhab logger level is error
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
+    // all bindings as a convenience object :
     protected @InjectBinding @NonNullByDefault({}) Map<String, Object> bindings;
 
     // default preset
@@ -83,14 +70,14 @@ public abstract class Java223Script {
     // additional useful class :
     protected @InjectBinding @NonNullByDefault({}) RuleManager ruleManager;
     protected @InjectBinding @NonNullByDefault({}) MetadataRegistry metadataRegistry;
-    
-    // inject generated libraries 
-    protected @InjectBinding @NonNullByDefault({}) Things _things;
-    protected @InjectBinding @NonNullByDefault({}) Actions _actions;
+
+    // generated classes
     protected @InjectBinding @NonNullByDefault({}) Items _items;
+    protected @InjectBinding @NonNullByDefault({}) Actions _actions;
+    protected @InjectBinding @NonNullByDefault({}) Things _things;
 
     /**
-     * Parse all method rules presents in this script
+     * Parse all method rules in this script
      */
     @RunScript
     public void internalParseRules() {

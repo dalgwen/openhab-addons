@@ -18,8 +18,8 @@ import javax.script.SimpleBindings;
 import javax.script.SimpleScriptContext;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 
@@ -206,9 +206,16 @@ public class JavaScriptEngine implements ScriptEngine, Compilable {
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-        StandardJavaFileManager standardFileManager = compiler.getStandardFileManager(diagnostics, null, null);
         ClassLoader parentClassLoader = isolation == Isolation.CallerClassLoader ? executionClassLoader : null;
-        MemoryFileManager memoryFileManager = new MemoryFileManager(standardFileManager, parentClassLoader);
+        JavaFileManager fileManager = compilationStrategy.getJavaFileManager(
+                ToolProvider.getSystemJavaCompiler().getStandardFileManager(diagnostics, null, null));
+        if (fileManager == null) {
+            fileManager = compiler.getStandardFileManager(diagnostics, null, null);
+        } else {
+            parentClassLoader = fileManager.getClassLoader(StandardLocation.CLASS_PATH);
+        }
+        MemoryFileManager memoryFileManager = new MemoryFileManager(fileManager, parentClassLoader);
+
         memoryFileManager.setPackageResourceListingStrategy(packageResourceListingStrategy);
 
         String fullClassName = nameStrategy.getFullName(script);

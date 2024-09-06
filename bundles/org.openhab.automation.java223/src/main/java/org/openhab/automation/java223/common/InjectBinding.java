@@ -22,7 +22,7 @@ import java.lang.annotation.Target;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link InjectBinding} tags field with an injection intent
+ * The {@link InjectBinding} tags field with an injection intent and related details.
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -31,8 +31,18 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public @interface InjectBinding {
 
+    /**
+     * Prevent injection. Useful if you want to do it yourself.
+     *
+     * @return
+     */
     public boolean enable() default true;
 
+    /**
+     * If set, use this name. Else use the variable name.
+     *
+     * @return
+     */
     public String named() default ANNOTATION_DEFAULT;
 
     /**
@@ -42,5 +52,11 @@ public @interface InjectBinding {
      */
     public String preset() default ANNOTATION_DEFAULT;
 
+    /**
+     * If true and no value to inject is found, the binding process will fail with an exception.
+     * If false, null value are allowed.
+     *
+     * @return
+     */
     public boolean mandatory() default true;
 }

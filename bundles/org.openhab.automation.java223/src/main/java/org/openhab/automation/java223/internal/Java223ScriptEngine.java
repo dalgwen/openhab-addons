@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2023 Contributors to the SmartHome/J project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -44,12 +44,17 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
 
     @Override
     public JavaCompiledScript compile(@Nullable String script) throws ScriptException {
-        JavaCompiledScript localLastCompiledScript = super.compile(script);
-        lastCompiledScript = localLastCompiledScript;
-        if (localLastCompiledScript != null) {
-            return localLastCompiledScript;
-        } else {
-            throw new ScriptException("Compile result is null. Should not happened");
+        JavaCompiledScript localLastCompiledScript;
+        try {
+            localLastCompiledScript = super.compile(script);
+            lastCompiledScript = localLastCompiledScript;
+            if (localLastCompiledScript != null) {
+                return localLastCompiledScript;
+            } else {
+                throw new ScriptException("Compile result is null. Should not happened");
+            }
+        } catch (NoClassDefFoundError e) {
+            throw new ScriptException("NoClassDefFoundError: " + e.getMessage());
         }
     }
 
@@ -91,8 +96,8 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
                     try {
                         method.invoke(compiledInstance);
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                        logger.warn("Method " + method.getName()
-                                + " cannot be called by ScriptLoaded/ScriptUnloaded trigger");
+                        logger.warn("Method {} cannot be called by ScriptLoaded/ScriptUnloaded trigger",
+                                method.getName());
                         throw new ScriptException(e);
                     }
                 }

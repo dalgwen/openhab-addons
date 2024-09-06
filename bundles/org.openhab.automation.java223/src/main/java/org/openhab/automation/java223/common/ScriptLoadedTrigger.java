@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021-2024 Contributors to the SmartHome/J project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -20,9 +20,9 @@ import java.lang.annotation.Target;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link ScriptLoadedTrigger} lets a rule run immediately when script is loaded
+ * The {@link ScriptLoadedTrigger} Run a method when the script is loaded
  *
- * @author Jan N. Klug - Initial contribution
+ * @author Gwendal Roulleau - Initial contribution
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD })

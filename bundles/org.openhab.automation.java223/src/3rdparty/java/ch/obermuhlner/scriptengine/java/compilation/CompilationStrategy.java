@@ -1,10 +1,11 @@
 package ch.obermuhlner.scriptengine.java.compilation;
 
-import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
+
+import org.eclipse.jdt.annotation.NonNull;
 
 /**
  * This strategy is used to decide what to compile
@@ -16,33 +17,10 @@ public interface CompilationStrategy {
      *
      * @param simpleClassName the class name of the script
      * @param currentSource The current source script we want to execute
-     * @return
+     * @return A list of java file object to compile alongside the main script
      */
-    List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource);
-
-    /**
-     * Get all paths to JAR file to include
-     *
-     * @return
-     */
-    default List<Path> getJarsPath() {
-        return Collections.emptyList();
-    }
-
-    /**
-     * Help the compiler to see if the classloader should be rebuild with the jar inside
-     *
-     * @return true if the jar list changed since the last modification
-     */
-    default boolean needRebuild() {
-        return false;
-    }
-
-    /**
-     * Event if the class loader has been rebuild, including all JARs
-     */
-    default void rebuildDone() {
-    }
+    @NonNull
+    List<JavaFileObject> getJavaFileObjectsToCompile(@NonNull String simpleClassName, @NonNull String currentSource);
 
     /**
      * As the script is compiled, this is an opportunity to see if we still want to
@@ -51,6 +29,16 @@ public interface CompilationStrategy {
      * @param clazz
      */
     default void compilationResult(Class<?> clazz) {
+    }
+
+    /**
+     * Get a file manager to use, during compilation, as a parent of the in-memory file manager
+     *
+     * @param parentJavaFileManager The parent javaFileManager of the returned file manager
+     * @return a file manager. It will be the parent of the in-memory file manager managing the script.
+     */
+    default JavaFileManager getJavaFileManager(JavaFileManager parentJavaFileManager) {
+        return null;
     }
 
 }

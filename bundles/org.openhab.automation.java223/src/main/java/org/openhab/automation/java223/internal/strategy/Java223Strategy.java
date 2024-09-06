@@ -10,7 +10,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-
 package org.openhab.automation.java223.internal.strategy;
 
 import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
@@ -30,13 +29,17 @@ import java.util.Map.Entry;
 import java.util.Optional;
 
 import javax.script.ScriptException;
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Constants;
+import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.common.RunScript;
+import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager;
+import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager.JarFileManagerFactory;
 import org.openhab.core.service.WatchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +55,9 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 /**
  * A one-for-all strategy for a goal : providing binding / execution / library compilation and management to java223
  *
- * @author Gwendal Roulleau
+ * @author Gwendal Roulleau - Initial contribution
  */
+@NonNullByDefault
 public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrategy, BindingStrategy,
         CompilationStrategy, WatchService.WatchEventListener {
 
@@ -62,20 +66,22 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     private static final List<String> METHOD_NAMES_TO_EXECUTE = Arrays.asList("eval", "main", "run");
 
     // Additional bindings, not in the openhab JSR 223 specification
-    private static Map<String, Object> additionalBindings;
+    private Map<String, Object> additionalBindings;
 
-    // Keeping a list of library class
+    // Keeping a list of library .java file in the lib directory
     private static Map<String, JavaFileObject> librariesByFullClassName = new HashMap<>();
     private static Map<String, String> librariesFullClassNameByPath = new HashMap<>();
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
+    JarFileManager.JarFileManagerFactory jarFileManagerfactory;
 
     // Store bindings temporary to inject it as a method parameter during execution phase
     private BindingsStore bindingsStore = new BindingsStore();
 
-    public Java223Strategy(Map<String, Object> additionalBindings) {
+    public Java223Strategy(Map<String, Object> additionalBindings, ClassLoader classLoader) {
         super();
-        Java223Strategy.additionalBindings = additionalBindings;
+        this.additionalBindings = additionalBindings;
+        jarFileManagerfactory = new JarFileManagerFactory(LIB_DIR, classLoader);
     }
 
     @Override
@@ -105,43 +111,40 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             throw new ScriptException("Cannot run null class/instance");
         }
 
-        // try to execute
-        try {
-            Optional<Object> returned = null;
-            for (Method method : instance.getClass().getMethods()) {
-                if (METHOD_NAMES_TO_EXECUTE.contains(method.getName())
-                        || method.getAnnotation(RunScript.class) != null) {
-                    try {
-                        Map<String, Object> bindings = bindingsStore.getBindings(instance);
-                        if (bindings == null) {
-                            throw new ScriptException(
-                                    String.format("Error executing entry point %s in %s : bindings is null",
-                                            method.getName(), instance.getClass().getSimpleName()));
-                        }
-                        Object[] parameterValues = BindingInjector.getParameterValuesFor(method, bindings, null);
-                        returned = Optional.ofNullable(method.invoke(instance, parameterValues));
-                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                        String simpleName = instance.getClass().getSimpleName();
-                        logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
+        Optional<Object> returned = null;
+        for (Method method : instance.getClass().getMethods()) {
+            if (METHOD_NAMES_TO_EXECUTE.contains(method.getName()) || method.getAnnotation(RunScript.class) != null) {
+                try {
+                    Map<String, Object> bindings = bindingsStore.getBindings(instance);
+                    if (bindings == null) {
                         throw new ScriptException(
-                                String.format("Error executing entry point %s in %s", method.getName(), simpleName, e));
+                                String.format("Error executing entry point %s in %s : bindings is null",
+                                        method.getName(), instance.getClass().getSimpleName()));
                     }
+                    Object[] parameterValues = BindingInjector.getParameterValuesFor(method, bindings, null);
+                    returned = Optional.ofNullable(method.invoke(instance, parameterValues));
+                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
+                        | InstantiationException e) {
+                    String simpleName = instance.getClass().getSimpleName();
+                    logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
+                    throw new ScriptException(
+                            String.format("Error executing entry point %s in %s", method.getName(), simpleName, e));
                 }
             }
-            // arbitrary choose to return the last execution call result :
-            if (returned != null) {
-                return returned;
-            }
-
-            throw new ScriptException(String.format("cannot execute: %s doesn't have an eval/main/run method",
-                    instance.getClass().getSimpleName()));
-        } catch (Exception e) {
-            throw new ScriptException(e);
         }
+        // arbitrary choose to return the last execution call result :
+        if (returned != null) {
+            return returned;
+        }
+
+        throw new ScriptException(String.format(
+                "cannot execute: %s doesn't have a method named eval/main/run, or a RunScript annotated method",
+                instance.getClass().getSimpleName()));
     }
 
     @Override
     public Map<String, Object> retrieveBindings(Class<?> compiledClass, Object compiledInstance) {
+        // not supported ? What it the use case ?
         return new HashMap<String, Object>();
     }
 
@@ -170,8 +173,12 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                 default:
                     logger.warn("watch event not implemented {}", kind);
             }
+        } else if (fullPath.getFileName().toString().endsWith("." + Java223Constants.JAR_FILE_TYPE)) {
+            jarFileManagerfactory.rebuildLibPackages();
         } else {
-            logger.trace("Received '{}' for path '{}' - ignoring (wrong extension)", kind, fullPath);
+            logger.trace(
+                    "Received '{}' for path '{}' - ignoring (wrong extension, only .java and .jar file are supported)",
+                    kind, fullPath);
         }
     }
 
@@ -201,6 +208,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             Files.walk(LIB_DIR).filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith("." + Java223Constants.JAVA_FILE_TYPE))
                     .forEach(this::addLibrary);
+            jarFileManagerfactory.rebuildLibPackages();
         } catch (IOException e) {
             logger.error("Cannot use libraries", e);
         }
@@ -220,7 +228,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
 
         @Nullable
         private Map<String, Object> getBindings(Object scriptInstance) {
-            BindingStoreEntry bindingsForObject = mapStorage.remove(scriptInstance);
+            BindingStoreEntry bindingsForObject = mapStorage.get(scriptInstance);
             if (bindingsForObject != null) {
                 return bindingsForObject.bindings;
             } else {
@@ -235,14 +243,21 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
          */
         private void clearOld() {
             Long now = System.currentTimeMillis();
-            for (Iterator<@NonNull Entry<Object, BindingStoreEntry>> it = mapStorage.entrySet().iterator(); it
-                    .hasNext();) {
+            for (Iterator<Entry<Object, BindingStoreEntry>> it = mapStorage.entrySet().iterator(); it.hasNext();) {
                 Entry<Object, BindingStoreEntry> next = it.next();
                 if (now - next.getValue().timeStamp() > 50000) {
                     it.remove();
                 }
             }
         }
+    }
+
+    @Override
+    public JavaFileManager getJavaFileManager(@Nullable JavaFileManager parentJavaFileManager) {
+        if (parentJavaFileManager == null) {
+            throw new Java223Exception("Parent JavaFileManager should not be null");
+        }
+        return jarFileManagerfactory.create(parentJavaFileManager);
     }
 
     private record BindingStoreEntry(Long timeStamp, Map<String, Object> bindings) {

@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -26,9 +25,8 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
  * Wrapps a script in boilerplate code if not present.
  * Must respect some conditions to be wrapped correctly:
  * - must not contains "public class"
- * - line containing import must start with "import " (on their own line)
- * - you can globally return a value, but take care to put the "return " keyword at the beginning of the line (on its
- * own line)
+ * - line containing import must start with "import "
+ * - you can globally return a value, but take care to put the "return " keyword at the beginning of its own line
  * - you cannot declare method (in fact, your script is already wrapped inside a method)
  *
  * @author Gwendal Roulleau - Initial contribution
@@ -56,7 +54,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
         if (script == null) {
             return "";
         }
-        List<@NonNull String> lines = script.lines().toList();
+        List<String> lines = script.lines().toList();
 
         String packageDeclarationLine = "";
         List<String> importLines = new ArrayList<>(lines.size());

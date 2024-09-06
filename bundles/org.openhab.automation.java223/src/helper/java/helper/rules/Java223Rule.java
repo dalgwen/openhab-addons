@@ -10,7 +10,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-
 package helper.rules;
 
 import java.lang.reflect.Field;
@@ -46,7 +45,7 @@ public class Java223Rule extends SimpleRule {
 
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
-    
+
     private static final Logger logger = LoggerFactory.getLogger(Java223Rule.class);
 
     private BiFunction<Action, Map<String, Object>, @Nullable Object> codeToExecute;
@@ -119,7 +118,7 @@ public class Java223Rule extends SimpleRule {
         };
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({ "unchecked" })
     public Java223Rule(Object script, Field fieldMember) throws RuleParserException {
         Class<?> fieldType = fieldMember.getType();
 

@@ -113,8 +113,8 @@ public class JavaCompiledScript extends CompiledScript {
         
         if (bindingStrategy != null)
         {
-        	bindingStrategy.associateBindings(compiledClass, compiledInstance, mergedBindings);
-        	return;
+            bindingStrategy.associateBindings(compiledClass, compiledInstance, mergedBindings);
+            return;
         }
 
         for (Map.Entry<String, Object> entry : mergedBindings.entrySet()) {
@@ -131,22 +131,22 @@ public class JavaCompiledScript extends CompiledScript {
     }
 
     private void pullVariables(Bindings globalBindings, Bindings engineBindings) throws ScriptException {
-    	
+        
         if (bindingStrategy != null)
         {
-        	Map<String, Object> retrievedBindings = bindingStrategy.retrieveBindings(compiledClass, compiledInstance);
-        	
-        	for (Map.Entry<String, Object> entry : retrievedBindings.entrySet()) {
+            Map<String, Object> retrievedBindings = bindingStrategy.retrieveBindings(compiledClass, compiledInstance);
+            
+            for (Map.Entry<String, Object> entry : retrievedBindings.entrySet()) {
                   String name = entry.getKey();
                   Object value = entry.getValue();
                   
                   setBindingsValue(globalBindings, engineBindings, name, value);
-        	}
-        	
-        	return;
+            }
+            
+            return;
         }
-    	
-    	
+        
+        
         for (Field field : compiledClass.getFields()) {
             try {
                 String name = field.getName();

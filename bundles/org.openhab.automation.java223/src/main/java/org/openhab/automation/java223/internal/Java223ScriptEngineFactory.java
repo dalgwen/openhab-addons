@@ -15,7 +15,10 @@ package org.openhab.automation.java223.internal;
 import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -27,13 +30,12 @@ import java.util.stream.Stream;
 
 import javax.script.ScriptEngine;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceGenerator;
-import org.openhab.automation.java223.internal.codegeneration.SourceHelperCopier;
 import org.openhab.automation.java223.internal.codegeneration.SourceWriter;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
@@ -74,22 +76,23 @@ import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStr
  */
 @Component(service = { ScriptEngineFactory.class, Java223ScriptEngineFactory.class,
         EventSubscriber.class }, configurationPid = "automation.java223")
+@NonNullByDefault
 public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         implements ScriptEngineFactory, EventSubscriber {
 
     private static final Logger logger = LoggerFactory.getLogger(Java223ScriptEngineFactory.class);
 
-    private BundleWiring bundleWiring;
-    private BundleContext bundleContext;
+    private final BundleWiring bundleWiring;
+    private final BundleContext bundleContext;
 
-    private PackageResourceListingStrategy osgiPackageResourceListingStrategy;
-    private Java223Strategy java223Strategy;
-    private ScriptInterceptorStrategy scriptWrappingStrategy;
+    private final PackageResourceListingStrategy osgiPackageResourceListingStrategy;
+    private final Java223Strategy java223Strategy;
+    private final ScriptInterceptorStrategy scriptWrappingStrategy;
 
     private final WatchService watchService;
 
-    private SourceGenerator classGenerator;
-    private DependencyGenerator dependencyGenerator;
+    private final SourceGenerator classGenerator;
+    private final DependencyGenerator dependencyGenerator;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
             ThingStatus.UNKNOWN);
@@ -121,25 +124,26 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         Integer initializationWaitTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"),
                 Integer.class, 10000);
 
-        osgiPackageResourceListingStrategy = new PackageResourceListingStrategy() {
-            @Override
-            public Collection<String> listResources(String packageName) {
-                return listClassResources(packageName);
-            }
-        };
-        java223Strategy = new Java223Strategy(getAdditionalBindings());
+        osgiPackageResourceListingStrategy = this::listClassResources;
+        java223Strategy = new Java223Strategy(getAdditionalBindings(),
+                bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         scriptWrappingStrategy = new ScriptWrappingStrategy();
 
         try {
+            // copy the helper lib jar
+            InputStream source = getClass().getResourceAsStream("/helper-lib.jar");
+            Path dest = LIB_DIR.resolve("helper-lib.jar");
+            Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
+
             dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig, additionalClassesConfig,
                     bundleContext);
             SourceWriter classWriter = new SourceWriter(LIB_DIR);
-            SourceHelperCopier.copyFiles(classWriter);
             this.classGenerator = new SourceGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
                     bundleContext, initializationWaitTime);
             classGenerator.generateThings();
             classGenerator.generateActions();
             classGenerator.generateItems();
+            classGenerator.generateJava223Script();
             dependencyGenerator.createCoreDependencies();
             watchService.registerListener(classWriter, LIB_DIR);
         } catch (IOException e) {
@@ -187,6 +191,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         if (getScriptTypes().contains(scriptType)) {
             JavaScriptEngine engine = new Java223ScriptEngine();
 
+            // needed ? it's from javarule
+            // engine.setExecutionClassLoader(bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
             engine.setExecutionStrategyFactory(java223Strategy);
             engine.setBindingStrategy(java223Strategy);
             engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
@@ -201,11 +207,15 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     @Override
     public ScriptEngine getScriptEngine() {
-        return createScriptEngine(Java223Constants.JAVA_FILE_TYPE);
+        ScriptEngine scriptEngine = createScriptEngine(Java223Constants.JAVA_FILE_TYPE);
+        if (scriptEngine == null) {
+            throw new Java223Exception("Null script engine returned. Should not happened");
+        }
+        return scriptEngine;
     }
 
     /**
-     * Additionnal data to put into bindings so the scripts could use them.
+     * Additional data to put into bindings so the scripts could use them.
      *
      * @return
      */
@@ -226,7 +236,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     }
 
     @Override
-    public @NonNull Set<@NonNull String> getSubscribedEventTypes() {
+    public Set<String> getSubscribedEventTypes() {
         return EVENTS;
     }
 

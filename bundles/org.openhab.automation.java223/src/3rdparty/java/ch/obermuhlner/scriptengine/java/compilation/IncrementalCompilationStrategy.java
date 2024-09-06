@@ -13,22 +13,21 @@ import ch.obermuhlner.scriptengine.java.MemoryFileManager;
 public class IncrementalCompilationStrategy implements CompilationStrategy {
 
     Map<String, JavaFileObject> previousFileObject = new HashMap<>();
-    
-    JavaFileObject currentJavaFileObject; 
+
+    JavaFileObject currentJavaFileObject;
 
     @Override
     public List<JavaFileObject> getJavaFileObjectsToCompile(String simpleClassName, String currentSource) {
-	currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName,
-		currentSource);
-	Stream<JavaFileObject> previousFileObjects = previousFileObject.entrySet().stream()
-		.filter(entry -> !entry.getKey().equals(simpleClassName)) // do no keep the old file
-		.map(Entry::getValue);
-	return Stream.concat(previousFileObjects, Stream.of(currentJavaFileObject)).toList();
+        currentJavaFileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName, currentSource);
+        Stream<JavaFileObject> previousFileObjects = previousFileObject.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(simpleClassName)) // do no keep the old file
+                .map(Entry::getValue);
+        return Stream.concat(previousFileObjects, Stream.of(currentJavaFileObject)).toList();
     }
 
     @Override
-    public void compilationResult(Class<?> clazz) {	
-	previousFileObject.put(clazz.getSimpleName(), currentJavaFileObject);
+    public void compilationResult(Class<?> clazz) {
+        previousFileObject.put(clazz.getSimpleName(), currentJavaFileObject);
     }
 
 }
