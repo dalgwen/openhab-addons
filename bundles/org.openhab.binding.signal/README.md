@@ -147,6 +147,10 @@ If you want notification when sending message to your own account, use the send 
 
 Each "send" action returns a map with one key : "RESULT", which has either "OK" or "KO" as a value.
 
+#### Return value
+
+Each send action returns a Map<String, Object>. The only member of the map is keyed by the string "RESULT". The value is "OK" or "KO".
+
 ## Full Example
 
 ### Thing configuration
