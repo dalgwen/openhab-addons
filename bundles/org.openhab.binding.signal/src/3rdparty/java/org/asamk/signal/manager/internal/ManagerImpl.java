@@ -23,6 +23,7 @@ import org.asamk.signal.manager.api.CaptchaRejectedException;
 import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.Configuration;
 import org.asamk.signal.manager.api.Device;
+import org.asamk.signal.manager.api.DeviceLimitExceededException;
 import org.asamk.signal.manager.api.DeviceLinkUrl;
 import org.asamk.signal.manager.api.Group;
 import org.asamk.signal.manager.api.GroupId;
@@ -92,6 +93,7 @@ import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.SignalSessionLock;
+import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
 import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServicePreview;
 import org.whispersystems.signalservice.api.messages.SignalServiceReceiptMessage;
@@ -486,7 +488,7 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public void addDeviceLink(DeviceLinkUrl linkUrl) throws IOException, InvalidDeviceLinkException, NotPrimaryDeviceException {
+    public void addDeviceLink(DeviceLinkUrl linkUrl) throws IOException, InvalidDeviceLinkException, NotPrimaryDeviceException, DeviceLimitExceededException {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
@@ -703,8 +705,15 @@ public class ManagerImpl implements Manager {
             final SignalServiceReceiptMessage receiptMessage
     ) {
         try {
-            final var result = context.getSendHelper()
-                    .sendReceiptMessage(receiptMessage, context.getRecipientHelper().resolveRecipient(sender));
+            final var recipientId = context.getRecipientHelper().resolveRecipient(sender);
+            final var result = context.getSendHelper().sendReceiptMessage(receiptMessage, recipientId);
+
+            final var serviceId = account.getRecipientAddressResolver()
+                    .resolveRecipientAddress(recipientId)
+                    .serviceId();
+            if (serviceId.isPresent()) {
+                context.getSyncHelper().sendSyncReceiptMessage(serviceId.get(), receiptMessage);
+            }
             return new SendMessageResults(timestamp, Map.of(sender, List.of(toSendMessageResult(result))));
         } catch (UnregisteredRecipientException e) {
             return new SendMessageResults(timestamp,
@@ -738,17 +747,28 @@ public class ManagerImpl implements Manager {
     private void applyMessage(
             final SignalServiceDataMessage.Builder messageBuilder, final Message message
     ) throws AttachmentInvalidException, IOException, UnregisteredRecipientException, InvalidStickerException {
+        final var additionalAttachments = new ArrayList<SignalServiceAttachment>();
         if (message.messageText().length() > 2000) {
             final var messageBytes = message.messageText().getBytes(StandardCharsets.UTF_8);
-            final var textAttachment = AttachmentUtils.createAttachmentStream(new StreamDetails(new ByteArrayInputStream(
-                    messageBytes), MimeUtils.LONG_TEXT, messageBytes.length), Optional.empty());
+            final var uploadSpec = dependencies.getMessageSender().getResumableUploadSpec().toProto();
+            final var streamDetails = new StreamDetails(new ByteArrayInputStream(messageBytes),
+                    MimeUtils.LONG_TEXT,
+                    messageBytes.length);
+            final var textAttachment = AttachmentUtils.createAttachmentStream(streamDetails,
+                    Optional.empty(),
+                    uploadSpec);
             messageBuilder.withBody(message.messageText().substring(0, 2000));
-            messageBuilder.withAttachment(context.getAttachmentHelper().uploadAttachment(textAttachment));
+            additionalAttachments.add(context.getAttachmentHelper().uploadAttachment(textAttachment));
         } else {
             messageBuilder.withBody(message.messageText());
         }
         if (!message.attachments().isEmpty()) {
-            messageBuilder.withAttachments(context.getAttachmentHelper().uploadAttachments(message.attachments()));
+            if (!additionalAttachments.isEmpty()) {
+                additionalAttachments.addAll(context.getAttachmentHelper().uploadAttachments(message.attachments()));
+                messageBuilder.withAttachments(additionalAttachments);
+            } else {
+                messageBuilder.withAttachments(context.getAttachmentHelper().uploadAttachments(message.attachments()));
+            }
         }
         if (!message.mentions().isEmpty()) {
             messageBuilder.withMentions(resolveMentions(message.mentions()));
@@ -793,11 +813,15 @@ public class ManagerImpl implements Manager {
             if (streamDetails == null) {
                 throw new InvalidStickerException("Missing local sticker file");
             }
+            final var uploadSpec = dependencies.getMessageSender().getResumableUploadSpec().toProto();
+            final var stickerAttachment = AttachmentUtils.createAttachmentStream(streamDetails,
+                    Optional.empty(),
+                    uploadSpec);
             messageBuilder.withSticker(new SignalServiceDataMessage.Sticker(packId.serialize(),
                     stickerPack.packKey(),
                     stickerId,
                     manifestSticker.emoji(),
-                    AttachmentUtils.createAttachmentStream(streamDetails, Optional.empty())));
+                    stickerAttachment));
         }
         if (!message.previews().isEmpty()) {
             final var previews = new ArrayList<SignalServicePreview>(message.previews().size());

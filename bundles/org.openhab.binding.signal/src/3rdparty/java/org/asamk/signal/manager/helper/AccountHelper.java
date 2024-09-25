@@ -39,6 +39,7 @@ import org.whispersystems.signalservice.api.push.exceptions.UsernameIsNotReserve
 import org.whispersystems.signalservice.api.push.exceptions.UsernameMalformedException;
 import org.whispersystems.signalservice.api.push.exceptions.UsernameTakenException;
 import org.whispersystems.signalservice.api.util.DeviceNameUtil;
+import org.whispersystems.signalservice.internal.push.DeviceLimitExceededException;
 import org.whispersystems.signalservice.internal.push.KyberPreKeyEntity;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.SyncMessage;
@@ -219,20 +220,30 @@ public class AccountHelper {
         final var messageSender = dependencies.getMessageSender();
         for (final var deviceId : deviceIds) {
             // Signed Prekey
-            final var signedPreKeyRecord = KeyUtils.generateSignedPreKeyRecord(KeyUtils.getRandomInt(PREKEY_MAXIMUM_ID),
-                    pniIdentity.getPrivateKey());
-            final var signedPreKeyEntity = new SignedPreKeyEntity(signedPreKeyRecord.getId(),
-                    signedPreKeyRecord.getKeyPair().getPublicKey(),
-                    signedPreKeyRecord.getSignature());
-            devicePniSignedPreKeys.put(deviceId, signedPreKeyEntity);
+            final SignedPreKeyRecord signedPreKeyRecord;
+            try {
+                signedPreKeyRecord = KeyUtils.generateSignedPreKeyRecord(KeyUtils.getRandomInt(PREKEY_MAXIMUM_ID),
+                        pniIdentity.getPrivateKey());
+                final var signedPreKeyEntity = new SignedPreKeyEntity(signedPreKeyRecord.getId(),
+                        signedPreKeyRecord.getKeyPair().getPublicKey(),
+                        signedPreKeyRecord.getSignature());
+                devicePniSignedPreKeys.put(deviceId, signedPreKeyEntity);
+            } catch (InvalidKeyException e) {
+                throw new AssertionError("unexpected invalid key", e);
+            }
 
             // Last-resort kyber prekey
-            final var lastResortKyberPreKeyRecord = KeyUtils.generateKyberPreKeyRecord(KeyUtils.getRandomInt(
-                    PREKEY_MAXIMUM_ID), pniIdentity.getPrivateKey());
-            final var kyberPreKeyEntity = new KyberPreKeyEntity(lastResortKyberPreKeyRecord.getId(),
-                    lastResortKyberPreKeyRecord.getKeyPair().getPublicKey(),
-                    lastResortKyberPreKeyRecord.getSignature());
-            devicePniLastResortKyberPreKeys.put(deviceId, kyberPreKeyEntity);
+            final KyberPreKeyRecord lastResortKyberPreKeyRecord;
+            try {
+                lastResortKyberPreKeyRecord = KeyUtils.generateKyberPreKeyRecord(KeyUtils.getRandomInt(PREKEY_MAXIMUM_ID),
+                        pniIdentity.getPrivateKey());
+                final var kyberPreKeyEntity = new KyberPreKeyEntity(lastResortKyberPreKeyRecord.getId(),
+                        lastResortKyberPreKeyRecord.getKeyPair().getPublicKey(),
+                        lastResortKyberPreKeyRecord.getSignature());
+                devicePniLastResortKyberPreKeys.put(deviceId, kyberPreKeyEntity);
+            } catch (InvalidKeyException e) {
+                throw new AssertionError("unexpected invalid key", e);
+            }
 
             // Registration Id
             var pniRegistrationId = -1;
@@ -466,8 +477,13 @@ public class AccountHelper {
         dependencies.getAccountManager().setAccountAttributes(account.getAccountAttributes(null));
     }
 
-    public void addDevice(DeviceLinkUrl deviceLinkInfo) throws IOException, InvalidDeviceLinkException {
-        var verificationCode = dependencies.getAccountManager().getNewDeviceVerificationCode();
+    public void addDevice(DeviceLinkUrl deviceLinkInfo) throws IOException, InvalidDeviceLinkException, org.asamk.signal.manager.api.DeviceLimitExceededException {
+        String verificationCode;
+        try {
+            verificationCode = dependencies.getAccountManager().getNewDeviceVerificationCode();
+        } catch (DeviceLimitExceededException e) {
+            throw new org.asamk.signal.manager.api.DeviceLimitExceededException("Too many linked devices", e);
+        }
 
         try {
             dependencies.getAccountManager()
