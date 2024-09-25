@@ -80,7 +80,7 @@ public class SignalService {
 
     private static final String SIGNAL_DIRECTORY = "signal";
     private static final int MAX_BACKOFF_COUNTER = 9;
-    public static final String DEFAULT_USER_AGENT = "Signal-Android/6.46.0 signal-cli";
+    public static final String DEFAULT_USER_AGENT = "Signal-Android/7.9.0 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
     private static final ServiceEnvironment SERVICE_ENVIRONMENT = ServiceEnvironment.LIVE;
 

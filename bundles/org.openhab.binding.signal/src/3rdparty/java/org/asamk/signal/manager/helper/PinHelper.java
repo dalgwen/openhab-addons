@@ -105,7 +105,7 @@ public class PinHelper {
     public SecureValueRecovery.RestoreResponse.Success getRegistrationLockData(
             SecureValueRecovery secureValueRecovery, AuthCredentials authCredentials, String pin
     ) throws IOException, IncorrectPinException {
-        final var restoreResponse = secureValueRecovery.restoreDataPreRegistration(authCredentials, pin);
+        final var restoreResponse = secureValueRecovery.restoreDataPreRegistration(authCredentials, null, pin);
 
         if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.Success s) {
             return s;

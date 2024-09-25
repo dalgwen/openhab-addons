@@ -9,7 +9,6 @@ import org.asamk.signal.manager.storage.groups.GroupInfoV1;
 import org.asamk.signal.manager.storage.recipients.RecipientAddress;
 import org.asamk.signal.manager.storage.recipients.RecipientId;
 import org.asamk.signal.manager.storage.stickers.StickerPack;
-import org.asamk.signal.manager.util.AttachmentUtils;
 import org.asamk.signal.manager.util.IOUtils;
 import org.asamk.signal.manager.util.MimeUtils;
 import org.jetbrains.annotations.NotNull;
@@ -18,11 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.messages.SendMessageResult;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
-import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentStream;
+import org.whispersystems.signalservice.api.messages.SignalServiceReceiptMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ConfigurationMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ContactsMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceContact;
+import org.whispersystems.signalservice.api.messages.multidevice.DeviceContactAvatar;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceContactsInputStream;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceContactsOutputStream;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroup;
@@ -30,12 +30,16 @@ import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroupsInp
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceGroupsOutputStream;
 import org.whispersystems.signalservice.api.messages.multidevice.KeysMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.MessageRequestResponseMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.StickerPackOperationMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ViewedMessage;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.SyncMessage;
+import org.whispersystems.signalservice.internal.push.http.ResumableUploadSpec;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -88,6 +92,22 @@ public class SyncHelper {
                 .sendSyncMessage(SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.STORAGE_MANIFEST));
     }
 
+    public void sendSyncReceiptMessage(ServiceId sender, SignalServiceReceiptMessage receiptMessage) {
+        if (receiptMessage.isReadReceipt()) {
+            final var readMessages = receiptMessage.getTimestamps()
+                    .stream()
+                    .map(t -> new ReadMessage(sender, t))
+                    .toList();
+            context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forRead(readMessages));
+        } else if (receiptMessage.isViewedReceipt()) {
+            final var viewedMessages = receiptMessage.getTimestamps()
+                    .stream()
+                    .map(t -> new ViewedMessage(sender, t))
+                    .toList();
+            context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forViewed(viewedMessages));
+        }
+    }
+
     public void sendGroups() throws IOException {
         var groupsFile = IOUtils.createTempFile();
 
@@ -115,10 +135,15 @@ public class SyncHelper {
 
             if (groupsFile.exists() && groupsFile.length() > 0) {
                 try (var groupsFileStream = new FileInputStream(groupsFile)) {
+                    final var uploadSpec = context.getDependencies()
+                            .getMessageSender()
+                            .getResumableUploadSpec()
+                            .toProto();
                     var attachmentStream = SignalServiceAttachment.newStreamBuilder()
                             .withStream(groupsFileStream)
                             .withContentType(MimeUtils.OCTET_STREAM)
                             .withLength(groupsFile.length())
+                            .withResumableUploadSpec(ResumableUploadSpec.from(uploadSpec))
                             .build();
 
                     context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forGroups(attachmentStream));
@@ -144,7 +169,14 @@ public class SyncHelper {
                     final var contact = contactPair.second();
                     final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
 
-                    out.write(getDeviceContact(address, recipientId, contact));
+                    final var deviceContact = getDeviceContact(address, recipientId, contact);
+                    out.write(deviceContact);
+                    deviceContact.getAvatar().ifPresent(a -> {
+                        try {
+                            a.getInputStream().close();
+                        } catch (IOException ignored) {
+                        }
+                    });
                 }
 
                 if (account.getProfileKey() != null) {
@@ -152,16 +184,28 @@ public class SyncHelper {
                     final var address = account.getSelfRecipientAddress();
                     final var recipientId = account.getSelfRecipientId();
                     final var contact = account.getContactStore().getContact(recipientId);
-                    out.write(getDeviceContact(address, recipientId, contact));
+                    final var deviceContact = getDeviceContact(address, recipientId, contact);
+                    out.write(deviceContact);
+                    deviceContact.getAvatar().ifPresent(a -> {
+                        try {
+                            a.getInputStream().close();
+                        } catch (IOException ignored) {
+                        }
+                    });
                 }
             }
 
             if (contactsFile.exists() && contactsFile.length() > 0) {
                 try (var contactsFileStream = new FileInputStream(contactsFile)) {
+                    final var uploadSpec = context.getDependencies()
+                            .getMessageSender()
+                            .getResumableUploadSpec()
+                            .toProto();
                     var attachmentStream = SignalServiceAttachment.newStreamBuilder()
                             .withStream(contactsFileStream)
                             .withContentType(MimeUtils.OCTET_STREAM)
                             .withLength(contactsFile.length())
+                            .withResumableUploadSpec(ResumableUploadSpec.from(uploadSpec))
                             .build();
 
                     context.getSendHelper()
@@ -202,6 +246,7 @@ public class SyncHelper {
                 Optional.ofNullable(verifiedMessage),
                 Optional.ofNullable(profileKey),
                 Optional.ofNullable(contact == null ? null : contact.messageExpirationTime()),
+                Optional.empty(),
                 Optional.empty(),
                 contact != null && contact.isArchived());
     }
@@ -360,7 +405,7 @@ public class SyncHelper {
             account.getContactStore().storeContact(recipientId, builder.build());
 
             if (c.getAvatar().isPresent()) {
-                downloadContactAvatar(c.getAvatar().get(), address);
+                storeContactAvatar(c.getAvatar().get(), address);
             }
         }
     }
@@ -394,20 +439,22 @@ public class SyncHelper {
         return context.getSendHelper().sendSyncMessage(message);
     }
 
-    private Optional<SignalServiceAttachmentStream> createContactAvatarAttachment(RecipientAddress address) throws IOException {
+    private Optional<DeviceContactAvatar> createContactAvatarAttachment(RecipientAddress address) throws IOException {
         final var streamDetails = context.getAvatarStore().retrieveContactAvatar(address);
         if (streamDetails == null) {
             return Optional.empty();
         }
 
-        return Optional.of(AttachmentUtils.createAttachmentStream(streamDetails, Optional.empty()));
+        return Optional.of(new DeviceContactAvatar(streamDetails.getStream(),
+                streamDetails.getLength(),
+                streamDetails.getContentType()));
     }
 
-    private void downloadContactAvatar(SignalServiceAttachment avatar, RecipientAddress address) {
+    private void storeContactAvatar(DeviceContactAvatar avatar, RecipientAddress address) {
         try {
             context.getAvatarStore()
                     .storeContactAvatar(address,
-                            outputStream -> context.getAttachmentHelper().retrieveAttachment(avatar, outputStream));
+                            outputStream -> IOUtils.copyStream(avatar.getInputStream(), outputStream));
         } catch (IOException e) {
             logger.warn("Failed to download avatar for contact {}, ignoring: {}", address, e.getMessage());
         }
