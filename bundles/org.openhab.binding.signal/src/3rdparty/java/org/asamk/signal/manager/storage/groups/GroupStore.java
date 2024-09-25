@@ -269,7 +269,7 @@ public class GroupStore {
     private GroupInfoV2 getGroupOrPartialMigrate(
             Connection connection, final GroupMasterKey groupMasterKey, final GroupIdV2 groupId
     ) throws SQLException {
-        GroupInfo group = getGroup(groupId);
+        GroupInfo group = getGroup(connection, (GroupId) groupId);
 
         if (group == null) {
             return new GroupInfoV2(groupId, groupMasterKey, recipientResolver);
