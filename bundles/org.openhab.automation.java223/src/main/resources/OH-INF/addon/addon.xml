@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon:addon id="java223" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:addon="https://openhab.org/schemas/addon/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
+
+	<type>automation</type>
+	<name>Java223 Scripting Automation</name>
+	<description>This bundle allows using Java in JSR223 scripts.</description>
+
+	<config-description>
+		<parameter name="scriptCacheSize" type="text">
+			<label>Script Cache Size</label>
+			<description>Script compilation cache size. 0 to disable. A positive number allows keeping compilation result.</description>
+		</parameter>
+		<parameter name="allowInstanceReuse" type="boolean">
+			<label>Allow Script Instance Reuse</label>
+			<description>Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware
+				of concurrency issues</description>
+		</parameter>
+		<parameter name="additionalBundles" type="text">
+			<label>Additional Bundles</label>
+			<description>Additional bundles exported for developing, concatenated by ",".</description>
+		</parameter>
+		<parameter name="additionalClasses" type="text">
+			<label>Additional Classes</label>
+			<description>Additional classes exported for developing, concatenated by ",".</description>
+		</parameter>
+		<parameter name="stabilityGenerationWaitTime" type="integer">
+			<advanced>true</advanced>
+			<label>Stability Generation Wait Time</label>
+			<description>Delay (in ms) before writing generated classes. Each new generation triggering event further delays the
+				generation. Especially useful at startup.</description>
+			<default>10000</default>
+		</parameter>
+	</config-description>
+
+</addon:addon>
