@@ -23,14 +23,22 @@ public class ${simpleClassName} {
     public static final String SCOPE = "${scope}";
     
     ThingActions thingActions;
+    ScriptThingActions scriptThingActions;
+    String thingUID;
     
     public ${simpleClassName}(ScriptThingActions actions, String thingUID) {
-        thingActions = actions.get(SCOPE, thingUID);
+        this.thingActions = actions.get(SCOPE, thingUID);
+        this.scriptThingActions = actions;
+        this.thingUID = thingUID;
     }
 
 <#list methods as method><#if (method.returnValueType() != "void")>
     @SuppressWarnings("unchecked")</#if>
     public ${method.returnValueType()} ${method.name()}(<#list method.parameterTypes() as parameter>${parameter} p${parameter?counter}<#sep>, </#list>) {
+        if (thingActions == null) {
+            thingActions = scriptThingActions.get(SCOPE, thingUID);
+        }
+        
         try {
             Class<?> thingActionClass = thingActions.getClass();
 <#if (method.parameterTypes()?size > 0)>
