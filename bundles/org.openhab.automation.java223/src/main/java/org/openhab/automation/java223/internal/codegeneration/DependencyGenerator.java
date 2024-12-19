@@ -70,21 +70,21 @@ public class DependencyGenerator {
             "org.eclipse.jdt.annotation.DefaultLocation", "org.slf4j.LoggerFactory", "org.slf4j.Logger",
             "org.slf4j.Marker");
 
-    private Path libDir;
+    private final Path libDir;
     // bundle
     private String additionalBundlesConfig;
     // individual classes
     private String additionalClassesConfig;
-    private BundleContext bundleContext;
+    private final BundleContext bundleContext;
 
-    private Set<String> additionalClassesToExport = new HashSet<>();
+    private final Set<String> additionalClassesToExport = new HashSet<>();
 
     /**
      *
      * @param libDir The target library directory
      * @param additionalBundlesConfig Bundle to inspect. We will extract classes from it.
      * @param additionalClassesConfig Individual classes to add to the exported JAR
-     * @param bundleContext
+     * @param bundleContext OSGI Bundle context
      */
     public DependencyGenerator(Path libDir, String additionalBundlesConfig, String additionalClassesConfig,
             BundleContext bundleContext) {
@@ -132,11 +132,11 @@ public class DependencyGenerator {
                 }
             }
 
-            // we want to warn about the list of packages we didn't found
+            // we want to warn about the list of packages we didn't find
             if (logger.isWarnEnabled()) {
                 Set<String> packagesNotFound = new HashSet<>(DEFAULT_DEPENDENCIES);
-                packagesNotFound
-                        .removeAll(packagesSuccessfullyExported.stream().map(s -> s.replaceAll("/", ".")).toList());
+                packagesSuccessfullyExported.stream().map(s -> s.replaceAll("/", ".")).toList()
+                        .forEach(packagesNotFound::remove);
                 for (String remainingPackage : packagesNotFound) {
                     logger.warn("Failed to found classes to export in package {}", remainingPackage);
                 }
@@ -166,7 +166,7 @@ public class DependencyGenerator {
             }
             try (InputStream stream = classLoader.getResourceAsStream(path)) {
                 if (stream != null) {
-                    addEntryToJar(target, path, 0, stream);
+                    addEntryToJar(target, path, stream);
                 } else {
                     logger.warn("InputStream {} from classpath is null", classToExtract);
                 }
@@ -186,7 +186,7 @@ public class DependencyGenerator {
         List<String> exportedPackages = Arrays.stream(exportPackage //
                 .split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) // split only on comma not in double quotes
                 .map(s -> s.split(";")[0]) // get only package name and drop uses, version, etc.
-                .map(b -> b.replace(".", "/")).collect(Collectors.toList());
+                .map(b -> b.replace(".", "/")).toList();
         Set<String> dependenciesWithSlash = dependencies.stream().map(b -> b.replace(".", "/"))
                 .collect(Collectors.<String> toSet());
 
@@ -196,7 +196,7 @@ public class DependencyGenerator {
                         int classNameStart = classFile.lastIndexOf("/");
                         if (classNameStart != -1) {
                             String packageName = classFile.substring(0, classNameStart);
-                            if (classNameStart == -1 || !exportedPackages.contains(packageName)
+                            if (!exportedPackages.contains(packageName)
                                     || !dependenciesWithSlash.contains(packageName)) {
                                 return;
                             }
@@ -206,7 +206,7 @@ public class DependencyGenerator {
                                 logger.warn("URL for {} is empty, skipping", classFile);
                             } else {
                                 try (InputStream stream = urlEntry.openStream()) {
-                                    addEntryToJar(target, classFile, 0, stream);
+                                    addEntryToJar(target, classFile, stream);
                                     classesSuccessfullyExported.add(packageName);
                                 }
                             }
@@ -218,12 +218,8 @@ public class DependencyGenerator {
                 });
     }
 
-    private static void addEntryToJar(JarOutputStream jar, String name, long lastModified, InputStream content)
-            throws IOException {
+    private static void addEntryToJar(JarOutputStream jar, String name, InputStream content) throws IOException {
         JarEntry jarEntry = new JarEntry(name);
-        if (lastModified != 0) {
-            jarEntry.setTime(lastModified);
-        }
         jar.putNextEntry(jarEntry);
         jar.write(content.readAllBytes());
         jar.closeEntry();
@@ -231,9 +227,7 @@ public class DependencyGenerator {
 
     private boolean excludeFromExport(String classToExport) {
         return classToExport.startsWith("java.") || DEFAULT_DEPENDENCIES.stream() //
-                .filter(packageAlreadyExported -> classToExport.startsWith(packageAlreadyExported)) //
-                .findFirst() //
-                .isPresent();
+                .anyMatch(classToExport::startsWith);
     }
 
     private static void getAllInterfaces(@Nullable Class<?> cls, final Set<String> interfacesFound) {
@@ -264,7 +258,7 @@ public class DependencyGenerator {
      * Add classes to export inside the dependencies JAR
      * Purely for convenience
      *
-     * @param allClassesToExport
+     * @param allClassesToExport Classes to export inside the JAR
      */
     public void setClassesToAddToDependenciesLib(Set<String> allClassesToExport) {
 

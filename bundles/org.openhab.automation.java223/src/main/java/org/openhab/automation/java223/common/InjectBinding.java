@@ -34,29 +34,29 @@ public @interface InjectBinding {
     /**
      * Prevent injection. Useful if you want to do it yourself.
      *
-     * @return
+     * @return If the binding should not be injected in the annotated element
      */
-    public boolean enable() default true;
+    boolean enable() default true;
 
     /**
      * If set, use this name. Else try to get the name from the code.
      *
-     * @return
+     * @return The name to search in the openHAB bindings
      */
-    public String named() default ANNOTATION_DEFAULT;
+    String named() default ANNOTATION_DEFAULT;
 
     /**
      * If set, instructs the framework to get value inside a preset
      *
-     * @return
+     * @return The name of the preset
      */
-    public String preset() default ANNOTATION_DEFAULT;
+    String preset() default ANNOTATION_DEFAULT;
 
     /**
      * If true and no value to inject is found, the binding process will fail with an exception.
      * If false, null value are allowed.
      *
-     * @return
+     * @return True if the value searched MUST be present in the openHAB binding
      */
-    public boolean mandatory() default true;
+    boolean mandatory() default true;
 }

@@ -46,7 +46,7 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
     /**
      * Recreate cache with a new size
      *
-     * @param scriptCacheSize
+     * @param newCacheSize New cache size
      */
     public void setCacheSize(Integer newCacheSize) {
         if (!newCacheSize.equals(cacheSize)) {
@@ -69,8 +69,8 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
         return wrapper;
     }
 
-    public static interface Compiler {
-        public JavaCompiledScript compile(String script) throws ScriptException;
+    public interface Compiler {
+        JavaCompiledScript compile(String script) throws ScriptException;
     }
 
     /**
