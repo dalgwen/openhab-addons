@@ -12,6 +12,8 @@
  */
 package org.openhab.automation.java223.common;
 
+import java.io.Serial;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
@@ -22,6 +24,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public class Java223Exception extends RuntimeException {
 
+    @Serial
     private static final long serialVersionUID = 7608058563887813804L;
 
     public Java223Exception(String message, Exception source) {

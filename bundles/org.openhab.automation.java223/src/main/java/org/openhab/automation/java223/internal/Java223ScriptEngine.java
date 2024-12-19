@@ -44,9 +44,9 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
 
     private @Nullable JavaCompiledScript lastCompiledScript;
 
-    private Java223CompiledScriptCache cache;
+    private final Java223CompiledScriptCache cache;
 
-    private Java223Strategy java223Strategy;
+    private final Java223Strategy java223Strategy;
 
     public Java223ScriptEngine(Java223CompiledScriptCache cache, Java223Strategy java223Strategy) {
         super();
@@ -95,17 +95,11 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
             return null;
         }
 
-        Class<? extends Annotation> annotation;
-        switch (name) {
-            case "scriptLoaded":
-                annotation = ScriptLoadedTrigger.class;
-                break;
-            case "scriptUnloaded":
-                annotation = ScriptUnloadedTrigger.class;
-                break;
-            default:
-                throw new ScriptException(name + " is not an allowed method in java223");
-        }
+        Class<? extends Annotation> annotation = switch (name) {
+            case "scriptLoaded" -> ScriptLoadedTrigger.class;
+            case "scriptUnloaded" -> ScriptUnloadedTrigger.class;
+            default -> throw new ScriptException(name + " is not an allowed method in java223");
+        };
 
         Java223CompiledScriptInstanceWrapper wrapperInstance = (Java223CompiledScriptInstanceWrapper) compiledScript
                 .getCompiledInstance();
@@ -119,15 +113,14 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
                 } else {
                     try {
                         if (Modifier.isStatic(method.getModifiers())) {
-                            method.invoke(null);
+                            method.invoke(new Object()); // new object() required (but value ignored) to avoid non-null
+                                                         // check compiler error
+                        } else if (compiledInstance == null) {
+                            logger.debug(
+                                    "Calling ScriptLoaded/ScriptUnloaded {} method from a script not yet instantiated is ignored. Use a static modifier",
+                                    method.getName());
                         } else {
-                            if (compiledInstance == null) {
-                                logger.debug(
-                                        "Calling ScriptLoaded/ScriptUnloaded {} method from a script not yet instanciated is ignored. Use a static modifier",
-                                        method.getName());
-                            } else {
-                                method.invoke(compiledInstance);
-                            }
+                            method.invoke(compiledInstance);
                         }
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                         logger.warn("Method {} cannot be called by ScriptLoaded/ScriptUnloaded trigger",

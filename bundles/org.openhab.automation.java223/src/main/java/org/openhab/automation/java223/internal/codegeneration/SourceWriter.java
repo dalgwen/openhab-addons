@@ -73,8 +73,8 @@ public class SourceWriter implements WatchService.WatchEventListener {
         }
     }
 
-    protected synchronized boolean replaceHelperFileIfNotEqual(String packageName, String className,
-            String generatedClass) throws IOException {
+    protected synchronized void replaceHelperFileIfNotEqual(String packageName, String className, String generatedClass)
+            throws IOException {
         String key = packageName + "." + className;
 
         if (sourceHasChange(key, generatedClass)) {
@@ -86,10 +86,8 @@ public class SourceWriter implements WatchService.WatchEventListener {
                 outFile.write(generatedClass.getBytes(StandardCharsets.UTF_8));
                 logger.debug("Wrote generated class: {}", javaFile.toAbsolutePath());
             }
-            return true;
         } else {
             logger.debug("{} has not changed.", key);
-            return false;
         }
     }
 

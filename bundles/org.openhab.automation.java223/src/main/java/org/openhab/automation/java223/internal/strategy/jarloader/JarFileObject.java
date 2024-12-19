@@ -75,8 +75,10 @@ public class JarFileObject implements JavaFileObject {
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
         try (ByteArrayOutputStream result = new ByteArrayOutputStream()) {
-            result.write(openInputStream().readAllBytes());
-            return result.toString(StandardCharsets.UTF_8);
+            try (InputStream inputStream = openInputStream()) {
+                result.write(inputStream.readAllBytes());
+                return result.toString(StandardCharsets.UTF_8);
+            }
         }
     }
 

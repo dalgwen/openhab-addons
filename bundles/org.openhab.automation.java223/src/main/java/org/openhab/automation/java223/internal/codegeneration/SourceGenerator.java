@@ -69,8 +69,8 @@ public class SourceGenerator {
     private final ThingRegistry thingRegistry;
     private final BundleContext bundleContext;
 
-    private SourceWriter sourceWriter;
-    private DependencyGenerator dependencyGenerator;
+    private final SourceWriter sourceWriter;
+    private final DependencyGenerator dependencyGenerator;
 
     private static final String TPL_LOCATION = "/generated/";
 
@@ -79,23 +79,23 @@ public class SourceGenerator {
     private Integer stabilityGenerationWaitTime;
 
     // keep a reference to generation method, to use as a key in the delayed map
-    private InternalGenerator actionGeneration = this::internalGenerateActions;
-    private InternalGenerator itemGeneration = this::internalGenerateItems;
-    private InternalGenerator thingGeneration = this::internalGenerateThings;
-    private Map<InternalGenerator, ScheduledFuture<?>> futureGeneration = new HashMap<>();
+    private final InternalGenerator actionGeneration = this::internalGenerateActions;
+    private final InternalGenerator itemGeneration = this::internalGenerateItems;
+    private final InternalGenerator thingGeneration = this::internalGenerateThings;
+    private final Map<InternalGenerator, ScheduledFuture<?>> futureGeneration = new HashMap<>();
 
-    private ScheduledExecutorService scheduledPool = ThreadPoolManager
+    private final ScheduledExecutorService scheduledPool = ThreadPoolManager
             .getScheduledPool(ThreadPoolManager.THREAD_POOL_NAME_COMMON);
 
     /**
      *
      * @param sourceWriter The real writer, with a cache to avoid writing something already existing
-     * @param dependencyGenerator We will add to the dependency generator a list of package we thing would be
+     * @param dependencyGenerator We will add to the dependency generator a list of package we think would be
      *            interesting to export
      * @param itemRegistry Lookup inside the itemRegistry to generate a list of item
      * @param thingRegistry Lookup inside the thingRegistry to generate a list of thing
      * @param bundleContext We will search for class action inside
-     * @param stabilityGenerationWaitTime
+     * @param stabilityGenerationWaitTime Wait until no new call are made during the period defined
      */
     public SourceGenerator(SourceWriter sourceWriter, DependencyGenerator dependencyGenerator,
             ItemRegistry itemRegistry, ThingRegistry thingRegistry, BundleContext bundleContext,
@@ -118,9 +118,9 @@ public class SourceGenerator {
      * registries are not completely ready.
      * Until there is no more item/thing/action activating, this code will delay code generation.
      *
-     * @param generator
+     * @param generator The generator responsible for creating the class
      */
-    protected synchronized void delayWhenStable(InternalGenerator generator) {
+    private synchronized void delayWhenStable(InternalGenerator generator) {
         ScheduledFuture<?> scheduledFuture = futureGeneration.get(generator);
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
@@ -172,8 +172,7 @@ public class SourceGenerator {
         try {
             Set<Class<?>> classes = new HashSet<>();
             thingActions = bundleContext.getServiceReferences(ThingActions.class, null).stream()
-                    .map(bundleContext::getService).filter(sr -> classes.add(sr.getClass()))
-                    .collect(Collectors.toList());
+                    .map(bundleContext::getService).filter(sr -> classes.add(sr.getClass())).toList();
         } catch (InvalidSyntaxException e) {
             logger.warn("Failed to get thing actions: {}", e.getMessage());
             return;
@@ -190,17 +189,15 @@ public class SourceGenerator {
             if (scopeAnnotation == null) {
                 continue;
             }
-            String scope = scopeAnnotation.name().toString();
+            String scope = scopeAnnotation.name();
             String simpleClassName = clazz.getSimpleName();
             String packageName = sourceWriter.getPackageName(GENERATED, scope);
-            actionsByScope.computeIfAbsent(scope, (key -> new HashSet<String>()))
-                    .add(packageName + "." + simpleClassName);
+            actionsByScope.computeIfAbsent(scope, (key -> new HashSet<>())).add(packageName + "." + simpleClassName);
 
             logger.trace("Processing class '{}' in package '{}'", simpleClassName, clazz.getPackageName());
 
             List<Method> methods = Arrays.stream(clazz.getDeclaredMethods())
-                    .filter(method -> method.getDeclaredAnnotation(RuleAction.class) != null)
-                    .collect(Collectors.toList());
+                    .filter(method -> method.getDeclaredAnnotation(RuleAction.class) != null).toList();
 
             Set<String> classesToImport = new HashSet<>();
             List<MethodDTO> methodsDTO = new ArrayList<>();
@@ -241,7 +238,7 @@ public class SourceGenerator {
         Template templateActionFactory = cfg.getTemplate(TPL_LOCATION + "Actions.ftl");
         Map<String, Object> context = new HashMap<>();
         context.put("packageName", sourceWriter.getPackageName(GENERATED));
-        context.put("classesToImport", actionsByScope.values().stream().flatMap(s -> s.stream()).toList());
+        context.put("classesToImport", actionsByScope.values().stream().flatMap(Collection::stream).toList());
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmmLastName = (
                 args) -> className(((List<freemarker.template.SimpleScalar>) args).get(0).getAsString()).get();
@@ -258,17 +255,17 @@ public class SourceGenerator {
     }
 
     /**
-     * Return a user friendly short readable name (without package details) and add the relevant full class name to the
+     * Return a user-friendly short readable name (without package details) and add the relevant full class name to the
      * imports list
      *
-     * @param type
+     * @param type The type to consider
      * @param imports A set to add imports into
-     * @return a user friendly printable name (without package)
+     * @return a user-friendly printable name (without package)
      */
     protected static String parseArgumentType(Type type, Set<String> imports) {
         String typeName = type.getTypeName();
         String currentName = "";
-        String friendlyFullType = "";
+        StringBuilder friendlyFullType = new StringBuilder();
         for (int i = 0; i < typeName.length(); i++) {
             char ch = typeName.charAt(i);
             boolean isAOKClassCharacter = Character.isLetter(ch) || Character.isDigit(ch)
@@ -281,18 +278,18 @@ public class SourceGenerator {
                     Optional<String> classNameOfAPackage = className(currentName);
                     if (classNameOfAPackage.isPresent()) {
                         imports.add(currentName);
-                        friendlyFullType += classNameOfAPackage.get();
+                        friendlyFullType.append(classNameOfAPackage.get());
                     } else {
-                        friendlyFullType += currentName;
+                        friendlyFullType.append(currentName);
                     }
                 }
                 if (!isAOKClassCharacter) {
-                    friendlyFullType += ch;
+                    friendlyFullType.append(ch);
                 }
                 currentName = "";
             }
         }
-        return friendlyFullType;
+        return friendlyFullType.toString();
     }
 
     private void internalGenerateItems() throws IOException, TemplateException {
@@ -346,11 +343,11 @@ public class SourceGenerator {
         return lastDotIndex == -1 ? Optional.empty() : Optional.of(fullName.substring(lastDotIndex + 1));
     }
 
-    public static record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
+    public record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
     }
 
-    private static interface InternalGenerator {
-        public void generate() throws IOException, TemplateException;
+    private interface InternalGenerator {
+        void generate() throws IOException, TemplateException;
     }
 
     public void setStabilityGenerationWaitTime(Integer stabilityGenerationWaitTime) {

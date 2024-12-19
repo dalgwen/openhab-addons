@@ -19,7 +19,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Exception;
 
 /**
- * Custom java compiled script instance wrapping additional informations
+ * Custom java compiled script instance wrapping additional information
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -32,7 +32,7 @@ public class Java223CompiledScriptInstanceWrapper {
     @Nullable
     private Object wrappedScriptInstance;
 
-    private Class<?> wrappedScriptClass;
+    private final Class<?> wrappedScriptClass;
 
     public Java223CompiledScriptInstanceWrapper(Class<?> wrappedScriptClass) {
         this.wrappedScriptClass = wrappedScriptClass;
