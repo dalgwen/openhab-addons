@@ -139,14 +139,14 @@ public class BindingInjector {
                 Object[] parameterValues = getParameterValuesFor(sourceScript, constructor, bindings,
                         libAlreadyInstanciated);
                 valueToInject = constructor.newInstance(parameterValues);
-                if (valueToInject != null) {
+                if (valueToInject != null) { // cannot be null but null-check think so
                     // store it to avoid multiple instantiation
                     libAlreadyInstanciated.put(fieldType, valueToInject);
                     // and then also use injection into it
                     injectBindingsInto(sourceScript, bindings, valueToInject, libAlreadyInstanciated);
                 }
             }
-            if (valueToInject != null) {
+            if (valueToInject != null) { // cannot be null but null-check think so
                 return valueToInject;
             }
         }
@@ -154,7 +154,6 @@ public class BindingInjector {
         // second. It's not a library, so search value in bindings map.
         // Choose a name to search as a key in the binding map
         // the name can be a path inside the object
-        Queue<String> namePath = new LinkedList<>();
         String named;
         if (injectBindingAnnotation != null
                 && !injectBindingAnnotation.named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
@@ -162,7 +161,7 @@ public class BindingInjector {
         } else {
             named = codeName;
         }
-        Arrays.stream(named.split("\\.")).forEach(namePath::add);
+        Queue<String> namePath = new LinkedList<>(Arrays.asList(named.split("\\.")));
 
         // third, choose where to look : in bindings, or deeper, in a preset :
         Object value = bindings;
@@ -189,10 +188,10 @@ public class BindingInjector {
                 break;
             }
             if (value instanceof Map<?, ?> elementToParseAsMap) {
-                String key = namePath.poll();
-                value = elementToParseAsMap.get(key);
+                String namePart = namePath.poll();
+                value = elementToParseAsMap.get(namePart);
                 if (value == null) {
-                    logger.debug("Cannot find an element with the key {}", key);
+                    logger.debug("Cannot find an element with the key {}", namePart);
                 }
             } else {
                 Field targetField;
@@ -251,17 +250,17 @@ public class BindingInjector {
      * @param executable Method or constructor
      * @param bindings The map used to search the appropriate value to inject
      * @param libAlreadyInstanciated To avoid looping the instantiation of libraries
-     * @return
-     * @throws InstantiationException
-     * @throws IllegalAccessException
-     * @throws IllegalArgumentException
-     * @throws InvocationTargetException
+     * @return An array of parameter values that fits the executable
+     * @throws InstantiationException If instantiation of the parameter doesn't work
+     * @throws IllegalAccessException If reflexion fails
+     * @throws IllegalArgumentException If reflexion fails
+     * @throws InvocationTargetException If reflexion fails
      */
-    public static Object[] getParameterValuesFor(Class<?> sourceScriptClass, Executable executable,
+    public static Object @Nullable [] getParameterValuesFor(Class<?> sourceScriptClass, Executable executable,
             Map<String, Object> bindings, @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         Parameter[] parameters = executable.getParameters();
-        Object[] parameterValues = new Object[parameters.length];
+        Object @Nullable [] parameterValues = new Object[parameters.length];
         Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated != null ? libAlreadyInstanciated
                 : new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
@@ -276,7 +275,7 @@ public class BindingInjector {
         while (clazz != null && clazz != Object.class) {
             try {
                 return clazz.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException | SecurityException e) {
+            } catch (NoSuchFieldException | SecurityException ignored) {
             }
             clazz = clazz.getSuperclass();
         }
@@ -284,7 +283,7 @@ public class BindingInjector {
     }
 
     private static Set<Field> getAllFields(Class<?> type) {
-        Set<Field> fields = new HashSet<Field>();
+        Set<Field> fields = new HashSet<>();
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
             fields.addAll(Arrays.asList(c.getDeclaredFields()));
         }

@@ -90,7 +90,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     private final PackageResourceListingStrategy osgiPackageResourceListingStrategy;
     private final Java223Strategy java223Strategy;
     private final ScriptInterceptorStrategy scriptWrappingStrategy;
-    private Java223CompiledScriptCache compiledScriptCache;
+    private final Java223CompiledScriptCache compiledScriptCache;
 
     private final WatchService watchService;
 
@@ -198,7 +198,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         // compare and write only if different
         if (!Arrays.equals(oldHelperLibAsByteArray, newHelperLibAsByteArray)) {
             try (FileOutputStream fileOutputStream = new FileOutputStream(dest.toFile())) {
-                ;
                 fileOutputStream.write(newHelperLibAsByteArray);
             } catch (IOException e) {
                 throw new Java223Exception("Cannot write helper file", e);
@@ -271,7 +270,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     /**
      * Additional data to put into bindings so the scripts could use them.
      *
-     * @return
+     * @return Additional data to use when binding
      */
     private Map<String, Object> getAdditionalBindings() {
         RuleManager ruleManager = bundleContext.getService(bundleContext.getServiceReference(RuleManager.class));
@@ -287,9 +286,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         String path = packageName.replace(".", "/");
         path = "/" + path;
 
-        Collection<String> resources = bundleWiring.listResources(path, "*.class", 0);
-
-        return resources;
+        return bundleWiring.listResources(path, "*.class", 0);
     }
 
     @Override

@@ -59,7 +59,6 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
     private static final Logger logger = LoggerFactory.getLogger(JarFileManager.class);
 
     private final Map<String, List<JavaFileObject>> additionalPackages;
-    @Nullable
     private final ClassLoader classLoader;
 
     public JarFileManager(M fileManager, ClassLoader classLoader,
@@ -78,11 +77,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
     @Override
     public @NonNullByDefault({}) Iterable<JavaFileObject> list(@Nullable Location location,
             @Nullable String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-        var localFileManager = fileManager;
-        if (localFileManager == null) {
-            throw new Java223Exception("FileManager cannot not be null");
-        }
-        Iterable<JavaFileObject> stdResult = localFileManager.list(location, packageName, kinds, recurse);
+        Iterable<JavaFileObject> stdResult = fileManager.list(location, packageName, kinds, recurse);
 
         if (location != StandardLocation.CLASS_PATH || !kinds.contains(JavaFileObject.Kind.CLASS)) {
             return stdResult;
@@ -103,11 +98,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
             URI outFile = URI.create(removeExtension(sibling.toUri().toString()) + ".class");
             return JarFileObject.classFileObject(outFile);
         }
-        var localFileManager = fileManager;
-        if (localFileManager == null) {
-            throw new Java223Exception("FileManager cannot not be null");
-        }
-        return localFileManager.getJavaFileForOutput(location, className, kind, sibling);
+        return fileManager.getJavaFileForOutput(location, className, kind, sibling);
     }
 
     @SuppressWarnings({ "unused", "null" })
@@ -116,11 +107,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         if (file instanceof JarFileObject) {
             return removeExtension(getPath(file.toUri()).replace("/", ".").substring(1));
         }
-        var localFileManager = fileManager;
-        if (localFileManager == null) {
-            throw new Java223Exception("FileManager cannot not be null");
-        }
-        return localFileManager.inferBinaryName(location, file);
+        return fileManager.inferBinaryName(location, file);
     }
 
     private static String removeExtension(String name) {
@@ -149,7 +136,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
 
         private Map<String, List<JavaFileObject>> upToDateAdditionalPackages = Map.of();
         private ClassLoader upToDateClassLoader;
-        private ClassLoader parentClassLoader;
+        private final ClassLoader parentClassLoader;
 
         MessageDigest md5Digest;
         byte[] md5LibSum = new byte[0];
@@ -170,7 +157,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         }
 
         public JarFileManager<JavaFileManager> create(JavaFileManager fileManager) {
-            return new JarFileManager<JavaFileManager>(fileManager, upToDateClassLoader, upToDateAdditionalPackages);
+            return new JarFileManager<>(fileManager, upToDateClassLoader, upToDateAdditionalPackages);
         }
 
         public void rebuildLibPackages() {
@@ -218,7 +205,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
             }
             try {
                 FILEMANAGER_LOCK.lock();
-                logger.debug("Library to load to memory: {}", newLib.toString());
+                logger.debug("Library to load to memory: {}", newLib);
                 if (upToDateClassLoader instanceof JarClassLoader upToDateJarClassLoader) {
                     processLibrary(newLib, upToDateJarClassLoader, upToDateAdditionalPackages);
                 } else {
@@ -252,7 +239,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
             }
 
             jarClassLoader.addJar(jarFile);
-            logger.info("JAR loaded in the java223 script classpath: {}", jarFile.toString());
+            logger.info("JAR loaded in the java223 script classpath: {}", jarFile);
         }
     }
 }

@@ -129,7 +129,7 @@ public class Java223Rule extends SimpleRule {
      * Prepare some executable code from a field
      *
      * @param script The instance to execute the method on
-     * @param method The field member containing some code to execute
+     * @param fieldMember The field member containing some code to execute
      */
     @SuppressWarnings({ "unchecked" })
     public Java223Rule(Object script, Field fieldMember) throws RuleParserException {
