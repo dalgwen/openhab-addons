@@ -38,4 +38,6 @@ public @interface Rule {
     String[] tags() default {};
 
     boolean disabled() default false;
+
+    String uid() default ANNOTATION_DEFAULT;
 }

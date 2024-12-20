@@ -83,7 +83,7 @@ public abstract class Java223Script {
     public void internalParseRules() {
         try {
             RuleAnnotationParser.parse(this, automationManager);
-        } catch (IllegalArgumentException | IllegalAccessException | RuleParserException e) {
+        } catch (IllegalArgumentException | RuleParserException e) {
             logger.error("Cannot parse rules", e);
         }
     }

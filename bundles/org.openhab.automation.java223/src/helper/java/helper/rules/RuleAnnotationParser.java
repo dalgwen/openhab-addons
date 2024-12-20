@@ -77,7 +77,7 @@ import helper.rules.annotations.TimeOfDayTrigger;
 @NonNullByDefault
 public class RuleAnnotationParser {
 
-    private static Logger logger = LoggerFactory.getLogger(RuleAnnotationParser.class);
+    private static final Logger logger = LoggerFactory.getLogger(RuleAnnotationParser.class);
 
     public static final Map<Class<? extends Annotation>, String> TRIGGER_FROM_ANNOTATION = Map.ofEntries(
             Map.entry(ItemCommandTrigger.class, "core.ItemCommandTrigger"),
@@ -108,7 +108,7 @@ public class RuleAnnotationParser {
 
     @SuppressWarnings({ "unused", "null" })
     public static void parse(Object script, ScriptedAutomationManager automationManager)
-            throws IllegalArgumentException, IllegalAccessException, RuleParserException {
+            throws IllegalArgumentException, RuleParserException {
         Class<?> c = script.getClass();
 
         logger.debug("Parsing: {}", c.getName());
@@ -124,7 +124,7 @@ public class RuleAnnotationParser {
                 continue;
             }
             if (ra.disabled()) {
-                logger.debug("Ignoring disabled rule '{}'");
+                logger.debug("Ignoring disabled rule");
                 continue;
             }
 
@@ -147,6 +147,9 @@ public class RuleAnnotationParser {
                     script.getClass().getSimpleName() + "/" + ruleName);
             simpleRule.setName(ruleName);
             simpleRule.setDescription(ruleDescription);
+
+            // uid
+            simpleRule.setUid(chooseFirstOk(ra.uid()));
 
             // tags
             simpleRule.setTags(Set.of(ra.tags()));
@@ -174,7 +177,7 @@ public class RuleAnnotationParser {
                 logger.debug("@Rule(name = {}", ruleName);
                 for (Trigger trigger : simpleRule.getTriggers()) {
                     logger.debug("Trigger(id = {}, uid = {})", trigger.getId(), trigger.getTypeUID());
-                    logger.debug("Configuration: {}", trigger.getConfiguration().toString());
+                    logger.debug("Configuration: {}", trigger.getConfiguration());
                 }
             }
 
@@ -185,9 +188,7 @@ public class RuleAnnotationParser {
 
     private static String chooseFirstOk(String... choices) {
         for (String choice : choices) {
-            if (choice == null || choice.isBlank() || choice.equals(ANNOTATION_DEFAULT)) {
-                continue;
-            } else {
+            if (choice != null && !choice.isBlank() && !choice.equals(ANNOTATION_DEFAULT)) {
                 return choice;
             }
         }

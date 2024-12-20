@@ -16,9 +16,12 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.script.Invocable;
 import javax.script.ScriptException;
+import javax.tools.*;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -28,8 +31,10 @@ import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
+import ch.obermuhlner.scriptengine.java.Isolation;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
+import ch.obermuhlner.scriptengine.java.MemoryFileManager;
+import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
  * This class adds a cache for compiled script to Obermuhlner's base class.
@@ -42,7 +47,7 @@ import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     private final Logger logger = LoggerFactory.getLogger(Java223ScriptEngine.class);
 
-    private @Nullable JavaCompiledScript lastCompiledScript;
+    private @Nullable Java223CompiledScript lastCompiledScript;
 
     private final Java223CompiledScriptCache cache;
 
@@ -58,22 +63,68 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         setConstructorStrategy(java223Strategy);
     }
 
-    @Override
-    public JavaCompiledScript compile(@Nullable String script) throws ScriptException {
+    /**
+     * Recopy super compile implementation with small changes
+     * 
+     * @param script The script to compile
+     * @return A compiled instance
+     * @throws ScriptException when script has error
+     */
+    private Java223CompiledScript internalCompilation(String script) throws ScriptException {
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        ClassLoader parentClassLoader = isolation == Isolation.CallerClassLoader ? executionClassLoader : null;
+        JavaFileManager fileManager = compilationStrategy.getJavaFileManager(
+                ToolProvider.getSystemJavaCompiler().getStandardFileManager(diagnostics, null, null));
+        if (fileManager == null) {
+            fileManager = compiler.getStandardFileManager(diagnostics, null, null);
+        } else {
+            parentClassLoader = fileManager.getClassLoader(StandardLocation.CLASS_PATH);
+        }
+        MemoryFileManager memoryFileManager = new MemoryFileManager(fileManager, parentClassLoader);
+
+        memoryFileManager.setPackageResourceListingStrategy(packageResourceListingStrategy);
+
+        String fullClassName = nameStrategy.getFullName(script);
+        String simpleClassName = NameStrategy.extractSimpleName(fullClassName);
+
+        List<JavaFileObject> toCompile = compilationStrategy.getJavaFileObjectsToCompile(simpleClassName, script);
+
+        JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics, compilationOptions,
+                null, toCompile);
+        if (!task.call()) {
+            String message = diagnostics.getDiagnostics().stream().map(Object::toString)
+                    .collect(Collectors.joining("\n"));
+            throw new ScriptException(message);
+        }
+
+        ClassLoader classLoader = memoryFileManager.getClassLoader(StandardLocation.CLASS_OUTPUT);
+
         try {
-            if (script == null) {
+            Class<?> clazz = classLoader.loadClass(fullClassName);
+            compilationStrategy.compilationResult(clazz);
+            // Object instance = constructorStrategy.construct(clazz);
+            // ExecutionStrategy executionStrategy = executionStrategyFactory.create(clazz);
+            return new Java223CompiledScript(this, clazz, java223Strategy);
+        } catch (ClassNotFoundException e) {
+            throw new ScriptException(e);
+        }
+    }
+
+    @Override
+    public Java223CompiledScript compile(@Nullable String originalScript) throws ScriptException {
+        try {
+            logger.error("oulala");
+            if (originalScript == null) {
                 throw new ScriptException("script cannot be null");
             }
-            // reuse the original compilation class, potentially cached
-            Java223CompiledScriptInstanceWrapper compiledScriptInstanceWrapper = cache.getOrCompile(script,
-                    super::compile);
-            // then rebuild a new JavaCompiled object
-            JavaCompiledScript localCompiledScript = new JavaCompiledScript(this,
-                    compiledScriptInstanceWrapper.getCompiledClass(), compiledScriptInstanceWrapper, java223Strategy,
-                    java223Strategy);
-            lastCompiledScript = localCompiledScript;
-            return localCompiledScript;
+            String script = scriptInterceptorStrategy.intercept(originalScript);
 
+            // reuse the original compilation class, potentially cached
+            var compiledScriptResult = cache.getOrCompile(script, this::internalCompilation);
+            lastCompiledScript = compiledScriptResult;
+            return compiledScriptResult;
         } catch (NoClassDefFoundError e) {
             throw new ScriptException("NoClassDefFoundError: " + e.getMessage());
         }
@@ -90,7 +141,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
 
         // here we assume (from OpenHAB usual behavior) that the script engine served only once and so the wanted
         // compiled script is the last (and only) one
-        JavaCompiledScript compiledScript = this.lastCompiledScript;
+        Java223CompiledScript compiledScript = this.lastCompiledScript;
         if (compiledScript == null || name == null) {
             return null;
         }
@@ -101,10 +152,8 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
             default -> throw new ScriptException(name + " is not an allowed method in java223");
         };
 
-        Java223CompiledScriptInstanceWrapper wrapperInstance = (Java223CompiledScriptInstanceWrapper) compiledScript
-                .getCompiledInstance();
-        Object compiledInstance = wrapperInstance.getWrappedScriptInstance();
-        for (Method method : wrapperInstance.getCompiledClass().getMethods()) {
+        Object compiledInstance = compiledScript.getCompiledInstance();
+        for (Method method : compiledScript.getCompiledClass().getMethods()) {
             Annotation scriptLoadedOrUnloadedAnnotation = method.getAnnotation(annotation);
             if (scriptLoadedOrUnloadedAnnotation != null) {
                 if (method.getParameters().length != 0) {

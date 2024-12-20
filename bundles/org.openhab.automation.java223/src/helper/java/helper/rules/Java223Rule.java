@@ -48,7 +48,13 @@ public class Java223Rule extends SimpleRule {
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
 
-    private BiFunction<Action, Map<String, Object>, @Nullable Object> codeToExecute;
+    private final BiFunction<Action, Map<String, Object>, @Nullable Object> codeToExecute;
+
+    public void setUid(String uid) {
+        if (!uid.isBlank()) {
+            this.uid = uid;
+        }
+    }
 
     @Nullable
     public Object execute(SimpleRule simpleRule, Action module, Map<String, Object> inputs) {
@@ -106,7 +112,7 @@ public class Java223Rule extends SimpleRule {
                 if (method.getParameters().length == 0) {
                     return method.invoke(script);
                 } else {
-                    Object[] parameterValues = new Object[parameters.length];
+                    Object @Nullable [] parameterValues = new Object @Nullable [parameters.length];
                     for (int i = 0; i < parameters.length; i++) {
                         if (parameters[i].getType().equals(Action.class)) {
                             parameterValues[i] = module;
@@ -135,7 +141,7 @@ public class Java223Rule extends SimpleRule {
     public Java223Rule(Object script, Field fieldMember) throws RuleParserException {
         Class<?> fieldType = fieldMember.getType();
 
-        if (ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().noneMatch(clazz -> fieldType.isAssignableFrom(clazz))) {
+        if (ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().noneMatch(fieldType::isAssignableFrom)) {
             throw new RuleParserException("Field member " + fieldMember.getName() + " cannot be of class " + fieldType
                     + ". Must be " + ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().map(Class::getSimpleName)
                             .collect(Collectors.joining(" or ")));
@@ -160,8 +166,8 @@ public class Java223Rule extends SimpleRule {
                 return execute(bifunction, module, inputs);
             } else if (objectToExecute instanceof Callable callable) {
                 return execute(callable);
-            } else if (objectToExecute instanceof Runnable runable) {
-                return execute(runable);
+            } else if (objectToExecute instanceof Runnable runnable) {
+                return execute(runnable);
             } else if (objectToExecute instanceof Consumer consumer) {
                 return execute(consumer, inputs);
             } else if (objectToExecute instanceof BiConsumer biconsumer) {
