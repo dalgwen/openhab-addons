@@ -42,19 +42,19 @@ import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStr
  */
 public class JavaScriptEngine implements ScriptEngine, Compilable {
 
-    private NameStrategy nameStrategy = new DefaultNameStrategy();
-    private ConstructorStrategy constructorStrategy = DefaultConstructorStrategy.byDefaultConstructor();
-    private ExecutionStrategyFactory executionStrategyFactory = clazz -> new DefaultExecutionStrategy(clazz);
-    private Isolation isolation = Isolation.CallerClassLoader;
-    private List<String> compilationOptions = null;
-    private PackageResourceListingStrategy packageResourceListingStrategy = null;
-    private BindingStrategy bindingStrategy = null;
-    private CompilationStrategy compilationStrategy = new DefaultCompilationStrategy();
-    private ScriptInterceptorStrategy scriptInterceptorStrategy = new NoInterceptorStrategy();
+    protected NameStrategy nameStrategy = new DefaultNameStrategy();
+    protected ConstructorStrategy constructorStrategy = DefaultConstructorStrategy.byDefaultConstructor();
+    protected ExecutionStrategyFactory executionStrategyFactory = clazz -> new DefaultExecutionStrategy(clazz);
+    protected Isolation isolation = Isolation.CallerClassLoader;
+    protected List<String> compilationOptions = null;
+    protected PackageResourceListingStrategy packageResourceListingStrategy = null;
+    protected BindingStrategy bindingStrategy = null;
+    protected CompilationStrategy compilationStrategy = new DefaultCompilationStrategy();
+    protected ScriptInterceptorStrategy scriptInterceptorStrategy = new NoInterceptorStrategy();
 
     private ScriptContext context = new SimpleScriptContext();
 
-    private ClassLoader executionClassLoader = getClass().getClassLoader();
+    protected ClassLoader executionClassLoader = getClass().getClassLoader();
 
     /**
      * Sets the name strategy used to determine the Java class name from a script.
