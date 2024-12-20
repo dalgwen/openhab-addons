@@ -24,7 +24,7 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 /**
  * Wraps a script in boilerplate code if not present.
  * Must respect some conditions to be wrapped correctly:
- * - must not contains "public class"
+ * - must not contain "public class"
  * - line containing import must start with "import "
  * - you can globally return a value, but take care to put the "return " keyword at the beginning of its own line
  * - you cannot declare method (in fact, your script is already wrapped inside a method)
@@ -38,7 +38,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
     private static final Pattern IMPORT_PATTERN = Pattern.compile("import\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
 
-    private static String BOILERPLATE_CODE_BEFORE = """
+    private static final String BOILERPLATE_CODE_BEFORE = """
             import helper.generated.Java223Script;
             import org.openhab.core.library.items.*;
             import org.openhab.core.library.types.*;
@@ -60,7 +60,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
                 public Object main() {
             """;
 
-    private static String BOILERPLATE_CODE_AFTER = """
+    private static final String BOILERPLATE_CODE_AFTER = """
                 }
             }
             """;
@@ -98,7 +98,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
         // recompose a complete script with the different parts
         StringBuilder modifiedScript = new StringBuilder();
-        modifiedScript.append(packageDeclarationLine + "\n");
+        modifiedScript.append(packageDeclarationLine).append("\n");
         modifiedScript.append(String.join("\n", importLines));
         modifiedScript.append("\n");
         modifiedScript.append(BOILERPLATE_CODE_BEFORE);

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import javax.script.ScriptException;
 import javax.tools.JavaFileManager;
@@ -38,7 +39,7 @@ import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.common.ReuseScriptInstance;
 import org.openhab.automation.java223.common.RunScript;
-import org.openhab.automation.java223.internal.Java223CompiledScriptInstanceWrapper;
+import org.openhab.automation.java223.internal.Java223CompiledScript;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager;
 import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager.JarFileManagerFactory;
@@ -64,15 +65,15 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrategy, BindingStrategy,
         CompilationStrategy, ConstructorStrategy, WatchService.WatchEventListener {
 
-    private static Logger logger = LoggerFactory.getLogger(Java223Strategy.class);
+    private static final Logger logger = LoggerFactory.getLogger(Java223Strategy.class);
 
     private static final List<String> METHOD_NAMES_TO_EXECUTE = Arrays.asList("eval", "main", "run", "exec");
 
     // Additional bindings, not in the openhab JSR 223 specification
-    private Map<String, Object> additionalBindings;
+    private final Map<String, Object> additionalBindings;
 
     // Keeping a list of library .java file in the lib directory
-    private static Map<String, JavaFileObject> librariesByPath = new HashMap<>();
+    private static final Map<String, JavaFileObject> librariesByPath = new HashMap<>();
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
     JarFileManager.JarFileManagerFactory jarFileManagerfactory;
@@ -100,14 +101,14 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         bindings.putAll(additionalBindings);
 
         // store bindings because of deferred instantiation
-        Java223CompiledScriptInstanceWrapper compiledInstanceWrapper = (Java223CompiledScriptInstanceWrapper) compiledInstance;
+        Java223CompiledScript compiledInstanceWrapper = (Java223CompiledScript) compiledInstance;
         compiledInstanceWrapper.setBindings(bindings);
     }
 
     @Override
     public @Nullable Object execute(@Nullable Object instance) throws ScriptException {
 
-        Java223CompiledScriptInstanceWrapper compiledInstanceWrapper = (Java223CompiledScriptInstanceWrapper) instance;
+        Java223CompiledScript compiledInstanceWrapper = (Java223CompiledScript) instance;
         if (compiledInstanceWrapper == null) {
             throw new ScriptException("Cannot run null class/instance");
         }
@@ -118,7 +119,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         compiledInstanceWrapper.setBindings(null);
 
         // instantiate the script
-        Object compiledInstance = instanciate(compiledInstanceWrapper, bindings);
+        Object compiledInstance = instantiate(compiledInstanceWrapper, bindings);
 
         // inject bindings data in the script
         BindingInjector.injectBindingsInto(compiledClass, bindings, compiledInstance);
@@ -144,8 +145,8 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                         | InstantiationException e) {
                     String simpleName = compiledInstance.getClass().getSimpleName();
                     logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
-                    throw new ScriptException(
-                            String.format("Error executing entry point %s in %s", method.getName(), simpleName, e));
+                    throw new ScriptException(String.format("Error executing entry point %s in %s, exception %s",
+                            method.getName(), simpleName, e.getMessage()));
                 }
             }
         }
@@ -161,8 +162,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     }
 
     @SuppressWarnings("null")
-    private Object instanciate(Java223CompiledScriptInstanceWrapper compiledInstanceWrapper,
-            Map<String, Object> bindings) {
+    private Object instantiate(Java223CompiledScript compiledInstanceWrapper, Map<String, Object> bindings) {
 
         // default re-instantiation option overwritten by annotation if present
         boolean instanceReuse = allowInstanceReuseDefaultProperty;
@@ -173,7 +173,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         }
 
         // if allowed, get from cache and return
-        var alreadyExistingWrappedScriptInstance = compiledInstanceWrapper.getWrappedScriptInstance();
+        var alreadyExistingWrappedScriptInstance = compiledInstanceWrapper.getCompiledInstance();
         if (instanceReuse && alreadyExistingWrappedScriptInstance != null) {
             return alreadyExistingWrappedScriptInstance;
         }
@@ -188,10 +188,10 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledInstanceWrapper.getCompiledClass(),
                     constructor, bindings, null);
             Object compiledInstance = constructor.newInstance(parameterValues);
-            if (compiledInstance == null) {
-                throw new Java223Exception("Instanciation of compiledInstance failed. Should not happened");
+            if (compiledInstance == null) { // can't be null but null-check think so
+                throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
             }
-            compiledInstanceWrapper.setWrappedScriptInstance(compiledInstance);
+            compiledInstanceWrapper.setCompiledInStance(compiledInstance);
             return compiledInstance;
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
                 | InvocationTargetException e) {
@@ -202,7 +202,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     @Override
     public Map<String, Object> retrieveBindings(Class<?> compiledClass, Object compiledInstance) {
         // not needed ? What is the use case ?
-        return new HashMap<String, Object>();
+        return new HashMap<>();
     }
 
     @Override
@@ -268,8 +268,8 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             JavaFileObject javafileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName, readString);
             librariesByPath.put(path.toString(), javafileObject);
         } catch (ScriptException | IOException e) {
-            logger.info("Cannot get the file {} as a valid java object. Cause: {} {}", path.toString(),
-                    e.getClass().getName(), e.getMessage());
+            logger.info("Cannot get the file {} as a valid java object. Cause: {} {}", path, e.getClass().getName(),
+                    e.getMessage());
         }
     }
 
@@ -278,8 +278,8 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     }
 
     public void scanLibDirectory() {
-        try {
-            Files.walk(LIB_DIR).filter(Files::isRegularFile)
+        try (Stream<Path> walk = Files.walk(LIB_DIR)) {
+            walk.filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith("." + Java223Constants.JAVA_FILE_TYPE))
                     .forEach(this::addLibrary);
             jarFileManagerfactory.rebuildLibPackages();
@@ -299,8 +299,9 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     @Override
     @Nullable
     public Object construct(@Nullable Class<?> clazz) throws ScriptException {
-        // in Java223ScriptEngineour strategy, we overwrote the compile method
-        // to use a cache. So the constructor strategy is useless
+        // in our strategy, we overwrote the compile method
+        // to use a cache. We also construct only after binding data.
+        // So the constructor strategy must be disabled
         return null;
     }
 

@@ -23,8 +23,6 @@ import org.openhab.core.service.WatchService.Kind;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
-import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
-
 /**
  * This class caches compiled scripts
  *
@@ -35,7 +33,7 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
 
     private int cacheSize;
 
-    private Cache<String, Java223CompiledScriptInstanceWrapper> cache;
+    private Cache<String, Java223CompiledScript> cache;
 
     public Java223CompiledScriptCache(int cacheSize) {
         super();
@@ -55,22 +53,22 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
         }
     }
 
-    @SuppressWarnings({ "null", "unused" }) // yes it can be null, no there is no dead code
-    public Java223CompiledScriptInstanceWrapper getOrCompile(String script, Compiler compiler) throws ScriptException {
-        if (cacheSize <= 0) { // no cache
-            // Create our wrapper directly
-            return new Java223CompiledScriptInstanceWrapper(compiler.compile(script).getCompiledClass());
+    public Java223CompiledScript getOrCompile(String script, Compiler compiler) throws ScriptException {
+        Java223CompiledScript wrapper = null;
+        if (cacheSize > 0) {
+            wrapper = cache.getIfPresent(script);
         }
-        Java223CompiledScriptInstanceWrapper wrapper = cache.getIfPresent(script);
         if (wrapper == null) {
-            wrapper = new Java223CompiledScriptInstanceWrapper(compiler.compile(script).getCompiledClass());
-            cache.put(script, wrapper);
+            wrapper = compiler.compile(script);
+            if (cacheSize > 0) {
+                cache.put(script, wrapper);
+            }
         }
         return wrapper;
     }
 
     public interface Compiler {
-        JavaCompiledScript compile(String script) throws ScriptException;
+        Java223CompiledScript compile(String script) throws ScriptException;
     }
 
     /**
