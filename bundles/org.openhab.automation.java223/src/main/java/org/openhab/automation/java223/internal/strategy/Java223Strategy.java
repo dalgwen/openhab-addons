@@ -41,7 +41,6 @@ import org.openhab.automation.java223.common.ReuseScriptInstance;
 import org.openhab.automation.java223.common.RunScript;
 import org.openhab.automation.java223.internal.Java223CompiledScript;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
-import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager;
 import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager.JarFileManagerFactory;
 import org.openhab.core.service.WatchService;
 import org.slf4j.Logger;
@@ -50,7 +49,6 @@ import org.slf4j.LoggerFactory;
 import ch.obermuhlner.scriptengine.java.MemoryFileManager;
 import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
-import ch.obermuhlner.scriptengine.java.construct.ConstructorStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
 import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
@@ -63,7 +61,7 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
  */
 @NonNullByDefault
 public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrategy, BindingStrategy,
-        CompilationStrategy, ConstructorStrategy, WatchService.WatchEventListener {
+        CompilationStrategy, WatchService.WatchEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(Java223Strategy.class);
 
@@ -76,7 +74,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
     private static final Map<String, JavaFileObject> librariesByPath = new HashMap<>();
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
-    JarFileManager.JarFileManagerFactory jarFileManagerfactory;
+    JarFileManagerFactory jarFileManagerfactory;
 
     private boolean allowInstanceReuseDefaultProperty;
 
@@ -92,47 +90,53 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         return this;
     }
 
+    /**
+     * Add data in bindings. Do not use the compiledClass or compiledInstance.
+     * 
+     * @param compiledClass Not used
+     * @param compiledInstance Not used
+     * @param bindings Map to add special data inside
+     */
     @Override
-    public void associateBindings(Class<?> compiledClass, Object compiledInstance, Map<String, Object> bindings) {
+    public void associateBindings(@Nullable Class<?> compiledClass, @Nullable Object compiledInstance,
+            Map<String, Object> bindings) {
         // adding a special self reference to bindings : "bindings", to receive a map with all bindings
         bindings.put("bindings", bindings);
-
         // adding some custom additional fields
         bindings.putAll(additionalBindings);
-
-        // store bindings because of deferred instantiation
-        Java223CompiledScript compiledInstanceWrapper = (Java223CompiledScript) compiledInstance;
-        compiledInstanceWrapper.setBindings(bindings);
     }
 
     @Override
     public @Nullable Object execute(@Nullable Object instance) throws ScriptException {
+        throw new UnsupportedOperationException(
+                "Wrong way to use this strategy. Use execute(script, bindings instead)");
+    }
 
-        Java223CompiledScript compiledInstanceWrapper = (Java223CompiledScript) instance;
-        if (compiledInstanceWrapper == null) {
-            throw new ScriptException("Cannot run null class/instance");
-        }
+    /**
+     * Contrary to the original architecture, this executes method doesn't use an instance, but the CompiledScript
+     * itself. It is indeed responsible for instantiation, with the bindings data.
+     * 
+     * @param instance an instantiated script
+     * @param bindings bindings data to inject
+     * @return Execution result
+     * @throws ScriptException When script cannot execute
+     */
+    public @Nullable Object execute(Object instance, Map<String, Object> bindings) throws ScriptException {
 
-        Class<?> compiledClass = compiledInstanceWrapper.getCompiledClass();
-        Map<String, Object> bindings = compiledInstanceWrapper.getBindings();
-        // empty bindings (this instance may be used in the cache, but its bindings won't be useful anymore)
-        compiledInstanceWrapper.setBindings(null);
-
-        // instantiate the script
-        Object compiledInstance = instantiate(compiledInstanceWrapper, bindings);
+        Class<?> compiledClass = instance.getClass();
 
         // inject bindings data in the script
-        BindingInjector.injectBindingsInto(compiledClass, bindings, compiledInstance);
+        BindingInjector.injectBindingsInto(compiledClass, bindings, instance);
 
         // find methods to execute
         Optional<Object> returned = null;
-        for (Method method : compiledInstance.getClass().getMethods()) {
+        for (Method method : instance.getClass().getMethods()) {
             // methods with a special name, or methods with a special annotation
             if (METHOD_NAMES_TO_EXECUTE.contains(method.getName()) || method.getAnnotation(RunScript.class) != null) {
                 try {
                     Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledClass, method, bindings,
                             null);
-                    var returnedLocal = method.invoke(compiledInstance, parameterValues);
+                    var returnedLocal = method.invoke(instance, parameterValues);
                     // keep arbitrarily only the first returned value
                     if (returned == null || returned.isEmpty()) {
                         if (returnedLocal != null) {
@@ -143,7 +147,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                     }
                 } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
                         | InstantiationException e) {
-                    String simpleName = compiledInstance.getClass().getSimpleName();
+                    String simpleName = instance.getClass().getSimpleName();
                     logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
                     throw new ScriptException(String.format("Error executing entry point %s in %s, exception %s",
                             method.getName(), simpleName, e.getMessage()));
@@ -159,44 +163,6 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         throw new ScriptException(String.format(
                 "cannot execute: %s doesn't have a method named eval/main/run, or a RunScript annotated method",
                 compiledClass.getSimpleName()));
-    }
-
-    @SuppressWarnings("null")
-    private Object instantiate(Java223CompiledScript compiledInstanceWrapper, Map<String, Object> bindings) {
-
-        // default re-instantiation option overwritten by annotation if present
-        boolean instanceReuse = allowInstanceReuseDefaultProperty;
-        ReuseScriptInstance reuseAnnotation = compiledInstanceWrapper.getCompiledClass()
-                .getAnnotation(ReuseScriptInstance.class);
-        if (reuseAnnotation != null) {
-            instanceReuse = reuseAnnotation.value();
-        }
-
-        // if allowed, get from cache and return
-        var alreadyExistingWrappedScriptInstance = compiledInstanceWrapper.getCompiledInstance();
-        if (instanceReuse && alreadyExistingWrappedScriptInstance != null) {
-            return alreadyExistingWrappedScriptInstance;
-        }
-
-        // create real instance from compiled class
-        // use the empty constructor if available, or the first one otherwise
-        Constructor<?>[] constructors = compiledInstanceWrapper.getCompiledClass().getDeclaredConstructors();
-        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
-                .orElseGet(() -> constructors[0]);
-
-        try {
-            Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledInstanceWrapper.getCompiledClass(),
-                    constructor, bindings, null);
-            Object compiledInstance = constructor.newInstance(parameterValues);
-            if (compiledInstance == null) { // can't be null but null-check think so
-                throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
-            }
-            compiledInstanceWrapper.setCompiledInStance(compiledInstance);
-            return compiledInstance;
-        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-                | InvocationTargetException e) {
-            throw new Java223Exception("Cannot instantiate the script", e);
-        }
     }
 
     @Override
@@ -296,13 +262,47 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         return jarFileManagerfactory.create(parentJavaFileManager);
     }
 
-    @Override
-    @Nullable
-    public Object construct(@Nullable Class<?> clazz) throws ScriptException {
-        // in our strategy, we overwrote the compile method
-        // to use a cache. We also construct only after binding data.
-        // So the constructor strategy must be disabled
-        return null;
+    @SuppressWarnings("null")
+    public Object construct(Java223CompiledScript compiledScript, Map<String, Object> bindings) {
+
+        // default re-instantiation option overwritten by annotation if present
+        boolean instanceReuse = allowInstanceReuseDefaultProperty;
+        Class<?> compiledClass = null;
+        try {
+            compiledClass = compiledScript.getCompiledClassSafe();
+        } catch (ScriptException e) {
+            throw new Java223Exception("Cannot");
+        }
+        ReuseScriptInstance reuseAnnotation = compiledClass.getAnnotation(ReuseScriptInstance.class);
+        if (reuseAnnotation != null) {
+            instanceReuse = reuseAnnotation.value();
+        }
+
+        // if allowed, get from cache and return
+        var alreadyExistingScriptInstance = compiledScript.getCompiledInstance();
+        if (instanceReuse && alreadyExistingScriptInstance != null) {
+            return alreadyExistingScriptInstance;
+        }
+
+        // create real instance from compiled class
+        // use the empty constructor if available, or the first one otherwise
+        Constructor<?>[] constructors = compiledClass.getDeclaredConstructors();
+        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
+                .orElseGet(() -> constructors[0]);
+
+        try {
+            Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledClass, constructor, bindings,
+                    null);
+            Object compiledInstance = constructor.newInstance(parameterValues);
+            if (compiledInstance == null) { // can't be null but null-check think so
+                throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
+            }
+            compiledScript.setCompiledInStance(compiledInstance);
+            return compiledInstance;
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                | InvocationTargetException e) {
+            throw new Java223Exception("Cannot instantiate the script", e);
+        }
     }
 
     public void setAllowInstanceReuse(boolean allowInstanceReuse) {

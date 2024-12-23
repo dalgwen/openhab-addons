@@ -13,6 +13,7 @@
 package org.openhab.automation.java223.internal;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 import javax.script.ScriptException;
 
@@ -77,6 +78,8 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
      */
     @Override
     public void processWatchEvent(Kind kind, Path path) {
-        cache.invalidateAll();
+        for (Map.Entry<String, Java223CompiledScript> entry : cache.asMap().entrySet()) {
+            entry.getValue().invalidate(entry.getKey());
+        }
     }
 }
