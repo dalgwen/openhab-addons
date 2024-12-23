@@ -1,28 +1,5 @@
 package ch.obermuhlner.scriptengine.java;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-import javax.script.Bindings;
-import javax.script.Compilable;
-import javax.script.CompiledScript;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineFactory;
-import javax.script.ScriptException;
-import javax.script.SimpleBindings;
-import javax.script.SimpleScriptContext;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardLocation;
-import javax.tools.ToolProvider;
-
 import ch.obermuhlner.scriptengine.java.bindings.BindingStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.CompilationStrategy;
 import ch.obermuhlner.scriptengine.java.compilation.DefaultCompilationStrategy;
@@ -33,28 +10,36 @@ import ch.obermuhlner.scriptengine.java.construct.DefaultConstructorStrategy;
 import ch.obermuhlner.scriptengine.java.execution.DefaultExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategyFactory;
-import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
+import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
+
+import javax.script.*;
+import javax.tools.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.Reader;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Script engine to compile and run a Java class on the fly.
  */
 public class JavaScriptEngine implements ScriptEngine, Compilable {
 
-    protected NameStrategy nameStrategy = new DefaultNameStrategy();
-    protected ConstructorStrategy constructorStrategy = DefaultConstructorStrategy.byDefaultConstructor();
-    protected ExecutionStrategyFactory executionStrategyFactory = clazz -> new DefaultExecutionStrategy(clazz);
-    protected Isolation isolation = Isolation.CallerClassLoader;
-    protected List<String> compilationOptions = null;
-    protected PackageResourceListingStrategy packageResourceListingStrategy = null;
-    protected BindingStrategy bindingStrategy = null;
-    protected CompilationStrategy compilationStrategy = new DefaultCompilationStrategy();
-    protected ScriptInterceptorStrategy scriptInterceptorStrategy = new NoInterceptorStrategy();
+    private NameStrategy nameStrategy = new DefaultNameStrategy();
+    private ConstructorStrategy constructorStrategy = DefaultConstructorStrategy.byDefaultConstructor();
+    private ExecutionStrategyFactory executionStrategyFactory = clazz -> new DefaultExecutionStrategy(clazz);
+    private Isolation isolation = Isolation.CallerClassLoader;
+    private List<String> compilationOptions = null;
+    private PackageResourceListingStrategy packageResourceListingStrategy = null;
+    private BindingStrategy bindingStrategy = null;
+    private CompilationStrategy compilationStrategy = new DefaultCompilationStrategy();
+    private ScriptInterceptorStrategy scriptInterceptorStrategy = new NoInterceptorStrategy();
 
     private ScriptContext context = new SimpleScriptContext();
 
-    protected ClassLoader executionClassLoader = getClass().getClassLoader();
+    private ClassLoader executionClassLoader = getClass().getClassLoader();
 
     /**
      * Sets the name strategy used to determine the Java class name from a script.
@@ -206,16 +191,9 @@ public class JavaScriptEngine implements ScriptEngine, Compilable {
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        StandardJavaFileManager standardFileManager = compiler.getStandardFileManager(diagnostics, null, null);
         ClassLoader parentClassLoader = isolation == Isolation.CallerClassLoader ? executionClassLoader : null;
-        JavaFileManager fileManager = compilationStrategy.getJavaFileManager(
-                ToolProvider.getSystemJavaCompiler().getStandardFileManager(diagnostics, null, null));
-        if (fileManager == null) {
-            fileManager = compiler.getStandardFileManager(diagnostics, null, null);
-        } else {
-            parentClassLoader = fileManager.getClassLoader(StandardLocation.CLASS_PATH);
-        }
-        MemoryFileManager memoryFileManager = new MemoryFileManager(fileManager, parentClassLoader);
-
+        MemoryFileManager memoryFileManager = new MemoryFileManager(standardFileManager, parentClassLoader);
         memoryFileManager.setPackageResourceListingStrategy(packageResourceListingStrategy);
 
         String fullClassName = nameStrategy.getFullName(script);
@@ -226,7 +204,8 @@ public class JavaScriptEngine implements ScriptEngine, Compilable {
         JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics, compilationOptions,
                 null, toCompile);
         if (!task.call()) {
-            String message = diagnostics.getDiagnostics().stream().map(d -> d.toString())
+            String message = diagnostics.getDiagnostics().stream()
+                    .map(d -> d.toString())
                     .collect(Collectors.joining("\n"));
             throw new ScriptException(message);
         }
