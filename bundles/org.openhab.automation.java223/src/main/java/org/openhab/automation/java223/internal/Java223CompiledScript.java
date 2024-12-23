@@ -12,7 +12,12 @@
  */
 package org.openhab.automation.java223.internal;
 
+import java.util.HashMap;
 import java.util.Map;
+
+import javax.script.Bindings;
+import javax.script.ScriptContext;
+import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -21,7 +26,6 @@ import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 
 import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
-import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 
 /**
  * Custom java compiled script instance wrapping additional information
@@ -31,12 +35,6 @@ import ch.obermuhlner.scriptengine.java.execution.ExecutionStrategy;
 @NonNullByDefault
 public class Java223CompiledScript extends JavaCompiledScript {
 
-    /**
-     * Store binding data is mandatory to defer instantiation
-     */
-    @Nullable
-    private Map<String, Object> bindings;
-
     // overwrite compiledInstance from super class
     /**
      * Write access mandatory for setting instance after creation.
@@ -44,33 +42,88 @@ public class Java223CompiledScript extends JavaCompiledScript {
     @Nullable
     private Object java223CompiledInstance;
 
+    private Class<?> java223CompiledClass;
+
+    /**
+     * Hold the script source if, and only if, the script should be recompiled the next time it is needed
+     */
+    @Nullable
+    private String recompileScriptSource = null;
+
+    private final Java223Strategy java223Strategy;
+
     /**
      * Construct a {@link JavaCompiledScript}.
      *
      * @param engine the {@link JavaScriptEngine} that compiled this script
      * @param compiledClass the compiled {@link Class}
-     * @param java223Strategy the {@link ExecutionStrategy}
+     * @param java223Strategy the {@link Java223Strategy}
      */
     public Java223CompiledScript(JavaScriptEngine engine, Class<?> compiledClass, Java223Strategy java223Strategy) {
         super(engine, compiledClass, null, java223Strategy, java223Strategy);
+        this.java223CompiledClass = compiledClass;
+        this.java223Strategy = java223Strategy;
     }
 
-    public Map<String, Object> getBindings() {
-        var localBindings = bindings;
-        if (localBindings != null) {
-            return localBindings;
-        } else {
-            throw new Java223Exception("Getting bindings before being set ! Should not happened");
+    @Override
+    public synchronized Class<?> getCompiledClass() {
+        try {
+            return getCompiledClassSafe();
+        } catch (ScriptException e) {
+            throw new Java223Exception("Cannot recompile class", e);
         }
     }
 
-    public void setBindings(@Nullable Map<String, Object> bindings) {
-        this.bindings = bindings;
+    /**
+     * Get the class, possibly recompiling it if necessary
+     * 
+     * @return The compiled class
+     * @throws ScriptException Only when the script should be recompiled and there is an error during it.
+     */
+    public synchronized Class<?> getCompiledClassSafe() throws ScriptException {
+        Class<?> localCompiledClass = java223CompiledClass;
+        String localRecompileScriptSource = recompileScriptSource;
+        if (localRecompileScriptSource != null) { // a recompilation has been asked
+            this.java223CompiledInstance = null;
+            localCompiledClass = ((Java223ScriptEngine) getEngine()).internalCompilation(localRecompileScriptSource);
+            this.java223CompiledClass = localCompiledClass;
+            this.recompileScriptSource = null;
+        }
+        return localCompiledClass;
+    }
+
+    @Override
+    public @Nullable Object eval(@Nullable ScriptContext context) throws ScriptException {
+
+        // prepare bindings data
+        if (context == null) {
+            throw new IllegalArgumentException("ScriptContext must not be null");
+        }
+        Bindings globalBindings = context.getBindings(ScriptContext.GLOBAL_SCOPE);
+        Bindings engineBindings = context.getBindings(ScriptContext.ENGINE_SCOPE);
+        Map<String, Object> mergedBindings = new HashMap<>();
+        if (globalBindings != null) {
+            mergedBindings.putAll(globalBindings);
+        }
+        if (engineBindings != null) {
+            mergedBindings.putAll(engineBindings);
+        }
+        java223Strategy.associateBindings(null, null, mergedBindings);
+
+        // instantiate the script
+        Object compiledInstance = java223Strategy.construct(this, mergedBindings);
+
+        // execute
+        return java223Strategy.execute(compiledInstance, mergedBindings);
     }
 
     @Override
     public @Nullable Object getCompiledInstance() {
         return java223CompiledInstance;
+    }
+
+    public void invalidate(String scriptSource) {
+        this.recompileScriptSource = scriptSource;
     }
 
     public void setCompiledInStance(Object compiledInstance) {

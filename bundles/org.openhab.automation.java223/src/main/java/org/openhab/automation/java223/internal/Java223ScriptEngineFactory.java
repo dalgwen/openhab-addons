@@ -66,7 +66,6 @@ import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngineFactory;
 import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
@@ -248,12 +247,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     @Override
     public @Nullable ScriptEngine createScriptEngine(String scriptType) {
         if (getScriptTypes().contains(scriptType)) {
-            JavaScriptEngine engine = new Java223ScriptEngine(compiledScriptCache, java223Strategy);
-            engine.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
-            engine.setScriptInterceptorStrategy(scriptWrappingStrategy);
-            engine.setCompilationOptions(Arrays.asList("-g", "-parameters"));
-
-            return engine;
+            return new Java223ScriptEngine(compiledScriptCache, java223Strategy, osgiPackageResourceListingStrategy,
+                    scriptWrappingStrategy, Arrays.asList("-g", "-parameters"));
         }
         return null;
     }

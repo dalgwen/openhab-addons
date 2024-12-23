@@ -21,7 +21,12 @@ import java.util.stream.Collectors;
 
 import javax.script.Invocable;
 import javax.script.ScriptException;
-import javax.tools.*;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileManager;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
+import javax.tools.ToolProvider;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -31,14 +36,17 @@ import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ch.obermuhlner.scriptengine.java.Isolation;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 import ch.obermuhlner.scriptengine.java.MemoryFileManager;
+import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
+import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
+import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
 
 /**
  * This class adds a cache for compiled script to Obermuhlner's base class.
  * This class also adds the Invocable aspect to the JavaScriptEngine. The Invocable aspect adds the ability to be called
+ * Finally, the compile method is rewritten for our specificity.
  * when loaded and unloaded script event are triggered.
  *
  * @author Gwendal Roulleau - Initial contribution
@@ -52,44 +60,44 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     private final Java223CompiledScriptCache cache;
 
     private final Java223Strategy java223Strategy;
+    private final PackageResourceListingStrategy osgiPackageResourceListingStrategy;
+    private final ScriptInterceptorStrategy scriptInterceptorStrategy;
+    private final List<String> compilationOptions;
+    private final NameStrategy nameStrategy = new DefaultNameStrategy();
 
-    public Java223ScriptEngine(Java223CompiledScriptCache cache, Java223Strategy java223Strategy) {
+    public Java223ScriptEngine(Java223CompiledScriptCache compiledScriptCache, Java223Strategy java223Strategy,
+            PackageResourceListingStrategy osgiPackageResourceListingStrategy,
+            ScriptInterceptorStrategy scriptInterceptorStrategy, List<String> compilationOptions) {
         super();
-        this.cache = cache;
+        this.cache = compiledScriptCache;
         this.java223Strategy = java223Strategy;
-        setExecutionStrategyFactory(java223Strategy);
-        setBindingStrategy(java223Strategy);
-        setCompilationStrategy(java223Strategy);
-        setConstructorStrategy(java223Strategy);
+        this.osgiPackageResourceListingStrategy = osgiPackageResourceListingStrategy;
+        this.scriptInterceptorStrategy = scriptInterceptorStrategy;
+        this.compilationOptions = compilationOptions;
     }
 
     /**
-     * Recopy super compile implementation with small changes
-     * 
+     * Some change to the JavaScriptEngine implementation
+     *
      * @param script The script to compile
      * @return A compiled instance
      * @throws ScriptException when script has error
      */
-    private Java223CompiledScript internalCompilation(String script) throws ScriptException {
+    protected Class<?> internalCompilation(String script) throws ScriptException {
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-        ClassLoader parentClassLoader = isolation == Isolation.CallerClassLoader ? executionClassLoader : null;
-        JavaFileManager fileManager = compilationStrategy.getJavaFileManager(
+        JavaFileManager fileManager = java223Strategy.getJavaFileManager(
                 ToolProvider.getSystemJavaCompiler().getStandardFileManager(diagnostics, null, null));
-        if (fileManager == null) {
-            fileManager = compiler.getStandardFileManager(diagnostics, null, null);
-        } else {
-            parentClassLoader = fileManager.getClassLoader(StandardLocation.CLASS_PATH);
-        }
+        ClassLoader parentClassLoader = fileManager.getClassLoader(StandardLocation.CLASS_PATH);
         MemoryFileManager memoryFileManager = new MemoryFileManager(fileManager, parentClassLoader);
 
-        memoryFileManager.setPackageResourceListingStrategy(packageResourceListingStrategy);
+        memoryFileManager.setPackageResourceListingStrategy(osgiPackageResourceListingStrategy);
 
         String fullClassName = nameStrategy.getFullName(script);
         String simpleClassName = NameStrategy.extractSimpleName(fullClassName);
 
-        List<JavaFileObject> toCompile = compilationStrategy.getJavaFileObjectsToCompile(simpleClassName, script);
+        List<JavaFileObject> toCompile = java223Strategy.getJavaFileObjectsToCompile(simpleClassName, script);
 
         JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics, compilationOptions,
                 null, toCompile);
@@ -102,11 +110,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         ClassLoader classLoader = memoryFileManager.getClassLoader(StandardLocation.CLASS_OUTPUT);
 
         try {
-            Class<?> clazz = classLoader.loadClass(fullClassName);
-            compilationStrategy.compilationResult(clazz);
-            // Object instance = constructorStrategy.construct(clazz);
-            // ExecutionStrategy executionStrategy = executionStrategyFactory.create(clazz);
-            return new Java223CompiledScript(this, clazz, java223Strategy);
+            return classLoader.loadClass(fullClassName);
         } catch (ClassNotFoundException e) {
             throw new ScriptException(e);
         }
@@ -115,14 +119,16 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     @Override
     public Java223CompiledScript compile(@Nullable String originalScript) throws ScriptException {
         try {
-            logger.error("oulala");
             if (originalScript == null) {
                 throw new ScriptException("script cannot be null");
             }
             String script = scriptInterceptorStrategy.intercept(originalScript);
 
             // reuse the original compilation class, potentially cached
-            var compiledScriptResult = cache.getOrCompile(script, this::internalCompilation);
+            Java223CompiledScriptCache.Compiler compilation = (_script) -> {
+                return new Java223CompiledScript(this, this.internalCompilation(_script), java223Strategy);
+            };
+            var compiledScriptResult = cache.getOrCompile(script, compilation);
             lastCompiledScript = compiledScriptResult;
             return compiledScriptResult;
         } catch (NoClassDefFoundError e) {
@@ -153,7 +159,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         };
 
         Object compiledInstance = compiledScript.getCompiledInstance();
-        for (Method method : compiledScript.getCompiledClass().getMethods()) {
+        for (Method method : compiledScript.getCompiledClassSafe().getMethods()) {
             Annotation scriptLoadedOrUnloadedAnnotation = method.getAnnotation(annotation);
             if (scriptLoadedOrUnloadedAnnotation != null) {
                 if (method.getParameters().length != 0) {
