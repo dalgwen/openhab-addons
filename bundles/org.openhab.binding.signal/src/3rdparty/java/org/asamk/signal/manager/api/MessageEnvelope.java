@@ -338,7 +338,8 @@ public record MessageEnvelope(
             }
 
             static Attachment from(
-                    SignalServiceDataMessage.Quote.QuotedAttachment a, final AttachmentFileProvider fileProvider
+                    SignalServiceDataMessage.Quote.QuotedAttachment a,
+                    final AttachmentFileProvider fileProvider
             ) {
                 return new Attachment(Optional.empty(),
                         Optional.empty(),
@@ -390,7 +391,7 @@ public record MessageEnvelope(
             }
 
             public record Name(
-                    Optional<String> display,
+                    Optional<String> nickname,
                     Optional<String> given,
                     Optional<String> family,
                     Optional<String> prefix,
@@ -399,7 +400,7 @@ public record MessageEnvelope(
             ) {
 
                 static Name from(org.whispersystems.signalservice.api.messages.shared.SharedContact.Name name) {
-                    return new Name(name.getDisplay(),
+                    return new Name(name.getNickname(),
                             name.getGiven(),
                             name.getFamily(),
                             name.getPrefix(),
@@ -510,9 +511,7 @@ public record MessageEnvelope(
 
         public record Preview(String title, String description, long date, String url, Optional<Attachment> image) {
 
-            static Preview from(
-                    SignalServicePreview preview, final AttachmentFileProvider fileProvider
-            ) {
+            static Preview from(SignalServicePreview preview, final AttachmentFileProvider fileProvider) {
                 return new Preview(preview.getTitle(),
                         preview.getDescription(),
                         preview.getDate(),
@@ -612,11 +611,12 @@ public record MessageEnvelope(
                     RecipientResolver recipientResolver,
                     RecipientAddressResolver addressResolver
             ) {
-                return new Blocked(blockedListMessage.getAddresses()
-                        .stream()
-                        .map(d -> addressResolver.resolveRecipientAddress(recipientResolver.resolveRecipient(d))
-                                .toApiRecipientAddress())
-                        .toList(), blockedListMessage.getGroupIds().stream().map(GroupId::unknownVersion).toList());
+                return new Blocked(blockedListMessage.individuals.stream()
+                        .map(d -> new RecipientAddress(d.getAci() == null ? null : d.getAci().toString(),
+                                null,
+                                d.getE164(),
+                                null))
+                        .toList(), blockedListMessage.groupIds.stream().map(GroupId::unknownVersion).toList());
             }
         }
 
@@ -832,9 +832,7 @@ public record MessageEnvelope(
             Optional<TextAttachment> textAttachment
     ) {
 
-        public static Story from(
-                SignalServiceStoryMessage storyMessage, final AttachmentFileProvider fileProvider
-        ) {
+        public static Story from(SignalServiceStoryMessage storyMessage, final AttachmentFileProvider fileProvider) {
             return new Story(storyMessage.getAllowsReplies().orElse(false),
                     storyMessage.getGroupContext().map(c -> GroupUtils.getGroupIdV2(c.getMasterKey())),
                     storyMessage.getFileAttachment().map(f -> Data.Attachment.from(f, fileProvider)),
@@ -852,7 +850,8 @@ public record MessageEnvelope(
         ) {
 
             static TextAttachment from(
-                    SignalServiceTextAttachment textAttachment, final AttachmentFileProvider fileProvider
+                    SignalServiceTextAttachment textAttachment,
+                    final AttachmentFileProvider fileProvider
             ) {
                 return new TextAttachment(textAttachment.getText(),
                         textAttachment.getStyle().map(Style::from),

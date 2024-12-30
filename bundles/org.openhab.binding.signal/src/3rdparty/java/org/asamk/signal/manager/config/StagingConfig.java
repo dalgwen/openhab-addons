@@ -28,7 +28,8 @@ class StagingConfig {
     private static final byte[] UNIDENTIFIED_SENDER_TRUST_ROOT = Base64.getDecoder()
             .decode("BbqY1DzohE4NUZoVF+L18oUPrK3kILllLEJh2UnPSsEx");
     private static final String CDSI_MRENCLAVE = "0f6fd79cdfdaa5b2e6337f534d3baf999318b0c462a7ac1f41297a3e4b424a57";
-    private static final String SVR2_MRENCLAVE = "acb1973aa0bbbd14b3b4e06f145497d948fd4a98efc500fcce363b3b743ec482";
+    private static final String SVR2_MRENCLAVE = "38e01eff4fe357dc0b0e8ef7a44b4abc5489fbccba3a78780f3872c277f62bf3";
+    private static final String SVR2_LEGACY_MRENCLAVE = "acb1973aa0bbbd14b3b4e06f145497d948fd4a98efc500fcce363b3b743ec482";
 
     private static final String URL = "https://chat.staging.signal.org";
     private static final String CDN_URL = "https://cdn-staging.signal.org";
@@ -50,7 +51,7 @@ class StagingConfig {
     private static final byte[] backupServerPublicParams = Base64.getDecoder()
             .decode("AHYrGb9IfugAAJiPKp+mdXUx+OL9zBolPYHYQz6GI1gWjpEu5me3zVNSvmYY4zWboZHif+HG1sDHSuvwFd0QszSwuSF4X4kRP3fJREdTZ5MCR0n55zUppTwfHRW2S4sdQ0JGz7YDQIJCufYSKh0pGNEHL6hv79Agrdnr4momr3oXdnkpVBIp3HWAQ6IbXQVSG18X36GaicI1vdT0UFmTwU2KTneluC2eyL9c5ff8PcmiS+YcLzh0OKYQXB5ZfQ06d6DiINvDQLy75zcfUOniLAj0lGJiHxGczin/RXisKSR8");
 
-    private static Network.Environment LIBSIGNAL_NET_ENV = Network.Environment.STAGING;
+    private static final Network.Environment LIBSIGNAL_NET_ENV = Network.Environment.STAGING;
 
     static SignalServiceConfiguration createDefaultServiceConfiguration(
             final List<Interceptor> interceptors
@@ -70,7 +71,8 @@ class StagingConfig {
                 proxy,
                 zkGroupServerPublicParams,
                 genericServerPublicParams,
-                backupServerPublicParams);
+                backupServerPublicParams,
+                false);
     }
 
     static ECPublicKey getUnidentifiedSenderTrustRoot() {
@@ -87,7 +89,7 @@ class StagingConfig {
                 createDefaultServiceConfiguration(interceptors),
                 getUnidentifiedSenderTrustRoot(),
                 CDSI_MRENCLAVE,
-                List.of(SVR2_MRENCLAVE));
+                List.of(SVR2_MRENCLAVE, SVR2_LEGACY_MRENCLAVE));
     }
 
     private StagingConfig() {

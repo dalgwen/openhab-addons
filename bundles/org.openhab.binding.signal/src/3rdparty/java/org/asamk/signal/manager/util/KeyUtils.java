@@ -14,6 +14,7 @@ import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
 import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.whispersystems.signalservice.api.account.PreKeyCollection;
+import org.whispersystems.signalservice.api.backup.MediaRootBackupKey;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
 
 import java.security.SecureRandom;
@@ -63,7 +64,8 @@ public class KeyUtils {
     }
 
     public static SignedPreKeyRecord generateSignedPreKeyRecord(
-            final int signedPreKeyId, final ECPrivateKey privateKey
+            final int signedPreKeyId,
+            final ECPrivateKey privateKey
     ) {
         var keyPair = Curve.generateKeyPair();
         byte[] signature;
@@ -75,9 +77,7 @@ public class KeyUtils {
         return new SignedPreKeyRecord(signedPreKeyId, System.currentTimeMillis(), keyPair, signature);
     }
 
-    public static List<KyberPreKeyRecord> generateKyberPreKeyRecords(
-            final int offset, final ECPrivateKey privateKey
-    ) {
+    public static List<KyberPreKeyRecord> generateKyberPreKeyRecords(final int offset, final ECPrivateKey privateKey) {
         var records = new ArrayList<KyberPreKeyRecord>(PREKEY_BATCH_SIZE);
         for (var i = 0; i < PREKEY_BATCH_SIZE; i++) {
             var preKeyId = (offset + i) % PREKEY_MAXIMUM_ID;
@@ -111,6 +111,10 @@ public class KeyUtils {
 
     public static MasterKey createMasterKey() {
         return MasterKey.createNew(secureRandom);
+    }
+
+    public static MediaRootBackupKey createMediaRootBackupKey() {
+        return new MediaRootBackupKey(getSecretBytes(32));
     }
 
     public static byte[] createRawStorageId() {

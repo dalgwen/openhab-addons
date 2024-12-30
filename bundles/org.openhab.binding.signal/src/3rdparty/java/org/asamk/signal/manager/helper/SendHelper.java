@@ -86,8 +86,8 @@ public class SendHelper {
             account.getContactStore().storeContact(recipientId, contact);
         }
 
-        final var expirationTime = contact.messageExpirationTime();
-        messageBuilder.withExpiration(expirationTime);
+        messageBuilder.withExpiration(contact.messageExpirationTime());
+        messageBuilder.withExpireTimerVersion(contact.messageExpirationTimeVersion());
 
         if (!contact.isBlocked()) {
             final var profileKey = account.getProfileKey().serialize();
@@ -125,7 +125,8 @@ public class SendHelper {
     }
 
     public SendMessageResult sendReceiptMessage(
-            final SignalServiceReceiptMessage receiptMessage, final RecipientId recipientId
+            final SignalServiceReceiptMessage receiptMessage,
+            final RecipientId recipientId
     ) {
         final var messageSendLogStore = account.getMessageSendLogStore();
         final var result = handleSendMessage(recipientId,
@@ -157,7 +158,9 @@ public class SendHelper {
     }
 
     public SendMessageResult sendRetryReceipt(
-            DecryptionErrorMessage errorMessage, RecipientId recipientId, Optional<GroupId> groupId
+            DecryptionErrorMessage errorMessage,
+            RecipientId recipientId,
+            Optional<GroupId> groupId
     ) {
         logger.debug("Sending retry receipt for {} to {}, device: {}",
                 errorMessage.getTimestamp(),
@@ -183,12 +186,13 @@ public class SendHelper {
     }
 
     public SendMessageResult sendSelfMessage(
-            SignalServiceDataMessage.Builder messageBuilder, Optional<Long> editTargetTimestamp
+            SignalServiceDataMessage.Builder messageBuilder,
+            Optional<Long> editTargetTimestamp
     ) {
         final var recipientId = account.getSelfRecipientId();
         final var contact = account.getContactStore().getContact(recipientId);
-        final var expirationTime = contact != null ? contact.messageExpirationTime() : 0;
-        messageBuilder.withExpiration(expirationTime);
+        messageBuilder.withExpiration(contact != null ? contact.messageExpirationTime() : 0);
+        messageBuilder.withExpireTimerVersion(contact != null ? contact.messageExpirationTimeVersion() : 1);
 
         var message = messageBuilder.build();
         return sendSelfMessage(message, editTargetTimestamp);
@@ -214,9 +218,7 @@ public class SendHelper {
         }
     }
 
-    public SendMessageResult sendTypingMessage(
-            SignalServiceTypingMessage message, RecipientId recipientId
-    ) {
+    public SendMessageResult sendTypingMessage(SignalServiceTypingMessage message, RecipientId recipientId) {
         final var result = handleSendMessage(recipientId,
                 (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendTyping(List.of(
                         address), List.of(unidentifiedAccess), message, null).get(0));
@@ -225,7 +227,8 @@ public class SendHelper {
     }
 
     public List<SendMessageResult> sendGroupTypingMessage(
-            SignalServiceTypingMessage message, GroupId groupId
+            SignalServiceTypingMessage message,
+            GroupId groupId
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
         final var g = getGroupForSending(groupId);
         if (g.isAnnouncementGroup() && !g.isAdmin(account.getSelfRecipientId())) {
@@ -238,7 +241,9 @@ public class SendHelper {
     }
 
     public SendMessageResult resendMessage(
-            final RecipientId recipientId, final long timestamp, final MessageSendLogEntry messageSendLogEntry
+            final RecipientId recipientId,
+            final long timestamp,
+            final MessageSendLogEntry messageSendLogEntry
     ) {
         logger.trace("Resending message {} to {}", timestamp, recipientId);
         if (messageSendLogEntry.groupId().isEmpty()) {
@@ -552,7 +557,9 @@ public class SendHelper {
     }
 
     private List<SendMessageResult> sendGroupMessageInternalWithLegacy(
-            final LegacySenderHandler sender, final Set<RecipientId> recipientIds, final boolean isRecipientUpdate
+            final LegacySenderHandler sender,
+            final Set<RecipientId> recipientIds,
+            final boolean isRecipientUpdate
     ) throws IOException {
         final var recipientIdList = new ArrayList<>(recipientIds);
         final var addresses = recipientIdList.stream()
@@ -644,7 +651,9 @@ public class SendHelper {
     }
 
     private SendMessageResult sendMessage(
-            SignalServiceDataMessage message, RecipientId recipientId, Optional<Long> editTargetTimestamp
+            SignalServiceDataMessage message,
+            RecipientId recipientId,
+            Optional<Long> editTargetTimestamp
     ) {
         final var messageSendLogStore = account.getMessageSendLogStore();
         final var urgent = true;
