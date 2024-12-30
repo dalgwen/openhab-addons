@@ -271,7 +271,9 @@ public final class ProfileHelper {
     }
 
     private Profile decryptProfileAndDownloadAvatar(
-            final RecipientId recipientId, final ProfileKey profileKey, final SignalServiceProfile encryptedProfile
+            final RecipientId recipientId,
+            final ProfileKey profileKey,
+            final SignalServiceProfile encryptedProfile
     ) {
         final var avatarPath = encryptedProfile.getAvatar();
         downloadProfileAvatar(recipientId, avatarPath, profileKey);
@@ -280,7 +282,9 @@ public final class ProfileHelper {
     }
 
     public void downloadProfileAvatar(
-            final RecipientId recipientId, final String avatarPath, final ProfileKey profileKey
+            final RecipientId recipientId,
+            final String avatarPath,
+            final ProfileKey profileKey
     ) {
         var profile = account.getProfileStore().getProfile(recipientId);
         if (profile == null || !Objects.equals(avatarPath, profile.getAvatarUrlPath())) {
@@ -308,7 +312,8 @@ public final class ProfileHelper {
     }
 
     private Single<ProfileAndCredential> retrieveProfile(
-            RecipientId recipientId, SignalServiceProfile.RequestType requestType
+            RecipientId recipientId,
+            SignalServiceProfile.RequestType requestType
     ) {
         var unidentifiedAccess = getUnidentifiedAccess(recipientId);
         var profileKey = Optional.ofNullable(account.getProfileStore().getProfileKey(recipientId));
@@ -331,13 +336,6 @@ public final class ProfileHelper {
 
             final var profile = account.getProfileStore().getProfile(recipientId);
 
-            if (recipientId.equals(account.getSelfRecipientId())) {
-                final var isUnrestricted = encryptedProfile.isUnrestrictedUnidentifiedAccess();
-                if (account.isUnrestrictedUnidentifiedAccess() != isUnrestricted) {
-                    account.setUnrestrictedUnidentifiedAccess(isUnrestricted);
-                }
-            }
-
             Profile newProfile = null;
             if (profileKey.isPresent()) {
                 logger.trace("Decrypting profile");
@@ -351,6 +349,18 @@ public final class ProfileHelper {
                         .withUnidentifiedAccessMode(ProfileUtils.getUnidentifiedAccessMode(encryptedProfile, null))
                         .withCapabilities(ProfileUtils.getCapabilities(encryptedProfile))
                         .build();
+            }
+
+            if (recipientId.equals(account.getSelfRecipientId())) {
+                final var isUnrestricted = encryptedProfile.isUnrestrictedUnidentifiedAccess();
+                if (account.isUnrestrictedUnidentifiedAccess() != isUnrestricted) {
+                    account.setUnrestrictedUnidentifiedAccess(isUnrestricted);
+                }
+                if (account.isPrimaryDevice() && profile != null && newProfile.getCapabilities()
+                        .contains(Profile.Capability.storageServiceEncryptionV2Capability) && !profile.getCapabilities()
+                        .contains(Profile.Capability.storageServiceEncryptionV2Capability)) {
+                    context.getJobExecutor().enqueueJob(new SyncStorageJob(true));
+                }
             }
 
             try {
@@ -408,9 +418,7 @@ public final class ProfileHelper {
         });
     }
 
-    private void downloadProfileAvatar(
-            RecipientAddress address, String avatarPath, ProfileKey profileKey
-    ) {
+    private void downloadProfileAvatar(RecipientAddress address, String avatarPath, ProfileKey profileKey) {
         if (avatarPath == null) {
             try {
                 context.getAvatarStore().deleteProfileAvatar(address);
@@ -430,7 +438,9 @@ public final class ProfileHelper {
     }
 
     private void retrieveProfileAvatar(
-            String avatarPath, ProfileKey profileKey, OutputStream outputStream
+            String avatarPath,
+            ProfileKey profileKey,
+            OutputStream outputStream
     ) throws IOException {
         var tmpFile = IOUtils.createTempFile();
         try (var input = dependencies.getMessageReceiver()

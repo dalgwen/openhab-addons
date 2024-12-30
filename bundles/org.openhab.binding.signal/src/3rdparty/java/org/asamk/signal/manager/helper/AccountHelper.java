@@ -3,7 +3,6 @@ package org.asamk.signal.manager.helper;
 import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.DeviceLinkUrl;
 import org.asamk.signal.manager.api.IncorrectPinException;
-import org.asamk.signal.manager.api.InvalidDeviceLinkException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
@@ -27,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.account.ChangePhoneNumberRequest;
 import org.whispersystems.signalservice.api.crypto.UntrustedIdentityException;
+import org.whispersystems.signalservice.api.link.LinkedDeviceVerificationCodeResponse;
 import org.whispersystems.signalservice.api.push.ServiceId.ACI;
 import org.whispersystems.signalservice.api.push.ServiceId.PNI;
 import org.whispersystems.signalservice.api.push.ServiceIdType;
@@ -56,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 import okio.ByteString;
 
 import static org.asamk.signal.manager.config.ServiceConfig.PREKEY_MAXIMUM_ID;
+import static org.asamk.signal.manager.util.Utils.handleResponseException;
 import static org.whispersystems.signalservice.internal.util.Util.isEmpty;
 
 public class AccountHelper {
@@ -165,19 +166,24 @@ public class AccountHelper {
     }
 
     public void startChangeNumber(
-            String newNumber, boolean voiceVerification, String captcha
+            String newNumber,
+            boolean voiceVerification,
+            String captcha
     ) throws IOException, CaptchaRequiredException, NonNormalizedPhoneNumberException, RateLimitException, VerificationMethodNotAvailableException {
         final var accountManager = dependencies.createUnauthenticatedAccountManager(newNumber, account.getPassword());
-        String sessionId = NumberVerificationUtils.handleVerificationSession(accountManager,
+        final var registrationApi = accountManager.getRegistrationApi();
+        String sessionId = NumberVerificationUtils.handleVerificationSession(registrationApi,
                 account.getSessionId(newNumber),
                 id -> account.setSessionId(newNumber, id),
                 voiceVerification,
                 captcha);
-        NumberVerificationUtils.requestVerificationCode(accountManager, sessionId, voiceVerification);
+        NumberVerificationUtils.requestVerificationCode(registrationApi, sessionId, voiceVerification);
     }
 
     public void finishChangeNumber(
-            String newNumber, String verificationCode, String pin
+            String newNumber,
+            String verificationCode,
+            String pin
     ) throws IncorrectPinException, PinLockedException, IOException {
         for (var attempts = 0; attempts < 5; attempts++) {
             try {
@@ -195,7 +201,9 @@ public class AccountHelper {
     }
 
     private void finishChangeNumberInternal(
-            String newNumber, String verificationCode, String pin
+            String newNumber,
+            String verificationCode,
+            String pin
     ) throws IncorrectPinException, PinLockedException, IOException {
         final var pniIdentity = KeyUtils.generateIdentityKeyPair();
         final var encryptedDeviceMessages = new ArrayList<OutgoingPushMessage>();
@@ -280,14 +288,13 @@ public class AccountHelper {
                 pin,
                 context.getPinHelper(),
                 (sessionId1, verificationCode1, registrationLock) -> {
-                    final var accountManager = dependencies.getAccountManager();
+                    final var registrationApi = dependencies.getRegistrationApi();
                     try {
-                        Utils.handleResponseException(accountManager.verifyAccount(verificationCode1, sessionId1));
+                        handleResponseException(registrationApi.verifyAccount(sessionId1, verificationCode1));
                     } catch (AlreadyVerifiedException e) {
                         // Already verified so can continue changing number
                     }
-                    return Utils.handleResponseException(accountManager.changeNumber(new ChangePhoneNumberRequest(
-                            sessionId1,
+                    return handleResponseException(registrationApi.changeNumber(new ChangePhoneNumberRequest(sessionId1,
                             null,
                             newNumber,
                             registrationLock,
@@ -307,9 +314,7 @@ public class AccountHelper {
         handlePniChangeNumberMessage(selfChangeNumber, updatePni);
     }
 
-    public void handlePniChangeNumberMessage(
-            final SyncMessage.PniChangeNumber pniChangeNumber, final PNI updatedPni
-    ) {
+    public void handlePniChangeNumberMessage(final SyncMessage.PniChangeNumber pniChangeNumber, final PNI updatedPni) {
         if (pniChangeNumber.identityKeyPair != null
                 && pniChangeNumber.registrationId != null
                 && pniChangeNumber.signedPreKey != null) {
@@ -477,26 +482,29 @@ public class AccountHelper {
         dependencies.getAccountManager().setAccountAttributes(account.getAccountAttributes(null));
     }
 
-    public void addDevice(DeviceLinkUrl deviceLinkInfo) throws IOException, InvalidDeviceLinkException, org.asamk.signal.manager.api.DeviceLimitExceededException {
-        String verificationCode;
+    public void addDevice(DeviceLinkUrl deviceLinkInfo) throws IOException, org.asamk.signal.manager.api.DeviceLimitExceededException {
+        final var linkDeviceApi = dependencies.getLinkDeviceApi();
+        final LinkedDeviceVerificationCodeResponse verificationCode;
         try {
-            verificationCode = dependencies.getAccountManager().getNewDeviceVerificationCode();
+            verificationCode = handleResponseException(linkDeviceApi.getDeviceVerificationCode());
         } catch (DeviceLimitExceededException e) {
             throw new org.asamk.signal.manager.api.DeviceLimitExceededException("Too many linked devices", e);
         }
 
-        try {
-            dependencies.getAccountManager()
-                    .addDevice(deviceLinkInfo.deviceIdentifier(),
-                            deviceLinkInfo.deviceKey(),
-                            account.getAciIdentityKeyPair(),
-                            account.getPniIdentityKeyPair(),
-                            account.getProfileKey(),
-                            account.getOrCreatePinMasterKey(),
-                            verificationCode);
-        } catch (InvalidKeyException e) {
-            throw new InvalidDeviceLinkException("Invalid device link", e);
-        }
+        handleResponseException(dependencies.getLinkDeviceApi()
+                .linkDevice(account.getNumber(),
+                        account.getAci(),
+                        account.getPni(),
+                        deviceLinkInfo.deviceIdentifier(),
+                        deviceLinkInfo.deviceKey(),
+                        account.getAciIdentityKeyPair(),
+                        account.getPniIdentityKeyPair(),
+                        account.getProfileKey(),
+                        account.getOrCreatePinMasterKey(),
+                        account.getOrCreateMediaRootBackupKey(),
+                        account.getOrCreateAccountEntropyPool(),
+                        verificationCode.getVerificationCode(),
+                        null));
         account.setMultiDevice(true);
         context.getJobExecutor().enqueueJob(new SyncStorageJob());
     }

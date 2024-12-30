@@ -6,9 +6,9 @@ import org.signal.libsignal.protocol.fingerprint.Fingerprint;
 import org.signal.libsignal.protocol.fingerprint.NumericFingerprintGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.NetworkResult;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.util.StreamDetails;
-import org.whispersystems.signalservice.internal.ServiceResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +30,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import okio.ByteString;
 
 public class Utils {
 
@@ -59,7 +62,10 @@ public class Utils {
     }
 
     public static Fingerprint computeSafetyNumberForNumber(
-            String ownNumber, IdentityKey ownIdentityKey, String theirNumber, IdentityKey theirIdentityKey
+            String ownNumber,
+            IdentityKey ownIdentityKey,
+            String theirNumber,
+            IdentityKey theirIdentityKey
     ) {
         // Version 1: E164 user
         final var version = 1;
@@ -70,7 +76,10 @@ public class Utils {
     }
 
     public static Fingerprint computeSafetyNumberForUuid(
-            ServiceId ownServiceId, IdentityKey ownIdentityKey, ServiceId theirServiceId, IdentityKey theirIdentityKey
+            ServiceId ownServiceId,
+            IdentityKey ownIdentityKey,
+            ServiceId theirServiceId,
+            IdentityKey theirIdentityKey
     ) {
         // Version 2: UUID user
         final var version = 2;
@@ -140,15 +149,57 @@ public class Utils {
         return map;
     }
 
-    public static <T> T handleResponseException(final ServiceResponse<T> response) throws IOException {
-        final var throwableOptional = response.getExecutionError().or(response::getApplicationError);
-        if (throwableOptional.isPresent()) {
-            if (throwableOptional.get() instanceof IOException) {
-                throw (IOException) throwableOptional.get();
+    public static <T> T handleResponseException(final NetworkResult<T> response) throws IOException {
+        final var throwableOptional = response.getCause();
+        if (throwableOptional != null) {
+            if (throwableOptional instanceof IOException ioException) {
+                throw ioException;
             } else {
-                throw new IOException(throwableOptional.get());
+                throw new IOException(throwableOptional);
             }
         }
-        return response.getResult().orElse(null);
+        return response.successOrThrow();
+    }
+
+    public static ByteString firstNonEmpty(ByteString... strings) {
+        for (final var s : strings) {
+            if (s.size() > 0) {
+                return s;
+            }
+        }
+        return ByteString.EMPTY;
+    }
+
+    @SafeVarargs
+    public static <T> List<T> firstNonEmpty(List<T>... values) {
+        for (final var s : values) {
+            if (!s.isEmpty()) {
+                return s;
+            }
+        }
+        return List.of();
+    }
+
+    public static String firstNonEmpty(String... strings) {
+        for (final var s : strings) {
+            if (!s.isEmpty()) {
+                return s;
+            }
+        }
+        return "";
+    }
+
+    @SafeVarargs
+    public static <T> T firstNonNull(T... values) {
+        for (final var v : values) {
+            if (v != null) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    public static String nullIfEmpty(String string) {
+        return string == null || string.isEmpty() ? null : string;
     }
 }

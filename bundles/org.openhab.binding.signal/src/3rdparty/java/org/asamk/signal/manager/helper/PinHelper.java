@@ -21,20 +21,18 @@ public class PinHelper {
         this.secureValueRecoveries = secureValueRecoveries;
     }
 
-    public void setRegistrationLockPin(
-            String pin, MasterKey masterKey
-    ) throws IOException {
+    public void setRegistrationLockPin(String pin, MasterKey masterKey) throws IOException {
         IOException exception = null;
         for (final var secureValueRecovery : secureValueRecoveries) {
             try {
                 final var backupResponse = secureValueRecovery.setPin(pin, masterKey).execute();
                 if (backupResponse instanceof SecureValueRecovery.BackupResponse.Success success) {
                 } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ServerRejected serverRejected) {
-                    logger.warn("Backup svr2 failed: ServerRejected");
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.EnclaveNotFound enclaveNotFound) {
-                    logger.warn("Backup svr2 failed: EnclaveNotFound");
+                    logger.warn("Backup svr failed: ServerRejected");
+                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.EnclaveNotFound enclaveNotFound ) {
+                    logger.warn("Backup svr failed: EnclaveNotFound");
                 } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ExposeFailure exposeFailure) {
-                    logger.warn("Backup svr2 failed: ExposeFailure");
+                    logger.warn("Backup svr failed: ExposeFailure");
                 } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ApplicationError error) {
                     throw new IOException(error.getException());
                 } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.NetworkError error) {
@@ -82,7 +80,8 @@ public class PinHelper {
     }
 
     public SecureValueRecovery.RestoreResponse.Success getRegistrationLockData(
-            String pin, LockedException lockedException
+            String pin,
+            LockedException lockedException
     ) throws IOException, IncorrectPinException {
         var svr2Credentials = lockedException.getSvr2Credentials();
         if (svr2Credentials != null) {
@@ -103,7 +102,9 @@ public class PinHelper {
     }
 
     public SecureValueRecovery.RestoreResponse.Success getRegistrationLockData(
-            SecureValueRecovery secureValueRecovery, AuthCredentials authCredentials, String pin
+            SecureValueRecovery secureValueRecovery,
+            AuthCredentials authCredentials,
+            String pin
     ) throws IOException, IncorrectPinException {
         final var restoreResponse = secureValueRecovery.restoreDataPreRegistration(authCredentials, null, pin);
 

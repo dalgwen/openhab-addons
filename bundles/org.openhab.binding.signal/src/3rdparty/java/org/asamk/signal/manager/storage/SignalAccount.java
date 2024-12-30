@@ -65,10 +65,12 @@ import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.AccountEntropyPool;
 import org.whispersystems.signalservice.api.SignalServiceAccountDataStore;
 import org.whispersystems.signalservice.api.SignalServiceDataStore;
 import org.whispersystems.signalservice.api.account.AccountAttributes;
 import org.whispersystems.signalservice.api.account.PreKeyCollection;
+import org.whispersystems.signalservice.api.backup.MediaRootBackupKey;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
 import org.whispersystems.signalservice.api.push.ServiceId;
@@ -138,6 +140,8 @@ public class SignalAccount implements Closeable {
     private String registrationLockPin;
     private MasterKey pinMasterKey;
     private StorageKey storageKey;
+    private AccountEntropyPool accountEntropyPool;
+    private MediaRootBackupKey mediaRootBackupKey;
     private ProfileKey profileKey;
 
     private Settings settings;
@@ -189,7 +193,10 @@ public class SignalAccount implements Closeable {
     }
 
     public static SignalAccount load(
-            File dataPath, String accountPath, boolean waitForLock, final Settings settings
+            File dataPath,
+            String accountPath,
+            boolean waitForLock,
+            final Settings settings
     ) throws IOException {
         logger.trace("Opening account file");
         final var fileName = getFileName(dataPath, accountPath);
@@ -285,7 +292,9 @@ public class SignalAccount implements Closeable {
             final IdentityKeyPair aciIdentity,
             final IdentityKeyPair pniIdentity,
             final ProfileKey profileKey,
-            final MasterKey masterKey
+            final MasterKey masterKey,
+            final AccountEntropyPool accountEntropyPool,
+            final MediaRootBackupKey mediaRootBackupKey
     ) {
         this.deviceId = 0;
         this.number = number;
@@ -301,7 +310,14 @@ public class SignalAccount implements Closeable {
         this.registered = false;
         this.isMultiDevice = true;
         setLastReceiveTimestamp(0L);
-        this.pinMasterKey = masterKey;
+        if (accountEntropyPool != null) {
+            this.pinMasterKey = null;
+            this.accountEntropyPool = accountEntropyPool;
+        } else {
+            this.pinMasterKey = masterKey;
+            this.accountEntropyPool = null;
+        }
+        this.mediaRootBackupKey = mediaRootBackupKey;
         getKeyValueStore().storeEntry(storageManifestVersion, -1L);
         this.setStorageManifest(null);
         this.storageKey = null;
@@ -316,7 +332,9 @@ public class SignalAccount implements Closeable {
     }
 
     public void finishLinking(
-            final int deviceId, final PreKeyCollection aciPreKeys, final PreKeyCollection pniPreKeys
+            final int deviceId,
+            final PreKeyCollection aciPreKeys,
+            final PreKeyCollection pniPreKeys
     ) {
         this.registered = true;
         this.deviceId = deviceId;
@@ -334,6 +352,7 @@ public class SignalAccount implements Closeable {
             final PreKeyCollection pniPreKeys
     ) {
         this.pinMasterKey = masterKey;
+        this.accountEntropyPool = null;
         getKeyValueStore().storeEntry(storageManifestVersion, -1L);
         this.setStorageManifest(null);
         this.storageKey = null;
@@ -375,7 +394,9 @@ public class SignalAccount implements Closeable {
     }
 
     private void mergeRecipients(
-            final Connection connection, RecipientId recipientId, RecipientId toBeMergedRecipientId
+            final Connection connection,
+            RecipientId recipientId,
+            RecipientId toBeMergedRecipientId
     ) throws SQLException {
         getMessageCache().mergeRecipients(recipientId, toBeMergedRecipientId);
         getGroupStore().mergeRecipients(connection, recipientId, toBeMergedRecipientId);
@@ -438,9 +459,7 @@ public class SignalAccount implements Closeable {
         return f.exists() && !f.isDirectory() && f.length() > 0L;
     }
 
-    private void load(
-            File dataPath, String accountPath, final Settings settings
-    ) throws IOException {
+    private void load(File dataPath, String accountPath, final Settings settings) throws IOException {
         logger.trace("Loading account file {}", accountPath);
         this.dataPath = dataPath;
         this.accountPath = accountPath;
@@ -493,6 +512,12 @@ public class SignalAccount implements Closeable {
             }
             if (storage.storageKey != null) {
                 storageKey = new StorageKey(base64.decode(storage.storageKey));
+            }
+            if (storage.accountEntropyPool != null) {
+                accountEntropyPool = new AccountEntropyPool(storage.accountEntropyPool);
+            }
+            if (storage.mediaRootBackupKey != null) {
+                mediaRootBackupKey = new MediaRootBackupKey(base64.decode(storage.mediaRootBackupKey));
             }
             if (storage.profileKey != null) {
                 try {
@@ -786,7 +811,8 @@ public class SignalAccount implements Closeable {
     }
 
     private void loadLegacyStores(
-            final JsonNode rootNode, final LegacyJsonSignalProtocolStore legacySignalProtocolStore
+            final JsonNode rootNode,
+            final LegacyJsonSignalProtocolStore legacySignalProtocolStore
     ) {
         var legacyRecipientStoreNode = rootNode.get("recipientStore");
         if (legacyRecipientStoreNode != null) {
@@ -864,6 +890,7 @@ public class SignalAccount implements Closeable {
                                 null,
                                 contact.color,
                                 contact.messageExpirationTime,
+                                1,
                                 0,
                                 false,
                                 contact.blocked,
@@ -939,6 +966,7 @@ public class SignalAccount implements Closeable {
                             getContactStore().storeContact(recipientId,
                                     Contact.newBuilder(contact)
                                             .withMessageExpirationTime(thread.messageExpirationTime)
+                                            .withMessageExpirationTimeVersion(1)
                                             .build());
                         }
                     } else {
@@ -973,6 +1001,8 @@ public class SignalAccount implements Closeable {
                     registrationLockPin,
                     pinMasterKey == null ? null : base64.encodeToString(pinMasterKey.serialize()),
                     storageKey == null ? null : base64.encodeToString(storageKey.serialize()),
+                    accountEntropyPool == null ? null : accountEntropyPool.getValue(),
+                    mediaRootBackupKey == null ? null : base64.encodeToString(mediaRootBackupKey.getValue()),
                     profileKey == null ? null : base64.encodeToString(profileKey.serialize()),
                     usernameLink == null ? null : base64.encodeToString(usernameLink.getEntropy()),
                     usernameLink == null ? null : usernameLink.getServerId().toString());
@@ -1434,6 +1464,10 @@ public class SignalAccount implements Closeable {
         return selfRecipientId;
     }
 
+    public Profile getSelfRecipientProfile() {
+        return recipientStore.getProfile(selfRecipientId);
+    }
+
     public String getSessionId(final String forNumber) {
         final var keyValueStore = getKeyValueStore();
         final var sessionNumber = keyValueStore.getEntry(verificationSessionNumber);
@@ -1504,16 +1538,30 @@ public class SignalAccount implements Closeable {
     public MasterKey getPinBackedMasterKey() {
         if (registrationLockPin == null) {
             return null;
+        } else if (!isPrimaryDevice()) {
+            return getMasterKey();
         }
-        return pinMasterKey;
+        return getOrCreatePinMasterKey();
     }
 
     public MasterKey getOrCreatePinMasterKey() {
-        if (pinMasterKey == null) {
-            pinMasterKey = KeyUtils.createMasterKey();
-            save();
+        final var key = getMasterKey();
+        if (key != null) {
+            return key;
         }
+
+        pinMasterKey = KeyUtils.createMasterKey();
+        save();
         return pinMasterKey;
+    }
+
+    private MasterKey getMasterKey() {
+        if (pinMasterKey != null) {
+            return pinMasterKey;
+        } else if (accountEntropyPool != null) {
+            return accountEntropyPool.deriveMasterKey();
+        }
+        return null;
     }
 
     public void setMasterKey(MasterKey masterKey) {
@@ -1521,14 +1569,19 @@ public class SignalAccount implements Closeable {
             return;
         }
         this.pinMasterKey = masterKey;
+        if (masterKey != null) {
+            this.storageKey = null;
+        }
         save();
     }
 
     public StorageKey getOrCreateStorageKey() {
-        if (pinMasterKey != null) {
-            return pinMasterKey.deriveStorageServiceKey();
-        } else if (storageKey != null) {
+        if (storageKey != null) {
             return storageKey;
+        } else if (pinMasterKey != null) {
+            return pinMasterKey.deriveStorageServiceKey();
+        } else if (accountEntropyPool != null) {
+            return accountEntropyPool.deriveMasterKey().deriveStorageServiceKey();
         } else if (!isPrimaryDevice() || !isMultiDevice()) {
             // Only upload storage, if a pin master key already exists or linked devices exist
             return null;
@@ -1542,6 +1595,40 @@ public class SignalAccount implements Closeable {
             return;
         }
         this.storageKey = storageKey;
+        save();
+    }
+
+    public AccountEntropyPool getOrCreateAccountEntropyPool() {
+        if (accountEntropyPool == null) {
+            accountEntropyPool = AccountEntropyPool.Companion.generate();
+            save();
+        }
+        return accountEntropyPool;
+    }
+
+    public void setAccountEntropyPool(final AccountEntropyPool accountEntropyPool) {
+        this.accountEntropyPool = accountEntropyPool;
+        if (accountEntropyPool != null) {
+            this.storageKey = null;
+            this.pinMasterKey = null;
+        }
+        save();
+    }
+
+    public boolean needsStorageKeyMigration() {
+        return isPrimaryDevice() && (storageKey != null || pinMasterKey != null);
+    }
+
+    public MediaRootBackupKey getOrCreateMediaRootBackupKey() {
+        if (mediaRootBackupKey == null) {
+            mediaRootBackupKey = KeyUtils.createMediaRootBackupKey();
+            save();
+        }
+        return mediaRootBackupKey;
+    }
+
+    public void setMediaRootBackupKey(final MediaRootBackupKey mediaRootBackupKey) {
+        this.mediaRootBackupKey = mediaRootBackupKey;
         save();
     }
 
@@ -1567,7 +1654,7 @@ public class SignalAccount implements Closeable {
             return Optional.empty();
         }
         try (var inputStream = new FileInputStream(storageManifestFile)) {
-            return Optional.of(SignalStorageManifest.deserialize(inputStream.readAllBytes()));
+            return Optional.of(SignalStorageManifest.Companion.deserialize(inputStream.readAllBytes()));
         } catch (IOException e) {
             logger.warn("Failed to read local storage manifest.", e);
             return Optional.empty();
@@ -1874,6 +1961,8 @@ public class SignalAccount implements Closeable {
             String registrationLockPin,
             String pinMasterKey,
             String storageKey,
+            String accountEntropyPool,
+            String mediaRootBackupKey,
             String profileKey,
             String usernameLinkEntropy,
             String usernameLinkServerId
