@@ -121,7 +121,10 @@ public class GroupStore {
     }
 
     public void storeStorageRecord(
-            final Connection connection, final GroupId groupId, final StorageId storageId, final byte[] storageRecord
+            final Connection connection,
+            final GroupId groupId,
+            final StorageId storageId,
+            final byte[] storageRecord
     ) throws SQLException {
         final var groupTable = groupId instanceof GroupIdV1 ? TABLE_GROUP_V1 : TABLE_GROUP_V2;
         final var deleteSql = (
@@ -248,7 +251,8 @@ public class GroupStore {
     }
 
     public GroupInfoV2 getGroupOrPartialMigrate(
-            Connection connection, final GroupMasterKey groupMasterKey
+            Connection connection,
+            final GroupMasterKey groupMasterKey
     ) throws SQLException {
         final var groupSecretParams = GroupSecretParams.deriveFromMasterKey(groupMasterKey);
         final var groupId = GroupUtils.getGroupIdV2(groupSecretParams);
@@ -256,9 +260,7 @@ public class GroupStore {
         return getGroupOrPartialMigrate(connection, groupMasterKey, groupId);
     }
 
-    public GroupInfoV2 getGroupOrPartialMigrate(
-            final GroupMasterKey groupMasterKey, final GroupIdV2 groupId
-    ) {
+    public GroupInfoV2 getGroupOrPartialMigrate(final GroupMasterKey groupMasterKey, final GroupIdV2 groupId) {
         try (final var connection = database.getConnection()) {
             return getGroupOrPartialMigrate(connection, groupMasterKey, groupId);
         } catch (SQLException e) {
@@ -267,7 +269,9 @@ public class GroupStore {
     }
 
     private GroupInfoV2 getGroupOrPartialMigrate(
-            Connection connection, final GroupMasterKey groupMasterKey, final GroupIdV2 groupId
+            Connection connection,
+            final GroupMasterKey groupMasterKey,
+            final GroupIdV2 groupId
     ) throws SQLException {
         GroupInfo group = getGroup(connection, (GroupId) groupId);
 
@@ -321,7 +325,9 @@ public class GroupStore {
     }
 
     public void mergeRecipients(
-            final Connection connection, final RecipientId recipientId, final RecipientId toBeMergedRecipientId
+            final Connection connection,
+            final RecipientId recipientId,
+            final RecipientId toBeMergedRecipientId
     ) throws SQLException {
         final var sql = (
                 """
@@ -356,7 +362,9 @@ public class GroupStore {
     }
 
     public void updateStorageIds(
-            Connection connection, Map<GroupIdV1, StorageId> storageIdV1Map, Map<GroupIdV2, StorageId> storageIdV2Map
+            Connection connection,
+            Map<GroupIdV1, StorageId> storageIdV1Map,
+            Map<GroupIdV2, StorageId> storageIdV2Map
     ) throws SQLException {
         final var sql = (
                 """
@@ -381,9 +389,7 @@ public class GroupStore {
         }
     }
 
-    public void updateStorageId(
-            Connection connection, GroupId groupId, StorageId storageId
-    ) throws SQLException {
+    public void updateStorageId(Connection connection, GroupId groupId, StorageId storageId) throws SQLException {
         final var sqlV1 = (
                 """
                 UPDATE %s
@@ -456,7 +462,9 @@ public class GroupStore {
     }
 
     private void insertOrReplaceGroup(
-            final Connection connection, Long internalId, final GroupInfo group
+            final Connection connection,
+            Long internalId,
+            final GroupInfo group
     ) throws SQLException {
         if (group instanceof GroupInfoV1 groupV1) {
             if (internalId != null) {

@@ -97,7 +97,6 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
     private boolean shouldRun = false;
     private AtomicBoolean isStarting = new AtomicBoolean(false);
 
-
     @Override
     public void dispose() {
         shouldRun = false;

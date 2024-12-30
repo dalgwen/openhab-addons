@@ -27,7 +27,7 @@ public record RecipientAddress(
             pni = Optional.empty();
         }
         if (aci.isEmpty() && pni.isEmpty() && number.isEmpty() && username.isEmpty()) {
-            throw new AssertionError("Must have either a ServiceId, username or E164 number!");
+            throw new InvalidAddress("Must have either a ServiceId, username or E164 number!");
         }
     }
 
@@ -69,8 +69,8 @@ public record RecipientAddress(
     }
 
     public RecipientAddress(org.asamk.signal.manager.api.RecipientAddress address) {
-        this(address.aci().map(ACI::parseOrNull),
-                address.pni().map(PNI::parseOrNull),
+        this(address.aci().map(ACI::parseOrThrow),
+                address.pni().map(PNI::parseOrThrow),
                 address.number(),
                 address.username());
     }

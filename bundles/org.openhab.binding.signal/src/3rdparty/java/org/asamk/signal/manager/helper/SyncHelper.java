@@ -39,7 +39,6 @@ import org.whispersystems.signalservice.api.messages.multidevice.ViewedMessage;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.SyncMessage;
-import org.whispersystems.signalservice.internal.push.http.ResumableUploadSpec;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -135,15 +134,12 @@ public class SyncHelper {
 
             if (groupsFile.exists() && groupsFile.length() > 0) {
                 try (var groupsFileStream = new FileInputStream(groupsFile)) {
-                    final var uploadSpec = context.getDependencies()
-                            .getMessageSender()
-                            .getResumableUploadSpec()
-                            .toProto();
+                    final var uploadSpec = context.getDependencies().getMessageSender().getResumableUploadSpec();
                     var attachmentStream = SignalServiceAttachment.newStreamBuilder()
                             .withStream(groupsFileStream)
                             .withContentType(MimeUtils.OCTET_STREAM)
                             .withLength(groupsFile.length())
-                            .withResumableUploadSpec(ResumableUploadSpec.from(uploadSpec))
+                            .withResumableUploadSpec(uploadSpec)
                             .build();
 
                     context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forGroups(attachmentStream));
@@ -197,15 +193,12 @@ public class SyncHelper {
 
             if (contactsFile.exists() && contactsFile.length() > 0) {
                 try (var contactsFileStream = new FileInputStream(contactsFile)) {
-                    final var uploadSpec = context.getDependencies()
-                            .getMessageSender()
-                            .getResumableUploadSpec()
-                            .toProto();
+                    final var uploadSpec = context.getDependencies().getMessageSender().getResumableUploadSpec();
                     var attachmentStream = SignalServiceAttachment.newStreamBuilder()
                             .withStream(contactsFileStream)
                             .withContentType(MimeUtils.OCTET_STREAM)
                             .withLength(contactsFile.length())
-                            .withResumableUploadSpec(ResumableUploadSpec.from(uploadSpec))
+                            .withResumableUploadSpec(uploadSpec)
                             .build();
 
                     context.getSendHelper()
@@ -224,7 +217,9 @@ public class SyncHelper {
 
     @NotNull
     private DeviceContact getDeviceContact(
-            final RecipientAddress address, final RecipientId recipientId, final Contact contact
+            final RecipientAddress address,
+            final RecipientId recipientId,
+            final Contact contact
     ) throws IOException {
         var currentIdentity = address.serviceId().isEmpty()
                 ? null
@@ -246,16 +241,20 @@ public class SyncHelper {
                 Optional.ofNullable(verifiedMessage),
                 Optional.ofNullable(profileKey),
                 Optional.ofNullable(contact == null ? null : contact.messageExpirationTime()),
-                Optional.empty(),
+                Optional.ofNullable(contact == null ? null : contact.messageExpirationTimeVersion()),
                 Optional.empty(),
                 contact != null && contact.isArchived());
     }
 
     public SendMessageResult sendBlockedList() {
-        var addresses = new ArrayList<SignalServiceAddress>();
+        var addresses = new ArrayList<BlockedListMessage.Individual>();
         for (var record : account.getContactStore().getContacts()) {
             if (record.second().isBlocked()) {
-                addresses.add(context.getRecipientHelper().resolveSignalServiceAddress(record.first()));
+                final var address = account.getRecipientAddressResolver().resolveRecipientAddress(record.first());
+                if (address.aci().isPresent() || address.number().isPresent()) {
+                    addresses.add(new BlockedListMessage.Individual(address.aci().orElse(null),
+                            address.number().orElse(null)));
+                }
             }
         }
         var groupIds = new ArrayList<byte[]>();
@@ -269,7 +268,9 @@ public class SyncHelper {
     }
 
     public SendMessageResult sendVerifiedMessage(
-            SignalServiceAddress destination, IdentityKey identityKey, TrustLevel trustLevel
+            SignalServiceAddress destination,
+            IdentityKey identityKey,
+            TrustLevel trustLevel
     ) {
         var verifiedMessage = new VerifiedMessage(destination,
                 identityKey,
@@ -279,13 +280,16 @@ public class SyncHelper {
     }
 
     public SendMessageResult sendKeysMessage() {
-        var keysMessage = new KeysMessage(Optional.ofNullable(account.getOrCreateStorageKey()),
-                Optional.ofNullable(account.getOrCreatePinMasterKey()));
+        var keysMessage = new KeysMessage(account.getOrCreateStorageKey(),
+                account.getOrCreatePinMasterKey(),
+                account.getOrCreateAccountEntropyPool(),
+                account.getOrCreateMediaRootBackupKey());
         return context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forKeys(keysMessage));
     }
 
     public SendMessageResult sendStickerOperationsMessage(
-            List<StickerPack> installStickers, List<StickerPack> removeStickers
+            List<StickerPack> installStickers,
+            List<StickerPack> removeStickers
     ) {
         var installStickerMessages = installStickers.stream().map(s -> getStickerPackOperationMessage(s, true));
         var removeStickerMessages = removeStickers.stream().map(s -> getStickerPackOperationMessage(s, false));
@@ -295,7 +299,8 @@ public class SyncHelper {
     }
 
     private static StickerPackOperationMessage getStickerPackOperationMessage(
-            final StickerPack s, final boolean installed
+            final StickerPack s,
+            final boolean installed
     ) {
         return new StickerPackOperationMessage(s.packId().serialize(),
                 s.packKey(),
@@ -399,7 +404,18 @@ public class SyncHelper {
                                 TrustLevel.fromVerifiedState(verifiedMessage.getVerified()));
             }
             if (c.getExpirationTimer().isPresent()) {
-                builder.withMessageExpirationTime(c.getExpirationTimer().get());
+                if (c.getExpirationTimerVersion().isPresent() && (
+                        contact == null || c.getExpirationTimerVersion().get() > contact.messageExpirationTimeVersion()
+                )) {
+                    builder.withMessageExpirationTime(c.getExpirationTimer().get());
+                    builder.withMessageExpirationTimeVersion(c.getExpirationTimerVersion().get());
+                } else {
+                    logger.debug(
+                            "[ContactSync] {} was synced with an old expiration timer. Ignoring. Received: {} Current: {}",
+                            recipientId,
+                            c.getExpirationTimerVersion(),
+                            contact == null ? 1 : contact.messageExpirationTimeVersion());
+                }
             }
             builder.withIsArchived(c.isArchived());
             account.getContactStore().storeContact(recipientId, builder.build());
@@ -410,15 +426,14 @@ public class SyncHelper {
         }
     }
 
-    public SendMessageResult sendMessageRequestResponse(
-            final MessageRequestResponse.Type type, final GroupId groupId
-    ) {
+    public SendMessageResult sendMessageRequestResponse(final MessageRequestResponse.Type type, final GroupId groupId) {
         final var response = MessageRequestResponseMessage.forGroup(groupId.serialize(), localToRemoteType(type));
         return context.getSendHelper().sendSyncMessage(SignalServiceSyncMessage.forMessageRequestResponse(response));
     }
 
     public SendMessageResult sendMessageRequestResponse(
-            final MessageRequestResponse.Type type, final RecipientId recipientId
+            final MessageRequestResponse.Type type,
+            final RecipientId recipientId
     ) {
         final var address = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId);
         if (address.serviceId().isEmpty()) {

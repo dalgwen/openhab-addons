@@ -14,6 +14,7 @@ import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.ServiceId.ACI;
 import org.whispersystems.signalservice.api.push.ServiceId.PNI;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.api.push.exceptions.CdsiInvalidArgumentException;
 import org.whispersystems.signalservice.api.push.exceptions.CdsiInvalidTokenException;
 import org.whispersystems.signalservice.api.services.CdsiV2Service;
 
@@ -78,7 +79,7 @@ public class RecipientHelper {
         if (recipient instanceof RecipientIdentifier.Uuid uuidRecipient) {
             return account.getRecipientResolver().resolveRecipient(ACI.from(uuidRecipient.uuid()));
         } else if (recipient instanceof RecipientIdentifier.Pni pniRecipient) {
-            return account.getRecipientResolver().resolveRecipient(PNI.parseOrThrow(pniRecipient.pni()));
+            return account.getRecipientResolver().resolveRecipient(PNI.from(pniRecipient.pni()));
         } else if (recipient instanceof RecipientIdentifier.Number numberRecipient) {
             final var number = numberRecipient.number();
             return account.getRecipientStore().resolveRecipientByNumber(number, () -> {
@@ -96,7 +97,8 @@ public class RecipientHelper {
     }
 
     public RecipientId resolveRecipientByUsernameOrLink(
-            String username, boolean forceRefresh
+            String username,
+            boolean forceRefresh
     ) throws UnregisteredRecipientException {
         final Username finalUsername;
         try {
@@ -179,7 +181,8 @@ public class RecipientHelper {
     }
 
     private Map<String, RegisteredUser> getRegisteredUsers(
-            final Set<String> numbers, final boolean isPartialRefresh
+            final Set<String> numbers,
+            final boolean isPartialRefresh
     ) throws IOException {
         Map<String, RegisteredUser> registeredUsers = getRegisteredUsersV2(numbers, isPartialRefresh);
 
@@ -210,7 +213,8 @@ public class RecipientHelper {
     }
 
     private Map<String, RegisteredUser> getRegisteredUsersV2(
-            final Set<String> numbers, boolean isPartialRefresh
+            final Set<String> numbers,
+            boolean isPartialRefresh
     ) throws IOException {
         final var previousNumbers = isPartialRefresh ? Set.<String>of() : account.getCdsiStore().getAllNumbers();
         final var newNumbers = new HashSet<>(numbers) {{
@@ -235,7 +239,6 @@ public class RecipientHelper {
                             newNumbers,
                             account.getRecipientStore().getServiceIdToProfileKeyMap(),
                             token,
-                            dependencies.getServiceEnvironmentConfig().cdsiMrenclave(),
                             null,
                             dependencies.getLibSignalNetwork(),
                             newToken -> {
@@ -254,7 +257,7 @@ public class RecipientHelper {
                                     account.setLastRecipientsRefresh(System.currentTimeMillis());
                                 }
                             });
-        } catch (CdsiInvalidTokenException e) {
+        } catch (CdsiInvalidTokenException | CdsiInvalidArgumentException e) {
             account.setCdsiToken(null);
             account.getCdsiStore().clearAll();
             throw e;
