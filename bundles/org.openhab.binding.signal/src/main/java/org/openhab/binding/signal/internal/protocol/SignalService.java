@@ -317,7 +317,8 @@ public class SignalService {
                             : result.isInvalidPreKeyFailure() ? "prekey"
                             : result.isNetworkFailure() ? "network"
                             : result.isRateLimitFailure() ? "rate"
-                            : result.isUnregisteredFailure() ? "recipient unregistered" : "unknown");
+                            : result.isUnregisteredFailure() ? "recipient unregistered"
+                            : "unknown");
                     return new DeliveryReport(DeliveryStatus.FAILED, address);
                 }
             }

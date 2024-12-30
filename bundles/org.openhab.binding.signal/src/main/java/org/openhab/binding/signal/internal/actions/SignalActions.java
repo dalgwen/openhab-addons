@@ -20,6 +20,8 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.handler.SignalBridgeHandler;
 import org.openhab.binding.signal.internal.protocol.DeliveryReport;
 import org.openhab.core.automation.annotation.ActionInput;
+import org.openhab.core.automation.annotation.ActionOutput;
+import org.openhab.core.automation.annotation.ActionOutputs;
 import org.openhab.core.automation.annotation.RuleAction;
 import org.openhab.core.thing.binding.ThingActions;
 import org.openhab.core.thing.binding.ThingActionsScope;
@@ -51,7 +53,7 @@ public class SignalActions implements ThingActions {
     }
 
     @RuleAction(label = "Send Message With Signal", description = "Send a message with Signal")
-    public Map<String, Object> sendSignal(
+    public @ActionOutputs({@ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignal(
             @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
             @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
         Map<String, Object> resultMap = new HashMap<>();
@@ -85,7 +87,7 @@ public class SignalActions implements ThingActions {
     }
 
     @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
-    public Map<String, Object> sendSignalImage(
+    public @ActionOutputs({@ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignalImage(
             @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
             @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
             @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {

@@ -98,9 +98,7 @@ public class CdsiStore {
         }
     }
 
-    private static void removeNumbers(
-            final Connection connection, final Set<String> numbers
-    ) throws SQLException {
+    private static void removeNumbers(final Connection connection, final Set<String> numbers) throws SQLException {
         final var sql = (
                 """
                 DELETE FROM %s
@@ -116,7 +114,9 @@ public class CdsiStore {
     }
 
     private static void addNumbers(
-            final Connection connection, final Set<String> numbers, final long lastSeen
+            final Connection connection,
+            final Set<String> numbers,
+            final long lastSeen
     ) throws SQLException {
         final var sql = (
                 """
@@ -135,7 +135,9 @@ public class CdsiStore {
     }
 
     private static void updateLastSeen(
-            final Connection connection, final Set<String> numbers, final long lastSeen
+            final Connection connection,
+            final Set<String> numbers,
+            final long lastSeen
     ) throws SQLException {
         final var sql = (
                 """
@@ -156,7 +158,7 @@ public class CdsiStore {
     public void clearAll() {
         final var sql = (
                 """
-                TRUNCATE %s
+                DELETE FROM %s
                 """
         ).formatted(TABLE_CDSI);
         try (final var connection = database.getConnection()) {
