@@ -42,7 +42,7 @@ public class ${simpleClassName} {
         try {
             Class<?> thingActionClass = thingActions.getClass();
 <#if (method.parameterTypes()?size > 0)>
-            Method method = thingActionClass.getMethod("${method.name()}", <#list method.parameterTypes() as parameter>${parameter}.class<#sep>, </#list>);
+            Method method = thingActionClass.getMethod("${method.name()}", <#list method.nonGenericParameterTypes() as parameter>${parameter}.class<#sep>, </#list>);
             <#if (method.returnValueType() != "void")>
             Object returnValue = </#if>method.invoke(thingActions, <#list 1..method.parameterTypes()?size as i>p${i}<#sep>, </#list>);
 <#else>
