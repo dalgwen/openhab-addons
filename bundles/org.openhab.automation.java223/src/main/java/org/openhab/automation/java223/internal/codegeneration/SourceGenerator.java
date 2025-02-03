@@ -208,8 +208,10 @@ public class SourceGenerator {
 
                 List<String> parametersType = Arrays.stream(method.getGenericParameterTypes())
                         .map(pt -> parseArgumentType(pt, classesToImport)).toList();
+                List<String> nonGenericParametersType = Arrays.stream(method.getParameterTypes())
+                        .map(pt -> parseArgumentType(pt, new HashSet<>())).toList();
 
-                MethodDTO methodDTO = new MethodDTO(returnValue, name, parametersType);
+                MethodDTO methodDTO = new MethodDTO(returnValue, name, parametersType, nonGenericParametersType);
                 logger.trace("Found method '{}' with parameters '{}' and return value '{}'.", name, parametersType,
                         returnValue);
 
@@ -343,7 +345,8 @@ public class SourceGenerator {
         return lastDotIndex == -1 ? Optional.empty() : Optional.of(fullName.substring(lastDotIndex + 1));
     }
 
-    public record MethodDTO(String returnValueType, String name, List<String> parameterTypes) {
+    public record MethodDTO(String returnValueType, String name, List<String> parameterTypes,
+            List<String> nonGenericParameterTypes) {
     }
 
     private interface InternalGenerator {
