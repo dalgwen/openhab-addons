@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,12 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.annotation.RuleAction;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.items.Item;
@@ -76,36 +79,30 @@ public class SourceGenerator {
 
     Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
 
-    private Integer stabilityGenerationWaitTime;
-
     // keep a reference to generation method, to use as a key in the delayed map
-    private final InternalGenerator actionGeneration = this::internalGenerateActions;
-    private final InternalGenerator itemGeneration = this::internalGenerateItems;
-    private final InternalGenerator thingGeneration = this::internalGenerateThings;
+    private final InternalGenerator actionGeneration = new InternalGenerator(this::internalGenerateActions, "Actions");
+    private final InternalGenerator itemGeneration = new InternalGenerator(this::internalGenerateItems, "Items");
+    private final InternalGenerator thingGeneration = new InternalGenerator(this::internalGenerateThings, "Things");
     private final Map<InternalGenerator, ScheduledFuture<?>> futureGeneration = new HashMap<>();
 
     private final ScheduledExecutorService scheduledPool = ThreadPoolManager
             .getScheduledPool(ThreadPoolManager.THREAD_POOL_NAME_COMMON);
 
     /**
-     *
      * @param sourceWriter The real writer, with a cache to avoid writing something already existing
      * @param dependencyGenerator We will add to the dependency generator a list of package we think would be
      *            interesting to export
      * @param itemRegistry Lookup inside the itemRegistry to generate a list of item
      * @param thingRegistry Lookup inside the thingRegistry to generate a list of thing
      * @param bundleContext We will search for class action inside
-     * @param stabilityGenerationWaitTime Wait until no new call are made during the period defined
      */
     public SourceGenerator(SourceWriter sourceWriter, DependencyGenerator dependencyGenerator,
-            ItemRegistry itemRegistry, ThingRegistry thingRegistry, BundleContext bundleContext,
-            Integer stabilityGenerationWaitTime) {
+            ItemRegistry itemRegistry, ThingRegistry thingRegistry, BundleContext bundleContext) {
         this.sourceWriter = sourceWriter;
         this.itemRegistry = itemRegistry;
         this.thingRegistry = thingRegistry;
         this.bundleContext = bundleContext;
         this.dependencyGenerator = dependencyGenerator;
-        this.stabilityGenerationWaitTime = stabilityGenerationWaitTime;
 
         cfg.setClassForTemplateLoading(SourceGenerator.class, "/");
         cfg.setDefaultEncoding("UTF-8");
@@ -119,11 +116,16 @@ public class SourceGenerator {
      * Until there is no more item/thing/action activating, this code will delay code generation.
      *
      * @param generator The generator responsible for creating the class
+     * @param writeGuardTime Delay before writing the file. Each call may delay it further.
      */
-    private synchronized void delayWhenStable(InternalGenerator generator) {
+    private synchronized void delayWhenStable(InternalGenerator generator, int writeGuardTime) {
         ScheduledFuture<?> scheduledFuture = futureGeneration.get(generator);
         if (scheduledFuture != null) {
-            scheduledFuture.cancel(false);
+            if (scheduledFuture.getDelay(TimeUnit.MILLISECONDS) < writeGuardTime) {
+                scheduledFuture.cancel(false);
+            } else {
+                return;
+            }
         }
         Runnable command = () -> {
             try {
@@ -133,20 +135,26 @@ public class SourceGenerator {
                 logger.warn("Cannot create helper class file in library directory", e);
             }
         };
-        futureGeneration.put(generator,
-                scheduledPool.schedule(command, stabilityGenerationWaitTime, TimeUnit.MILLISECONDS));
+        int computedDelay = writeGuardTime;
+        // Minimal delay if the file doesn't exist, we can write it
+        Path path = sourceWriter.getPath(sourceWriter.getPackageName(GENERATED), generator.getGeneratedFileName());
+        if (!path.toFile().exists()) {
+            computedDelay = 1000;
+        }
+        logger.debug("Scheduling {} generation in {} ms", generator.getGeneratedFileName(), computedDelay);
+        futureGeneration.put(generator, scheduledPool.schedule(command, computedDelay, TimeUnit.MILLISECONDS));
     }
 
-    public void generateActions() {
-        delayWhenStable(actionGeneration);
+    public void generateActions(int guardTime) {
+        delayWhenStable(actionGeneration, guardTime);
     }
 
-    public void generateItems() {
-        delayWhenStable(itemGeneration);
+    public void generateItems(int guardTime) {
+        delayWhenStable(itemGeneration, guardTime);
     }
 
-    public void generateThings() {
-        delayWhenStable(thingGeneration);
+    public void generateThings(int guardTime) {
+        delayWhenStable(thingGeneration, guardTime);
     }
 
     public void generateJava223Script() {
@@ -167,7 +175,9 @@ public class SourceGenerator {
     }
 
     @SuppressWarnings({ "unused", "null" })
-    private void internalGenerateActions() throws IOException, TemplateException {
+    @Nullable
+    private Void internalGenerateActions() throws IOException, TemplateException {
+        logger.debug("Generating actions");
         List<ThingActions> thingActions;
         try {
             Set<Class<?>> classes = new HashSet<>();
@@ -175,7 +185,7 @@ public class SourceGenerator {
                     .map(bundleContext::getService).filter(sr -> classes.add(sr.getClass())).toList();
         } catch (InvalidSyntaxException e) {
             logger.warn("Failed to get thing actions: {}", e.getMessage());
-            return;
+            return null;
         }
 
         Template templateAction = cfg.getTemplate(TPL_LOCATION + "ThingAction.ftl");
@@ -208,10 +218,10 @@ public class SourceGenerator {
 
                 List<String> parametersType = Arrays.stream(method.getGenericParameterTypes())
                         .map(pt -> parseArgumentType(pt, classesToImport)).toList();
-                List<String> nonGenericParametersType = Arrays.stream(method.getParameterTypes())
-                        .map(pt -> parseArgumentType(pt, new HashSet<>())).toList();
+                List<String> parametersClass = Arrays.stream(method.getParameterTypes())
+                        .map(pt -> parseArgumentType(pt, classesToImport)).toList();
 
-                MethodDTO methodDTO = new MethodDTO(returnValue, name, parametersType, nonGenericParametersType);
+                MethodDTO methodDTO = new MethodDTO(returnValue, name, parametersType, parametersClass);
                 logger.trace("Found method '{}' with parameters '{}' and return value '{}'.", name, parametersType,
                         returnValue);
 
@@ -254,6 +264,7 @@ public class SourceGenerator {
         templateActionFactory.process(context, writer);
 
         sourceWriter.replaceHelperFileIfNotEqual(sourceWriter.getPackageName(GENERATED), "Actions", writer.toString());
+        return null;
     }
 
     /**
@@ -294,7 +305,9 @@ public class SourceGenerator {
         return friendlyFullType.toString();
     }
 
-    private void internalGenerateItems() throws IOException, TemplateException {
+    @Nullable
+    private Void internalGenerateItems() throws IOException, TemplateException {
+        logger.debug("Generating items");
         Collection<Item> items = itemRegistry.getItems();
         String packageName = sourceWriter.getPackageName(GENERATED);
 
@@ -309,9 +322,12 @@ public class SourceGenerator {
         template.process(context, writer);
 
         sourceWriter.replaceHelperFileIfNotEqual(packageName, "Items", writer.toString());
+        return null;
     }
 
-    private void internalGenerateThings() throws IOException, TemplateException {
+    @Nullable
+    private Void internalGenerateThings() throws IOException, TemplateException {
+        logger.debug("Generating things");
         Collection<Thing> things = thingRegistry.getAll();
         String packageName = sourceWriter.getPackageName(GENERATED);
 
@@ -330,6 +346,7 @@ public class SourceGenerator {
         template.process(context, writer);
 
         sourceWriter.replaceHelperFileIfNotEqual(packageName, "Things", writer.toString());
+        return null;
     }
 
     private static String capitalize(String minusString) {
@@ -349,11 +366,27 @@ public class SourceGenerator {
             List<String> nonGenericParameterTypes) {
     }
 
-    private interface InternalGenerator {
-        void generate() throws IOException, TemplateException;
-    }
+    public static class InternalGenerator {
+        private final Callable<@Nullable Void> generator;
+        private final String generatedFileName;
 
-    public void setStabilityGenerationWaitTime(Integer stabilityGenerationWaitTime) {
-        this.stabilityGenerationWaitTime = stabilityGenerationWaitTime;
+        public InternalGenerator(Callable<@Nullable Void> generator, String generatedFiledName) {
+            this.generator = generator;
+            this.generatedFileName = generatedFiledName;
+        }
+
+        void generate() throws IOException, TemplateException {
+            try {
+                generator.call();
+            } catch (IOException | TemplateException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IOException("Cannot generate " + generatedFileName, e);
+            }
+        }
+
+        String getGeneratedFileName() {
+            return generatedFileName;
+        };
     }
 }

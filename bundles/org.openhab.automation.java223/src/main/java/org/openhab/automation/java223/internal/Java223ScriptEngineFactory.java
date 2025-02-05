@@ -96,6 +96,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     private final SourceGenerator sourceGenerator;
     private final SourceWriter classWriter;
     private final DependencyGenerator dependencyGenerator;
+    private Integer writeGuardTime;
 
     private static final Set<ThingStatus> INITIALIZED = Set.of(ThingStatus.ONLINE, ThingStatus.OFFLINE,
             ThingStatus.UNKNOWN);
@@ -121,11 +122,12 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
 
         String additionalBundlesConfig = ConfigParser.valueAsOrElse(properties.get("additionalBundles"), String.class,
-                "");
+                "").trim();
         String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
-                "");
-        Integer initializationWaitTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"),
-                Integer.class, 10000);
+                "").trim();
+        writeGuardTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"), Integer.class,
+                10000);
+        Integer startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
         Integer scriptCacheSize = ConfigParser.valueAsOrElse(properties.get("scriptCacheSize"), Integer.class, 50);
         Boolean allowInstanceReuse = ConfigParser.valueAsOrElse(properties.get("allowInstanceReuse"), Boolean.class,
                 false);
@@ -144,10 +146,10 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                     bundleContext);
             classWriter = new SourceWriter(LIB_DIR);
             this.sourceGenerator = new SourceGenerator(classWriter, dependencyGenerator, itemRegistry, thingRegistry,
-                    bundleContext, initializationWaitTime);
-            sourceGenerator.generateThings();
-            sourceGenerator.generateActions();
-            sourceGenerator.generateItems();
+                    bundleContext);
+            sourceGenerator.generateThings(startupGuardTime);
+            sourceGenerator.generateActions(startupGuardTime);
+            sourceGenerator.generateItems(startupGuardTime);
             sourceGenerator.generateJava223Script();
             dependencyGenerator.createCoreDependencies();
             // When a lib is removed, SourceWriter should now because it may have to regenerate it
@@ -217,7 +219,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                 false);
 
         compiledScriptCache.setCacheSize(scriptCacheSize);
-        sourceGenerator.setStabilityGenerationWaitTime(stabilityGenerationWaitTime);
+        this.writeGuardTime = stabilityGenerationWaitTime;
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         dependencyGenerator.setAdditionalConfig(additionalBundlesConfig, additionalClassesConfig);
         dependencyGenerator.createCoreDependencies();
@@ -299,15 +301,15 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                     && INITIALIZED.contains(eventStatusInfoChange.getStatusInfo().getStatus()))
                     || (ThingStatus.UNINITIALIZED.equals(eventStatusInfoChange.getStatusInfo().getStatus())
                             && INITIALIZED.contains(eventStatusInfoChange.getOldStatusInfo().getStatus()))) {
-                sourceGenerator.generateActions();
+                sourceGenerator.generateActions(writeGuardTime);
             }
         } else if (ITEM_EVENTS.contains(eventType)) {
             logger.debug("Added/updated item: {}", event);
-            sourceGenerator.generateItems();
+            sourceGenerator.generateItems(writeGuardTime);
         } else if (THING_EVENTS.contains(eventType)) {
             logger.debug("Added/updated thing: {}", event);
-            sourceGenerator.generateThings();
-            sourceGenerator.generateActions();
+            sourceGenerator.generateThings(writeGuardTime);
+            sourceGenerator.generateActions(writeGuardTime);
         }
     }
 }
