@@ -9,6 +9,7 @@
 
 	<config-description>
 		<parameter name="scriptCacheSize" type="text">
+			<default>50</default>
 			<label>Script Cache Size</label>
 			<description>Script compilation cache size. 0 to disable. A positive number allows keeping compilation result.</description>
 		</parameter>
@@ -29,8 +30,15 @@
 			<advanced>true</advanced>
 			<label>Stability Generation Wait Time</label>
 			<description>Delay (in ms) before writing generated classes. Each new generation triggering event further delays the
-				generation. Especially useful at startup.</description>
+				generation. Useful to prevent multiple code generations when many Things activate at the same times.</description>
 			<default>10000</default>
+		</parameter>
+		<parameter name="startupGuardTime" type="integer">
+			<advanced>true</advanced>
+			<label>Startup Guard Time</label>
+			<description>Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files
+				from previous openHAB run with incomplete generation from a not fully loaded system.</description>
+			<default>60000</default>
 		</parameter>
 	</config-description>
 

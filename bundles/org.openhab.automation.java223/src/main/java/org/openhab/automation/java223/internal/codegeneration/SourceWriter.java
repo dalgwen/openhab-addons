@@ -78,8 +78,7 @@ public class SourceWriter implements WatchService.WatchEventListener {
         String key = packageName + "." + className;
 
         if (sourceHasChange(key, generatedClass)) {
-            String packageFolder = packageName.replaceAll("\\.", "/");
-            Path javaFile = folder.resolve(packageFolder + "/" + className + "." + Java223Constants.JAVA_FILE_TYPE);
+            Path javaFile = getPath(packageName, className);
 
             Files.createDirectories(javaFile.getParent());
             try (FileOutputStream outFile = new FileOutputStream(javaFile.toFile())) {
@@ -89,6 +88,11 @@ public class SourceWriter implements WatchService.WatchEventListener {
         } else {
             logger.debug("{} has not changed.", key);
         }
+    }
+
+    protected Path getPath(String packageName, String className) {
+        String packageFolder = packageName.replaceAll("\\.", "/");
+        return folder.resolve(packageFolder + "/" + className + "." + Java223Constants.JAVA_FILE_TYPE);
     }
 
     protected boolean sourceHasChange(String key, String newSource) {

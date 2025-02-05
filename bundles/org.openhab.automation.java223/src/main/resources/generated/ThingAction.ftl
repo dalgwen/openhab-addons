@@ -37,6 +37,9 @@ public class ${simpleClassName} {
     public ${method.returnValueType()} ${method.name()}(<#list method.parameterTypes() as parameter>${parameter} p${parameter?counter}<#sep>, </#list>) {
         if (thingActions == null) {
             thingActions = scriptThingActions.get(SCOPE, thingUID);
+            if (thingActions == null) {
+                throw new Java223Exception("Action is null. Thing " + thingUID + " may be of the wrong type, or not initialized ?");
+            }
         }
         
         try {
