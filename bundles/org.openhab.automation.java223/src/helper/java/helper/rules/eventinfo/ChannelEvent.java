@@ -14,6 +14,7 @@ package helper.rules.eventinfo;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.java223.common.InjectBinding;
+import org.openhab.core.thing.events.ChannelTriggeredEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
@@ -26,14 +27,13 @@ public class ChannelEvent extends EventInfo {
     protected @NonNullByDefault({}) String channelUUID;
 
     @InjectBinding
-    protected @NonNullByDefault({}) String event;
+    protected @NonNullByDefault({}) ChannelTriggeredEvent event;
 
     public String getChannelUUID() {
         return channelUUID;
     }
 
-    public String getEvent() {
+    public ChannelTriggeredEvent getEvent() {
         return event;
     }
-
 }

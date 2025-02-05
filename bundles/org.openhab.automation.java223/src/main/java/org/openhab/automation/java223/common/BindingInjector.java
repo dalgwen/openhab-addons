@@ -100,7 +100,7 @@ public class BindingInjector {
 
     @SuppressWarnings({ "null", "unused" })
     private static @Nullable Object extractBindingValueForElement(Class<?> sourceScript, Map<String, Object> bindings,
-            AnnotatedElement annotatedElement, Map<Class<?>, Object> libAlreadyInstanciated)
+            AnnotatedElement annotatedElement, Map<Class<?>, Object> libAlreadyInstantiated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 
         Class<?> fieldType;
@@ -130,20 +130,20 @@ public class BindingInjector {
                 return null;
             }
             // has it already been instantiated and stored in the store?
-            Object valueToInject = libAlreadyInstanciated.get(fieldType);
+            Object valueToInject = libAlreadyInstantiated.get(fieldType);
             if (valueToInject == null) { // not instantiated, create it
                 Constructor<?>[] constructors = fieldType.getDeclaredConstructors();
                 // use the empty constructor if available, or the first one
                 Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0)
                         .findFirst().orElseGet(() -> constructors[0]);
                 Object[] parameterValues = getParameterValuesFor(sourceScript, constructor, bindings,
-                        libAlreadyInstanciated);
+                        libAlreadyInstantiated);
                 valueToInject = constructor.newInstance(parameterValues);
                 if (valueToInject != null) { // cannot be null but null-check think so
                     // store it to avoid multiple instantiation
-                    libAlreadyInstanciated.put(fieldType, valueToInject);
+                    libAlreadyInstantiated.put(fieldType, valueToInject);
                     // and then also use injection into it
-                    injectBindingsInto(sourceScript, bindings, valueToInject, libAlreadyInstanciated);
+                    injectBindingsInto(sourceScript, bindings, valueToInject, libAlreadyInstantiated);
                 }
             }
             if (valueToInject != null) { // cannot be null but null-check think so
