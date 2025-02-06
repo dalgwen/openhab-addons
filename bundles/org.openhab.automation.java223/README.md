@@ -294,8 +294,19 @@ Tip : to access a remote OpenHAB installation, you can copy, use Webdav, a Samba
 
 <a id="examples"></a>
 
-# Examples
+# Configuration parameters
 
+| Parameter Name                 | Type    | Default | Label                           | Description |
+|--------------------------------|---------|---------|---------------------------------|-------------|
+| `scriptCacheSize`             | text    | 50      | Script Cache Size              | Script compilation cache size. 0 to disable. A positive number allows keeping compilation result. |
+| `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse     | Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware of concurrency issues. |
+| `additionalBundles`           | text    | -       | Additional Bundles              | Additional bundles exported for developing, concatenated by ",". |
+| `additionalClasses`           | text    | -       | Additional Classes              | Additional classes exported for developing, concatenated by ",". |
+| `stabilityGenerationWaitTime` | integer | 10000   | Stability Generation Wait Time  | Delay (in ms) before writing generated classes. Each new generation triggering event further delays the generation. Useful to prevent multiple code generations when many Things activate at the same time. |
+| `startupGuardTime`           | integer | 60000   | Startup Guard Time              | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system. |
+
+
+# Examples
 
 ## Lightning a bulb
 

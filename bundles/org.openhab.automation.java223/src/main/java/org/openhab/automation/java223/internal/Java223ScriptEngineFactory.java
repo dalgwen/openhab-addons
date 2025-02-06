@@ -121,10 +121,10 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.bundleContext = bundleContext;
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
 
-        String additionalBundlesConfig = ConfigParser.valueAsOrElse(properties.get("additionalBundles"), String.class,
-                "").trim();
-        String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
-                "").trim();
+        String additionalBundlesConfig = ConfigParser
+                .valueAsOrElse(properties.get("additionalBundles"), String.class, "").trim();
+        String additionalClassesConfig = ConfigParser
+                .valueAsOrElse(properties.get("additionalClasses"), String.class, "").trim();
         writeGuardTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"), Integer.class,
                 10000);
         Integer startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
