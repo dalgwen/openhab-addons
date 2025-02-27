@@ -191,7 +191,7 @@ public class BindingInjector {
                 String namePart = namePath.poll();
                 value = elementToParseAsMap.get(namePart);
                 if (value == null) {
-                    logger.debug("Cannot find an element with the key {}", namePart);
+                    logger.trace("Cannot find an element with the key {}", namePart);
                 }
             } else {
                 Field targetField;
