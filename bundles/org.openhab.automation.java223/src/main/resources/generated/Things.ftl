@@ -15,6 +15,7 @@ public class Things {
 <#if thing.getLabel()??>
     /** ${thing.getLabel()} */
 </#if>
+    @InjectBinding(enable = false)
     public static final String ${escapeName(thing.getUID())} = "${thing.getUID()}";
 
 </#list>
