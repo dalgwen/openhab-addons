@@ -93,6 +93,16 @@ public abstract class Java223Script {
      * You probably don't need this (you should use your object as a library and let this helper framework injects it)
      */
     public void injectBindings(Object objectToInjectInto) {
-        BindingInjector.injectBindingsInto(this.getClass(), bindings, objectToInjectInto);
+        BindingInjector.injectBindingsInto(this.getClass().getClassLoader(), bindings, objectToInjectInto);
+    }
+
+    /**
+     * Use this method to instantiate one of your library with all binding values injected, if you can't use auto injection.
+     * This can be especially useful for one-liner script, because they can't declare library as class member or method parameter.
+     * @param clazz
+     * @return The instantiated class
+     */
+    public <T> T createAndInjectBindings(Class<T> clazz) {
+        BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
     }
 }

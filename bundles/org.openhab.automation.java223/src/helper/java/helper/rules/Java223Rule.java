@@ -117,7 +117,11 @@ public class Java223Rule extends SimpleRule {
                         if (parameters[i].getType().equals(Action.class)) {
                             parameterValues[i] = module;
                         } else {
-                            parameterValues[i] = BindingInjector.extractBindingValueForElement(script.getClass(),
+                            ClassLoader classLoader = script.getClass().getClassLoader();
+                            if (classLoader == null) { // should not happen
+                                throw new Java223Exception("Cannot get class loader for " + script.getClass());
+                            }
+                            parameterValues[i] = BindingInjector.extractBindingValueForElement(classLoader,
                                     inputs, parameters[i]);
                         }
                     }
