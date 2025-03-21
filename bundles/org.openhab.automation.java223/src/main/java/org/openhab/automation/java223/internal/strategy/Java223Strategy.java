@@ -126,7 +126,11 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         Class<?> compiledClass = instance.getClass();
 
         // inject bindings data in the script
-        BindingInjector.injectBindingsInto(compiledClass, bindings, instance);
+        ClassLoader classLoader = compiledClass.getClassLoader();
+        if (classLoader == null) { // should not happen
+            throw new Java223Exception("Cannot get the classloader of " + compiledClass.getName());
+        }
+        BindingInjector.injectBindingsInto(classLoader, bindings, instance);
 
         // find methods to execute
         Optional<Object> returned = null;
@@ -134,7 +138,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             // methods with a special name, or methods with a special annotation
             if (METHOD_NAMES_TO_EXECUTE.contains(method.getName()) || method.getAnnotation(RunScript.class) != null) {
                 try {
-                    Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledClass, method, bindings,
+                    Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, method, bindings,
                             null);
                     var returnedLocal = method.invoke(instance, parameterValues);
                     // keep arbitrarily only the first returned value
@@ -291,8 +295,11 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
                 .orElseGet(() -> constructors[0]);
 
         try {
-            Object[] parameterValues = BindingInjector.getParameterValuesFor(compiledClass, constructor, bindings,
-                    null);
+            ClassLoader classLoader = compiledClass.getClassLoader();
+            if (classLoader == null) { // should not happen
+                throw new Java223Exception("Cannot get the classloader of " + compiledClass.getName());
+            }
+            Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
             Object compiledInstance = constructor.newInstance(parameterValues);
             if (compiledInstance == null) { // can't be null but null-check think so
                 throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
