@@ -1,19 +1,46 @@
+/**
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.binding.wyoming.internal.protocol.message.data;
 
 import java.util.List;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
+/**
+ * @author Gwendal Roulleau - Initial contribution
+ */
+@NonNullByDefault
 public class InfoData extends WyomingData {
 
+    @Nullable
     private List<Asr> asr;
+    @Nullable
     private List<Tts> tts;
+    @Nullable
     private List<Wake> wake;
+    @Nullable
     private List<Handle> handle;
+    @Nullable
     private List<Intent> intent;
+    @Nullable
     private Satellite satellite;
+    @Nullable
     private List<Mic> mic;
+    @Nullable
     private List<Snd> snd;
 
-    public List<Asr> getAsr() {
+    public @Nullable List<Asr> getAsr() {
         return asr;
     }
 
@@ -21,7 +48,7 @@ public class InfoData extends WyomingData {
         this.asr = asr;
     }
 
-    public List<Tts> getTts() {
+    public @Nullable List<Tts> getTts() {
         return tts;
     }
 
@@ -29,7 +56,7 @@ public class InfoData extends WyomingData {
         this.tts = tts;
     }
 
-    public List<Wake> getWake() {
+    public @Nullable List<Wake> getWake() {
         return wake;
     }
 
@@ -37,7 +64,7 @@ public class InfoData extends WyomingData {
         this.wake = wake;
     }
 
-    public List<Handle> getHandle() {
+    public @Nullable List<Handle> getHandle() {
         return handle;
     }
 
@@ -45,7 +72,7 @@ public class InfoData extends WyomingData {
         this.handle = handle;
     }
 
-    public List<Intent> getIntent() {
+    public @Nullable List<Intent> getIntent() {
         return intent;
     }
 
@@ -53,7 +80,7 @@ public class InfoData extends WyomingData {
         this.intent = intent;
     }
 
-    public Satellite getSatellite() {
+    public @Nullable Satellite getSatellite() {
         return satellite;
     }
 
@@ -61,7 +88,7 @@ public class InfoData extends WyomingData {
         this.satellite = satellite;
     }
 
-    public List<Mic> getMic() {
+    public @Nullable List<Mic> getMic() {
         return mic;
     }
 
@@ -69,7 +96,7 @@ public class InfoData extends WyomingData {
         this.mic = mic;
     }
 
-    public List<Snd> getSnd() {
+    public @Nullable List<Snd> getSnd() {
         return snd;
     }
 
@@ -79,21 +106,15 @@ public class InfoData extends WyomingData {
 
     @Override
     public String toString() {
-        return "InfoData{" +
-                "asr=" + asr +
-                ", tts=" + tts +
-                ", wake=" + wake +
-                ", handle=" + handle +
-                ", intent=" + intent +
-                ", satellite=" + satellite +
-                ", mic=" + mic +
-                ", snd=" + snd +
-                '}';
+        return "InfoData{" + "asr=" + asr + ", tts=" + tts + ", wake=" + wake + ", handle=" + handle + ", intent="
+                + intent + ", satellite=" + satellite + ", mic=" + mic + ", snd=" + snd + '}';
     }
 
     public static class Asr {
+        @Nullable
         private List<Model> models;
 
+        @Nullable
         public List<Model> getModels() {
             return models;
         }
@@ -104,15 +125,16 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Asr{" +
-                    "models=" + models +
-                    '}';
+            return "Asr{" + "models=" + models + '}';
         }
     }
 
     public static class Tts {
+
+        @Nullable
         private List<TtsModel> models;
 
+        @Nullable
         public List<TtsModel> getModels() {
             return models;
         }
@@ -123,27 +145,36 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Tts{" +
-                    "models=" + models +
-                    '}';
+            return "Tts{" + "models=" + models + '}';
         }
     }
 
     public static class Wake {
+
+        @Nullable
         private List<Model> models;
 
+        @Nullable
         public List<Model> getModels() {
             return models;
         }
 
         public void setModels(List<Model> models) {
             this.models = models;
+        }
+
+        @Override
+        public String toString() {
+            return "Wake{" + "models=" + models + '}';
         }
     }
 
     public static class Handle {
+
+        @Nullable
         private List<Model> models;
 
+        @Nullable
         public List<Model> getModels() {
             return models;
         }
@@ -154,15 +185,16 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Handle{" +
-                    "models=" + models +
-                    '}';
+            return "Handle{" + "models=" + models + '}';
         }
     }
 
     public static class Intent {
+
+        @Nullable
         private List<Model> models;
 
+        @Nullable
         public List<Model> getModels() {
             return models;
         }
@@ -173,20 +205,26 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Intent{" +
-                    "models=" + models +
-                    '}';
+            return "Intent{" + "models=" + models + '}';
         }
     }
 
     public static class Satellite {
+
+        @Nullable
         private String name;
+        @Nullable
         private String area;
+        @Nullable
         private Boolean hasVad;
+        @Nullable
         private List<String> activeWakeWords;
+        @Nullable
         private Integer maxActiveWakeWords;
+        @Nullable
         private Boolean supportsTrigger;
 
+        @Nullable
         public String getArea() {
             return area;
         }
@@ -195,6 +233,7 @@ public class InfoData extends WyomingData {
             this.area = area;
         }
 
+        @Nullable
         public Boolean getHasVad() {
             return hasVad;
         }
@@ -203,6 +242,7 @@ public class InfoData extends WyomingData {
             this.hasVad = hasVad;
         }
 
+        @Nullable
         public List<String> getActiveWakeWords() {
             return activeWakeWords;
         }
@@ -211,6 +251,7 @@ public class InfoData extends WyomingData {
             this.activeWakeWords = activeWakeWords;
         }
 
+        @Nullable
         public Integer getMaxActiveWakeWords() {
             return maxActiveWakeWords;
         }
@@ -219,6 +260,7 @@ public class InfoData extends WyomingData {
             this.maxActiveWakeWords = maxActiveWakeWords;
         }
 
+        @Nullable
         public Boolean getSupportsTrigger() {
             return supportsTrigger;
         }
@@ -227,6 +269,7 @@ public class InfoData extends WyomingData {
             this.supportsTrigger = supportsTrigger;
         }
 
+        @Nullable
         public String getName() {
             return name;
         }
@@ -237,20 +280,18 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Satellite{" +
-                    "name='" + name + '\'' +
-                    ", area='" + area + '\'' +
-                    ", hasVad=" + hasVad +
-                    ", activeWakeWords=" + activeWakeWords +
-                    ", maxActiveWakeWords=" + maxActiveWakeWords +
-                    ", supportsTrigger=" + supportsTrigger +
-                    '}';
+            return "Satellite{" + "name='" + name + '\'' + ", area='" + area + '\'' + ", hasVad=" + hasVad
+                    + ", activeWakeWords=" + activeWakeWords + ", maxActiveWakeWords=" + maxActiveWakeWords
+                    + ", supportsTrigger=" + supportsTrigger + '}';
         }
     }
 
     public static class Mic {
+
+        @Nullable
         private MicFormat micFormat;
 
+        @Nullable
         public MicFormat getMicFormat() {
             return micFormat;
         }
@@ -261,30 +302,29 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Mic{" +
-                    "micFormat=" + micFormat +
-                    '}';
+            return "Mic{" + "micFormat=" + micFormat + '}';
         }
 
         public static class MicFormat {
+            @Nullable
             private Integer rate;
+            @Nullable
             private Integer width;
+            @Nullable
             private Integer channels;
 
             @Override
             public String toString() {
-                return "MicFormat{" +
-                        "rate=" + rate +
-                        ", width=" + width +
-                        ", channels=" + channels +
-                        '}';
+                return "MicFormat{" + "rate=" + rate + ", width=" + width + ", channels=" + channels + '}';
             }
         }
     }
 
     public static class Snd {
+        @Nullable
         private SndFormat sndFormat;
 
+        @Nullable
         public SndFormat getSndFormat() {
             return sndFormat;
         }
@@ -295,35 +335,39 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Snd{" +
-                    "sndFormat=" + sndFormat +
-                    '}';
+            return "Snd{" + "sndFormat=" + sndFormat + '}';
         }
 
         public static class SndFormat {
+            @Nullable
             private Integer rate;
+            @Nullable
             private Integer width;
+            @Nullable
             private Integer channels;
 
             @Override
             public String toString() {
-                return "SndFormat{" +
-                        "rate=" + rate +
-                        ", width=" + width +
-                        ", channels=" + channels +
-                        '}';
+                return "SndFormat{" + "rate=" + rate + ", width=" + width + ", channels=" + channels + '}';
             }
         }
     }
 
     public static class Model {
+        @Nullable
         private String name;
+        @Nullable
         private List<String> languages;
+        @Nullable
         private Attribution attribution;
+        @Nullable
         private Boolean installed;
+        @Nullable
         private String description;
+        @Nullable
         private String version;
 
+        @Nullable
         public String getName() {
             return name;
         }
@@ -332,6 +376,7 @@ public class InfoData extends WyomingData {
             this.name = name;
         }
 
+        @Nullable
         public List<String> getLanguages() {
             return languages;
         }
@@ -340,6 +385,7 @@ public class InfoData extends WyomingData {
             this.languages = languages;
         }
 
+        @Nullable
         public Attribution getAttribution() {
             return attribution;
         }
@@ -348,6 +394,7 @@ public class InfoData extends WyomingData {
             this.attribution = attribution;
         }
 
+        @Nullable
         public Boolean getInstalled() {
             return installed;
         }
@@ -356,6 +403,7 @@ public class InfoData extends WyomingData {
             this.installed = installed;
         }
 
+        @Nullable
         public String getDescription() {
             return description;
         }
@@ -364,6 +412,7 @@ public class InfoData extends WyomingData {
             this.description = description;
         }
 
+        @Nullable
         public String getVersion() {
             return version;
         }
@@ -374,33 +423,29 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "Model{" +
-                    "name='" + name + '\'' +
-                    ", languages=" + languages +
-                    ", attribution=" + attribution +
-                    ", installed=" + installed +
-                    ", description='" + description + '\'' +
-                    ", version='" + version + '\'' +
-                    '}';
+            return "Model{" + "name='" + name + '\'' + ", languages=" + languages + ", attribution=" + attribution
+                    + ", installed=" + installed + ", description='" + description + '\'' + ", version='" + version
+                    + '\'' + '}';
         }
 
         public static class Attribution {
+            @Nullable
             private String name;
+            @Nullable
             private String url;
 
             @Override
             public String toString() {
-                return "Attribution{" +
-                        "name='" + name + '\'' +
-                        ", url='" + url + '\'' +
-                        '}';
+                return "Attribution{" + "name='" + name + '\'' + ", url='" + url + '\'' + '}';
             }
         }
     }
 
     public static class TtsModel extends Model {
+        @Nullable
         private List<Speaker> speakers;
 
+        @Nullable
         public List<Speaker> getSpeakers() {
             return speakers;
         }
@@ -411,19 +456,16 @@ public class InfoData extends WyomingData {
 
         @Override
         public String toString() {
-            return "TtsModel{" +
-                    "speakers=" + speakers +
-                    '}';
+            return "TtsModel{" + "speakers=" + speakers + '}';
         }
 
         public static class Speaker {
+            @Nullable
             private String name;
 
             @Override
             public String toString() {
-                return "Speaker{" +
-                        "name='" + name + '\'' +
-                        '}';
+                return "Speaker{" + "name='" + name + '\'' + '}';
             }
         }
     }

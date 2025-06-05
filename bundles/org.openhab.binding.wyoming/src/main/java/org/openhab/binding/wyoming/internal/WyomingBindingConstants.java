@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -29,4 +29,9 @@ public class WyomingBindingConstants {
     // List of all Thing Type UIDs
     public static final ThingTypeUID THING_TYPE_SERVICE = new ThingTypeUID(BINDING_ID, "service");
 
+    public static final String THING_PROPERTY_SND = "capability_sound";
+    public static final String THING_PROPERTY_MIC = "capability_microphone";
+    public static final String THING_PROPERTY_WAKE = "capability_wakeword";
+    public static final String THING_PROPERTY_STT = "capability_speechtotext";
+    public static final String THING_PROPERTY_TTS = "capability_texttospeech";
 }

@@ -1,14 +1,33 @@
+/**
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.binding.wyoming.internal.protocol.message;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.wyoming.internal.protocol.message.data.AudioChunkData;
 import org.openhab.binding.wyoming.internal.protocol.message.data.AudioStartData;
 import org.openhab.binding.wyoming.internal.protocol.message.data.AudioStopData;
 import org.openhab.binding.wyoming.internal.protocol.message.data.DescribeData;
-import org.openhab.binding.wyoming.internal.protocol.message.data.RunSatelliteData;
-import org.openhab.binding.wyoming.internal.protocol.message.data.WyomingData;
 import org.openhab.binding.wyoming.internal.protocol.message.data.InfoData;
 import org.openhab.binding.wyoming.internal.protocol.message.data.NotImplementedData;
+import org.openhab.binding.wyoming.internal.protocol.message.data.RunPipelineData;
+import org.openhab.binding.wyoming.internal.protocol.message.data.RunSatelliteData;
+import org.openhab.binding.wyoming.internal.protocol.message.data.WyomingData;
 
+/**
+ * @author Gwendal Roulleau - Initial contribution
+ */
+@NonNullByDefault
 public enum MessageType {
 
     AudioChunk("audio-chunk", AudioChunkData.class),
@@ -36,9 +55,8 @@ public enum MessageType {
     SatelliteDisconnected("satellite-disconnected", NotImplementedData.class),
     StreamingStarted("streaming-started", NotImplementedData.class),
     StreamingStopped("streaming-stopped", NotImplementedData.class),
-    RunPipeline("run-pipeline", NotImplementedData.class),
+    RunPipeline("run-pipeline", RunPipelineData.class),
     TooMuchPayload("too-much-payload", NotImplementedData.class);
-
 
     final String stringRepresentation;
     private final Class<? extends WyomingData> relatedClass;
@@ -52,6 +70,7 @@ public enum MessageType {
         return relatedClass;
     }
 
+    @Nullable
     public static MessageType fromRelatedClass(Class<? extends WyomingData> relatedClass) {
         for (MessageType type : MessageType.values()) {
             if (type.relatedClass.equals(relatedClass)) {
@@ -61,6 +80,7 @@ public enum MessageType {
         return null;
     }
 
+    @Nullable
     public static MessageType fromString(String stringRepresentation) {
         for (MessageType type : MessageType.values()) {
             if (type.stringRepresentation.equals(stringRepresentation)) {
@@ -70,5 +90,3 @@ public enum MessageType {
         return null;
     }
 }
-
-

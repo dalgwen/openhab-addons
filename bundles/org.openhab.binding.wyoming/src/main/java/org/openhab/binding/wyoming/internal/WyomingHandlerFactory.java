@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -33,7 +33,8 @@ import org.osgi.service.component.annotations.Component;
 @Component(configurationPid = "binding.wyoming", service = ThingHandlerFactory.class)
 public class WyomingHandlerFactory extends BaseThingHandlerFactory {
 
-    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_SAMPLE);
+    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set
+            .of(WyomingBindingConstants.THING_TYPE_SERVICE);
 
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
@@ -44,8 +45,8 @@ public class WyomingHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
-        if (THING_TYPE_SAMPLE.equals(thingTypeUID)) {
-            return new WyomingHandler(thing);
+        if (SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID)) {
+            return new WyomingHandler(thing, bundleContext);
         }
 
         return null;

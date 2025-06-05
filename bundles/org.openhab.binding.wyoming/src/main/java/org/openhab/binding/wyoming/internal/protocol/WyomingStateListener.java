@@ -10,26 +10,24 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.wyoming.internal.protocol.message.data;
+package org.openhab.binding.wyoming.internal.protocol;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
+ * Implements this interface to receive Wyoming states
+ * 
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class AudioStopData extends WyomingData {
+public interface WyomingStateListener {
 
-    @Nullable
-    private Integer timestamp; // Timestamp in milliseconds (optional)
-
-    @Nullable
-    public Integer getTimestamp() {
-        return timestamp;
+    public enum WyomingState {
+        Ready,
+        Disconnected,
+        ProtocolError
     }
 
-    public void setTimestamp(Integer timestamp) {
-        this.timestamp = timestamp;
-    }
+    public void onState(WyomingState state, @Nullable String detailedMessage);
 }

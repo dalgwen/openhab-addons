@@ -1,10 +1,30 @@
+/**
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.binding.wyoming.internal.protocol.message.data;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
+/**
+ * @author Gwendal Roulleau - Initial contribution
+ */
+@NonNullByDefault
 public class AudioChunkData extends WyomingData {
 
-    private int rate;          // sample rate in Hertz (required)
-    private int width;         // sample width in bytes (required)
-    private int channels;      // number of channels (required)
+    private int rate; // sample rate in Hertz (required)
+    private int width; // sample width in bytes (required)
+    private int channels; // number of channels (required)
+    @Nullable
     private Integer timestamp; // timestamp of audio chunk in milliseconds (optional)
 
     public AudioChunkData(int rate, int width, int channels) {
@@ -37,6 +57,7 @@ public class AudioChunkData extends WyomingData {
         this.channels = channels;
     }
 
+    @Nullable
     public Integer getTimestamp() {
         return timestamp;
     }
@@ -47,11 +68,7 @@ public class AudioChunkData extends WyomingData {
 
     @Override
     public String toString() {
-        return "AudioChunk{" +
-                "rate=" + rate +
-                ", width=" + width +
-                ", channels=" + channels +
-                ", timestamp=" + timestamp +
-                '}';
+        return "AudioChunk{" + "rate=" + rate + ", width=" + width + ", channels=" + channels + ", timestamp="
+                + timestamp + '}';
     }
 }
