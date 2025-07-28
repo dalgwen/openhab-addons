@@ -16,13 +16,13 @@ import java.io.IOException;
 import java.util.Hashtable;
 import java.util.Optional;
 
+import net.iot.wyoming.WyomingClient;
+import net.iot.wyoming.WyomingProtocolException;
+import net.iot.wyoming.WyomingStateListener;
+import net.iot.wyoming.message.data.InfoData;
+import net.iot.wyoming.sound.SoundManager;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.wyoming.internal.protocol.WyomingClient;
-import org.openhab.binding.wyoming.internal.protocol.WyomingProtocolException;
-import org.openhab.binding.wyoming.internal.protocol.WyomingStateListener;
-import org.openhab.binding.wyoming.internal.protocol.message.data.InfoData;
-import org.openhab.binding.wyoming.internal.protocol.sound.SoundManager;
 import org.openhab.core.audio.AudioSink;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;

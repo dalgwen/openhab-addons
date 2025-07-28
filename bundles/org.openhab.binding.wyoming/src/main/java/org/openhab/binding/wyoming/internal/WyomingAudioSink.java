@@ -19,10 +19,10 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+import net.iot.wyoming.WyomingProtocolException;
+import net.iot.wyoming.sound.SoundManager;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.wyoming.internal.protocol.WyomingProtocolException;
-import org.openhab.binding.wyoming.internal.protocol.sound.SoundManager;
 import org.openhab.core.audio.AudioFormat;
 import org.openhab.core.audio.AudioSinkAsync;
 import org.openhab.core.audio.AudioStream;

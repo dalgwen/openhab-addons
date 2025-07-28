@@ -16,6 +16,11 @@
 
   <dependencies>
     <dependency>
+      <version>1.0-SNAPSHOT</version>
+      <groupId>net.iot.wyoming</groupId>
+      <artifactId>wyoming-java</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.googlecode.soundlibs</groupId>
       <artifactId>mp3spi</artifactId>
       <version>1.9.5.4</version>
