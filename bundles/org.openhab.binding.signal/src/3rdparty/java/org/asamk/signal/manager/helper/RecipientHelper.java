@@ -10,13 +10,14 @@ import org.signal.libsignal.usernames.BaseUsernameException;
 import org.signal.libsignal.usernames.Username;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.cds.CdsiV2Service;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.ServiceId.ACI;
 import org.whispersystems.signalservice.api.push.ServiceId.PNI;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.exceptions.CdsiInvalidArgumentException;
 import org.whispersystems.signalservice.api.push.exceptions.CdsiInvalidTokenException;
-import org.whispersystems.signalservice.api.services.CdsiV2Service;
+import org.whispersystems.signalservice.api.push.exceptions.NonSuccessfulResponseCodeException;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -25,8 +26,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.asamk.signal.manager.config.ServiceConfig.MAXIMUM_ONE_OFF_REQUEST_SIZE;
+import static org.asamk.signal.manager.util.Utils.handleResponseException;
 
 public class RecipientHelper {
 
@@ -66,7 +69,7 @@ public class RecipientHelper {
                 .toSignalServiceAddress();
     }
 
-    public Set<RecipientId> resolveRecipients(Collection<RecipientIdentifier.Single> recipients) throws UnregisteredRecipientException {
+    public Set<RecipientId> resolveRecipients(Collection<RecipientIdentifier.Single> recipients) throws UnregisteredRecipientException, IOException {
         final var recipientIds = new HashSet<RecipientId>(recipients.size());
         for (var number : recipients) {
             final var recipientId = resolveRecipient(number);
@@ -76,12 +79,11 @@ public class RecipientHelper {
     }
 
     public RecipientId resolveRecipient(final RecipientIdentifier.Single recipient) throws UnregisteredRecipientException {
-        if (recipient instanceof RecipientIdentifier.Uuid uuidRecipient) {
-            return account.getRecipientResolver().resolveRecipient(ACI.from(uuidRecipient.uuid()));
-        } else if (recipient instanceof RecipientIdentifier.Pni pniRecipient) {
-            return account.getRecipientResolver().resolveRecipient(PNI.from(pniRecipient.pni()));
-        } else if (recipient instanceof RecipientIdentifier.Number numberRecipient) {
-            final var number = numberRecipient.number();
+        if (recipient instanceof RecipientIdentifier.Uuid(UUID uuid)) {
+            return account.getRecipientResolver().resolveRecipient(ACI.from(uuid));
+        } else if (recipient instanceof RecipientIdentifier.Pni(UUID pni)) {
+            return account.getRecipientResolver().resolveRecipient(PNI.from(pni));
+        } else if (recipient instanceof RecipientIdentifier.Number(String number)) {
             return account.getRecipientStore().resolveRecipientByNumber(number, () -> {
                 try {
                     return getRegisteredUserByNumber(number);
@@ -89,9 +91,12 @@ public class RecipientHelper {
                     return null;
                 }
             });
-        } else if (recipient instanceof RecipientIdentifier.Username usernameRecipient) {
-            var username = usernameRecipient.username();
-            return resolveRecipientByUsernameOrLink(username, false);
+        } else if (recipient instanceof RecipientIdentifier.Username(String username)) {
+            try {
+                return resolveRecipientByUsernameOrLink(username, false);
+            } catch (Exception e) {
+                return null;
+            }
         }
         throw new AssertionError("Unexpected RecipientIdentifier: " + recipient);
     }
@@ -99,7 +104,7 @@ public class RecipientHelper {
     public RecipientId resolveRecipientByUsernameOrLink(
             String username,
             boolean forceRefresh
-    ) throws UnregisteredRecipientException {
+    ) throws UnregisteredRecipientException, IOException {
         final Username finalUsername;
         try {
             finalUsername = getUsernameFromUsernameOrLink(username);
@@ -108,18 +113,22 @@ public class RecipientHelper {
         }
         if (forceRefresh) {
             try {
-                final var aci = dependencies.getAccountManager().getAciByUsername(finalUsername);
+                final var aci = handleResponseException(dependencies.getUsernameApi().getAciByUsername(finalUsername));
                 return account.getRecipientStore().resolveRecipientTrusted(aci, finalUsername.getUsername());
-            } catch (IOException e) {
-                throw new UnregisteredRecipientException(new org.asamk.signal.manager.api.RecipientAddress(null,
-                        null,
-                        null,
-                        username));
+            } catch (NonSuccessfulResponseCodeException e) {
+                if (e.code == 404) {
+                    throw new UnregisteredRecipientException(new org.asamk.signal.manager.api.RecipientAddress(null,
+                            null,
+                            null,
+                            username));
+                }
+                logger.debug("Failed to get uuid for username: {}", username, e);
+                throw e;
             }
         }
         return account.getRecipientStore().resolveRecipientByUsername(finalUsername.getUsername(), () -> {
             try {
-                return dependencies.getAccountManager().getAciByUsername(finalUsername);
+                return handleResponseException(dependencies.getUsernameApi().getAciByUsername(finalUsername));
             } catch (Exception e) {
                 return null;
             }
@@ -130,8 +139,8 @@ public class RecipientHelper {
         try {
             final var usernameLinkUrl = UsernameLinkUrl.fromUri(username);
             final var components = usernameLinkUrl.getComponents();
-            final var encryptedUsername = dependencies.getAccountManager()
-                    .getEncryptedUsernameFromLinkServerId(components.getServerId());
+            final var encryptedUsername = handleResponseException(dependencies.getUsernameApi()
+                    .getEncryptedUsernameFromLinkServerId(components.getServerId()));
             final var link = new Username.UsernameLink(components.getEntropy(), encryptedUsername);
 
             return Username.fromLink(link);
@@ -144,8 +153,8 @@ public class RecipientHelper {
         try {
             return Optional.of(resolveRecipient(recipient));
         } catch (UnregisteredRecipientException e) {
-            if (recipient instanceof RecipientIdentifier.Number r) {
-                return account.getRecipientStore().resolveRecipientByNumberOptional(r.number());
+            if (recipient instanceof RecipientIdentifier.Number(String number)) {
+                return account.getRecipientStore().resolveRecipientByNumberOptional(number);
             } else {
                 return Optional.empty();
             }
@@ -234,8 +243,8 @@ public class RecipientHelper {
 
         final CdsiV2Service.Response response;
         try {
-            response = dependencies.getAccountManager()
-                    .getRegisteredUsersWithCdsi(token.isEmpty() ? Set.of() : previousNumbers,
+            response = handleResponseException(dependencies.getCdsApi()
+                    .getRegisteredUsers(token.isEmpty() ? Set.of() : previousNumbers,
                             newNumbers,
                             account.getRecipientStore().getServiceIdToProfileKeyMap(),
                             token,
@@ -256,7 +265,7 @@ public class RecipientHelper {
                                     account.setCdsiToken(newToken);
                                     account.setLastRecipientsRefresh(System.currentTimeMillis());
                                 }
-                            });
+                            }));
         } catch (CdsiInvalidTokenException | CdsiInvalidArgumentException e) {
             account.setCdsiToken(null);
             account.getCdsiStore().clearAll();

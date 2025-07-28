@@ -116,7 +116,7 @@ public class SignalAccount implements Closeable {
     private static final Logger logger = LoggerFactory.getLogger(SignalAccount.class);
 
     private static final int MINIMUM_STORAGE_VERSION = 1;
-    private static final int CURRENT_STORAGE_VERSION = 9;
+    private static final int CURRENT_STORAGE_VERSION = 10;
 
     private final Object LOCK = new Object();
 
@@ -827,6 +827,7 @@ public class SignalAccount implements Closeable {
 
         if (legacySignalProtocolStore != null && legacySignalProtocolStore.getLegacyPreKeyStore() != null) {
             logger.debug("Migrating legacy pre key store.");
+            aciAccountData.getPreKeyStore().removeAllPreKeys();
             for (var entry : legacySignalProtocolStore.getLegacyPreKeyStore().getPreKeys().entrySet()) {
                 try {
                     aciAccountData.getPreKeyStore().storePreKey(entry.getKey(), new PreKeyRecord(entry.getValue()));
@@ -838,6 +839,7 @@ public class SignalAccount implements Closeable {
 
         if (legacySignalProtocolStore != null && legacySignalProtocolStore.getLegacySignedPreKeyStore() != null) {
             logger.debug("Migrating legacy signed pre key store.");
+            aciAccountData.getSignedPreKeyStore().removeAllSignedPreKeys();
             for (var entry : legacySignalProtocolStore.getLegacySignedPreKeyStore().getSignedPreKeys().entrySet()) {
                 try {
                     aciAccountData.getSignedPreKeyStore()
@@ -1550,9 +1552,7 @@ public class SignalAccount implements Closeable {
             return key;
         }
 
-        pinMasterKey = KeyUtils.createMasterKey();
-        save();
-        return pinMasterKey;
+        return getOrCreateAccountEntropyPool().deriveMasterKey();
     }
 
     private MasterKey getMasterKey() {

@@ -37,7 +37,7 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
 
     private static final Logger logger = LoggerFactory.getLogger(ContactRecordProcessor.class);
 
-    private static final Pattern E164_PATTERN = Pattern.compile("^\\+[1-9]\\d{0,18}$");
+    private static final Pattern E164_PATTERN = Pattern.compile("^\\+[1-9]\\d{6,18}$");
 
     private final ACI selfAci;
     private final PNI selfPni;
@@ -172,7 +172,7 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
             e164 = firstNonEmpty(remote.e164, local.e164);
         }
 
-        final var mergedBuilder = SignalContactRecord.Companion.newBuilder(remote.unknownFields().toByteArray())
+        final var mergedBuilder = remote.newBuilder()
                 .aci(local.aci.isEmpty() ? remote.aci : local.aci)
                 .e164(e164)
                 .pni(pni)
@@ -195,7 +195,8 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                 .hidden(remote.hidden)
                 .pniSignatureVerified(remote.pniSignatureVerified || local.pniSignatureVerified)
                 .nickname(remote.nickname)
-                .note(remote.note);
+                .note(remote.note)
+                .avatarColor(remote.avatarColor);
         final var merged = mergedBuilder.build();
 
         final var matchesRemote = doProtosMatch(merged, remote);
@@ -267,10 +268,16 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
                     .withGivenName(nullIfEmpty(contactProto.systemGivenName))
                     .withFamilyName(nullIfEmpty(contactProto.systemFamilyName))
                     .withNickName(nullIfEmpty(contactProto.systemNickname))
-                    .withNickNameGivenName(nullIfEmpty(contactProto.givenName))
-                    .withNickNameFamilyName(nullIfEmpty(contactProto.familyName))
+                    .withNickNameGivenName(nullIfEmpty(contactProto.nickname == null
+                            ? null
+                            : contactProto.nickname.given))
+                    .withNickNameFamilyName(nullIfEmpty(contactProto.nickname == null
+                            ? null
+                            : contactProto.nickname.family))
                     .withNote(nullIfEmpty(contactProto.note))
-                    .withUnregisteredTimestamp(contactProto.unregisteredAtTimestamp);
+                    .withUnregisteredTimestamp(contactProto.unregisteredAtTimestamp == 0
+                            ? null
+                            : contactProto.unregisteredAtTimestamp);
             account.getRecipientStore().storeContact(connection, recipientId, newContact.build());
         }
 

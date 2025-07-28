@@ -934,7 +934,7 @@ public class RecipientStore implements RecipientIdCreator, RecipientResolver, Re
     }
 
     public void markUndiscoverablePossiblyUnregistered(final Set<String> numbers) {
-        logger.debug("Marking {} numbers as unregistered", numbers.size());
+        logger.debug("Marking {} numbers as undiscoverable", numbers.size());
         try (final var connection = database.getConnection()) {
             connection.setAutoCommit(false);
             for (final var number : numbers) {
@@ -994,7 +994,12 @@ public class RecipientStore implements RecipientIdCreator, RecipientResolver, Re
     ) throws SQLException {
         markUnregistered(connection, recipientId);
         final var address = resolveRecipientAddress(connection, recipientId);
-        if (address.aci().isPresent() && address.pni().isPresent()) {
+        final var needSplit = address.aci().isPresent() && address.pni().isPresent();
+        logger.trace("Marking unregistered recipient {} as unregistered (and split={}): {}",
+                recipientId,
+                needSplit,
+                address);
+        if (needSplit) {
             final var numberAddress = new RecipientAddress(address.pni().get(), address.number().orElse(null));
             updateRecipientAddress(connection, recipientId, address.removeIdentifiersFrom(numberAddress));
             addNewRecipient(connection, numberAddress);

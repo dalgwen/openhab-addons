@@ -39,7 +39,7 @@ public class MergeRecipientHelper {
                     )
             ) || recipient.address().aci().equals(address.aci())) {
                 logger.debug("Got existing recipient {}, updating with high trust address", recipient.id());
-                store.updateRecipientAddress(recipient.id(), recipient.address().withIdentifiersFrom(address));
+                store.updateRecipientAddress(recipient.id(), address.withOtherIdentifiersFrom(recipient.address()));
                 return new Pair<>(recipient.id(), List.of());
             }
 
@@ -83,24 +83,25 @@ public class MergeRecipientHelper {
             recipientsToBeStripped.add(recipient);
         }
 
-        logger.debug("Got separate recipients for high trust identifiers {}, need to merge ({}) and strip ({})",
+        logger.debug("Got separate recipients for high trust identifiers {}, need to merge ({}, {}) and strip ({})",
                 address,
-                recipientsToBeMerged.stream().map(r -> r.id().toString()).collect(Collectors.joining(", ")),
-                recipientsToBeStripped.stream().map(r -> r.id().toString()).collect(Collectors.joining(", ")));
+                resultingRecipient.map(RecipientWithAddress::address),
+                recipientsToBeMerged.stream().map(r -> r.address().toString()).collect(Collectors.joining(", ")),
+                recipientsToBeStripped.stream().map(r -> r.address().toString()).collect(Collectors.joining(", ")));
 
         RecipientAddress finalAddress = resultingRecipient.map(RecipientWithAddress::address).orElse(null);
         for (final var recipient : recipientsToBeMerged) {
             if (finalAddress == null) {
                 finalAddress = recipient.address();
             } else {
-                finalAddress = finalAddress.withIdentifiersFrom(recipient.address());
+                finalAddress = finalAddress.withOtherIdentifiersFrom(recipient.address());
             }
             store.removeRecipientAddress(recipient.id());
         }
         if (finalAddress == null) {
             finalAddress = address;
         } else {
-            finalAddress = finalAddress.withIdentifiersFrom(address);
+            finalAddress = address.withOtherIdentifiersFrom(finalAddress);
         }
 
         for (final var recipient : recipientsToBeStripped) {

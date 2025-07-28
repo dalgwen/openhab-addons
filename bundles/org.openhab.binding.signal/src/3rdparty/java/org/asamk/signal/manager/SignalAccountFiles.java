@@ -2,6 +2,7 @@ package org.asamk.signal.manager;
 
 import org.asamk.signal.manager.api.AccountCheckException;
 import org.asamk.signal.manager.api.NotRegisteredException;
+import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.ServiceEnvironment;
 import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
@@ -14,13 +15,16 @@ import org.asamk.signal.manager.internal.RegistrationManagerImpl;
 import org.asamk.signal.manager.storage.SignalAccount;
 import org.asamk.signal.manager.storage.accounts.AccountsStore;
 import org.asamk.signal.manager.util.KeyUtils;
+import org.eclipse.jdt.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.exceptions.DeprecatedVersionException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -63,19 +67,28 @@ public class SignalAccountFiles {
         return accountsStore.getAllNumbers();
     }
 
-    public MultiAccountManager initMultiAccountManager() throws IOException {
-        final var managers = accountsStore.getAllAccounts().parallelStream().map(a -> {
+    public MultiAccountManager initMultiAccountManager() throws IOException, AccountCheckException {
+        final List<Pair<Manager, Throwable>> managerPairs = (List<Pair<Manager, Throwable>>) accountsStore.getAllAccounts().parallelStream().map(a -> {
             try {
-                return initManager(a.number(), a.path());
-            } catch (NotRegisteredException | IOException | AccountCheckException e) {
+                return Optional.of(new Pair<Manager, Throwable>(initManager(a.number(), a.path()), null));
+            } catch (NotRegisteredException e) {
                 logger.warn("Ignoring {}: {} ({})", a.number(), e.getMessage(), e.getClass().getSimpleName());
-                return null;
-            } catch (Throwable e) {
+                return Optional.<Pair<Manager, Throwable>>empty();
+            } catch (AccountCheckException | IOException e) {
                 logger.error("Failed to load {}: {} ({})", a.number(), e.getMessage(), e.getClass().getSimpleName());
+                return Optional.of(new Pair<Manager, Throwable>(null, e));
+            }
+        }).filter(Optional::isPresent).map(Optional::get).toList();
+
+        for (final var pair : managerPairs) {
+            if (pair.second() instanceof IOException e) {
+                throw e;
+            } else if (pair.second() instanceof AccountCheckException e) {
                 throw e;
             }
-        }).filter(Objects::nonNull).toList();
+        }
 
+        final var managers = managerPairs.stream().map(Pair::first).toList();
         return new MultiAccountManagerImpl(managers, this);
     }
 

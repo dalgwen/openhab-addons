@@ -9,6 +9,7 @@ import org.asamk.signal.manager.util.IOUtils;
 import org.signal.libsignal.protocol.InvalidMessageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.whispersystems.signalservice.api.crypto.AttachmentCipherInputStream;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentPointer;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentStream;
@@ -44,14 +45,20 @@ public class AttachmentHelper {
     }
 
     public List<SignalServiceAttachment> uploadAttachments(final List<String> attachments) throws AttachmentInvalidException, IOException {
-        var attachmentStreams = createAttachmentStreams(attachments);
+        final var attachmentStreams = createAttachmentStreams(attachments);
 
-        // Upload attachments here, so we only upload once even for multiple recipients
-        var attachmentPointers = new ArrayList<SignalServiceAttachment>(attachmentStreams.size());
-        for (var attachmentStream : attachmentStreams) {
-            attachmentPointers.add(uploadAttachment(attachmentStream));
+        try {
+            // Upload attachments here, so we only upload once even for multiple recipients
+            final var attachmentPointers = new ArrayList<SignalServiceAttachment>(attachmentStreams.size());
+            for (final var attachmentStream : attachmentStreams) {
+                attachmentPointers.add(uploadAttachment(attachmentStream));
+            }
+            return attachmentPointers;
+        } finally {
+            for (final var attachmentStream : attachmentStreams) {
+                attachmentStream.close();
+            }
         }
-        return attachmentPointers;
     }
 
     private List<SignalServiceAttachmentStream> createAttachmentStreams(List<String> attachments) throws AttachmentInvalidException, IOException {
@@ -132,9 +139,15 @@ public class AttachmentHelper {
             SignalServiceAttachmentPointer pointer,
             File tmpFile
     ) throws IOException {
+        if (pointer.getDigest().isEmpty()) {
+            throw new IOException("Attachment pointer has no digest.");
+        }
         try {
             return dependencies.getMessageReceiver()
-                    .retrieveAttachment(pointer, tmpFile, ServiceConfig.MAX_ATTACHMENT_SIZE);
+                    .retrieveAttachment(pointer,
+                            tmpFile,
+                            ServiceConfig.MAX_ATTACHMENT_SIZE,
+                            AttachmentCipherInputStream.IntegrityCheck.forEncryptedDigest(pointer.getDigest().get()));
         } catch (MissingConfigurationException | InvalidMessageException e) {
             throw new IOException(e);
         }
