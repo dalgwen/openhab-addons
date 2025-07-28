@@ -1,19 +1,18 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>org.openhab.addons.bundles</groupId>
     <artifactId>org.openhab.addons.reactor.bundles</artifactId>
-    <version>4.3.0</version>
+    <version>5.0.0</version>
   </parent>
 
   <artifactId>org.openhab.automation.java223</artifactId>
 
   <name>openHAB Add-ons :: Bundles :: Automation :: Java Scripting</name>
-
 
   <dependencies>
     <dependency>
@@ -56,12 +55,13 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
-          <execution> <!-- Create the helper library and put it in the target class directory to be embedded inside the jar -->
+          <execution>
+            <!-- Create the helper library and put it in the target class directory to be embedded inside the jar -->
             <id>create-helper-jar</id>
-            <phase>compile</phase>
             <goals>
               <goal>jar</goal>
             </goals>
+            <phase>compile</phase>
             <configuration>
               <finalName>helper</finalName>
               <classifier>lib</classifier>
@@ -73,10 +73,10 @@
           </execution>
           <execution>
             <id>default-jar</id>
-            <phase>package</phase>
             <goals>
               <goal>jar</goal>
             </goals>
+            <phase>package</phase>
             <configuration>
               <excludes>
                 <exclude>helper/**</exclude>
