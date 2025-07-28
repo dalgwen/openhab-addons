@@ -4,7 +4,7 @@ import org.asamk.signal.manager.storage.SignalAccount;
 import org.signal.libsignal.protocol.IdentityKey;
 import org.signal.libsignal.protocol.IdentityKeyPair;
 import org.signal.libsignal.protocol.InvalidKeyException;
-import org.signal.libsignal.protocol.ecc.Curve;
+import org.signal.libsignal.protocol.ecc.ECKeyPair;
 import org.signal.libsignal.protocol.ecc.ECPrivateKey;
 import org.signal.libsignal.protocol.kem.KEMKeyPair;
 import org.signal.libsignal.protocol.kem.KEMKeyType;
@@ -15,7 +15,6 @@ import org.signal.libsignal.zkgroup.InvalidInputException;
 import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.whispersystems.signalservice.api.account.PreKeyCollection;
 import org.whispersystems.signalservice.api.backup.MediaRootBackupKey;
-import org.whispersystems.signalservice.api.kbs.MasterKey;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -34,8 +33,8 @@ public class KeyUtils {
 
     public static IdentityKeyPair getIdentityKeyPair(byte[] publicKeyBytes, byte[] privateKeyBytes) {
         try {
-            IdentityKey publicKey = new IdentityKey(publicKeyBytes);
-            ECPrivateKey privateKey = Curve.decodePrivatePoint(privateKeyBytes);
+            final var publicKey = new IdentityKey(publicKeyBytes);
+            final var privateKey = new ECPrivateKey(privateKeyBytes);
 
             return new IdentityKeyPair(publicKey, privateKey);
         } catch (InvalidKeyException e) {
@@ -44,7 +43,7 @@ public class KeyUtils {
     }
 
     public static IdentityKeyPair generateIdentityKeyPair() {
-        var djbKeyPair = Curve.generateKeyPair();
+        var djbKeyPair = ECKeyPair.generate();
         var djbIdentityKey = new IdentityKey(djbKeyPair.getPublicKey());
         var djbPrivateKey = djbKeyPair.getPrivateKey();
 
@@ -55,7 +54,7 @@ public class KeyUtils {
         var records = new ArrayList<PreKeyRecord>(PREKEY_BATCH_SIZE);
         for (var i = 0; i < PREKEY_BATCH_SIZE; i++) {
             var preKeyId = (offset + i) % PREKEY_MAXIMUM_ID;
-            var keyPair = Curve.generateKeyPair();
+            var keyPair = ECKeyPair.generate();
             var record = new PreKeyRecord(preKeyId, keyPair);
 
             records.add(record);
@@ -67,13 +66,9 @@ public class KeyUtils {
             final int signedPreKeyId,
             final ECPrivateKey privateKey
     ) {
-        var keyPair = Curve.generateKeyPair();
+        var keyPair = ECKeyPair.generate();
         byte[] signature;
-        try {
-            signature = Curve.calculateSignature(privateKey, keyPair.getPublicKey().serialize());
-        } catch (InvalidKeyException e) {
-            throw new AssertionError(e);
-        }
+        signature = privateKey.calculateSignature(keyPair.getPublicKey().serialize());
         return new SignedPreKeyRecord(signedPreKeyId, System.currentTimeMillis(), keyPair, signature);
     }
 
@@ -107,10 +102,6 @@ public class KeyUtils {
 
     public static byte[] createStickerUploadKey() {
         return getSecretBytes(32);
-    }
-
-    public static MasterKey createMasterKey() {
-        return MasterKey.createNew(secureRandom);
     }
 
     public static MediaRootBackupKey createMediaRootBackupKey() {

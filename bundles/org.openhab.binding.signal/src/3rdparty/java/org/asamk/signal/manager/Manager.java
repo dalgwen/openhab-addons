@@ -1,5 +1,7 @@
 package org.asamk.signal.manager;
 
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
 import org.asamk.signal.manager.api.CaptchaRejectedException;
@@ -28,6 +30,7 @@ import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotPrimaryDeviceException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PendingAdminApprovalException;
+import org.asamk.signal.manager.api.PinLockMissingException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.ReceiveConfig;
@@ -49,7 +52,6 @@ import org.asamk.signal.manager.api.UsernameStatus;
 import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
 
 import java.io.Closeable;
 import java.io.File;
@@ -65,7 +67,7 @@ import java.util.Set;
 public interface Manager extends Closeable {
 
     static boolean isValidNumber(final String e164Number, final String countryCode) {
-        return PhoneNumberFormatter.isValidNumber(e164Number, countryCode);
+        return PhoneNumberUtil.getInstance().isPossibleNumber(e164Number, countryCode);
     }
 
     static boolean isSignalClientAvailable() {
@@ -94,7 +96,7 @@ public interface Manager extends Closeable {
      */
     Map<String, UserStatus> getUserStatus(Set<String> numbers) throws IOException, RateLimitException;
 
-    Map<String, UsernameStatus> getUsernameStatus(Set<String> usernames);
+    Map<String, UsernameStatus> getUsernameStatus(Set<String> usernames) throws IOException;
 
     void updateAccountAttributes(
             String deviceName,
@@ -139,7 +141,7 @@ public interface Manager extends Closeable {
             String newNumber,
             String verificationCode,
             String pin
-    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException;
+    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException, PinLockMissingException;
 
     void unregister() throws IOException;
 
@@ -237,9 +239,12 @@ public interface Manager extends Closeable {
     void deleteContact(RecipientIdentifier.Single recipient);
 
     void setContactName(
-            RecipientIdentifier.Single recipient,
-            String givenName,
-            final String familyName
+            final RecipientIdentifier.Single recipient,
+            final String givenName,
+            final String familyName,
+            final String nickGivenName,
+            final String nickFamilyName,
+            final String note
     ) throws NotPrimaryDeviceException, UnregisteredRecipientException;
 
     void setContactsBlocked(

@@ -212,19 +212,21 @@ public class GroupStore {
     }
 
     public GroupInfo getGroup(final Connection connection, final GroupId groupId) throws SQLException {
-        if (groupId instanceof GroupIdV1 groupIdV1) {
-            final var group = getGroup(connection, groupIdV1);
-            if (group != null) {
-                return group;
+        switch (groupId) {
+            case GroupIdV1 groupIdV1 -> {
+                final var group = getGroup(connection, groupIdV1);
+                if (group != null) {
+                    return group;
+                }
+                return getGroupV2ByV1Id(connection, groupIdV1);
             }
-            return getGroupV2ByV1Id(connection, groupIdV1);
-        } else {
-            GroupIdV2 groupIdV2 = (GroupIdV2) groupId;
-            final var group = getGroup(connection, groupIdV2);
-            if (group != null) {
-                return group;
+            case GroupIdV2 groupIdV2 -> {
+                final var group = getGroup(connection, groupIdV2);
+                if (group != null) {
+                    return group;
+                }
+                return getGroupV1ByV2Id(connection, groupIdV2);
             }
-            return getGroupV1ByV2Id(connection, groupIdV2);
         }
     }
 
@@ -273,22 +275,24 @@ public class GroupStore {
             final GroupMasterKey groupMasterKey,
             final GroupIdV2 groupId
     ) throws SQLException {
-        GroupInfo group = getGroup(connection, (GroupId) groupId);
-
-        if (group == null) {
-            return new GroupInfoV2(groupId, groupMasterKey, recipientResolver);
-        }
-        if (group instanceof GroupInfoV1 groupInfoV1) {
-            // Received a v2 group message for a v1 group, we need to locally migrate the group
-            deleteGroup(connection, groupInfoV1.getGroupId());
-            final var groupInfoV2 = new GroupInfoV2(groupId, groupMasterKey, recipientResolver);
-            groupInfoV2.setBlocked(groupInfoV1.isBlocked());
-            updateGroup(connection, groupInfoV2);
-            logger.debug("Locally migrated group {} to group v2, id: {}", groupInfoV1.getGroupId().toBase64(),
-                    groupInfoV2.getGroupId().toBase64());
-            return groupInfoV2;
-        } else {
-            return (GroupInfoV2) group;
+        switch (getGroup(connection, (GroupId) groupId)) {
+            case GroupInfoV1 groupInfoV1 -> {
+                // Received a v2 group message for a v1 group, we need to locally migrate the group
+                deleteGroup(connection, groupInfoV1.getGroupId());
+                final var groupInfoV2 = new GroupInfoV2(groupId, groupMasterKey, recipientResolver);
+                groupInfoV2.setBlocked(groupInfoV1.isBlocked());
+                updateGroup(connection, groupInfoV2);
+                logger.debug("Locally migrated group {} to group v2, id: {}",
+                        groupInfoV1.getGroupId().toBase64(),
+                        groupInfoV2.getGroupId().toBase64());
+                return groupInfoV2;
+            }
+            case GroupInfoV2 groupInfoV2 -> {
+                return groupInfoV2;
+            }
+            case null -> {
+                return new GroupInfoV2(groupId, groupMasterKey, recipientResolver);
+            }
         }
     }
 

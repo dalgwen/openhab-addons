@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.HashMap;
 import java.util.Objects;
 
 public class KeyValueStore {
@@ -18,6 +19,7 @@ public class KeyValueStore {
     private static final Logger logger = LoggerFactory.getLogger(KeyValueStore.class);
 
     private final Database database;
+    private final HashMap<KeyValueEntry<?>, Object> cache = new HashMap<>();
 
     public static void createSql(Connection connection) throws SQLException {
         // When modifying the CREATE statement here, also add a migration in AccountDatabase.java
@@ -36,11 +38,18 @@ public class KeyValueStore {
         this.database = database;
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T getEntry(KeyValueEntry<T> key) {
+        synchronized (cache) {
+            if (cache.containsKey(key)) {
+                logger.trace("Got entry for key {} from cache", key.key());
+                return (T) cache.get(key);
+            }
+        }
         try (final var connection = database.getConnection()) {
             return getEntry(connection, key);
         } catch (SQLException e) {
-            throw new RuntimeException("Failed read from pre_key store", e);
+            throw new RuntimeException("Failed read from key_value store", e);
         }
     }
 
@@ -52,7 +61,7 @@ public class KeyValueStore {
         }
     }
 
-    private <T> T getEntry(final Connection connection, final KeyValueEntry<T> key) throws SQLException {
+    public <T> T getEntry(final Connection connection, final KeyValueEntry<T> key) throws SQLException {
         final var sql = (
                 """
                 SELECT key, value
@@ -63,11 +72,17 @@ public class KeyValueStore {
         try (final var statement = connection.prepareStatement(sql)) {
             statement.setString(1, key.key());
 
-            final var result = Utils.executeQueryForOptional(statement,
-                    resultSet -> readValueFromResultSet(key, resultSet)).orElse(null);
+            var result = Utils.executeQueryForOptional(statement, resultSet -> readValueFromResultSet(key, resultSet))
+                    .orElse(null);
 
             if (result == null) {
-                return key.defaultValue();
+                logger.trace("Got entry for key {} from default value", key.key());
+                result = key.defaultValue();
+            } else {
+                logger.trace("Got entry for key {} from db", key.key());
+            }
+            synchronized (cache) {
+                cache.put(key, result);
             }
             return result;
         }
@@ -78,7 +93,7 @@ public class KeyValueStore {
             final KeyValueEntry<T> key,
             final T value
     ) throws SQLException {
-        final var entry = getEntry(key);
+        final var entry = getEntry(connection, key);
         if (Objects.equals(entry, value)) {
             return false;
         }
@@ -94,6 +109,9 @@ public class KeyValueStore {
             statement.setString(1, key.key());
             setParameterValue(statement, 2, key.clazz(), value);
             statement.executeUpdate();
+        }
+        synchronized (cache) {
+            cache.put(key, value);
         }
         return true;
     }

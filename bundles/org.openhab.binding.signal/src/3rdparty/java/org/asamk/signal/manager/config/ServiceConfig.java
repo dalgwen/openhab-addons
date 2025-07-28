@@ -20,7 +20,7 @@ public class ServiceConfig {
 
     public static final int MAX_ATTACHMENT_SIZE = 150 * 1024 * 1024;
     public static final long MAX_ENVELOPE_SIZE = 0;
-    public static final int MAX_MESSAGE_BODY_SIZE = 2000;
+    public static final int MAX_MESSAGE_SIZE_BYTES = 2000;
     public static final long AVATAR_DOWNLOAD_FAILSAFE_MAX_SIZE = 10 * 1024 * 1024;
     public static final boolean AUTOMATIC_NETWORK_RETRY = true;
     public static final int GROUP_MAX_SIZE = 1001;
@@ -30,7 +30,8 @@ public class ServiceConfig {
     public static AccountAttributes.Capabilities getCapabilities(boolean isPrimaryDevice) {
         final var deleteSync = !isPrimaryDevice;
         final var storageEncryptionV2 = !isPrimaryDevice;
-        return new AccountAttributes.Capabilities(true, deleteSync, true, storageEncryptionV2);
+        final var attachmentBackfill = !isPrimaryDevice;
+        return new AccountAttributes.Capabilities(true, deleteSync, true, storageEncryptionV2, attachmentBackfill);
     }
 
     public static ServiceEnvironmentConfig getServiceEnvironmentConfig(

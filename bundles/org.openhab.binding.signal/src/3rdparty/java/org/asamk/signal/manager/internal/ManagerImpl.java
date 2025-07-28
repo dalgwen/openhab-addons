@@ -35,6 +35,7 @@ import org.asamk.signal.manager.api.IdentityVerificationCode;
 import org.asamk.signal.manager.api.InactiveGroupLinkException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.InvalidDeviceLinkException;
+import org.asamk.signal.manager.api.InvalidNumberException;
 import org.asamk.signal.manager.api.InvalidStickerException;
 import org.asamk.signal.manager.api.InvalidUsernameException;
 import org.asamk.signal.manager.api.LastGroupAdminException;
@@ -47,6 +48,7 @@ import org.asamk.signal.manager.api.NotPrimaryDeviceException;
 import org.asamk.signal.manager.api.Pair;
 import org.asamk.signal.manager.api.PendingAdminApprovalException;
 import org.asamk.signal.manager.api.PhoneNumberSharingMode;
+import org.asamk.signal.manager.api.PinLockMissingException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.Profile;
 import org.asamk.signal.manager.api.RateLimitException;
@@ -68,7 +70,6 @@ import org.asamk.signal.manager.api.UserStatus;
 import org.asamk.signal.manager.api.UsernameLinkUrl;
 import org.asamk.signal.manager.api.UsernameStatus;
 import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
-import org.asamk.signal.manager.config.ServiceConfig;
 import org.asamk.signal.manager.config.ServiceEnvironmentConfig;
 import org.asamk.signal.manager.helper.AccountFileUpdater;
 import org.asamk.signal.manager.helper.Context;
@@ -88,12 +89,12 @@ import org.asamk.signal.manager.storage.stickers.StickerPack;
 import org.asamk.signal.manager.util.AttachmentUtils;
 import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.MimeUtils;
+import org.asamk.signal.manager.util.PhoneNumberFormatter;
 import org.asamk.signal.manager.util.StickerUtils;
 import org.signal.libsignal.protocol.InvalidMessageException;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.SignalSessionLock;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
 import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServicePreview;
@@ -107,8 +108,6 @@ import org.whispersystems.signalservice.api.push.exceptions.CdsiResourceExhauste
 import org.whispersystems.signalservice.api.push.exceptions.UsernameMalformedException;
 import org.whispersystems.signalservice.api.push.exceptions.UsernameTakenException;
 import org.whispersystems.signalservice.api.util.DeviceNameUtil;
-import org.whispersystems.signalservice.api.util.InvalidNumberException;
-import org.whispersystems.signalservice.api.util.PhoneNumberFormatter;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.util.Hex;
 import org.whispersystems.signalservice.internal.util.Util;
@@ -133,13 +132,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import okio.Utf8;
+
+import static org.asamk.signal.manager.config.ServiceConfig.MAX_MESSAGE_SIZE_BYTES;
+import static org.asamk.signal.manager.util.Utils.handleResponseException;
+import static org.signal.core.util.StringExtensionsKt.splitByByteLength;
 
 public class ManagerImpl implements Manager {
 
@@ -158,6 +162,7 @@ public class ManagerImpl implements Manager {
     private final List<Runnable> closedListeners = new ArrayList<>();
     private final List<Runnable> addressChangedListeners = new ArrayList<>();
     private final CompositeDisposable disposable = new CompositeDisposable();
+    private final AtomicLong lastMessageTimestamp = new AtomicLong();
 
     public ManagerImpl(
             SignalAccount account,
@@ -168,15 +173,7 @@ public class ManagerImpl implements Manager {
     ) {
         this.account = account;
 
-        final var sessionLock = new SignalSessionLock() {
-            private final ReentrantLock LEGACY_LOCK = new ReentrantLock();
-
-            @Override
-            public Lock acquire() {
-                LEGACY_LOCK.lock();
-                return LEGACY_LOCK::unlock;
-            }
-        };
+        final var sessionLock = new ReentrantSignalSessionLock();
         this.dependencies = new SignalDependencies(serviceEnvironmentConfig,
                 userAgent,
                 account.getCredentialsProvider(),
@@ -288,7 +285,7 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
-    public Map<String, UsernameStatus> getUsernameStatus(Set<String> usernames) {
+    public Map<String, UsernameStatus> getUsernameStatus(Set<String> usernames) throws IOException {
         final var registeredUsers = new HashMap<String, RecipientAddress>();
         for (final var username : usernames) {
             try {
@@ -432,7 +429,7 @@ public class ManagerImpl implements Manager {
             String newNumber,
             String verificationCode,
             String pin
-    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException {
+    ) throws IncorrectPinException, PinLockedException, IOException, NotPrimaryDeviceException, PinLockMissingException {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
@@ -454,10 +451,10 @@ public class ManagerImpl implements Manager {
             String challenge,
             String captcha
     ) throws IOException, CaptchaRejectedException {
-        captcha = captcha == null ? null : captcha.replace("signalcaptcha://", "");
+        captcha = captcha == null ? "" : captcha.replace("signalcaptcha://", "");
 
         try {
-            dependencies.getAccountManager().submitRateLimitRecaptchaChallenge(challenge, captcha);
+            handleResponseException(dependencies.getRateLimitChallengeApi().submitCaptchaChallenge(challenge, captcha));
         } catch (org.whispersystems.signalservice.internal.push.exceptions.CaptchaRejectedException ignored) {
             throw new CaptchaRejectedException();
         }
@@ -465,7 +462,7 @@ public class ManagerImpl implements Manager {
 
     @Override
     public List<Device> getLinkedDevices() throws IOException {
-        var devices = dependencies.getAccountManager().getDevices();
+        var devices = handleResponseException(dependencies.getLinkDeviceApi().getDevices());
         account.setMultiDevice(devices.size() > 1);
         var identityKey = account.getAciIdentityKeyPair().getPrivateKey();
         return devices.stream().map(d -> {
@@ -604,6 +601,24 @@ public class ManagerImpl implements Manager {
         return context.getGroupHelper().joinGroup(inviteLinkUrl);
     }
 
+    private long getNextMessageTimestamp() {
+        while (true) {
+            final var last = lastMessageTimestamp.get();
+            final var timestamp = System.currentTimeMillis();
+            if (last == timestamp) {
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                continue;
+            }
+            if (lastMessageTimestamp.compareAndSet(last, timestamp)) {
+                return timestamp;
+            }
+        }
+    }
+
     private SendMessageResults sendMessage(
             SignalServiceDataMessage.Builder messageBuilder,
             Set<RecipientIdentifier> recipients,
@@ -619,7 +634,7 @@ public class ManagerImpl implements Manager {
             Optional<Long> editTargetTimestamp
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
         var results = new HashMap<RecipientIdentifier, List<SendMessageResult>>();
-        long timestamp = System.currentTimeMillis();
+        long timestamp = getNextMessageTimestamp();
         messageBuilder.withTimestamp(timestamp);
         for (final var recipient : recipients) {
             if (recipient instanceof RecipientIdentifier.NoteToSelf || (
@@ -659,7 +674,7 @@ public class ManagerImpl implements Manager {
             Set<RecipientIdentifier> recipients
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException {
         var results = new HashMap<RecipientIdentifier, List<SendMessageResult>>();
-        final var timestamp = System.currentTimeMillis();
+        final var timestamp = getNextMessageTimestamp();
         for (var recipient : recipients) {
             if (recipient instanceof RecipientIdentifier.Single single) {
                 final var message = new SignalServiceTypingMessage(action, timestamp, Optional.empty());
@@ -691,7 +706,7 @@ public class ManagerImpl implements Manager {
 
     @Override
     public SendMessageResults sendReadReceipt(RecipientIdentifier.Single sender, List<Long> messageIds) {
-        final var timestamp = System.currentTimeMillis();
+        final var timestamp = getNextMessageTimestamp();
         var receiptMessage = new SignalServiceReceiptMessage(SignalServiceReceiptMessage.Type.READ,
                 messageIds,
                 timestamp);
@@ -701,7 +716,7 @@ public class ManagerImpl implements Manager {
 
     @Override
     public SendMessageResults sendViewedReceipt(RecipientIdentifier.Single sender, List<Long> messageIds) {
-        final var timestamp = System.currentTimeMillis();
+        final var timestamp = getNextMessageTimestamp();
         var receiptMessage = new SignalServiceReceiptMessage(SignalServiceReceiptMessage.Type.VIEWED,
                 messageIds,
                 timestamp);
@@ -763,17 +778,24 @@ public class ManagerImpl implements Manager {
             final Message message
     ) throws AttachmentInvalidException, IOException, UnregisteredRecipientException, InvalidStickerException {
         final var additionalAttachments = new ArrayList<SignalServiceAttachment>();
-        if (message.messageText().length() > ServiceConfig.MAX_MESSAGE_BODY_SIZE) {
-            final var messageBytes = message.messageText().getBytes(StandardCharsets.UTF_8);
-            final var uploadSpec = dependencies.getMessageSender().getResumableUploadSpec();
-            final var streamDetails = new StreamDetails(new ByteArrayInputStream(messageBytes),
-                    MimeUtils.LONG_TEXT,
-                    messageBytes.length);
-            final var textAttachment = AttachmentUtils.createAttachmentStream(streamDetails,
-                    Optional.empty(),
-                    uploadSpec);
-            messageBuilder.withBody(message.messageText().substring(0, ServiceConfig.MAX_MESSAGE_BODY_SIZE));
-            additionalAttachments.add(context.getAttachmentHelper().uploadAttachment(textAttachment));
+        if (Utf8.size(message.messageText()) > MAX_MESSAGE_SIZE_BYTES) {
+            final var result = splitByByteLength(message.messageText(), MAX_MESSAGE_SIZE_BYTES);
+            final var trimmed = result.getFirst();
+            final var remainder = result.getSecond();
+            if (remainder != null) {
+                final var messageBytes = message.messageText().getBytes(StandardCharsets.UTF_8);
+                final var uploadSpec = dependencies.getMessageSender().getResumableUploadSpec();
+                final var streamDetails = new StreamDetails(new ByteArrayInputStream(messageBytes),
+                        MimeUtils.LONG_TEXT,
+                        messageBytes.length);
+                final var textAttachment = AttachmentUtils.createAttachmentStream(streamDetails,
+                        Optional.empty(),
+                        uploadSpec);
+                messageBuilder.withBody(trimmed);
+                additionalAttachments.add(context.getAttachmentHelper().uploadAttachment(textAttachment));
+            } else {
+                messageBuilder.withBody(message.messageText());
+            }
         } else {
             messageBuilder.withBody(message.messageText());
         }
@@ -788,6 +810,7 @@ public class ManagerImpl implements Manager {
         } else if (!additionalAttachments.isEmpty()) {
             messageBuilder.withAttachments(additionalAttachments);
         }
+        messageBuilder.withViewOnce(message.viewOnce());
         if (!message.mentions().isEmpty()) {
             messageBuilder.withMentions(resolveMentions(message.mentions()));
         }
@@ -1039,15 +1062,23 @@ public class ManagerImpl implements Manager {
 
     @Override
     public void setContactName(
-            RecipientIdentifier.Single recipient,
-            String givenName,
-            final String familyName
+            final RecipientIdentifier.Single recipient,
+            final String givenName,
+            final String familyName,
+            final String nickGivenName,
+            final String nickFamilyName,
+            final String note
     ) throws NotPrimaryDeviceException, UnregisteredRecipientException {
         if (!account.isPrimaryDevice()) {
             throw new NotPrimaryDeviceException();
         }
         context.getContactHelper()
-                .setContactName(context.getRecipientHelper().resolveRecipient(recipient), givenName, familyName);
+                .setContactName(context.getRecipientHelper().resolveRecipient(recipient),
+                        givenName,
+                        familyName,
+                        nickGivenName,
+                        nickFamilyName,
+                        note);
         syncRemoteStorage();
     }
 
@@ -1211,7 +1242,7 @@ public class ManagerImpl implements Manager {
         if (receiveThread != null || isReceivingSynchronous) {
             return;
         }
-        receiveThread = new Thread(() -> {
+        receiveThread = Thread.ofPlatform().name("receive-" + threadNumber.getAndIncrement()).start(() -> {
             logger.debug("Starting receiving messages");
             context.getReceiveHelper().receiveMessagesContinuously(this::passReceivedMessageToHandlers);
             logger.debug("Finished receiving messages");
@@ -1224,8 +1255,7 @@ public class ManagerImpl implements Manager {
                     startReceiveThreadIfRequired();
                 }
             }
-        }, "receive-" + threadNumber.getAndIncrement());
-        receiveThread.start();
+        });
     }
 
     private void passReceivedMessageToHandlers(MessageEnvelope envelope, Throwable e) {
@@ -1463,18 +1493,15 @@ public class ManagerImpl implements Manager {
             RecipientIdentifier.Single recipient,
             IdentityVerificationCode verificationCode
     ) throws UnregisteredRecipientException {
-        if (verificationCode instanceof IdentityVerificationCode.Fingerprint fingerprint) {
-            return trustIdentity(recipient,
+        return switch (verificationCode) {
+            case IdentityVerificationCode.Fingerprint fingerprint -> trustIdentity(recipient,
                     r -> context.getIdentityHelper().trustIdentityVerified(r, fingerprint.fingerprint()));
-        } else if (verificationCode instanceof IdentityVerificationCode.SafetyNumber safetyNumber) {
-            return trustIdentity(recipient,
+            case IdentityVerificationCode.SafetyNumber safetyNumber -> trustIdentity(recipient,
                     r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber.safetyNumber()));
-        } else if (verificationCode instanceof IdentityVerificationCode.ScannableSafetyNumber safetyNumber) {
-            return trustIdentity(recipient,
+            case IdentityVerificationCode.ScannableSafetyNumber safetyNumber -> trustIdentity(recipient,
                     r -> context.getIdentityHelper().trustIdentityVerifiedSafetyNumber(r, safetyNumber.safetyNumber()));
-        } else {
-            throw new AssertionError("Invalid verification code type");
-        }
+            case null -> throw new AssertionError("Invalid verification code type");
+        };
     }
 
     @Override
@@ -1578,9 +1605,10 @@ public class ManagerImpl implements Manager {
             stopReceiveThread(thread);
         }
         context.close();
-        executor.shutdown();
+        executor.close();
 
-        dependencies.getSignalWebSocket().disconnect();
+        dependencies.getAuthenticatedSignalWebSocket().disconnect();
+        dependencies.getUnauthenticatedSignalWebSocket().disconnect();
         dependencies.getPushServiceSocket().close();
         disposable.dispose();
 

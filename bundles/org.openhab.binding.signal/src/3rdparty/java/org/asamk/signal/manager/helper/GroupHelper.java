@@ -265,49 +265,52 @@ public class GroupHelper {
         final var avatarBytes = readAvatarBytes(avatarFile);
 
         SendGroupMessageResults results;
-        if (group instanceof GroupInfoV2 gv2) {
-            try {
-                results = updateGroupV2(gv2,
-                        name,
-                        description,
-                        members,
-                        removeMembers,
-                        admins,
-                        removeAdmins,
-                        banMembers,
-                        unbanMembers,
-                        resetGroupLink,
-                        groupLinkState,
-                        addMemberPermission,
-                        editDetailsPermission,
-                        avatarBytes,
-                        expirationTimer,
-                        isAnnouncementGroup);
-            } catch (ConflictException e) {
-                // Detected conflicting update, refreshing group and trying again
-                group = getGroup(groupId, true);
-                results = updateGroupV2((GroupInfoV2) group,
-                        name,
-                        description,
-                        members,
-                        removeMembers,
-                        admins,
-                        removeAdmins,
-                        banMembers,
-                        unbanMembers,
-                        resetGroupLink,
-                        groupLinkState,
-                        addMemberPermission,
-                        editDetailsPermission,
-                        avatarBytes,
-                        expirationTimer,
-                        isAnnouncementGroup);
+        switch (group) {
+            case GroupInfoV2 gv2 -> {
+                try {
+                    results = updateGroupV2(gv2,
+                            name,
+                            description,
+                            members,
+                            removeMembers,
+                            admins,
+                            removeAdmins,
+                            banMembers,
+                            unbanMembers,
+                            resetGroupLink,
+                            groupLinkState,
+                            addMemberPermission,
+                            editDetailsPermission,
+                            avatarBytes,
+                            expirationTimer,
+                            isAnnouncementGroup);
+                } catch (ConflictException e) {
+                    // Detected conflicting update, refreshing group and trying again
+                    group = getGroup(groupId, true);
+                    results = updateGroupV2((GroupInfoV2) group,
+                            name,
+                            description,
+                            members,
+                            removeMembers,
+                            admins,
+                            removeAdmins,
+                            banMembers,
+                            unbanMembers,
+                            resetGroupLink,
+                            groupLinkState,
+                            addMemberPermission,
+                            editDetailsPermission,
+                            avatarBytes,
+                            expirationTimer,
+                            isAnnouncementGroup);
+                }
             }
-        } else {
-            GroupInfoV1 gv1 = (GroupInfoV1) group;
-            results = updateGroupV1(gv1, name, members, avatarBytes);
-            if (expirationTimer != null) {
-                setExpirationTimer(gv1, expirationTimer);
+
+            case GroupInfoV1 gv1 -> {
+                results = updateGroupV1(gv1, name, members, avatarBytes);
+                if (expirationTimer != null) {
+                    setExpirationTimer(gv1, expirationTimer);
+                }
             }
         }
         context.getJobExecutor().enqueueJob(new SyncStorageJob());
@@ -548,6 +551,9 @@ public class GroupHelper {
         while (true) {
             final var page = context.getGroupV2Helper()
                     .getDecryptedGroupHistoryPage(groupSecretParams, fromRevision, sendEndorsementsExpirationMs);
+            if (page == null) {
+                break;
+            }
             page.getChangeLogs()
                     .stream()
                     .map(DecryptedGroupChangeLog::getChange)

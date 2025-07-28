@@ -2,9 +2,9 @@ package org.asamk.signal.manager.config;
 
 import org.signal.libsignal.net.Network;
 import org.signal.libsignal.protocol.InvalidKeyException;
-import org.signal.libsignal.protocol.ecc.Curve;
 import org.signal.libsignal.protocol.ecc.ECPublicKey;
 import org.whispersystems.signalservice.api.push.TrustStore;
+import org.whispersystems.signalservice.internal.configuration.HttpProxy;
 import org.whispersystems.signalservice.internal.configuration.SignalCdnUrl;
 import org.whispersystems.signalservice.internal.configuration.SignalCdsiUrl;
 import org.whispersystems.signalservice.internal.configuration.SignalProxy;
@@ -28,8 +28,8 @@ class StagingConfig {
     private static final byte[] UNIDENTIFIED_SENDER_TRUST_ROOT = Base64.getDecoder()
             .decode("BbqY1DzohE4NUZoVF+L18oUPrK3kILllLEJh2UnPSsEx");
     private static final String CDSI_MRENCLAVE = "0f6fd79cdfdaa5b2e6337f534d3baf999318b0c462a7ac1f41297a3e4b424a57";
-    private static final String SVR2_MRENCLAVE = "38e01eff4fe357dc0b0e8ef7a44b4abc5489fbccba3a78780f3872c277f62bf3";
-    private static final String SVR2_LEGACY_MRENCLAVE = "acb1973aa0bbbd14b3b4e06f145497d948fd4a98efc500fcce363b3b743ec482";
+    private static final String SVR2_MRENCLAVE_LEGACY = "38e01eff4fe357dc0b0e8ef7a44b4abc5489fbccba3a78780f3872c277f62bf3";
+    private static final String SVR2_MRENCLAVE = "2e8cefe6e3f389d8426adb24e9b7fb7adf10902c96f06f7bbcee36277711ed91";
 
     private static final String URL = "https://chat.staging.signal.org";
     private static final String CDN_URL = "https://cdn-staging.signal.org";
@@ -42,6 +42,7 @@ class StagingConfig {
 
     private static final Optional<Dns> dns = Optional.empty();
     private static final Optional<SignalProxy> proxy = Optional.empty();
+    private static final Optional<HttpProxy> systemProxy = Optional.empty();
 
     private static final byte[] zkGroupServerPublicParams = Base64.getDecoder()
             .decode("ABSY21VckQcbSXVNCGRYJcfWHiAMZmpTtTELcDmxgdFbtp/bWsSxZdMKzfCp8rvIs8ocCU3B37fT3r4Mi5qAemeGeR2X+/YmOGR5ofui7tD5mDQfstAI9i+4WpMtIe8KC3wU5w3Inq3uNWVmoGtpKndsNfwJrCg0Hd9zmObhypUnSkfYn2ooMOOnBpfdanRtrvetZUayDMSC5iSRcXKpdlukrpzzsCIvEwjwQlJYVPOQPj4V0F4UXXBdHSLK05uoPBCQG8G9rYIGedYsClJXnbrgGYG3eMTG5hnx4X4ntARBgELuMWWUEEfSK0mjXg+/2lPmWcTZWR9nkqgQQP0tbzuiPm74H2wMO4u1Wafe+UwyIlIT9L7KLS19Aw8r4sPrXZSSsOZ6s7M1+rTJN0bI5CKY2PX29y5Ok3jSWufIKcgKOnWoP67d5b2du2ZVJjpjfibNIHbT/cegy/sBLoFwtHogVYUewANUAXIaMPyCLRArsKhfJ5wBtTminG/PAvuBdJ70Z/bXVPf8TVsR292zQ65xwvWTejROW6AZX6aqucUjlENAErBme1YHmOSpU6tr6doJ66dPzVAWIanmO/5mgjNEDeK7DDqQdB1xd03HT2Qs2TxY3kCK8aAb/0iM0HQiXjxZ9HIgYhbtvGEnDKW5ILSUydqH/KBhW4Pb0jZWnqN/YgbWDKeJxnDbYcUob5ZY5Lt5ZCMKuaGUvCJRrCtuugSMaqjowCGRempsDdJEt+cMaalhZ6gczklJB/IbdwENW9KeVFPoFNFzhxWUIS5ML9riVYhAtE6JE5jX0xiHNVIIPthb458cfA8daR0nYfYAUKogQArm0iBezOO+mPk5vCNWI+wwkyFCqNDXz/qxl1gAntuCJtSfq9OC3NkdhQlgYQ==");
@@ -69,6 +70,7 @@ class StagingConfig {
                 interceptors,
                 dns,
                 proxy,
+                systemProxy,
                 zkGroupServerPublicParams,
                 genericServerPublicParams,
                 backupServerPublicParams,
@@ -77,7 +79,7 @@ class StagingConfig {
 
     static ECPublicKey getUnidentifiedSenderTrustRoot() {
         try {
-            return Curve.decodePoint(UNIDENTIFIED_SENDER_TRUST_ROOT, 0);
+            return new ECPublicKey(UNIDENTIFIED_SENDER_TRUST_ROOT);
         } catch (InvalidKeyException e) {
             throw new AssertionError(e);
         }
@@ -89,7 +91,7 @@ class StagingConfig {
                 createDefaultServiceConfiguration(interceptors),
                 getUnidentifiedSenderTrustRoot(),
                 CDSI_MRENCLAVE,
-                List.of(SVR2_MRENCLAVE, SVR2_LEGACY_MRENCLAVE));
+                List.of(SVR2_MRENCLAVE, SVR2_MRENCLAVE_LEGACY));
     }
 
     private StagingConfig() {

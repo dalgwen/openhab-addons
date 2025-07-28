@@ -75,7 +75,7 @@ public class JobExecutor implements AutoCloseable {
             queueEmpty = queue.isEmpty();
         }
         if (queueEmpty) {
-            executorService.shutdown();
+            executorService.close();
             return;
         }
         synchronized (this) {
@@ -84,6 +84,6 @@ public class JobExecutor implements AutoCloseable {
             } catch (InterruptedException ignored) {
             }
         }
-        executorService.shutdown();
+        executorService.close();
     }
 }

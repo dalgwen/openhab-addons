@@ -4,6 +4,7 @@ import org.asamk.signal.manager.api.CaptchaRequiredException;
 import org.asamk.signal.manager.api.IncorrectPinException;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.Pair;
+import org.asamk.signal.manager.api.PinLockMissingException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.VerificationMethodNotAvailableException;
@@ -11,9 +12,9 @@ import org.asamk.signal.manager.helper.PinHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
+import org.whispersystems.signalservice.api.push.exceptions.ChallengeRequiredException;
 import org.whispersystems.signalservice.api.push.exceptions.NoSuchSessionException;
 import org.whispersystems.signalservice.api.push.exceptions.NonSuccessfulResponseCodeException;
-import org.whispersystems.signalservice.api.push.exceptions.PushChallengeRequiredException;
 import org.whispersystems.signalservice.api.push.exceptions.TokenNotAcceptedException;
 import org.whispersystems.signalservice.api.registration.RegistrationApi;
 import org.whispersystems.signalservice.internal.push.LockedException;
@@ -39,8 +40,7 @@ public class NumberVerificationUtils {
         RegistrationSessionMetadataResponse sessionResponse;
         try {
             sessionResponse = getValidSession(registrationApi, sessionId);
-        } catch (PushChallengeRequiredException |
-                 org.whispersystems.signalservice.api.push.exceptions.CaptchaRequiredException e) {
+        } catch (ChallengeRequiredException e) {
             if (captcha != null) {
                 sessionResponse = submitCaptcha(registrationApi, sessionId, captcha);
             } else {
@@ -48,38 +48,38 @@ public class NumberVerificationUtils {
             }
         }
 
-        sessionId = sessionResponse.getBody().getId();
+        sessionId = sessionResponse.getMetadata().getId();
         sessionIdSaver.accept(sessionId);
 
-        if (sessionResponse.getBody().getVerified()) {
+        if (sessionResponse.getMetadata().getVerified()) {
             return sessionId;
         }
 
-        if (sessionResponse.getBody().getAllowedToRequestCode()) {
+        if (sessionResponse.getMetadata().getAllowedToRequestCode()) {
             return sessionId;
         }
 
         final var nextAttempt = voiceVerification
-                ? sessionResponse.getBody().getNextCall()
-                : sessionResponse.getBody().getNextSms();
+                ? sessionResponse.getMetadata().getNextCall()
+                : sessionResponse.getMetadata().getNextSms();
         if (nextAttempt == null) {
             throw new VerificationMethodNotAvailableException();
         } else if (nextAttempt > 0) {
-            final var timestamp = sessionResponse.getHeaders().getTimestamp() + nextAttempt * 1000;
+            final var timestamp = sessionResponse.getClientReceivedAtMilliseconds() + nextAttempt * 1000;
             throw new RateLimitException(timestamp);
         }
 
-        final var nextVerificationAttempt = sessionResponse.getBody().getNextVerificationAttempt();
+        final var nextVerificationAttempt = sessionResponse.getMetadata().getNextVerificationAttempt();
         if (nextVerificationAttempt != null && nextVerificationAttempt > 0) {
-            final var timestamp = sessionResponse.getHeaders().getTimestamp() + nextVerificationAttempt * 1000;
+            final var timestamp = sessionResponse.getClientReceivedAtMilliseconds() + nextVerificationAttempt * 1000;
             throw new CaptchaRequiredException(timestamp);
         }
 
-        if (sessionResponse.getBody().getRequestedInformation().contains("captcha")) {
+        if (sessionResponse.getMetadata().getRequestedInformation().contains("captcha")) {
             if (captcha != null) {
                 sessionResponse = submitCaptcha(registrationApi, sessionId, captcha);
             }
-            if (!sessionResponse.getBody().getAllowedToRequestCode()) {
+            if (!sessionResponse.getMetadata().getAllowedToRequestCode()) {
                 throw new CaptchaRequiredException("Captcha Required");
             }
         }
@@ -99,7 +99,7 @@ public class NumberVerificationUtils {
                 voiceVerification ? VerificationCodeTransport.VOICE : VerificationCodeTransport.SMS);
         try {
             Utils.handleResponseException(response);
-        } catch (org.whispersystems.signalservice.api.push.exceptions.CaptchaRequiredException e) {
+        } catch (ChallengeRequiredException e) {
             throw new CaptchaRequiredException(e.getMessage(), e);
         } catch (org.whispersystems.signalservice.api.push.exceptions.NonNormalizedPhoneNumberException e) {
             throw new NonNormalizedPhoneNumberException("Phone number is not normalized ("
@@ -115,7 +115,7 @@ public class NumberVerificationUtils {
             String pin,
             PinHelper pinHelper,
             Verifier verifier
-    ) throws IOException, PinLockedException, IncorrectPinException {
+    ) throws IOException, PinLockedException, IncorrectPinException, PinLockMissingException {
         verificationCode = verificationCode.replace("-", "");
         try {
             final var response = verifier.verify(sessionId, verificationCode, null);
@@ -128,7 +128,7 @@ public class NumberVerificationUtils {
 
             final var registrationLockData = pinHelper.getRegistrationLockData(pin, e);
             if (registrationLockData == null) {
-                throw e;
+                throw new PinLockMissingException();
             }
 
             var registrationLock = registrationLockData.getMasterKey().deriveRegistrationLock();
@@ -179,9 +179,7 @@ public class NumberVerificationUtils {
         captcha = captcha == null ? null : captcha.replace("signalcaptcha://", "");
         try {
             return Utils.handleResponseException(registrationApi.submitCaptchaToken(sessionId, captcha));
-        } catch (PushChallengeRequiredException |
-                 org.whispersystems.signalservice.api.push.exceptions.CaptchaRequiredException |
-                 TokenNotAcceptedException _e) {
+        } catch (ChallengeRequiredException | TokenNotAcceptedException _e) {
             throw new CaptchaRequiredException("Captcha not accepted");
         } catch (NonSuccessfulResponseCodeException e) {
             if (e.code == 400) {

@@ -28,8 +28,6 @@ import org.whispersystems.signalservice.api.storage.StorageServiceRepository;
 import org.whispersystems.signalservice.api.storage.StorageServiceRepository.ManifestIfDifferentVersionResult;
 import org.whispersystems.signalservice.api.storage.StorageServiceRepository.WriteStorageRecordsResult;
 import org.whispersystems.signalservice.internal.storage.protos.ManifestRecord;
-import org.whispersystems.signalservice.internal.storage.protos.ManifestRecord.Identifier.Type;
-
 import org.whispersystems.signalservice.internal.storage.protos.StorageRecord;
 
 import java.io.IOException;
@@ -81,29 +79,26 @@ public class StorageHelper {
                 localManifestVersion);
 
         var needsForcePush = false;
-
-        SignalStorageManifest remoteManifest;
-        if (result instanceof ManifestIfDifferentVersionResult.DifferentVersion diff) {
-            final var manifest = diff.getManifest();
-            storeManifestLocally(manifest);
-            remoteManifest = manifest;
-        } else if (result instanceof ManifestIfDifferentVersionResult.DecryptionError ignore) {
-            logger.warn("Manifest couldn't be decrypted.");
-            if (account.isPrimaryDevice()) {
-                needsForcePush = true;
-            } else {
-                context.getSyncHelper().requestSyncKeys();
+        final var remoteManifest = switch (result) {
+            case ManifestIfDifferentVersionResult.DifferentVersion diff -> {
+                final var manifest = diff.getManifest();
+                storeManifestLocally(manifest);
+                yield manifest;
             }
-            remoteManifest = null;
-        } else if (result instanceof ManifestIfDifferentVersionResult.SameVersion ignored) {
-            remoteManifest = localManifest;
-        } else if (result instanceof ManifestIfDifferentVersionResult.NetworkError e) {
-            throw e.getException();
-        } else if (result instanceof ManifestIfDifferentVersionResult.StatusCodeError e) {
-            throw e.getException();
-        } else {
-            throw new RuntimeException("Unhandled ManifestIfDifferentVersionResult type");
-        }
+            case ManifestIfDifferentVersionResult.DecryptionError ignore -> {
+                logger.warn("Manifest couldn't be decrypted.");
+                if (account.isPrimaryDevice()) {
+                    needsForcePush = true;
+                } else {
+                    context.getSyncHelper().requestSyncKeys();
+                }
+                yield null;
+            }
+            case ManifestIfDifferentVersionResult.SameVersion ignored -> localManifest;
+            case ManifestIfDifferentVersionResult.NetworkError e -> throw e.getException();
+            case ManifestIfDifferentVersionResult.StatusCodeError e -> throw e.getException();
+            default -> throw new RuntimeException("Unhandled ManifestIfDifferentVersionResult type");
+        };
 
         if (remoteManifest != null) {
             logger.trace("Manifest versions: local {}, remote {}", localManifestVersion, remoteManifest.version);
@@ -144,7 +139,7 @@ public class StorageHelper {
         } else {
             try {
                 needsMultiDeviceSync = writeToStorage(storageKey, remoteManifest, needsForcePush);
-            } catch (RetryLaterException er) {
+            } catch (RetryLaterException e) {
                 // TODO retry later
                 return;
             }
@@ -155,7 +150,7 @@ public class StorageHelper {
             try {
                 forcePushToStorage(storageKey);
                 needsMultiDeviceSync = true;
-            } catch (RetryLaterException ex) {
+            } catch (RetryLaterException e) {
                 // TODO retry later
                 return;
             }
@@ -203,17 +198,6 @@ public class StorageHelper {
 
             logger.debug("Pre-Merge ID Difference :: {}", idDifference);
 
-            if (!idDifference.localOnlyIds().isEmpty()) {
-                final var updated = account.getRecipientStore()
-                        .removeStorageIdsFromLocalOnlyUnregisteredRecipients(connection, idDifference.localOnlyIds());
-
-                if (updated > 0) {
-                    logger.warn(
-                            "Found {} records that were deleted remotely but only marked unregistered locally. Removed those from local store.",
-                            updated);
-                }
-            }
-
             if (!idDifference.isEmpty()) {
                 final var remoteOnlyRecords = getSignalStorageRecords(storageKey,
                         remoteManifest,
@@ -224,6 +208,18 @@ public class StorageHelper {
                             "Could not find all remote-only records! Requested: {}, Found: {}. These stragglers should naturally get deleted during the sync.",
                             idDifference.remoteOnlyIds().size(),
                             remoteOnlyRecords.size());
+                }
+
+                if (!idDifference.localOnlyIds().isEmpty()) {
+                    final var updated = account.getRecipientStore()
+                            .removeStorageIdsFromLocalOnlyUnregisteredRecipients(connection,
+                                    idDifference.localOnlyIds());
+
+                    if (updated > 0) {
+                        logger.warn(
+                                "Found {} records that were deleted remotely but only marked unregistered locally. Removed those from local store.",
+                                updated);
+                    }
                 }
 
                 final var unknownInserts = processKnownRecords(connection, remoteOnlyRecords);
@@ -283,9 +279,21 @@ public class StorageHelper {
         try (final var connection = account.getAccountDatabase().getConnection()) {
             connection.setAutoCommit(false);
 
-            final var localStorageIds = getAllLocalStorageIds(connection);
-            final var idDifference = findIdDifference(remoteManifest.storageIds, localStorageIds);
+            var localStorageIds = getAllLocalStorageIds(connection);
+            var idDifference = findIdDifference(remoteManifest.storageIds, localStorageIds);
             logger.debug("ID Difference :: {}", idDifference);
+
+            final var unknownOnlyLocal = idDifference.localOnlyIds()
+                    .stream()
+                    .filter(id -> !KNOWN_TYPES.contains(id.getType()))
+                    .toList();
+
+            if (!unknownOnlyLocal.isEmpty()) {
+                logger.debug("Storage ids with unknown type: {} to delete", unknownOnlyLocal.size());
+                account.getUnknownStorageIdStore().deleteUnknownStorageIds(connection, unknownOnlyLocal);
+                localStorageIds = getAllLocalStorageIds(connection);
+                idDifference = findIdDifference(remoteManifest.storageIds, localStorageIds);
+            }
 
             final var remoteDeletes = idDifference.remoteOnlyIds().stream().map(StorageId::getRaw).toList();
             final var remoteInserts = buildLocalStorageRecords(connection, idDifference.localOnlyIds());
@@ -319,20 +327,19 @@ public class StorageHelper {
                         remoteWriteOperation.manifest(),
                         remoteWriteOperation.inserts(),
                         remoteWriteOperation.deletes());
-
-        if (result instanceof WriteStorageRecordsResult.ConflictError ignored) {
-            logger.debug("Hit a conflict when trying to resolve the conflict! Retrying.");
-            throw new RetryLaterException();
-        } else if (result instanceof WriteStorageRecordsResult.NetworkError networkError) {
-            throw networkError.getException();
-        } else if (result instanceof WriteStorageRecordsResult.StatusCodeError statusCodeError) {
-            throw statusCodeError.getException();
-        } else if (result instanceof WriteStorageRecordsResult.Success ignored) {
-            logger.debug("Saved new manifest. Now at version: {}", remoteWriteOperation.manifest().version);
-            storeManifestLocally(remoteWriteOperation.manifest());
-            return true;
-        } else {
-            throw new IllegalStateException("Unexpected value: " + result);
+        switch (result) {
+            case WriteStorageRecordsResult.ConflictError ignored -> {
+                logger.debug("Hit a conflict when trying to resolve the conflict! Retrying.");
+                throw new RetryLaterException();
+            }
+            case WriteStorageRecordsResult.NetworkError networkError -> throw networkError.getException();
+            case WriteStorageRecordsResult.StatusCodeError statusCodeError -> throw statusCodeError.getException();
+            case WriteStorageRecordsResult.Success ignored -> {
+                logger.debug("Saved new manifest. Now at version: {}", remoteWriteOperation.manifest().version);
+                storeManifestLocally(remoteWriteOperation.manifest());
+                return true;
+            }
+            default -> throw new IllegalStateException("Unexpected value: " + result);
         }
     }
 
@@ -358,7 +365,8 @@ public class StorageHelper {
                 final var storageId = newContactStorageIds.get(recipientId);
                 if (storageId.getType() == ManifestRecord.Identifier.Type.ACCOUNT.getValue()) {
                     final var recipient = account.getRecipientStore().getRecipient(connection, recipientId);
-                    final var accountRecord = StorageSyncModels.localToRemoteRecord(account.getConfigurationStore(),
+                    final var accountRecord = StorageSyncModels.localToRemoteRecord(connection,
+                            account.getConfigurationStore(),
                             recipient,
                             account.getUsernameLink());
                     newStorageRecords.add(new SignalStorageRecord(storageId,
@@ -425,18 +433,18 @@ public class StorageHelper {
                     .writeStorageRecords(storageServiceKey, manifest, newStorageRecords, Collections.emptyList());
         }
 
-        if (result instanceof WriteStorageRecordsResult.ConflictError ignored) {
-            logger.debug("Hit a conflict. Trying again.");
-            throw new RetryLaterException();
-        } else if (result instanceof WriteStorageRecordsResult.NetworkError networkError) {
-            throw networkError.getException();
-        } else if (result instanceof WriteStorageRecordsResult.StatusCodeError statusCodeError) {
-            throw statusCodeError.getException();
-        } else if (result instanceof WriteStorageRecordsResult.Success ignored) {
-            logger.debug("Force push succeeded. Updating local manifest version to: {}", manifest.version);
-            storeManifestLocally(manifest);
-        } else {
-            throw new IllegalStateException("Unexpected value: " + result);
+        switch (result) {
+            case WriteStorageRecordsResult.ConflictError ignored -> {
+                logger.debug("Hit a conflict. Trying again.");
+                throw new RetryLaterException();
+            }
+            case WriteStorageRecordsResult.NetworkError networkError -> throw networkError.getException();
+            case WriteStorageRecordsResult.StatusCodeError statusCodeError -> throw statusCodeError.getException();
+            case WriteStorageRecordsResult.Success ignored -> {
+                logger.debug("Force push succeeded. Updating local manifest version to: {}", manifest.version);
+                storeManifestLocally(manifest);
+            }
+            default -> throw new IllegalStateException("Unexpected value: " + result);
         }
 
         try (final var connection = account.getAccountDatabase().getConnection()) {
@@ -489,28 +497,24 @@ public class StorageHelper {
     ) throws IOException {
         final var result = dependencies.getStorageServiceRepository()
                 .readStorageRecords(storageKey, manifest.recordIkm, storageIds);
-
-        List<SignalStorageRecord> returnValue = null;
-        if (result instanceof StorageServiceRepository.StorageRecordResult.DecryptionError decryptionError) {
-            if (decryptionError.getException() instanceof InvalidKeyException) {
-                logger.warn("Failed to read storage records, ignoring.");
-                returnValue = List.of();
-            } else if (decryptionError.getException() instanceof IOException ioe) {
-                throw ioe;
-            } else {
-                throw new IOException(decryptionError.getException());
+        return switch (result) {
+            case StorageServiceRepository.StorageRecordResult.DecryptionError decryptionError -> {
+                if (decryptionError.getException() instanceof InvalidKeyException) {
+                    logger.warn("Failed to read storage records, ignoring.");
+                    yield List.of();
+                } else if (decryptionError.getException() instanceof IOException ioe) {
+                    throw ioe;
+                } else {
+                    throw new IOException(decryptionError.getException());
+                }
             }
-        } else if (result instanceof  StorageServiceRepository.StorageRecordResult.NetworkError networkError) {
-            throw networkError.getException();
-        } else if (result instanceof StorageServiceRepository.StorageRecordResult.StatusCodeError statusCodeError) {
-            throw statusCodeError.getException();
-        } else if (result instanceof StorageServiceRepository.StorageRecordResult.Success success) {
-            returnValue = success.getRecords();
-        } else {
-            throw new IllegalStateException("Unexpected value: " + result);
-        }
-
-        return returnValue;
+            case StorageServiceRepository.StorageRecordResult.NetworkError networkError ->
+                    throw networkError.getException();
+            case StorageServiceRepository.StorageRecordResult.StatusCodeError statusCodeError ->
+                    throw statusCodeError.getException();
+            case StorageServiceRepository.StorageRecordResult.Success success -> success.getRecords();
+            default -> throw new IllegalStateException("Unexpected value: " + result);
+        };
     }
 
     private List<StorageId> getAllLocalStorageIds(final Connection connection) throws SQLException {
@@ -538,38 +542,35 @@ public class StorageHelper {
             Connection connection,
             StorageId storageId
     ) throws SQLException {
-        Type storageIdType = ManifestRecord.Identifier.Type.fromValue(storageId.getType());
-        if (storageIdType == null) {
-            throw new AssertionError("Got unknown local storage record type: " + storageId);
-        }
-        return switch (storageIdType) {
-            case CONTACT -> {
+        return switch (ManifestRecord.Identifier.Type.fromValue(storageId.getType())) {
+            case ManifestRecord.Identifier.Type.CONTACT -> {
                 final var recipient = account.getRecipientStore().getRecipient(connection, storageId);
                 final var address = recipient.getAddress().getIdentifier();
                 final var identity = account.getIdentityKeyStore().getIdentityInfo(connection, address);
                 final var record = StorageSyncModels.localToRemoteRecord(recipient, identity);
                 yield new SignalStorageRecord(storageId, new StorageRecord.Builder().contact(record).build());
             }
-            case GROUPV1 -> {
+            case ManifestRecord.Identifier.Type.GROUPV1 -> {
                 final var groupV1 = account.getGroupStore().getGroupV1(connection, storageId);
                 final var record = StorageSyncModels.localToRemoteRecord(groupV1);
                 yield new SignalStorageRecord(storageId, new StorageRecord.Builder().groupV1(record).build());
             }
-            case GROUPV2 -> {
+            case ManifestRecord.Identifier.Type.GROUPV2 -> {
                 final var groupV2 = account.getGroupStore().getGroupV2(connection, storageId);
                 final var record = StorageSyncModels.localToRemoteRecord(groupV2);
                 yield new SignalStorageRecord(storageId, new StorageRecord.Builder().groupV2(record).build());
             }
-            case ACCOUNT -> {
-                final var selfRecipient = account.getRecipientStore().getRecipient(connection,
-                        account.getSelfRecipientId());
+            case ManifestRecord.Identifier.Type.ACCOUNT -> {
+                final var selfRecipient = account.getRecipientStore()
+                        .getRecipient(connection, account.getSelfRecipientId());
 
-                final var record = StorageSyncModels.localToRemoteRecord(account.getConfigurationStore(),
+                final var record = StorageSyncModels.localToRemoteRecord(connection,
+                        account.getConfigurationStore(),
                         selfRecipient,
                         account.getUsernameLink());
                 yield new SignalStorageRecord(storageId, new StorageRecord.Builder().account(record).build());
             }
-            default -> {
+            case null, default -> {
                 throw new AssertionError("Got unknown local storage record type: " + storageId);
             }
         };
@@ -606,7 +607,7 @@ public class StorageHelper {
             final var remote = remoteByRawId.get(rawId);
             final var local = localByRawId.get(rawId);
 
-            if (remote.getType() != local.getType() && local.getType() != 0) {
+            if (remote.getType() != local.getType() && KNOWN_TYPES.contains(local.getType())) {
                 remoteOnlyRawIds.remove(rawId);
                 localOnlyRawIds.remove(rawId);
                 hasTypeMismatch = true;

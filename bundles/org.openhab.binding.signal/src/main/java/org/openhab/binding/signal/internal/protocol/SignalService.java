@@ -44,6 +44,7 @@ import org.asamk.signal.manager.api.MessageEnvelope.Data.Reaction;
 import org.asamk.signal.manager.api.NonNormalizedPhoneNumberException;
 import org.asamk.signal.manager.api.NotAGroupMemberException;
 import org.asamk.signal.manager.api.NotRegisteredException;
+import org.asamk.signal.manager.api.PinLockMissingException;
 import org.asamk.signal.manager.api.PinLockedException;
 import org.asamk.signal.manager.api.RateLimitException;
 import org.asamk.signal.manager.api.ReceiveConfig;
@@ -69,7 +70,7 @@ import org.slf4j.LoggerFactory;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
 
 /**
- * Central service to exchange message
+ * Central service to exchange messages
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
@@ -80,11 +81,11 @@ public class SignalService {
 
     private static final String SIGNAL_DIRECTORY = "signal";
     private static final int MAX_BACKOFF_COUNTER = 9;
-    public static final String DEFAULT_USER_AGENT = "Signal-Android/7.9.0 signal-cli";
+    public static final String DEFAULT_USER_AGENT = "Signal-Android/7.47.1 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
     private static final ServiceEnvironment SERVICE_ENVIRONMENT = ServiceEnvironment.LIVE;
 
-    {
+    static {
         // Security.insertProviderAt(new SecurityProvider(), 1);
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -103,13 +104,13 @@ public class SignalService {
     @Nullable
     private ReceivingThread messageReceiverThread;
     private final MessageListener messageListener;
-    private StateListener connectionStateListener;
+    private final StateListener connectionStateListener;
 
     @Nullable
     private Manager manager;
     @Nullable
     private static SignalAccountFiles signalAccountsFiles = null;
-    private static ReentrantLock initializeLock = new ReentrantLock();
+    private static final ReentrantLock initializeLock = new ReentrantLock();
 
     public SignalService(MessageListener messageListener, StateListener connectionStateListener, String phoneNumber,
             @Nullable String captcha, @Nullable String verificationCode,
@@ -138,7 +139,7 @@ public class SignalService {
         }
     }
 
-    public void start() throws IncompleteRegistrationException, IOException {
+    public void start() throws IncompleteRegistrationException, IOException, ClassNotFoundException {
         synchronized (this) {
             Manager newManager;
             SignalAccountFiles signalAccountsFilesFinal = signalAccountsFiles;
@@ -166,6 +167,9 @@ public class SignalService {
                 }
             } catch (AccountCheckException e) {
                 throw new IOException(e);
+            } catch (NoClassDefFoundError e) {
+                String message = "Cannot find class " + e.getMessage() +  ". Report error";
+                throw new ClassNotFoundException(message, e);
             }
             this.manager = newManager;
             updateProfileIfNecessary();
@@ -235,7 +239,7 @@ public class SignalService {
             if (verificationCode != null && !verificationCode.isBlank()) {
                 try {
                     registrationManager.verifyAccount(verificationCode, null);
-                } catch (PinLockedException | IncorrectPinException e) {
+                } catch (PinLockedException | IncorrectPinException | PinLockMissingException e) {
                     throw new IncompleteRegistrationException(RegistrationState.VERIFICATION_CODE_NEEDED,
                             e.getMessage());
                 }
@@ -299,7 +303,7 @@ public class SignalService {
         try {
             List<String> attachments = attachment == null ? List.of() : List.of(attachment);
             sendResults = managerFinal.sendMessage(
-                    new Message(message, attachments, Collections.emptyList(), Optional.empty(), Optional.empty(),
+                    new Message(message, attachments, false, Collections.emptyList(), Optional.empty(), Optional.empty(),
                             Collections.emptyList(), Optional.empty(), List.of()),
                     Collections.singleton(recipient), notify);
         } catch (IOException | AttachmentInvalidException | NotAGroupMemberException | GroupNotFoundException
@@ -310,7 +314,7 @@ public class SignalService {
         if (sendResults.results() != null && !sendResults.results().values().isEmpty()) {
             List<SendMessageResult> resultsForRecipient = sendResults.results().get(recipient);
             if (resultsForRecipient != null) {
-                SendMessageResult result = resultsForRecipient.get(0);
+                SendMessageResult result = resultsForRecipient.getFirst();
                 if (!result.isSuccess()) {
                     logger.warn("Cannot send message to {}, cause {}", address,
                             result.isIdentityFailure() ? "identity"
@@ -413,7 +417,7 @@ public class SignalService {
                         messageListener.messageReceived(source, message.body().get());
                     } else if (message.reaction().isPresent()) {
                         Reaction reaction = message.reaction().get();
-                        if (reaction.emoji().length() > 0) {
+                        if (!reaction.emoji().isEmpty()) {
                             messageListener.reactionReceived(source, reaction);
                         }
                     } else {
