@@ -177,6 +177,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
         } catch (IOException e) {
             String message = e.getClass().getSimpleName() + " - " + e.getMessage();
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
+        } catch (ClassNotFoundException e) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.HANDLER_INITIALIZING_ERROR, e.getMessage());
         } finally {
             isStarting.set(false);
             lockStartAndStop.unlock();

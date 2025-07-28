@@ -26,19 +26,19 @@ public class PinHelper {
         for (final var secureValueRecovery : secureValueRecoveries) {
             try {
                 final var backupResponse = secureValueRecovery.setPin(pin, masterKey).execute();
-                if (backupResponse instanceof SecureValueRecovery.BackupResponse.Success success) {
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ServerRejected serverRejected) {
-                    logger.warn("Backup svr failed: ServerRejected");
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.EnclaveNotFound enclaveNotFound ) {
-                    logger.warn("Backup svr failed: EnclaveNotFound");
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ExposeFailure exposeFailure) {
-                    logger.warn("Backup svr failed: ExposeFailure");
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.ApplicationError error) {
-                    throw new IOException(error.getException());
-                } else if (backupResponse instanceof SecureValueRecovery.BackupResponse.NetworkError error) {
-                    throw error.getException();
-                } else {
-                    throw new AssertionError("Unexpected response");
+                switch (backupResponse) {
+                    case SecureValueRecovery.BackupResponse.Success success -> {
+                    }
+                    case SecureValueRecovery.BackupResponse.ServerRejected serverRejected ->
+                            logger.warn("Backup svr failed: ServerRejected");
+                    case SecureValueRecovery.BackupResponse.EnclaveNotFound enclaveNotFound ->
+                            logger.warn("Backup svr failed: EnclaveNotFound");
+                    case SecureValueRecovery.BackupResponse.ExposeFailure exposeFailure ->
+                            logger.warn("Backup svr failed: ExposeFailure");
+                    case SecureValueRecovery.BackupResponse.ApplicationError error ->
+                            throw new IOException(error.getException());
+                    case SecureValueRecovery.BackupResponse.NetworkError error -> throw error.getException();
+                    case null, default -> throw new AssertionError("Unexpected response");
                 }
             } catch (IOException e) {
                 exception = e;
@@ -58,17 +58,17 @@ public class PinHelper {
         for (final var secureValueRecovery : secureValueRecoveries) {
             try {
                 final var deleteResponse = secureValueRecovery.deleteData();
-                if (deleteResponse instanceof SecureValueRecovery.DeleteResponse.Success success) {
-                } else if (deleteResponse instanceof SecureValueRecovery.DeleteResponse.ServerRejected serverRejected) {
-                    logger.warn("Delete svr2 failed: ServerRejected");
-                } else if (deleteResponse instanceof SecureValueRecovery.DeleteResponse.EnclaveNotFound enclaveNotFound) {
-                    logger.warn("Delete svr2 failed: EnclaveNotFound");
-                } else if (deleteResponse instanceof SecureValueRecovery.DeleteResponse.ApplicationError error) {
-                    throw new IOException(error.getException());
-                } else if (deleteResponse instanceof SecureValueRecovery.DeleteResponse.NetworkError error) {
-                    throw error.getException();
-                } else {
-                    throw new AssertionError("Unexpected response");
+                switch (deleteResponse) {
+                    case SecureValueRecovery.DeleteResponse.Success success -> {
+                    }
+                    case SecureValueRecovery.DeleteResponse.ServerRejected serverRejected ->
+                            logger.warn("Delete svr2 failed: ServerRejected");
+                    case SecureValueRecovery.DeleteResponse.EnclaveNotFound enclaveNotFound ->
+                            logger.warn("Delete svr2 failed: EnclaveNotFound");
+                    case SecureValueRecovery.DeleteResponse.ApplicationError error ->
+                            throw new IOException(error.getException());
+                    case SecureValueRecovery.DeleteResponse.NetworkError error -> throw error.getException();
+                    case null, default -> throw new AssertionError("Unexpected response");
                 }
             } catch (IOException e) {
                 exception = e;
@@ -88,7 +88,11 @@ public class PinHelper {
             IOException exception = null;
             for (final var secureValueRecovery : secureValueRecoveries) {
                 try {
-                    return getRegistrationLockData(secureValueRecovery, svr2Credentials, pin);
+                    final var lockData = getRegistrationLockData(secureValueRecovery, svr2Credentials, pin);
+                    if (lockData == null) {
+                        continue;
+                    }
+                    return lockData;
                 } catch (IOException e) {
                     exception = e;
                 }
@@ -108,19 +112,21 @@ public class PinHelper {
     ) throws IOException, IncorrectPinException {
         final var restoreResponse = secureValueRecovery.restoreDataPreRegistration(authCredentials, null, pin);
 
-        if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.Success s) {
-            return s;
-        } else if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.PinMismatch pinMismatch) {
-            throw new IncorrectPinException(pinMismatch.getTriesRemaining());
-        } else if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.ApplicationError error) {
-            throw new IOException(error.getException());
-        } else if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.NetworkError error) {
-            throw error.getException();
-        } else if (restoreResponse instanceof SecureValueRecovery.RestoreResponse.Missing missing) {
-            logger.debug("No SVR data stored for the given credentials.");
-            return null;
-        } else {
-            throw new AssertionError("Unexpected response: " + restoreResponse.getClass().getSimpleName());
+        switch (restoreResponse) {
+            case SecureValueRecovery.RestoreResponse.Success s -> {
+                return s;
+            }
+            case SecureValueRecovery.RestoreResponse.PinMismatch pinMismatch ->
+                    throw new IncorrectPinException(pinMismatch.getTriesRemaining());
+            case SecureValueRecovery.RestoreResponse.ApplicationError error ->
+                    throw new IOException(error.getException());
+            case SecureValueRecovery.RestoreResponse.NetworkError error -> throw error.getException();
+            case SecureValueRecovery.RestoreResponse.Missing missing -> {
+                logger.debug("No SVR data stored for the given credentials.");
+                return null;
+            }
+            case null, default ->
+                    throw new AssertionError("Unexpected response: " + restoreResponse.getClass().getSimpleName());
         }
     }
 }

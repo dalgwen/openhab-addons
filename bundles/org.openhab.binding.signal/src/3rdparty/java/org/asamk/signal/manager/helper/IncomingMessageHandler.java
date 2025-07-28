@@ -41,6 +41,7 @@ import org.signal.libsignal.metadata.ProtocolNoSessionException;
 import org.signal.libsignal.metadata.ProtocolUntrustedIdentityException;
 import org.signal.libsignal.metadata.SelfSendException;
 import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.UsePqRatchet;
 import org.signal.libsignal.protocol.groups.GroupSessionBuilder;
 import org.signal.libsignal.protocol.message.DecryptionErrorMessage;
 import org.signal.libsignal.zkgroup.InvalidInputException;
@@ -105,7 +106,7 @@ public final class IncomingMessageHandler {
             try {
                 final var cipherResult = dependencies.getCipher(destination == null
                                 || destination.equals(account.getAci()) ? ServiceIdType.ACI : ServiceIdType.PNI)
-                        .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp());
+                        .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp(), UsePqRatchet.NO);
                 content = validate(envelope.getProto(), cipherResult, envelope.getServerDeliveredTimestamp());
                 if (content == null) {
                     return new Pair<>(List.of(), null);
@@ -143,7 +144,7 @@ public final class IncomingMessageHandler {
             try {
                 final var cipherResult = dependencies.getCipher(destination == null
                                 || destination.equals(account.getAci()) ? ServiceIdType.ACI : ServiceIdType.PNI)
-                        .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp());
+                        .decrypt(envelope.getProto(), envelope.getServerDeliveredTimestamp(), UsePqRatchet.NO);
                 content = validate(envelope.getProto(), cipherResult, envelope.getServerDeliveredTimestamp());
                 if (content == null) {
                     return new Pair<>(List.of(), null);
@@ -157,6 +158,9 @@ public final class IncomingMessageHandler {
             } catch (ProtocolInvalidKeyIdException | ProtocolInvalidKeyException | ProtocolNoSessionException |
                      ProtocolInvalidMessageException e) {
                 logger.debug("Failed to decrypt incoming message", e);
+                if (e instanceof ProtocolInvalidKeyIdException) {
+                    actions.add(RefreshPreKeysAction.create());
+                }
                 final var sender = account.getRecipientResolver().resolveRecipient(e.getSender());
                 if (context.getContactHelper().isContactBlocked(sender)) {
                     logger.debug("Received invalid message from blocked contact, ignoring.");
@@ -165,12 +169,11 @@ public final class IncomingMessageHandler {
                     if (serviceId != null) {
                         final var isSelf = sender.equals(account.getSelfRecipientId())
                                 && e.getSenderDevice() == account.getDeviceId();
+                        logger.debug("Received invalid message, queuing renew session action.");
+                        actions.add(new RenewSessionAction(sender, serviceId, destination));
                         if (!isSelf) {
                             logger.debug("Received invalid message, requesting message resend.");
-                            actions.add(new SendRetryMessageRequestAction(sender, serviceId, e, envelope, destination));
-                        } else {
-                            logger.debug("Received invalid message, queuing renew session action.");
-                            actions.add(new RenewSessionAction(sender, serviceId, destination));
+                            actions.add(new SendRetryMessageRequestAction(sender, e, envelope));
                         }
                     } else {
                         logger.debug("Received invalid message from invalid sender: {}", e.getSender());
@@ -962,7 +965,7 @@ public final class IncomingMessageHandler {
 
     private DeviceAddress getDestination(SignalServiceEnvelope envelope) {
         final var destination = envelope.getDestinationServiceId();
-        if (destination == null) {
+        if (destination == null || destination.isUnknown()) {
             return new DeviceAddress(account.getSelfRecipientId(), account.getAci(), account.getDeviceId());
         }
         return new DeviceAddress(account.getRecipientResolver().resolveRecipient(destination),

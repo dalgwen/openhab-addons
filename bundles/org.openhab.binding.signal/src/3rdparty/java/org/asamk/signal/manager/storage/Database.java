@@ -97,10 +97,13 @@ public abstract class Database implements AutoCloseable {
 
         HikariConfig config = new HikariConfig();
         SQLiteDataSource dataSource = new SQLiteDataSource(sqliteConfig);
-        dataSource.setUrl("jdbc:sqlite:" + databaseFile);
+        dataSource.setUrl("jdbc:sqlite:" + databaseFile + "?foreign_keys=ON&journal_mode=wal");
         config.setDataSource(dataSource);
         config.setDataSourceProperties(sqliteConfig.toProperties());
         config.setMinimumIdle(1);
+        config.setConnectionTimeout(90_000);
+        config.setMaximumPoolSize(50);
+        config.setMaxLifetime(0);
         config.setConnectionInitSql("PRAGMA foreign_keys=ON");
         return new HikariDataSource(config);
     }

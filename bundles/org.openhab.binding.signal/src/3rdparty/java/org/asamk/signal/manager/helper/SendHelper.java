@@ -221,7 +221,7 @@ public class SendHelper {
     public SendMessageResult sendTypingMessage(SignalServiceTypingMessage message, RecipientId recipientId) {
         final var result = handleSendMessage(recipientId,
                 (messageSender, address, unidentifiedAccess, includePniSignature) -> messageSender.sendTyping(List.of(
-                        address), List.of(unidentifiedAccess), message, null).get(0));
+                        address), List.of(unidentifiedAccess), message, null).getFirst());
         handleSendMessageResult(result);
         return result;
     }
