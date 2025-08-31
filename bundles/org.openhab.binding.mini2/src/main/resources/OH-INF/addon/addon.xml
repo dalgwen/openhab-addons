@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon:addon id="mini2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:addon="https://openhab.org/schemas/addon/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
+
+	<type>binding</type>
+	<name>Minimal Binding bundle with logging</name>
+	<description>This bundle just prints a message, when it is loaded, unloaded or reconfigured.</description>
+	<config-description>
+		<parameter name="reconfigure" type="boolean">
+			<label>Random name</label>
+			<description>Once the setting is modified, check the log how many times a change message is written.</description>
+		</parameter>
+	</config-description>
+
+</addon:addon>
