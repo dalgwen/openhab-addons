@@ -262,6 +262,7 @@
     <module>org.openhab.binding.millheat</module>
     <module>org.openhab.binding.milight</module>
     <module>org.openhab.binding.minecraft</module>
+    <module>org.openhab.binding.mini2</module>
     <module>org.openhab.binding.modbus</module>
     <module>org.openhab.binding.modbus.e3dc</module>
     <module>org.openhab.binding.modbus.kermi</module>
