@@ -26,6 +26,8 @@ If you just want to see how to use it, see the [Examples](#examples) section.
 You should first take a look at the [official documentation about OpenHAB JSR223 support](https://www.openhab.org/docs/configuration/jsr223.html).
 That said, keep reading for useful insider informations.
 
+For OpenHAB to run JRE is sufficient, but for this add-on you need JDK installed: it provides `javac`.
+
 ## Script location: where can I use Java223 ?
 
 ### First location option: GUI
