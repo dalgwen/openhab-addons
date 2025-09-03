@@ -88,7 +88,6 @@ public class DependencyGenerator {
      */
     public DependencyGenerator(Path libDir, String additionalBundlesConfig, String additionalClassesConfig,
             BundleContext bundleContext) {
-        super();
         this.libDir = libDir;
         this.additionalBundlesConfig = additionalBundlesConfig;
         this.additionalClassesConfig = additionalClassesConfig;
