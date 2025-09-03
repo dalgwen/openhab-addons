@@ -133,6 +133,8 @@ Tip: The Java223 automation bundle recognizes a library by its type, so you don'
 
 The helper library is totally optional, but you should seriously consider using it, as it will make your code experience much more streamlined. It consists of two parts: dynamically .java generated files, and a JAR file with some already compiled class.
 
+If you do not want to use the helper library, you can completely disable it by setting the `enableHelper` setting to `false`. Nothing (code, lib) will be generated/copied in the lib directory. 
+
 ### Java dynamic classes
 
 The Java223 bundle generates some ready-to-use library classes in the `automation\lib\java` directory. These classes are dynamic and contains information about your OpenHAB setup.
@@ -297,14 +299,15 @@ Tip : to access a remote OpenHAB installation scripts folder, you can copy, use 
 
 # Configuration parameters
 
-| Parameter Name                 | Type    | Default | Label                           | Description |
-|--------------------------------|---------|---------|---------------------------------|-------------|
-| `scriptCacheSize`             | text    | 50      | Script Cache Size              | Script compilation cache size. 0 to disable. A positive number allows keeping compilation result. |
-| `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse     | Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware of concurrency issues. |
-| `additionalBundles`           | text    | -       | Additional Bundles              | Additional bundles exported for developing, concatenated by ",". |
-| `additionalClasses`           | text    | -       | Additional Classes              | Additional classes exported for developing, concatenated by ",". |
-| `stabilityGenerationWaitTime` | integer | 10000   | Stability Generation Wait Time  | Delay (in ms) before writing generated classes. Each new generation triggering event further delays the generation. Useful to prevent multiple code generations when many Things activate at the same time. |
-| `startupGuardTime`           | integer | 60000   | Startup Guard Time              | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system. |
+| Parameter Name                | Type    | Default | Label                          | Description                                                                                                                                                                                                 |
+|-------------------------------|---------|---------|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `scriptCacheSize`             | text    | 50      | Script Cache Size              | Script compilation cache size. 0 to disable. A positive number allows keeping compilation result.                                                                                                           |
+| `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse    | Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware of concurrency issues.                                                                              |
+| `enableHelper`                | boolean | true    | Enable helper generation       | Enable code generation, and copying helper and convenience libraries                                                                                                                                        |
+| `additionalBundles`           | text    | -       | Additional Bundles             | Additional bundles exported for developing, concatenated by ",".                                                                                                                                            |
+| `additionalClasses`           | text    | -       | Additional Classes             | Additional classes exported for developing, concatenated by ",".                                                                                                                                            |
+| `stabilityGenerationWaitTime` | integer | 10000   | Stability Generation Wait Time | Delay (in ms) before writing generated classes. Each new generation triggering event further delays the generation. Useful to prevent multiple code generations when many Things activate at the same time. |
+| `startupGuardTime`            | integer | 60000   | Startup Guard Time             | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system.                 |
 
 
 # Examples

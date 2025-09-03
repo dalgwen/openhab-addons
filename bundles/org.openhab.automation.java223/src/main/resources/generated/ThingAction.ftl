@@ -51,7 +51,8 @@ public class ${simpleClassName} {
 <#else>
             Method method = thingActionClass.getMethod("${method.name()}");
             <#if (method.returnValueType() != "void")>@SuppressWarnings("unused")
-            Object returnValue = </#if>method.invoke(thingActions);
+            Object returnValue = <#else>
+           </#if>method.invoke(thingActions);
 </#if>
 <#if (method.returnValueType() != "void")>
             return (${method.returnValueType()}) returnValue;

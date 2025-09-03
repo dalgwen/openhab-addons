@@ -56,7 +56,7 @@ import freemarker.template.TemplateMethodModelEx;
 /**
  * The SourceGenerator is responsible for generating the additional classes
  * helping for rule development. It uses freemarker as a template engine.
- * Include a delayed mechanism to prevent creating file multiple time when there is many
+ * Include a delayed mechanism to prevent creating a file multiple times when there are many
  * modifications in the registry (especially useful at startup)
  *
  * @author Gwendal Roulleau - Initial contribution
@@ -79,7 +79,7 @@ public class SourceGenerator {
 
     Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
 
-    // keep a reference to generation method, to use as a key in the delayed map
+    // keep a reference to the generation method to use as a key in the delayed map
     private final InternalGenerator actionGeneration = new InternalGenerator(this::internalGenerateActions, "Actions");
     private final InternalGenerator itemGeneration = new InternalGenerator(this::internalGenerateItems, "Items");
     private final InternalGenerator thingGeneration = new InternalGenerator(this::internalGenerateThings, "Things");
@@ -111,8 +111,8 @@ public class SourceGenerator {
 
     /**
      * Delaying generation is especially useful during startup, when item and thing are not all properly initialized.
-     * To avoid overwriting file with incomplete list of things/items/actions, we must avoid writing to the file if the
-     * registries are not completely ready.
+     * To avoid overwriting a file with an incomplete list of things/items/actions, we must avoid writing to the file if
+     * the registries are not completely ready.
      * Until there is no more item/thing/action activating, this code will delay code generation.
      *
      * @param generator The generator responsible for creating the class
@@ -137,11 +137,11 @@ public class SourceGenerator {
         };
         int computedDelay = writeGuardTime;
         // Minimal delay if the file doesn't exist, we can write it
-        Path path = sourceWriter.getPath(sourceWriter.getPackageName(GENERATED), generator.getGeneratedFileName());
+        Path path = sourceWriter.getPath(sourceWriter.getPackageName(GENERATED), generator.generatedFileName());
         if (!path.toFile().exists()) {
             computedDelay = 1000;
         }
-        logger.debug("Scheduling {} generation in {} ms", generator.getGeneratedFileName(), computedDelay);
+        logger.debug("Scheduling {} generation in {} ms", generator.generatedFileName(), computedDelay);
         futureGeneration.put(generator, scheduledPool.schedule(command, computedDelay, TimeUnit.MILLISECONDS));
     }
 
@@ -253,11 +253,11 @@ public class SourceGenerator {
         context.put("classesToImport", actionsByScope.values().stream().flatMap(Collection::stream).toList());
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmmLastName = (
-                args) -> className(((List<freemarker.template.SimpleScalar>) args).get(0).getAsString()).get();
+                args) -> className(((List<freemarker.template.SimpleScalar>) args).getFirst().getAsString()).orElse("");
         context.put("lastName", tmmLastName);
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmmCapitalize = (args) -> capitalize(
-                ((List<freemarker.template.SimpleScalar>) args).get(0).getAsString());
+                ((List<freemarker.template.SimpleScalar>) args).getFirst().getAsString());
         context.put("camelCase", tmmCapitalize);
         context.put("actionsByScope", actionsByScope);
         StringWriter writer = new StringWriter();
@@ -269,7 +269,7 @@ public class SourceGenerator {
 
     /**
      * Return a user-friendly short readable name (without package details) and add the relevant full class name to the
-     * imports list
+     * import list
      *
      * @param type The type to consider
      * @param imports A set to add imports into
@@ -339,7 +339,7 @@ public class SourceGenerator {
 
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmm = (args) -> escapeName(
-                ((List<freemarker.ext.beans.StringModel>) args).get(0).getWrappedObject().toString());
+                ((List<freemarker.ext.beans.StringModel>) args).getFirst().getWrappedObject().toString());
         context.put("escapeName", tmm);
 
         StringWriter writer = new StringWriter();
@@ -366,14 +366,7 @@ public class SourceGenerator {
             List<String> nonGenericParameterTypes) {
     }
 
-    public static class InternalGenerator {
-        private final Callable<@Nullable Void> generator;
-        private final String generatedFileName;
-
-        public InternalGenerator(Callable<@Nullable Void> generator, String generatedFiledName) {
-            this.generator = generator;
-            this.generatedFileName = generatedFiledName;
-        }
+    public record InternalGenerator(Callable<@Nullable Void> generator, String generatedFileName) {
 
         void generate() throws IOException, TemplateException {
             try {
@@ -384,9 +377,5 @@ public class SourceGenerator {
                 throw new IOException("Cannot generate " + generatedFileName, e);
             }
         }
-
-        String getGeneratedFileName() {
-            return generatedFileName;
-        };
     }
 }

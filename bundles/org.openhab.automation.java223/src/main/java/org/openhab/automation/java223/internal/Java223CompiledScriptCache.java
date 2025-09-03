@@ -18,7 +18,6 @@ import java.util.Map;
 import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.openhab.core.service.WatchService;
 import org.openhab.core.service.WatchService.Kind;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -30,7 +29,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class Java223CompiledScriptCache implements WatchService.WatchEventListener {
+public class Java223CompiledScriptCache {
 
     private int cacheSize;
 
@@ -76,7 +75,6 @@ public class Java223CompiledScriptCache implements WatchService.WatchEventListen
      * If a change is detected somewhere in the libraries,
      * then we invalidate all cache
      */
-    @Override
     public void processWatchEvent(Kind kind, Path path) {
         for (Map.Entry<String, Java223CompiledScript> entry : cache.asMap().entrySet()) {
             entry.getValue().invalidate(entry.getKey());

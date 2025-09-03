@@ -29,7 +29,7 @@ import helper.rules.RuleParserException;
 /**
  * Base helper class for all Java223 Scripts.
  * This class needs the helper-lib.jar
- * Features :
+ * Features:
  * - Standard JSR223 OpenHAB bindings already declared as fields for immediate access
  * - Auto execution of a parsing rule method (internalParseRules calling RuleAnnotationParser)
  * - Additional shortcut to useful services (automationManager, sharedCache, ruleManager, metadataRegistry)
@@ -39,10 +39,10 @@ import helper.rules.RuleParserException;
  */
 public abstract class Java223Script {
 
-    // warning : default openhab logger level is error
+    // warning: default openhab logger level is error
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    // all OpenHAB input as a convenience object :
+    // all OpenHAB input as a convenience object:
     protected @InjectBinding Map<String, Object> bindings;
 
     // default preset
@@ -66,7 +66,7 @@ public abstract class Java223Script {
     // for transformation support
     protected @Nullable Object input;
 
-    // additional useful classes :
+    // additional useful classes:
     protected @InjectBinding RuleManager ruleManager;
     protected @InjectBinding ThingManager thingManager;
     protected @InjectBinding MetadataRegistry metadataRegistry;
@@ -89,20 +89,20 @@ public abstract class Java223Script {
     }
 
     /** 
-     * Use this method to manually inject bindings value in an object of your choice.
-     * You probably don't need this (you should use your object as a library and let this helper framework injects it)
+     * Use this method to manually inject binding value in an object of your choice.
+     * You probably don't need this (you should use your object as a library and let this helper framework inject it)
      */
     public void injectBindings(Object objectToInjectInto) {
         BindingInjector.injectBindingsInto(this.getClass().getClassLoader(), bindings, objectToInjectInto);
     }
 
     /**
-     * Use this method to instantiate one of your library with all binding values injected, if you can't use auto injection.
-     * This can be especially useful for one-liner script, because they can't declare library as class member or method parameter.
+     * Use this method to instantiate one of your libraries with all binding values injected if you can't use auto-injection.
+     * This can be especially useful for one-liner script because they can't declare a library as a class member or method parameter.
      * @param clazz
      * @return The instantiated class
      */
     public <T> T createAndInjectBindings(Class<T> clazz) {
-        BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
+        return BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
     }
 }

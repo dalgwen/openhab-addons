@@ -44,10 +44,10 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
 
 /**
- * This class adds a cache for compiled script to Obermuhlner's base class.
+ * This class adds a cache for compiled scripts to Obermuhlner's base class.
  * This class also adds the Invocable aspect to the JavaScriptEngine. The Invocable aspect adds the ability to be called
  * Finally, the compile method is rewritten for our specificity.
- * when loaded and unloaded script event are triggered.
+ * When loaded and unloaded, script events are triggered.
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -125,9 +125,8 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
             String script = scriptInterceptorStrategy.intercept(originalScript);
 
             // reuse the original compilation class, potentially cached
-            Java223CompiledScriptCache.Compiler compilation = (_script) -> {
-                return new Java223CompiledScript(this, this.internalCompilation(_script), java223Strategy);
-            };
+            Java223CompiledScriptCache.Compiler compilation = (_script) -> new Java223CompiledScript(this,
+                    this.internalCompilation(_script), java223Strategy);
             var compiledScriptResult = cache.getOrCompile(script, compilation);
             lastCompiledScript = compiledScriptResult;
             return compiledScriptResult;

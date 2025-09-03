@@ -52,7 +52,7 @@ public class BindingInjector {
      * @param sourceScriptClassLoader The Script class loader initiating the execution
      * @param bindings a bindings maps with value to inject
      * @param objectToInjectInto An object. Its fields will be filled with value from the
-     *            bindings, if a match is found
+     *            bindings if a match is found
      */
     public static void injectBindingsInto(ClassLoader sourceScriptClassLoader, Map<String, Object> bindings,
             Object objectToInjectInto) {
@@ -116,13 +116,13 @@ public class BindingInjector {
             return null;
         }
 
-        // step zero : exclusion case
+        // step zero: exclusion case
         InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
         if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
             return null;
         }
 
-        // first, special case, is the field a library ?
+        // first, special case, is the field a library?
         if (containsLibrary(classLoader, fieldType.getName())) { // it's a library
             InjectBinding libraryAnnotation = fieldType.getAnnotation(InjectBinding.class);
             if (libraryAnnotation != null && !libraryAnnotation.enable()) { // but it's disabled at class level
@@ -131,12 +131,12 @@ public class BindingInjector {
             }
             // has it already been instantiated and stored in the store?
             Object valueToInject = getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType);
-            if (valueToInject != null) { // cannot be null but null-check think so
+            if (valueToInject != null) { // cannot be null, but null-check thinks so
                 return valueToInject;
             }
         }
 
-        // second. It's not a library, so search value in bindings map.
+        // second. It's not a library, so search value in the bindings map.
         // Choose a name to search as a key in the binding map
         // the name can be a path inside the object
         String named;
@@ -248,14 +248,14 @@ public class BindingInjector {
             Object[] parameterValues = getParameterValuesFor(classLoader, constructor, bindings,
                     libAlreadyInstantiated);
             valueToInject = constructor.newInstance(parameterValues);
-            if (valueToInject != null) { // cannot be null but null-check think so
+            if (valueToInject != null) { // cannot be null, but null-check thinks so
                 // store it to avoid multiple instantiation
                 libAlreadyInstantiated.put(fieldType, valueToInject);
                 // and then also use injection into it
                 injectBindingsInto(classLoader, bindings, valueToInject, libAlreadyInstantiated);
             }
         }
-        if (valueToInject == null) { // cannot be null but null-check think so
+        if (valueToInject == null) { // cannot be null, but null-check thinks so
             throw new Java223Exception("Cannot instantiate " + fieldType.getName());
         }
         return (T) valueToInject;
