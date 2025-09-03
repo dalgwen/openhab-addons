@@ -60,8 +60,8 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
-public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrategy, BindingStrategy,
-        CompilationStrategy, WatchService.WatchEventListener {
+public class Java223Strategy
+        implements ExecutionStrategyFactory, ExecutionStrategy, BindingStrategy, CompilationStrategy {
 
     private static final Logger logger = LoggerFactory.getLogger(Java223Strategy.class);
 
@@ -187,7 +187,6 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
         return sumFileObjects;
     }
 
-    @Override
     public void processWatchEvent(WatchService.Kind kind, Path pathEvent) {
         Path fullPath = LIB_DIR.resolve(pathEvent);
 
@@ -238,7 +237,7 @@ public class Java223Strategy implements ExecutionStrategyFactory, ExecutionStrat
             JavaFileObject javafileObject = MemoryFileManager.createSourceFileObject(null, simpleClassName, readString);
             librariesByPath.put(path.toString(), javafileObject);
         } catch (ScriptException | IOException e) {
-            logger.info("Cannot get the file {} as a valid java object. Cause: {} {}", path, e.getClass().getName(),
+            logger.warn("Cannot get the file {} as a valid java object. Cause: {} {}", path, e.getClass().getName(),
                     e.getMessage());
         }
     }

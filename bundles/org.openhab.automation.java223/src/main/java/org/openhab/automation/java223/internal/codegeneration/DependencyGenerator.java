@@ -102,7 +102,7 @@ public class DependencyGenerator {
 
     /**
      * Generate a JAR with useful classes for a client project / IDE
-     * This JAR is not needed, it's just a convenience for writing script smoothly
+     * This JAR is not needed; it's just a convenience for writing scripts smoothly
      */
     public synchronized void createCoreDependencies() {
         try (FileOutputStream outFile = new FileOutputStream(libDir.resolve(CONVENIENCE_DEPENDENCIES_JAR).toFile())) {

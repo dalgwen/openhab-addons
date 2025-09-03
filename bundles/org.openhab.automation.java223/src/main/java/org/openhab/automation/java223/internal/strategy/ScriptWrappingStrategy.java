@@ -38,8 +38,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
     private static final Pattern IMPORT_PATTERN = Pattern.compile("import\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
 
-    private static final String BOILERPLATE_CODE_BEFORE = """
-            import helper.generated.Java223Script;
+    private static final String BOILERPLATE_CODE_COMMON_IMPORT = """
             import org.openhab.core.library.items.*;
             import org.openhab.core.library.types.*;
             import org.openhab.core.library.types.HSBType.*;
@@ -54,16 +53,87 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             import org.openhab.core.library.types.RewindFastforwardType.*;
             import org.openhab.core.library.types.StopMoveType.*;
             import org.openhab.core.library.types.UpDownType.*;
-
-
-            public class WrappedJavaScript extends Java223Script {
-                public Object main() {
             """;
+
+    private static final String BOILERPLATE_CODE_IMPORT_WITHOUT_GENERATION = """
+            import org.openhab.automation.java223.common.BindingInjector;
+            import org.openhab.automation.java223.common.InjectBinding;
+            import org.openhab.automation.java223.common.RunScript;
+            import org.openhab.core.audio.AudioManager;
+            import org.openhab.core.automation.RuleManager;
+            import org.openhab.core.automation.RuleRegistry;
+            import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
+            import org.openhab.core.automation.module.script.defaultscope.ScriptBusEvent;
+            import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
+            import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
+            import org.openhab.core.automation.module.script.rulesupport.shared.ValueCache;
+            import org.openhab.core.items.ItemRegistry;
+            import org.openhab.core.items.MetadataRegistry;
+            import org.openhab.core.thing.ThingManager;
+            import org.openhab.core.thing.ThingRegistry;
+            import org.openhab.core.types.State;
+            import org.openhab.core.voice.VoiceManager;
+            import org.slf4j.Logger;
+            import org.slf4j.LoggerFactory;
+            """;
+
+    private static final String BOILERPLATE_CODE_IMPORT_DECLARATION_WITH_GENERATION = """
+
+            import helper.generated.Java223Script;
+            """;
+
+    private static final String BOILERPLATE_CODE_BEFORE_WITH_GENERATION =
+
+            BOILERPLATE_CODE_IMPORT_DECLARATION_WITH_GENERATION + BOILERPLATE_CODE_COMMON_IMPORT + """
+
+                    public class WrappedJavaScript extends Java223Script {
+                        public Object main() {
+                    """;
+
+    private static final String BOILERPLATE_CODE_INJECTED_MEMBERS_DECLARATION = """
+            protected Logger logger = LoggerFactory.getLogger(this.getClass());
+
+            protected @InjectBinding Map<String, Object> bindings;
+
+            protected @InjectBinding Map<String, State> items;
+            protected @InjectBinding ItemRegistry ir;
+            protected @InjectBinding ItemRegistry itemRegistry;
+            protected @InjectBinding ThingRegistry things;
+            protected @InjectBinding RuleRegistry rules;
+            protected @InjectBinding ScriptBusEvent events;
+            protected @InjectBinding ScriptThingActions actions;
+            protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
+            protected @InjectBinding ScriptExtensionManagerWrapper se;
+            protected @InjectBinding VoiceManager voice;
+            protected @InjectBinding AudioManager audio;
+
+            protected @InjectBinding(preset = "RuleSupport", named = "automationManager") ScriptedAutomationManager automationManager;
+            protected @InjectBinding(preset = "cache", named = "sharedCache") ValueCache sharedCache;
+            protected @InjectBinding(preset = "cache", named = "privateCache") ValueCache privateCache;
+
+            protected Object input;
+
+            protected @InjectBinding RuleManager ruleManager;
+            protected @InjectBinding ThingManager thingManager;
+            protected @InjectBinding MetadataRegistry metadataRegistry;
+            """;
+
+    private static final String BOILERPLATE_CODE_BEFORE_WITHOUT_GENERATION =
+
+            BOILERPLATE_CODE_IMPORT_WITHOUT_GENERATION + BOILERPLATE_CODE_COMMON_IMPORT
+                    + " \npublic class WrappedJavaScript {" + BOILERPLATE_CODE_INJECTED_MEMBERS_DECLARATION
+                    + "\n\tpublic Object main() {\n";
 
     private static final String BOILERPLATE_CODE_AFTER = """
                 }
             }
             """;
+
+    private Boolean enableHelper;
+
+    public ScriptWrappingStrategy(Boolean enableHelper) {
+        this.enableHelper = enableHelper;
+    }
 
     @Override
     public @Nullable String intercept(@Nullable String script) {
@@ -101,7 +171,11 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
         modifiedScript.append(packageDeclarationLine).append("\n");
         modifiedScript.append(String.join("\n", importLines));
         modifiedScript.append("\n");
-        modifiedScript.append(BOILERPLATE_CODE_BEFORE);
+        if (enableHelper) {
+            modifiedScript.append(BOILERPLATE_CODE_BEFORE_WITH_GENERATION);
+        } else {
+            modifiedScript.append(BOILERPLATE_CODE_BEFORE_WITHOUT_GENERATION);
+        }
         modifiedScript.append(String.join("\n", scriptLines));
         modifiedScript.append("\n");
         if (!returnIsPresent) {
@@ -110,5 +184,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
         modifiedScript.append(BOILERPLATE_CODE_AFTER);
 
         return modifiedScript.toString();
+    }
+
+    public void setEnableHelper(Boolean enableHelper) {
+        this.enableHelper = enableHelper;
     }
 }

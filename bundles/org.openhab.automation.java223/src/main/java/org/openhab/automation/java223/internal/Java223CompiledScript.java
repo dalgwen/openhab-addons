@@ -45,7 +45,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
     private Class<?> java223CompiledClass;
 
     /**
-     * Hold the script source if, and only if, the script should be recompiled the next time it is needed
+     * Hold the script source if, and only if, the script should be recompiled the next time it is necessary
      */
     @Nullable
     private String recompileScriptSource = null;
