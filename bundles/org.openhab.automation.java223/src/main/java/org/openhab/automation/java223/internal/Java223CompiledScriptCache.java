@@ -36,7 +36,6 @@ public class Java223CompiledScriptCache {
     private Cache<String, Java223CompiledScript> cache;
 
     public Java223CompiledScriptCache(int cacheSize) {
-        super();
         this.cacheSize = cacheSize;
         cache = Caffeine.newBuilder().maximumSize(cacheSize).build();
     }
