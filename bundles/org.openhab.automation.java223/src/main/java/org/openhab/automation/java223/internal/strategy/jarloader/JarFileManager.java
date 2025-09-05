@@ -144,7 +144,6 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         Path libDirectory;
 
         public JarFileManagerFactory(Path libDirectory, ClassLoader parentClassLoader) {
-            super();
             this.parentClassLoader = parentClassLoader;
             this.libDirectory = libDirectory;
             // temporary/default use of the parent :

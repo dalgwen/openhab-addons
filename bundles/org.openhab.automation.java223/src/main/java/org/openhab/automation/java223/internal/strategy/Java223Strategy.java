@@ -79,7 +79,6 @@ public class Java223Strategy
     private boolean allowInstanceReuseDefaultProperty;
 
     public Java223Strategy(Map<String, Object> additionalBindings, ClassLoader classLoader) {
-        super();
         this.additionalBindings = additionalBindings;
         this.allowInstanceReuseDefaultProperty = false;
         jarFileManagerfactory = new JarFileManagerFactory(LIB_DIR, classLoader);
