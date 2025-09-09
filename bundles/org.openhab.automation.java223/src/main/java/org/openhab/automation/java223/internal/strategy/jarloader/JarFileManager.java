@@ -21,7 +21,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -132,16 +134,19 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
     public static class JarFileManagerFactory {
 
         private static final Lock FILEMANAGER_LOCK = new ReentrantLock();
-        private static final Predicate<Path> JAR_FILTER = p -> p.toString().endsWith(".jar");
 
+        private static final Predicate<Path> JAR_FILTER = p -> p.toString().endsWith(".jar");
         private Map<String, List<JavaFileObject>> upToDateAdditionalPackages = Map.of();
         private ClassLoader upToDateClassLoader;
-        private final ClassLoader parentClassLoader;
 
+        private final ClassLoader parentClassLoader;
         MessageDigest md5Digest;
+
         byte[] md5LibSum = new byte[0];
 
         Path libDirectory;
+
+        private final Set<Path> jarPaths = Collections.synchronizedSet(new HashSet<>());
 
         public JarFileManagerFactory(Path libDirectory, ClassLoader parentClassLoader) {
             this.parentClassLoader = parentClassLoader;
@@ -155,6 +160,10 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
             }
         }
 
+        public Set<Path> getAllJarPaths() {
+            return jarPaths;
+        }
+
         public JarFileManager<JavaFileManager> create(JavaFileManager fileManager) {
             return new JarFileManager<>(fileManager, upToDateClassLoader, upToDateAdditionalPackages);
         }
@@ -162,6 +171,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         public void rebuildLibPackages() {
             FILEMANAGER_LOCK.lock();
 
+            jarPaths.clear();
             try (Stream<Path> libFileStream = Files.list(libDirectory)) {
                 List<Path> libFiles = libFileStream.filter(JAR_FILTER) //
                         .filter((path) -> !path.getFileName().toString() // exclude convenience lib
@@ -202,6 +212,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
                     .equals(DependencyGenerator.CONVENIENCE_DEPENDENCIES_JAR)) {
                 return;
             }
+            jarPaths.add(newLib);
             try {
                 FILEMANAGER_LOCK.lock();
                 logger.debug("Library to load to memory: {}", newLib);

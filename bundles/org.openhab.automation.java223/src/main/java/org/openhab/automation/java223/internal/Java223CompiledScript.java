@@ -21,7 +21,6 @@ import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 
 import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
@@ -42,14 +41,6 @@ public class Java223CompiledScript extends JavaCompiledScript {
     @Nullable
     private Object java223CompiledInstance;
 
-    private Class<?> java223CompiledClass;
-
-    /**
-     * Hold the script source if, and only if, the script should be recompiled the next time it is necessary
-     */
-    @Nullable
-    private String recompileScriptSource = null;
-
     private final Java223Strategy java223Strategy;
 
     /**
@@ -61,35 +52,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
      */
     public Java223CompiledScript(JavaScriptEngine engine, Class<?> compiledClass, Java223Strategy java223Strategy) {
         super(engine, compiledClass, null, java223Strategy, java223Strategy);
-        this.java223CompiledClass = compiledClass;
         this.java223Strategy = java223Strategy;
-    }
-
-    @Override
-    public synchronized Class<?> getCompiledClass() {
-        try {
-            return getCompiledClassSafe();
-        } catch (ScriptException e) {
-            throw new Java223Exception("Cannot recompile class", e);
-        }
-    }
-
-    /**
-     * Get the class, possibly recompiling it if necessary
-     * 
-     * @return The compiled class
-     * @throws ScriptException Only when the script should be recompiled and there is an error during it.
-     */
-    public synchronized Class<?> getCompiledClassSafe() throws ScriptException {
-        Class<?> localCompiledClass = java223CompiledClass;
-        String localRecompileScriptSource = recompileScriptSource;
-        if (localRecompileScriptSource != null) { // a recompilation has been asked
-            this.java223CompiledInstance = null;
-            localCompiledClass = ((Java223ScriptEngine) getEngine()).internalCompilation(localRecompileScriptSource);
-            this.java223CompiledClass = localCompiledClass;
-            this.recompileScriptSource = null;
-        }
-        return localCompiledClass;
     }
 
     @Override
@@ -120,10 +83,6 @@ public class Java223CompiledScript extends JavaCompiledScript {
     @Override
     public @Nullable Object getCompiledInstance() {
         return java223CompiledInstance;
-    }
-
-    public void invalidate(String scriptSource) {
-        this.recompileScriptSource = scriptSource;
     }
 
     public void setCompiledInStance(Object compiledInstance) {

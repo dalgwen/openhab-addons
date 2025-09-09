@@ -241,9 +241,9 @@ public class BindingInjector {
             throws InstantiationException, IllegalAccessException, InvocationTargetException {
         Object valueToInject = libAlreadyInstantiated.get(fieldType);
         if (valueToInject == null) { // not instantiated, create it
-            Constructor<T>[] constructors = (Constructor<T>[]) fieldType.getDeclaredConstructors();
+            Constructor<?>[] constructors = (Constructor<?>[]) fieldType.getDeclaredConstructors();
             // use the empty constructor if available, or the first one
-            Constructor<T> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
+            Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
                     .orElseGet(() -> constructors[0]);
             Object[] parameterValues = getParameterValuesFor(classLoader, constructor, bindings,
                     libAlreadyInstantiated);
@@ -258,7 +258,9 @@ public class BindingInjector {
         if (valueToInject == null) { // cannot be null, but null-check thinks so
             throw new Java223Exception("Cannot instantiate " + fieldType.getName());
         }
-        return (T) valueToInject;
+        @SuppressWarnings("unchecked")
+        T valueToInject1 = (T) valueToInject;
+        return valueToInject1;
     }
 
     private static boolean containsLibrary(ClassLoader classLoader, String name) {

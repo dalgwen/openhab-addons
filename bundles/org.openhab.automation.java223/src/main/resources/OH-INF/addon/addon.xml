@@ -19,16 +19,11 @@
 			<description>Cache compilation settings.</description>
 		</parameter-group>
 
-		<parameter name="scriptCacheSize" type="integer" groupName="cache">
-			<default>50</default>
-			<label>Script Cache Size</label>
-			<description>Script compilation cache size. 0 to disable. A positive number allows keeping compilation result.</description>
-			<advanced>true</advanced>
-		</parameter>
 		<parameter name="allowInstanceReuse" type="boolean" groupName="cache">
 			<label>Allow Script Instance Reuse</label>
 			<description>Reuse a script instance if found in the cache. Allow sharing data between subsequent executions. Note:
 				Beware of concurrency issues</description>
+			<default>false</default>
 		</parameter>
 		<parameter name="enableHelper" type="boolean" groupName="helperLib">
 			<label>Enable Helper Library</label>

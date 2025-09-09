@@ -41,6 +41,7 @@ import org.openhab.automation.java223.internal.codegeneration.SourceWriter;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.RuleManager;
+import org.openhab.core.automation.module.script.ScriptDependencyTracker;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
@@ -88,13 +89,14 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     private final PackageResourceListingStrategy osgiPackageResourceListingStrategy;
     private final Java223Strategy java223Strategy;
     private final ScriptWrappingStrategy scriptWrappingStrategy;
-    private final Java223CompiledScriptCache compiledScriptCache;
 
     private final WatchService watchService;
 
     private final SourceGenerator sourceGenerator;
     private final SourceWriter sourceWriter;
     private final DependencyGenerator dependencyGenerator;
+    private final Java223DependencyTracker dependencyTracker;
+
     private int startupGuardTime;
     private Integer writeWaitTime;
 
@@ -110,7 +112,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     @Activate
     public Java223ScriptEngineFactory(BundleContext bundleContext, Map<String, Object> properties,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
-            @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry) {
+            @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
+            @Reference Java223DependencyTracker dependencyTracker) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -122,6 +125,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.watchService = watchService;
         this.bundleContext = bundleContext;
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
+        this.dependencyTracker = dependencyTracker;
 
         String additionalBundlesConfig = ConfigParser
                 .valueAsOrElse(properties.get("additionalBundles"), String.class, "").trim();
@@ -130,7 +134,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         enableHelper = ConfigParser.valueAsOrElse(properties.get("enableHelper"), Boolean.class, true);
         writeWaitTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"), Integer.class, 10000);
         startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
-        Integer scriptCacheSize = ConfigParser.valueAsOrElse(properties.get("scriptCacheSize"), Integer.class, 50);
         Boolean allowInstanceReuse = ConfigParser.valueAsOrElse(properties.get("allowInstanceReuse"), Boolean.class,
                 false);
 
@@ -139,7 +142,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper);
-        compiledScriptCache = new Java223CompiledScriptCache(scriptCacheSize);
 
         try {
             this.dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,
@@ -156,6 +158,9 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         java223Strategy.scanLibDirectory();
         // When a lib changes, notify
         watchService.registerListener(this, LIB_DIR);
+        // registering the watch service for dependency tracker AFTER our own
+        dependencyTracker.finalizeInitialisation();
+        dependencyGenerator.setAdditionalConfig(additionalBundlesConfig, additionalClassesConfig);
 
         logger.info("Bundle activated");
     }
@@ -215,7 +220,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                 "");
         String additionalClassesConfig = ConfigParser.valueAsOrElse(properties.get("additionalClasses"), String.class,
                 "");
-        Integer scriptCacheSize = ConfigParser.valueAsOrElse(properties.get("scriptCacheSize"), Integer.class, 50);
         Integer stabilityGenerationWaitTime = ConfigParser.valueAsOrElse(properties.get("stabilityGenerationWaitTime"),
                 Integer.class, 10000);
         Boolean allowInstanceReuse = ConfigParser.valueAsOrElse(properties.get("allowInstanceReuse"), Boolean.class,
@@ -224,7 +228,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         this.startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
 
         scriptWrappingStrategy.setEnableHelper(enableHelper);
-        compiledScriptCache.setCacheSize(scriptCacheSize);
         this.writeWaitTime = stabilityGenerationWaitTime;
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         if (enableHelper) {
@@ -261,8 +264,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     @Override
     public @Nullable ScriptEngine createScriptEngine(String scriptType) {
         if (getScriptTypes().contains(scriptType)) {
-            return new Java223ScriptEngine(compiledScriptCache, java223Strategy, osgiPackageResourceListingStrategy,
-                    scriptWrappingStrategy, Arrays.asList("-g", "-parameters"));
+            return new Java223ScriptEngine(java223Strategy, osgiPackageResourceListingStrategy, scriptWrappingStrategy,
+                    Arrays.asList("-g", "-parameters"));
         }
         return null;
     }
@@ -334,9 +337,12 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     public void processWatchEvent(WatchService.Kind kind, Path fullPath) {
         // When a lib changes, update internal lib storage
         java223Strategy.processWatchEvent(kind, fullPath);
-        // When a lib changes, invalidate the cache of compiled scripts
-        compiledScriptCache.processWatchEvent(kind, fullPath);
         // When a lib is removed, SourceWriter should know because it may have to regenerate it
         sourceWriter.processWatchEvent(kind, fullPath);
+    }
+
+    @Override
+    public @Nullable ScriptDependencyTracker getDependencyTracker() {
+        return dependencyTracker;
     }
 }

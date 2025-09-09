@@ -22,10 +22,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.script.ScriptException;
@@ -55,7 +59,7 @@ import ch.obermuhlner.scriptengine.java.name.DefaultNameStrategy;
 import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 
 /**
- * A one-for-all strategy for a goal : providing binding / execution / library compilation and management to java223
+ * A one-for-all strategy for a goal: providing binding / execution / library compilation and management to java223
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -70,8 +74,8 @@ public class Java223Strategy
     // Additional bindings, not in the openhab JSR 223 specification
     private final Map<String, Object> additionalBindings;
 
-    // Keeping a list of library .java file in the lib directory
-    private static final Map<String, JavaFileObject> librariesByPath = new HashMap<>();
+    // Keeping a list of .java files libraries in the lib directory
+    private static final Map<String, JavaFileObject> librariesByPath = Collections.synchronizedMap(new HashMap<>());
 
     NameStrategy nameStrategy = new DefaultNameStrategy();
     JarFileManagerFactory jarFileManagerfactory;
@@ -99,7 +103,7 @@ public class Java223Strategy
     @Override
     public void associateBindings(@Nullable Class<?> compiledClass, @Nullable Object compiledInstance,
             Map<String, Object> bindings) {
-        // adding a special self reference to bindings : "bindings", to receive a map with all bindings
+        // adding a special self-reference to bindings: "bindings", to receive a map with all bindings
         bindings.put("bindings", bindings);
         // adding some custom additional fields
         bindings.putAll(additionalBindings);
@@ -113,7 +117,7 @@ public class Java223Strategy
 
     /**
      * Contrary to the original architecture, this executes method doesn't use an instance, but the CompiledScript
-     * itself. It is indeed responsible for instantiation, with the bindings data.
+     * itself. It is indeed responsible for instantiation, with the binding's data.
      * 
      * @param instance an instantiated script
      * @param bindings bindings data to inject
@@ -124,7 +128,7 @@ public class Java223Strategy
 
         Class<?> compiledClass = instance.getClass();
 
-        // inject bindings data in the script
+        // inject binding's data in the script
         ClassLoader classLoader = compiledClass.getClassLoader();
         if (classLoader == null) { // should not happen
             throw new Java223Exception("Cannot get the classloader of " + compiledClass.getName());
@@ -141,6 +145,7 @@ public class Java223Strategy
                             null);
                     var returnedLocal = method.invoke(instance, parameterValues);
                     // keep arbitrarily only the first returned value
+                    // comparing this optional to null is OK. Null value means no method was yet executed.
                     if (returned == null || returned.isEmpty()) {
                         if (returnedLocal != null) {
                             returned = Optional.of(returnedLocal);
@@ -159,6 +164,7 @@ public class Java223Strategy
         }
 
         // return if there was at least one execution
+        // comparing this optional to null is OK. Null value means no method was executed.
         if (returned != null) {
             return returned.orElse(null);
         }
@@ -245,6 +251,14 @@ public class Java223Strategy
         librariesByPath.remove(path.toString());
     }
 
+    public Set<Path> getAllLibraries() {
+        // combine lib package (jar) and lib java file :
+        HashSet<Path> libsPath = new HashSet<Path>();
+        libsPath.addAll(librariesByPath.keySet().stream().map(Path::of).collect(Collectors.toSet()));
+        libsPath.addAll(jarFileManagerfactory.getAllJarPaths());
+        return libsPath;
+    }
+
     public void scanLibDirectory() {
         try (Stream<Path> walk = Files.walk(LIB_DIR)) {
             walk.filter(Files::isRegularFile)
@@ -269,18 +283,14 @@ public class Java223Strategy
 
         // default re-instantiation option overwritten by annotation if present
         boolean instanceReuse = allowInstanceReuseDefaultProperty;
-        Class<?> compiledClass = null;
-        try {
-            compiledClass = compiledScript.getCompiledClassSafe();
-        } catch (ScriptException e) {
-            throw new Java223Exception("Cannot");
-        }
+        Class<?> compiledClass = compiledScript.getCompiledClass();
+
         ReuseScriptInstance reuseAnnotation = compiledClass.getAnnotation(ReuseScriptInstance.class);
         if (reuseAnnotation != null) {
             instanceReuse = reuseAnnotation.value();
         }
 
-        // if allowed, get from cache and return
+        // if allowed, get from the cache and return
         var alreadyExistingScriptInstance = compiledScript.getCompiledInstance();
         if (instanceReuse && alreadyExistingScriptInstance != null) {
             return alreadyExistingScriptInstance;
@@ -299,7 +309,7 @@ public class Java223Strategy
             }
             Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
             Object compiledInstance = constructor.newInstance(parameterValues);
-            if (compiledInstance == null) { // can't be null but null-check think so
+            if (compiledInstance == null) { // can't be null, but null-check thinks so
                 throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
             }
             compiledScript.setCompiledInStance(compiledInstance);

@@ -75,6 +75,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             import org.openhab.core.voice.VoiceManager;
             import org.slf4j.Logger;
             import org.slf4j.LoggerFactory;
+            import java.util.Map;
             """;
 
     private static final String BOILERPLATE_CODE_IMPORT_DECLARATION_WITH_GENERATION = """
@@ -118,11 +119,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             protected @InjectBinding MetadataRegistry metadataRegistry;
             """;
 
-    private static final String BOILERPLATE_CODE_BEFORE_WITHOUT_GENERATION =
-
-            BOILERPLATE_CODE_IMPORT_WITHOUT_GENERATION + BOILERPLATE_CODE_COMMON_IMPORT
-                    + " \npublic class WrappedJavaScript {" + BOILERPLATE_CODE_INJECTED_MEMBERS_DECLARATION
-                    + "\n\tpublic Object main() {\n";
+    private static final String BOILERPLATE_CODE_BEFORE_WITHOUT_GENERATION = BOILERPLATE_CODE_IMPORT_WITHOUT_GENERATION
+            + BOILERPLATE_CODE_COMMON_IMPORT + " \npublic class WrappedJavaScript {"
+            + BOILERPLATE_CODE_INJECTED_MEMBERS_DECLARATION + "\n\tpublic Object main() {\n";
 
     private static final String BOILERPLATE_CODE_AFTER = """
                 }
