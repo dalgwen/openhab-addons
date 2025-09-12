@@ -14,6 +14,7 @@ package org.openhab.automation.java223.internal.codegeneration;
 
 import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,15 +46,19 @@ public class SourceWriter {
     // and sources are already stored in memory by our implementation of MemoryJavaFileObject
     protected final Map<String, String> generatedClassesSources = new HashMap<>();
 
-    private final Path folder;
+    protected final Path folder;
 
     public SourceWriter(Path folder) throws IOException {
         this.folder = folder;
     }
 
     public void createHelperDirectory() throws IOException {
-        String helperPackageFolder = HELPER_PACKAGE.replaceAll("\\.", "/");
-        Files.createDirectories(folder.resolve(helperPackageFolder));
+        Files.createDirectories(getHelperPath());
+    }
+
+    public Path getHelperPath() {
+        String helperPackageFolder = HELPER_PACKAGE.replace('.', File.separatorChar);
+        return folder.resolve(helperPackageFolder);
     }
 
     public void processWatchEvent(Kind kind, Path path) {
@@ -89,8 +94,8 @@ public class SourceWriter {
     }
 
     protected Path getPath(String packageName, String className) {
-        String packageFolder = packageName.replaceAll("\\.", "/");
-        return folder.resolve(packageFolder + "/" + className + "." + Java223Constants.JAVA_FILE_TYPE);
+        String packageFolder = packageName.replace('.', File.separatorChar);
+        return folder.resolve(packageFolder + File.separator + className + "." + Java223Constants.JAVA_FILE_TYPE);
     }
 
     protected boolean sourceHasChange(String packageName, String className, String newSource) {
