@@ -18,6 +18,8 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 
@@ -34,6 +36,8 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 @NonNullByDefault
 public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
+    private static final Logger logger = LoggerFactory.getLogger(ScriptWrappingStrategy.class);
+
     private static final Pattern NAME_PATTERN = Pattern.compile("public\\s+class\\s+.*");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
     private static final Pattern IMPORT_PATTERN = Pattern.compile("import\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
@@ -41,18 +45,18 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
     private static final String BOILERPLATE_CODE_COMMON_IMPORT = """
             import org.openhab.core.library.items.*;
             import org.openhab.core.library.types.*;
-            import org.openhab.core.library.types.HSBType.*;
-            import org.openhab.core.library.types.IncreaseDecreaseType.*;
-            import org.openhab.core.library.types.NextPreviousType.*;
-            import org.openhab.core.library.types.OnOffType.*;
-            import org.openhab.core.library.types.OpenClosedType.*;
-            import org.openhab.core.library.types.PercentType.*;
-            import org.openhab.core.library.types.PlayPauseType.*;
-            import org.openhab.core.library.types.PointType.*;
-            import org.openhab.core.library.types.QuantityType.*;
-            import org.openhab.core.library.types.RewindFastforwardType.*;
-            import org.openhab.core.library.types.StopMoveType.*;
-            import org.openhab.core.library.types.UpDownType.*;
+            import static org.openhab.core.library.types.HSBType.*;
+            import static org.openhab.core.library.types.IncreaseDecreaseType.*;
+            import static org.openhab.core.library.types.NextPreviousType.*;
+            import static org.openhab.core.library.types.OnOffType.*;
+            import static org.openhab.core.library.types.OpenClosedType.*;
+            import static org.openhab.core.library.types.PercentType.*;
+            import static org.openhab.core.library.types.PlayPauseType.*;
+            import static org.openhab.core.library.types.PointType.*;
+            import static org.openhab.core.library.types.QuantityType.*;
+            import static org.openhab.core.library.types.RewindFastforwardType.*;
+            import static org.openhab.core.library.types.StopMoveType.*;
+            import static org.openhab.core.library.types.UpDownType.*;
             """;
 
     private static final String BOILERPLATE_CODE_IMPORT_WITHOUT_GENERATION = """
@@ -181,8 +185,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             modifiedScript.append("return null;");
         }
         modifiedScript.append(BOILERPLATE_CODE_AFTER);
-
-        return modifiedScript.toString();
+        String returnedScript = modifiedScript.toString();
+        logger.trace("Full script wrapped {}", returnedScript);
+        return returnedScript;
     }
 
     public void setEnableHelper(Boolean enableHelper) {

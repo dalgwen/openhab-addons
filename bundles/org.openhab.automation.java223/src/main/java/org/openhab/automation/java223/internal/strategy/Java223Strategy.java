@@ -176,7 +176,7 @@ public class Java223Strategy
 
     @Override
     public Map<String, Object> retrieveBindings(Class<?> compiledClass, Object compiledInstance) {
-        // not needed ? What is the use case ?
+        // not needed? What is the use case?
         return new HashMap<>();
     }
 
@@ -253,7 +253,7 @@ public class Java223Strategy
 
     public Set<Path> getAllLibraries() {
         // combine lib package (jar) and lib java file :
-        HashSet<Path> libsPath = new HashSet<Path>();
+        HashSet<Path> libsPath = new HashSet<>();
         libsPath.addAll(librariesByPath.keySet().stream().map(Path::of).collect(Collectors.toSet()));
         libsPath.addAll(jarFileManagerfactory.getAllJarPaths());
         return libsPath;

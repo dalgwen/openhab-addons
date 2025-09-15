@@ -48,9 +48,8 @@ import ch.obermuhlner.scriptengine.java.name.NameStrategy;
 import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStrategy;
 
 /**
- * This class adds a cache for compiled scripts to Obermuhlner's base class.
- * This class also adds the Invocable aspect to the JavaScriptEngine. The Invocable aspect adds the ability to be called
- * Finally, the compile method is rewritten for our specificity.
+ * This class adds the Invocable aspect to the JavaScriptEngine. The Invocable aspect adds the ability to be called
+ * The compile method is also rewritten for our specificity.
  * When loaded and unloaded, script events are triggered.
  *
  * @author Gwendal Roulleau - Initial contribution
