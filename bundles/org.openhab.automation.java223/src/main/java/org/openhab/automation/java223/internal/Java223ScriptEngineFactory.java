@@ -115,7 +115,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     public Java223ScriptEngineFactory(BundleContext bundleContext, Map<String, Object> properties,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
-            @Reference Java223DependencyTracker dependencyTracker) {
+            @Reference Java223DependencyTracker dependencyTracker, @Reference RuleManager ruleManager,
+            @Reference ThingManager thingManager, @Reference MetadataRegistry metadataRegistry) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -140,7 +141,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                 false);
 
         osgiPackageResourceListingStrategy = this::listClassResources;
-        java223Strategy = new Java223Strategy(getAdditionalBindings(),
+        java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager, metadataRegistry),
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper);
@@ -325,30 +326,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
      *
      * @return Additional data to use when binding
      */
-    private Map<String, Object> getAdditionalBindings() {
-        // If the openHAB cache has been cleaned. The service reference to the RuleManager could be null during
-        // initialization. In this case, we loop to wait a little bit and try again.
-        RuleManager ruleManager = null;
-        for (int nbTry = 1; nbTry <= 20; nbTry++) {
-            try {
-                ruleManager = bundleContext.getService(bundleContext.getServiceReference(RuleManager.class));
-                break;
-            } catch (NullPointerException e) {
-                logger.warn(
-                        "Could not retrieve RuleManager service. Cache cleaned ? Will wait a little bit and try again. {}/20",
-                        nbTry);
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ignored) {
-                }
-            }
-        }
-        if (ruleManager == null) {
-            throw new IllegalStateException("RuleManager is still null. Initialization failed.");
-        }
-        ThingManager thingManager = bundleContext.getService(bundleContext.getServiceReference(ThingManager.class));
-        MetadataRegistry metadataRegistry = bundleContext
-                .getService(bundleContext.getServiceReference(MetadataRegistry.class));
+    private Map<String, Object> getAdditionalBindings(RuleManager ruleManager, ThingManager thingManager,
+            MetadataRegistry metadataRegistry) {
         return Map.of(Java223Constants.RULE_MANAGER, ruleManager, //
                 Java223Constants.METADATA_REGISTRY, metadataRegistry, //
                 Java223Constants.THING_MANAGER, thingManager);
