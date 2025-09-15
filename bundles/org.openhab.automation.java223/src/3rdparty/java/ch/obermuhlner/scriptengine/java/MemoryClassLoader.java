@@ -40,10 +40,10 @@ public class MemoryClassLoader extends ClassLoader {
         this.mapClassBytes = mapClassBytes;
 
         try {
-            URL url = new URL(MEMORY_CLASS_URL);
+            URL url = new java.net.URI(MEMORY_CLASS_URL).toURL();
             CodeSource codeSource = new CodeSource(url, (Certificate[]) null);
             protectionDomain = new ProtectionDomain(codeSource, null, this, new Principal[0]);
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | java.net.URISyntaxException e) {
             throw new RuntimeException(e);
         }
     }
