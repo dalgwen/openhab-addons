@@ -86,7 +86,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     public static final String HELPER_LIB_JAR = "helper-lib.jar";
 
     private final BundleWiring bundleWiring;
-    private final BundleContext bundleContext;
 
     private final PackageResourceListingStrategy osgiPackageResourceListingStrategy;
     private final Java223Strategy java223Strategy;
@@ -126,7 +125,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         }
 
         this.watchService = watchService;
-        this.bundleContext = bundleContext;
         this.bundleWiring = bundleContext.getBundle().adapt(BundleWiring.class);
         this.dependencyTracker = dependencyTracker;
 
