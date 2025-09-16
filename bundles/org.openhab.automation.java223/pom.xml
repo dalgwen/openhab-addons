@@ -19,7 +19,7 @@
       <groupId>org.freemarker</groupId>
       <artifactId>freemarker</artifactId>
       <version>2.3.32</version>
-      <scope>compile</scope>
+      <scope>runtime</scope>
     </dependency>
     <!-- jdt annotation classes are included because we want to be able to
       export them to the dependencies jar -->
