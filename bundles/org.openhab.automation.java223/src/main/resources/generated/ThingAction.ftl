@@ -47,13 +47,12 @@ public class ${simpleClassName} {
             Class<?> thingActionClass = thingActions.getClass();
 <#if (method.parameterTypes()?size > 0)>
             Method method = thingActionClass.getMethod("${method.name()}", <#list method.nonGenericParameterTypes() as parameter>${parameter}.class<#sep>, </#list>);
-            <#if (method.returnValueType() != "void")>
+            <#if (method.returnValueType() != "void")>@SuppressWarnings("unused")
             Object returnValue = </#if>method.invoke(thingActions, <#list 1..method.parameterTypes()?size as i>p${i}<#sep>, </#list>);
 <#else>
             Method method = thingActionClass.getMethod("${method.name()}");
             <#if (method.returnValueType() != "void")>@SuppressWarnings("unused")
-            Object returnValue = <#else>
-           </#if>method.invoke(thingActions);
+            Object returnValue = </#if>method.invoke(thingActions);
 </#if>
 <#if (method.returnValueType() != "void")>
             return (${method.returnValueType()}) returnValue;
