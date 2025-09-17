@@ -9,7 +9,6 @@ Features :
 - library support for sharing code (.jar and .java)
 - rule annotations available in the helper library for creating rules the easiest way
 - helper library files auto generation for items, things, and actions, with strong typing and ease of use
-- cache compiled scripts in memory for blazingly fast executions after the first one (sub millisecond overload)
 - no boilerplate code for simple script: you can do a one liner script, as declaring a class and a method is optional.
 - optional reuse of instances script to share values between execution occurrences
 - designed to be easily used with your favorite IDE
@@ -177,7 +176,7 @@ public class MyRule extends Java223Script {
 }
 ```
 
-This rule above is triggered by a 'ON' state update of an item linked to a detector, and then light a bulb : **Here really shines the JSR223 for Java : no random 'magic' strings, full auto-completion from your IDE, strongly typed code and no misspelling mistake possible.**
+This rule above is triggered by an 'ON' state update of an item linked to a detector, and then light a bulb : **Here really shines the JSR223 for Java : no random 'magic' strings, full auto-completion from your IDE, strongly typed code and no misspelling mistake possible.**
 
 You can also use automatic injection **in your rule method parameter**. It is especially useful for having strongly typed parameter. Take a look at this rule, triggered by two different detectors:
 
@@ -251,7 +250,7 @@ This 'wrapping' will take place if nowhere in your code a trimmed line starts wi
 
 If you need to import some class, you can also do it. The import statements (lines starting with `import `) will be parsed and added in the beginning of the resulting wrapper script, before the wrapping class and method.
 
-You can return a value. The line returning the value MUST begins with `return `. This is useful for Transformation.
+You can return a value. The line returning the value MUST begin with `return `. This is useful for Transformation.
 
 But because your code is wrapped, the following functionalities are not available:
 
@@ -338,7 +337,7 @@ A one liner can also work
 
 ## Create a simple rule
 
-This rule is triggered by a 'ON' state update of an item linked to a detector, and then light a bulb. 
+This rule is triggered by an 'ON' state update of an item linked to a detector, and then light a bulb.
 
 ```java
 import ...;
@@ -355,7 +354,7 @@ public class MyRule extends Java223Script {
 
 ## Create a rule with several trigger and options
 
-This time, the rule is triggered by a 'ON' state update on one of two possible detectors.
+This time, the rule is triggered by an 'ON' state update on one of two possible detectors.
 The method parameter is a strongly typed library element (`ItemStateChange`) and as such, its field are auto injected with the right value from the input. Thanks to this, it is easy to get the input parameters without risking using a wrong parameter name. For example, we get here the name of the item triggering the detection, for a detailed log.
 Instead of the default (the method name used for the label of the rule), it has a description, and a dedicated name for the label, and both will be shown on the openHAB GUI.
 
@@ -432,8 +431,8 @@ public class ConstructorInjectionExample {
 
 ## Run another rule or script
 
-You may want to run another rule or a script. The rule manager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
-First, inject the rule manager in your script, then use it with the runNow method and the UID of the rule.
+You may want to run another rule or a script. The ruleManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
+First, inject the ruleManager in your script, then use it with the runNow method and the UID of the rule.
 
 Tip : The ruleManager is already declared as a field in the Java223Script helper class that you can inherit.
 
@@ -454,7 +453,7 @@ public class RunAnotherRule {
 
 ## Disable a thing
 
-The ThingManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it. It is also available in the base class `Java223Script`, as shown in this example.
+The thingManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it. It is also available in the base class `Java223Script`, as shown in this example.
 
 ```java 
 import java.util.Map;
@@ -470,7 +469,7 @@ public class DisableThing extends Java223Script {
 
 ## Use metadata
 
-The MetadataRegistry is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it. This script overwrites Google Assistant metadata every time it is executed (so, at each openHAB startup), effectively keeping this file as some kind of external 'database' where you can store all your metadata.
+The metadataRegistry is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it. This script overwrites Google Assistant metadata every time it is executed (so, at each openHAB startup), effectively keeping this file as some kind of external 'database' where you can store all your metadata.
 
 ```java 
 public class MetadataDatabase {
