@@ -73,6 +73,8 @@
             <phase>package</phase>
             <configuration>
               <excludes>
+                <exclude>freemarker/ext/ant/**</exclude>
+                <exclude>freemarker/ext/rhino/**</exclude>
                 <exclude>helper/**</exclude>
               </excludes>
             </configuration>
