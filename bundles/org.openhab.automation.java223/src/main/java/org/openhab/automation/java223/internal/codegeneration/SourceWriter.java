@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.core.service.WatchService.Kind;
 import org.slf4j.Logger;
@@ -57,8 +58,7 @@ public class SourceWriter {
     }
 
     public Path getHelperPath() {
-        String helperPackageFolder = HELPER_PACKAGE.replace('.', File.separatorChar);
-        return folder.resolve(helperPackageFolder);
+        return getPath(HELPER_PACKAGE, null);
     }
 
     public void processWatchEvent(Kind kind, Path path) {
@@ -93,9 +93,21 @@ public class SourceWriter {
         }
     }
 
-    protected Path getPath(String packageName, String className) {
+    /**
+     * Return the path to the file to write
+     * Or the path to the folder if className is null
+     * 
+     * @param packageName Package name
+     * @param className Class name
+     * @return Path to the file to write or the path to the folder if className is null
+     */
+    protected Path getPath(String packageName, @Nullable String className) {
         String packageFolder = packageName.replace('.', File.separatorChar);
-        return folder.resolve(packageFolder + File.separator + className + "." + Java223Constants.JAVA_FILE_TYPE);
+        if (className != null && !className.isEmpty()) {
+            return folder.resolve(packageFolder + File.separator + className + "." + Java223Constants.JAVA_FILE_TYPE);
+        } else {
+            return folder.resolve(packageFolder);
+        }
     }
 
     protected boolean sourceHasChange(String packageName, String className, String newSource) {
