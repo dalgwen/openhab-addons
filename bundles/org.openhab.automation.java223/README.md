@@ -5,42 +5,42 @@ Write openHAB scripts in Java as a JSR223 language.
 Features :
 
 - full JSR 223 support (use in files, in GUI, transformations, inline rule action, etc...)
-- auto injection of openHAB variable/preset for simplicity
+- auto-injection of openHAB variable/preset for simplicity
 - library support for sharing code (.jar and .java)
-- rule annotations available in the helper library for creating rules the easiest way
+- rule annotations are available in the helper library for creating rules the easiest way
 - helper library files auto generation for items, things, and actions, with strong typing and ease of use
-- no boilerplate code for simple script: you can do a one liner script, as declaring a class and a method is optional.
+- no boilerplate code for simple scripts: you can do a one-liner script, as declaring a class and a method is optional.
 - optional reuse of instances script to share values between execution occurrences
 - designed to be easily used with your favorite IDE
 
 It makes heavy use of Eric Obermühlner's Java JSR 223 ScriptEngine [java-scriptengine](https://github.com/eobermuhlner/java-scriptengine), and is partially based on work from other openHAB contributors who created their own JSR 223 java automation bundle (many thanks to them).
 
-# What you can do ?
+# What can you do?
 
-All JSR223 openHAB related thing, and surely a bit more, thanks to your scripts sharing the same JVM as openHAB.
+All JSR223 openHAB related things, and surely a bit more, thanks to your scripts sharing the same JVM as openHAB.
 If you just want to see how to use it, see the [Examples](#examples) section.
 
 # How it works
 
 You should first take a look at the [official documentation about openHAB JSR223 support](https://www.openhab.org/docs/configuration/jsr223.html).
-That said, keep reading for useful insider informations.
+That said, keep reading for useful insider information.
 
-## Script location: where can I use Java223 ?
+## Script location: where can I use Java223?
 
 ### First location option: GUI
 
-As a full featured JSR223 automation bundle, you can use the GUI to use Java223 scripts, everywhere JSR223 scripts are allowed. Including, but not limited to:
+As a full-featured JSR223 automation bundle, you can use the GUI to use Java223 scripts everywhere JSR223 scripts are allowed. Including, but not limited to:
 
 - Creating `Scripts` or `Transformation` in the so-called GUI sections
 - Inside a `Rule`, as an inline script action in the `Then` or the `Only If` section
 - When linking a channel to an item, as a transformation `Profile` of type `Script Java`
-- Probably more that I'm not aware of
+- Probably others
 
 ### Second location option: File script
 
-A JSR223 script file is a script located in your configuration directory, under the `automation/jsr223` sub directory.
+A JSR223 script file is a script located in your configuration directory, under the `automation/jsr223` subdirectory.
 
-At startup, or each time a file is created (or modified) in this directory, openHAB will handle it to the relevant JSR223 scripting language for **immediate** execution (using the extension as a discriminating value to chose the JSR implementation). So in our case, every `.java` files will be handled by the Java223 automation bundle.
+At startup, or each time a file is created (or modified) in this directory, openHAB will handle it to the relevant JSR223 scripting language for **immediate** execution (using the extension as a discriminating value to choose the JSR implementation). So in our case, every `.java` files will be handled by the Java223 automation bundle.
 
 As a script can create and register rules during its execution (by accessing and using the openHAB automation manager), **this 'file mode' is then especially useful for defining rules**. And icing on the cake: when a script that created rules is deleted, the linked rules are also deleted, thanks to the way openHAB registers a rule (same for modification, the associated rules are deleted and recreated). See the [rules](#rules) section for more information on how to create a rule.
 
@@ -56,17 +56,17 @@ public class SimpleClass {
 }
 ```
 
-(In fact it can even be a simpler one-liner, see the [no boilerplate section](#noboilerplate))
+(In fact, it can even be a simpler one-liner, see the [no boilerplate section](#noboilerplate))
 
-When openHAB presents a java script to the Java223 automation bundle, it searches for methods with name like `main`, or `eval`, or `run`, or `exec`, or any methods annotated with `@RunScript` and then runs them (from here we will refer to those as the "runnable methods"). Returning a value is supported but optional.  That's all you need for a very simple script !
+When openHAB presents a java script to the Java223 automation bundle, it searches for methods with name like `main`, or `eval`, or `run`, or `exec`, or any methods annotated with `@RunScript` and then runs them (from here we will refer to those as the "runnable methods"). Returning a value is supported but optional.  That's all you need for a basic script!
 
-A note about the context : each script has its own context, its own ClassLoader. It means that scripts are perfectly separated, and cannot interact with, or even see, each other. But do not worry, because there are dedicated features for this ([shared cache](#sharedcache) for sharing values, [library](#library) for sharing code).
+A note about the context: each script has its own context, its own ClassLoader. It means that scripts are perfectly separated and cannot interact with, or even see, each other. But do not worry, because there are dedicated features for this ([shared cache](#sharedcache) for sharing values, [library](#library) for sharing code).
 
 ## Variable injection
 
-Of course, a script needs to communicate with openHAB to be useful. We will call 'openHAB inputs' those objects, values, references, that openHAB gives to the automation bundles, in order for it to expose them to your script. For example, a reference to the items registry will allow a script to interact with items by checking their state or giving them command.
+Of course, a script needs to communicate with openHAB to be useful. We will call 'openHAB inputs' those objects, values, references, that openHAB gives to the automation bundles, in order for it to expose them to your script. For example, a reference to the item registry will allow a script to interact with items by checking their state or giving them command.
 
-With this Java223 bundle, it is done by the way of automatic injection. It means that you don't need to do anything special. You just have to declare variable in your script and the bundle will take care of injecting the corresponding 'openHAB input' value in it. There are three input injection possibilities:
+With this Java223 bundle, it is done by the way of automatic injection. It means that you don't need to do anything special. You only have to declare a variable in your script, and the bundle will take care of injecting the corresponding 'openHAB input' value in it. There are three input injection possibilities:
 
 - as a field in your script (see [example](#fieldinjection))
 - as a method parameter in your runnable methods (see [example](#parameterinjection))
@@ -82,9 +82,9 @@ You can control the injection further (i.e. overriding default behavior, or dire
 
 ## Defining Rules
 
-As a JSR223 openHAB language, you can define rule with the openHAB JSR223 DSL. All needed classes and instance (SimpleRule, TriggerBuilder, automationManager instance, etc.) are of course exposed natively with this bundle. You can see an example of how to use it [here](https://www.openhab.org/docs/configuration/jsr223.html#example-rules-for-a-first-impression) (examples are written with other languages, but concepts and objects for Java223 are the same).
+As a JSR223 openHAB language, you can define rules with the openHAB JSR223 DSL. All necessary classes and instances (SimpleRule, TriggerBuilder, automationManager instance, etc.) are, of course, exposed natively with this bundle. You can see an example of how to use it [here](https://www.openhab.org/docs/configuration/jsr223.html#example-rules-for-a-first-impression) (examples are written with other languages, but concepts and objects for Java223 are the same).
 
-**However**, keep in mind that there is a much, much more convenient way to do this. You can jump to the relevant section [here](#helperrules). But the following sections also exposes some prerequisites if you want to have a better comprehension before jumping in.
+**However**, keep in mind that there is a much, much more convenient way to do this. You can jump to the relevant section [here](#helperrules). But the following sections also expose some prerequisites if you want to have a better comprehension before jumping in.
 
 <a id="library"></a>
 
@@ -92,13 +92,13 @@ As a JSR223 openHAB language, you can define rule with the openHAB JSR223 DSL. A
 
 To share reusable code between your scripts, you have to define a library. A library is a .java file (or a .jar archive containing several compiled class) located in your configuration directory, under the `automation\lib\java` subdirectory.
 
-The Java223 bundle will monitor this directory, and automatically adds everything inside to the compilation unit of your script (although, it's not applied retrospectively). The script still have its dedicated ClassLoader, but inside this ClassLoader, all your library classes are also available.
+The Java223 bundle will monitor this directory and automatically adds everything inside to the compilation unit of your script (although, it's not applied retrospectively). The script still has its dedicated ClassLoader, but inside this ClassLoader, all your library classes are also available.
 
-Be careful : it also means that other scripts have their own library classes inside their own ClassLoader. **You cannot share value between scripts this way**, even by using a static property inside a library class.
+Be careful: it also means that other scripts have their own library classes inside their own ClassLoader. **You cannot share value between scripts this way**, even by using a static property inside a library class.
 
-### Auto injection of library
+### Auto-injection of libraries
 
-Your library probably also needs to communicate with openHAB. You can of course pass openHAB input references as a parameter to your library methods, or by a setter. For example, if we imagine a library `MyLibrary` that need access to the items and things registries :
+Your library probably also needs to communicate with openHAB. You can, of course, pass openHAB input references as a parameter to your library methods, or by a setter. For example, if we imagine a library `MyLibrary` that need access to the items and things registries:
 
 ```java
 ...
@@ -130,26 +130,26 @@ Tip: The Java223 automation bundle recognizes a library by its type, so you don'
 
 ## Generated helper library
 
-The helper library is totally optional, but you should seriously consider using it, as it will make your code experience much more streamlined. It consists of two parts: dynamically .java generated files, and a JAR file with some already compiled class.
+The helper library is totally optional, but you should seriously consider using it, as it will make your code experience much more streamlined. It consists of two parts: dynamically .java generated files, and a JAR file with some already compiled classes.
 
 If you do not want to use the helper library, you can completely disable it by setting the `enableHelper` setting to `false`. Nothing (code, lib) will be generated/copied in the lib directory. 
 
 ### Java dynamic classes
 
-The Java223 bundle generates some ready-to-use library classes in the `automation\lib\java` directory. These classes are dynamic and contains information about your openHAB setup.
+The Java223 bundle generates some ready-to-use library classes in the `automation\lib\java` directory. These classes are dynamic and contain information about your openHAB setup.
 
 You will get several java files in the package `helper.generated` :
 
-- Items.java : contains all your items name as static String, and label as their javadoc. Also contains methods to directly get the Item, casted to the right Class. (see [example](#itemsandthings))
-- Things.java : contains all your Thing UID as static String, with label as their javadoc. Also contains methods to directly get the Thing. (see [example](#itemsandthings))
-- Actions.java : contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions))
+- Items.java: contains all your item names as static String and label as their Javadoc. Also contains methods to directly get the Item, casted to the right Class. (see [example](#itemsandthings))
+- Things.java: contains all your Thing UID as static String, with label as their Javadoc. Also contains methods to directly get the Thing. (see [example](#itemsandthings))
+- Actions.java: contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions))
 <a id="java223script"></a>
-- Java223Script.java : this abstract class will come **very** handy. In fact, it is so handy that all your scripts should inherit it ! It already contains all openHAB inputs variables, as well as some other useful shortcuts. Take a look at it.
+- Java223Script.java: this abstract class will come **very** handy. In fact, it is so handy that all your scripts should inherit it! It already contains all openHAB inputs variables, as well as some other useful shortcuts. Take a look at it.
 
-As these files are no more, no less, standard Java223 library files, and you can of course use them as candidates for auto-injection in your script. Be careful though, do not use the variable names `items`, `things`, or `actions`, as they are already reserved as openHAB input values for the ItemRegistry, ThingsRegistry, and ScriptThingActions respectively.
+As these files are no more, no less, standard Java223 library files, and you can, of course, use them as candidates for auto-injection in your script. Be careful though, do not use the variable names `items`, `things`, or `actions`, as they are already reserved as openHAB input values for the ItemRegistry, ThingsRegistry, and ScriptThingActions respectively.
 As a reference, in the super handy Java223Script helper abstract class, we are using `_items`, `_things`, `_actions` for them.
 
-**Tip : all your scripts, *including libraries*, can extend the `Java223Script` class. This way they will automatically obtain easy access to all openHAB inputs, to some shortcuts, etc.**
+**Tip: all your scripts, *including libraries*, can extend the `Java223Script` class. This way they will automatically obtain easy access to all openHAB inputs, to some shortcuts, etc.**
 
 <a id="helperrules"></a>
 
@@ -157,9 +157,9 @@ As a reference, in the super handy Java223Script helper abstract class, we are u
 
 **This is the most useful feature of this entire bundle.**
 
-The Java223 bundle also copies in your `automation\lib\java` a pre-compiled jar with a set of library files inside. This jar is also no more, no less, a standard library JAR, and is an example of how powerful the openHAB JSR223 feature is. It contains all you need to define Rules with the help of simple-to-use annotations. The entry point is the `RuleAnnotationParser` class. The `parse` method automatically scans your script, searching for annotated method defining rules, and then creates and registers them.
+The Java223 bundle also copies in your `automation\lib\java` a pre-compiled jar with a set of library files inside. This jar is also no more, no less, a standard library JAR, and is an example of how powerful the openHAB JSR223 feature is. It contains all you need to define Rules with the help of simple-to-use annotations. The entry point is the `RuleAnnotationParser` class. The `parse` method automatically scans your script, searching for annotated methods defining rules, and then creates and registers them.
 
-Tip : But you don't have to care about the inner working and parsing ! The best way to use this functionality is to extend the `Java223Script`, as it already contains a call to the `parse` method in a `@RunScript` annotated method.
+Tip: But you don't have to care about the inner working and parsing! The best way to use this functionality is to extend the `Java223Script`, as it already contains a call to the `parse` method in a `@RunScript` annotated method.
 
 When combined with all the aforementioned helpers, see how easy it is to define a rule.
 
@@ -176,7 +176,7 @@ public class MyRule extends Java223Script {
 }
 ```
 
-This rule above is triggered by an 'ON' state update of an item linked to a detector, and then light a bulb : **Here really shines the JSR223 for Java : no random 'magic' strings, full auto-completion from your IDE, strongly typed code and no misspelling mistake possible.**
+This rule above is triggered by an 'ON' state update of an item linked to a detector, and then light a bulb: **Here really shines the JSR223 for Java: no random 'magic' strings, full auto-completion from your IDE, strongly typed code and no misspelling mistake possible.**
 
 You can also use automatic injection **in your rule method parameter**. It is especially useful for having strongly typed parameter. Take a look at this rule, triggered by two different detectors:
 
@@ -201,10 +201,10 @@ Here are all functionalities of the helper-lib:
 
 - Many different `@Trigger` class. Check the `helper.rules.annotation` package for a list.
 - You can add (multiple) `@Condition` to a Rule. It exposes a pre-condition for the rule to execute. Check the `helper.rules.annotation` package
-- `@Trigger`, `@Conditions`, `@Rule` have many parameter. Some parameters add functionality, others can overwrite default behavior (for example using the method name for the label of a rule).
+- `@Trigger`, `@Conditions`, `@Rule` have many parameters. Some parameters add functionality; others can overwrite default behavior (for example, using the method name for the label of a rule).
 - Pre-made event objects that you can use as a parameter in a rule are defined in the package `helper.rules.eventinfo`. You can define your own if some are missing (do not hesitate to make a Pull Request)
 - If you want all the triggering event input parameters in a map for a rule, you can use the parameter `Map<String, ?> inputs`.
-- You can set the `@Rule` annotation on a method, but also on many type of field containing code to execute, such as Function, Runnable... Take a look at the class `Java223Rule` for an exhaustive list of what is supported. You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
+- You can set the `@Rule` annotation on a method, but also on many types of field containing code to execute, such as Function, Runnable... Take a look at the class `Java223Rule` for an exhaustive list of what is supported. You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
 
 <a id="sharedcache"></a>
 
@@ -218,27 +218,27 @@ To share value between different scripts, you can use the shared standard openHA
 
 This cache is accessible the same way a `Map<String, Object>` is.
 
-Tip : it is automatically available to scripts inheriting the Java223Script helper class.
+Tip: it is automatically available to scripts inheriting the Java223Script helper class.
 
 ## Share value between script executions
 
-The Java223 automation bundle has an option `allowInstanceReuse`. If set to true, the default engine behavior will be to reuse script instance between executions, instead of re-instantiating your script with a `new` operator every time. If you run the same script over and over, it will try to use the same instance, thus allowing you to store information in its field (in memory, so only for the duration of the openHAB process). Be careful with read/write concurrency issue.
+The Java223 automation bundle has an option `allowInstanceReuse`. If set to true, the engine behavior will be to reuse script instance between executions, instead of re-instantiating your script with a `new` operator every time. If you run the same script over and over, it will try to use the same instance, thus allowing you to store information in its field (in memory, so only for the duration of the openHAB process). Be careful with concurrency/race issue, as your script may run multiple times depending on the trigger.
 
 Of course, for this to work, your script has to be re-executed. So, script files in the `automation/jsr223` directory **CANNOT** use this functionality, as they are only executed ONCE by nature, when openHAB starts, or when they are created or modified (which is another way of saying deleted/recreated).
-**BUT**, you should also note that Rule inner working is different: your rule code is some kind of lambda, and so is always executed on the same instance. It means you can share information here between rules (as a field).
+**BUT**, you should also note that Rule inner working is different: your rule code is registered as some java lambda, and so is always executed on the same instance. It means you can share information here between rules (as a field).
 
-You can also overwrite this default behavior for individual script by using the `@ReuseScriptInstance` annotation on the class level.
+You can also overwrite this default behavior for individual scripts by using the `@ReuseScriptInstance` annotation on the class level.
 
-Take note that it uses the compilation cache, managed by openHAB on best effort. So instance reuse is not guaranteed.
+Take note that it depends on the script compilation cache, managed by openHAB. So instance reuse is not guaranteed if something triggers a recompilation of your script (for example, a dependency change).
 
 
 <a id="noboilerplate"></a>
 
 ## No boilerplate code
 
-Sometimes, you 'real' (useful) code is very short, and you don't need complex logic, custom auto-injection, etc.
-In this case, you can omit the 'boilerplate' code, and just write your 'useful' code.
-Under the hood, the Java223 bundle will 'wrap' your code inside a class inheriting `Java223Script`, with a bunch of standard imports (mainly item state types) and a main method.
+Sometimes, your 'real' (useful) code is very short, and you don't need complex logic, custom auto-injection, etc.
+In this case, you can omit the 'boilerplate' code and directly write your 'useful' code.
+Under the hood, the Java223 bundle will 'wrap' your code inside a class inheriting `Java223Script` (if you enabled the helper lib), with a bunch of standard imports (mainly item state types) and a main method.
 
 For example, this one-line script is perfectly valid:
 
@@ -246,24 +246,43 @@ For example, this one-line script is perfectly valid:
     _items.myitem().send(ON); // let there be light
 ```
 
+It will produce the following wrapper script:
+
+```java
+            import org.openhab.core.library.items.*;
+import org.openhab.core.library.types.*;
+import static org.openhab.core.library.types.HSBType.*;
+import static org.openhab.core.library.types.IncreaseDecreaseType.*;
+[other imports...]
+
+public class WrappedJavaScript extends Java223Script {
+    public Object main() {
+        _items.myitem().send(ON); // let there be light
+        return null;
+    }
+}
+```
+
 This 'wrapping' will take place if nowhere in your code a trimmed line starts with `public class`.
 
-If you need to import some class, you can also do it. The import statements (lines starting with `import `) will be parsed and added in the beginning of the resulting wrapper script, before the wrapping class and method.
+If you disabled the helper library, and so the `Java223Script` class is not available, the 'wrapping' will happen with a verbose equivalent. 
 
-You can return a value. The line returning the value MUST begin with `return `. This is useful for Transformation.
+If you need to import some class, you can also do it. The import statements (lines starting with `import `) will be parsed and moved at the beginning of the resulting wrapper script, before the wrapping class and method.
 
-But because your code is wrapped, the following functionalities are not available:
+You can return a value. The line returning the value MUST begin with `return `, in order for the wrapping method to NOT insert a `return null` statement at the end. This is useful for Transformation.
+
+**Note that**, because your code is wrapped, the following functionalities are not available:
 
 - definition of methods (your code is already inside one)
-- customize the auto-injection (because class field members or method parameters happen outside the method body). You have to rely on what is already injected by the parent Java223Script.
-
+- customize the auto-injection (because class field members or method parameters happen outside the method body). You have to rely on what is already injected by the parent `Java223Script`.
+- instance reuse, while happening if set to true, is nearly useless (as you cannot declare fields in the wrapper class, you so cannot use them to share data)
 
 ## Transformation
 
-You can use Java223 script in transformation.
-A transformation is a piece of code with an input and an output. So you just have to respect this contract:
+You can use a Java223 script in transformations.
+A transformation is a piece of code with an input and an output. To do so, you only have to respect this contract:
 
-- you can use the openHAB input value named 'input'. Auto-injection is possible. Or you can inherit the Java223Script, as it is already declared.
+- you use the openHAB input value named 'input'. It is declared as an `Object`.
 - your runnable method must return a value
 
 Example of transformation appending the word "Hello" to the input, using the "no boilerplate" functionality:
@@ -276,7 +295,7 @@ return "Hello " + input.toString();
 
 ## convenience-dependencies.jar
 
-A jar file, purely for convenience, is exported, at startup, from the openHAB runtime and added to the lib directory. This jar is EXCLUDED from entering the compilation unit of your script; its sole purpose is for you to use inside an IDE. It contains most of the openHAB classes you probably need to write and compile scripts and rules. By using this jar in your project, you probably won't have to set up advanced dependencies management tools such as Maven or Gradle.
+A jar file, purely for convenience, is exported, at startup, from the openHAB runtime and added to the lib directory. This jar is EXCLUDED from entering the compilation unit of your script; its sole purpose is for you to use inside an IDE. It contains most of the openHAB classes you probably need to write and compile scripts and rules. By using this jar in your project, you probably won't have to set up advanced dependency management tools such as Maven or Gradle.
 
 You can ask the Java223 bundle to add to this exported jar some classes by using the following Java223 configuration properties:
 
@@ -285,14 +304,14 @@ You can ask the Java223 bundle to add to this exported jar some classes by using
 
 ## Configure your project
 
-In order to use an IDE and write code with autocompletion, javadoc, and all other syntax sugar, you just have to add to your project :
+To use an IDE and write code with autocompletion, Javadoc, and all other syntax sugar, you only have to add to your project :
 
 - **As a source directory**: the root directory of your scripts, under `automation/jsr223` (probably `automation/jsr223/java`, but you can use what you want)
 - **As a source directory**: the root directory reserved as the Java223 library location `automation/lib/java`
 - **As a library**: `automation/lib/java/helper-lib.jar`
 - **As a library**: `automation/lib/java/convenience-dependencies.jar`
 
-Tip : to access a remote openHAB installation scripts folder, you can copy, use Webdav, a Samba share, a SFTP virtual file system or sync feature (available on your OS or included in your IDE), or any other mean you can think about.
+Tip: to access a remote openHAB installation scripts folder, you can copy, use Webdav, a Samba share, a SFTP virtual file system or sync feature (available on your OS or included in your IDE), or any other mean you can think about.
 
 <a id="examples"></a>
 
@@ -318,7 +337,7 @@ import helper.generated.Java223Script;
 
 public class BasicExample extends Java223Script {
     public void main() {
-        _items.myitem().send(OnOffType.OFF); // let there be light
+        _items.myitem().send(OnOffType.ON); // let there be light
     }
 }
 ```
@@ -328,10 +347,10 @@ public class BasicExample extends Java223Script {
 
 ## No boilerplate code
 
-A one liner can also work
+A one-liner can also work
 
 ```java
-    _items.myitem().send(OnOffType.OFF); // let there be light
+    _items.myitem().send(OnOffType.ON); // let there be light
 ```
 
 
@@ -352,10 +371,10 @@ public class MyRule extends Java223Script {
 }
 ```
 
-## Create a rule with several trigger and options
+## Create a rule with several triggers and options
 
 This time, the rule is triggered by an 'ON' state update on one of two possible detectors.
-The method parameter is a strongly typed library element (`ItemStateChange`) and as such, its field are auto injected with the right value from the input. Thanks to this, it is easy to get the input parameters without risking using a wrong parameter name. For example, we get here the name of the item triggering the detection, for a detailed log.
+The method parameter is a strongly typed library element (`ItemStateChange`) and as such, its fields are auto-injected with the right value from the input. Thanks to this, it is easy to get the input parameters without risking using a wrong parameter name. For example, we get here the name of the item triggering the detection, for a detailed log.
 Instead of the default (the method name used for the label of the rule), it has a description, and a dedicated name for the label, and both will be shown on the openHAB GUI.
 
 ```java
@@ -401,7 +420,7 @@ import ...;
 
 public class MethodInjectionExample {
     public void main(ItemRegistry itemRegistry) {  // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
-        itemRegistry.get("myitem").send(OnOffType.ON);;
+        itemRegistry.get("myitem").send(OnOffType.ON);
     }
 }
 ```
@@ -422,7 +441,7 @@ public class ConstructorInjectionExample {
     }
 
     public void main() {
-        myItemRegistry.get("myitem").send(OnOffType.ON);;
+        myItemRegistry.get("myitem").send(OnOffType.ON);
     }
 }
 ```
@@ -434,7 +453,7 @@ public class ConstructorInjectionExample {
 You may want to run another rule or a script. The ruleManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
 First, inject the ruleManager in your script, then use it with the runNow method and the UID of the rule.
 
-Tip : The ruleManager is already declared as a field in the Java223Script helper class that you can inherit.
+Tip: The ruleManager is already declared as a field in the Java223Script helper class that you can inherit.
 
 ```java 
 import java.util.Map;
@@ -489,7 +508,7 @@ public class MetadataDatabase {
 }
 ```
 
-Tip : The metadataRegistry is already declared as a field in the Java223Script helper class that you can inherit.
+Tip: The metadataRegistry is already declared as a field in the Java223Script helper class that you can inherit.
 
 
 <a id="injectbinding"></a>
@@ -535,14 +554,14 @@ public class MyGreatLibrary {
 }
 ```
 
-Here is how to use it with auto injection your script (in automation/jsr223/), for example with field injection :
+Here is how to use it, with auto-injection of your script (in automation/jsr223/). For example, with field injection :
 
 ```java
 import ...;
 
 public class MyScript {
 
-    MyGreatLibrary mylib; // will be auto instantiated and then auto injected with all needed openHAB input value
+    MyGreatLibrary mylib; // will be auto-instantiated and then auto-injected with all necessary openHAB input value
 
     public void exec() {
         mylib.myUsefullLibraryMethod("myitemName");
@@ -552,7 +571,7 @@ public class MyScript {
 
 <a id="itemsandthings"></a>
 
-Tip : do not forget that all classes, including libraries, can extend Java223Script
+Tip: do not forget that all classes, including libraries, can extend Java223Script
 
 ## Items and Things helper libraries
 
@@ -575,7 +594,7 @@ public class ItemsAndThingAccessExample extends Java223Script { // <-- take the 
 
 ## Actions helper libraries
 
-With the auto generated `Actions` class (here referenced by the `_actions` variable), you can call a method to get strongly typed actions (and auto completion) linked to your Thing.
+With the auto generated `Actions` class (here referenced by the `_actions` variable), you can call a method to get strongly typed actions (and auto-completion) linked to your Thing.
 
 ```java
 import ...;
@@ -588,4 +607,3 @@ public class ActionExample extends Java223Script { // <-- take the Java223Script
     }
 }
 ```
-
