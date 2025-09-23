@@ -58,7 +58,7 @@ public class SimpleClass {
 
 (In fact, it can even be a simpler one-liner, see the [no boilerplate section](#noboilerplate))
 
-When openHAB presents a java script to the Java223 automation bundle, it searches for methods with name like `main`, or `eval`, or `run`, or `exec`, or any methods annotated with `@RunScript` and then runs them (from here we will refer to those as the "runnable methods"). Returning a value is supported but optional.  That's all you need for a basic script!
+When openHAB presents a java script to the Java223 automation bundle, it searches for methods with name `main`, `eval`, `run`, `exec`, or any methods annotated with `@RunScript`, and then runs them (from here we will refer to those as the "runnable methods"). Returning a value is supported but optional. That's all you need for a basic script!
 
 A note about the context: each script has its own context, its own ClassLoader. It means that scripts are perfectly separated and cannot interact with, or even see, each other. But do not worry, because there are dedicated features for this ([shared cache](#sharedcache) for sharing values, [library](#library) for sharing code).
 
@@ -249,7 +249,7 @@ For example, this one-line script is perfectly valid:
 It will produce the following wrapper script:
 
 ```java
-            import org.openhab.core.library.items.*;
+import org.openhab.core.library.items.*;
 import org.openhab.core.library.types.*;
 import static org.openhab.core.library.types.HSBType.*;
 import static org.openhab.core.library.types.IncreaseDecreaseType.*;
@@ -321,8 +321,8 @@ Tip: to access a remote openHAB installation scripts folder, you can copy, use W
 |-------------------------------|---------|---------|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse    | Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware of concurrency issues.                                                                              |
 | `enableHelper`                | boolean | true    | Enable helper generation       | Enable code generation, and copying helper and convenience libraries                                                                                                                                        |
-| `additionalBundles`           | text    | -       | Additional Bundles             | Additional bundles exported for developing, concatenated by ",".                                                                                                                                            |
-| `additionalClasses`           | text    | -       | Additional Classes             | Additional classes exported for developing, concatenated by ",".                                                                                                                                            |
+| `additionalBundles`           | text    | -       | Additional Bundles             | Additional bundles inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |
+| `additionalClasses`           | text    | -       | Additional Classes             | Additional classes inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |
 | `stabilityGenerationWaitTime` | integer | 10000   | Stability Generation Wait Time | Delay (in ms) before writing generated classes. Each new generation triggering event further delays the generation. Useful to prevent multiple code generations when many Things activate at the same time. |
 | `startupGuardTime`            | integer | 60000   | Startup Guard Time             | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system.                 |
 
@@ -575,7 +575,7 @@ Tip: do not forget that all classes, including libraries, can extend Java223Scri
 
 ## Items and Things helper libraries
 
-By extending the Java223Script class (optional, you can inject them the way you want), the variable _items and _things are directly accessible.
+By extending the Java223Script class (optional, you can inject them the way you want), the variables _items and _things are directly accessible.
 
 ```java
 import ...;
