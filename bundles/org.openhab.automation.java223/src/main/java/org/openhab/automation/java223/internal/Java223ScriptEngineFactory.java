@@ -182,7 +182,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         }
     }
 
-    private void copyHelperLibJar() throws Java223Exception, IOException {
+    private void copyHelperLibJar() throws IOException {
         // get old file :
         Path dest = LIB_DIR.resolve(HELPER_LIB_JAR);
         byte[] oldHelperLibAsByteArray = new byte[0];
@@ -213,8 +213,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         if (!Arrays.equals(oldHelperLibAsByteArray, newHelperLibAsByteArray)) {
             try (FileOutputStream fileOutputStream = new FileOutputStream(dest.toFile())) {
                 fileOutputStream.write(newHelperLibAsByteArray);
-            } catch (IOException e) {
-                throw new Java223Exception("Cannot write helper file", e);
             }
         }
     }

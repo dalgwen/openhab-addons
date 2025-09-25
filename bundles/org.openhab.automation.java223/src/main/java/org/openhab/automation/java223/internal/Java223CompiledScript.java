@@ -21,7 +21,10 @@ import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ch.obermuhlner.scriptengine.java.JavaCompiledScript;
 import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
@@ -33,6 +36,8 @@ import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
  */
 @NonNullByDefault
 public class Java223CompiledScript extends JavaCompiledScript {
+
+    private final Logger logger = LoggerFactory.getLogger(Java223CompiledScript.class);
 
     // overwrite compiledInstance from super class
     /**
@@ -73,11 +78,19 @@ public class Java223CompiledScript extends JavaCompiledScript {
         }
         java223Strategy.associateBindings(null, null, mergedBindings);
 
-        // instantiate the script
-        Object compiledInstance = java223Strategy.construct(this, mergedBindings);
+        try {
+            // instantiate the script
+            Object compiledInstance = java223Strategy.construct(this, mergedBindings);
 
-        // execute
-        return java223Strategy.execute(compiledInstance, mergedBindings);
+            // execute
+            return java223Strategy.execute(compiledInstance, mergedBindings);
+        } catch (Java223Exception e) {
+            // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
+            // and caller sometimes does not do it well
+            logger.error("Exception during evaluation of a java223 script: {}", e.getMessage(), e);
+            // and sending only the message upstream
+            throw new ScriptException(e.getMessage());
+        }
     }
 
     @Override

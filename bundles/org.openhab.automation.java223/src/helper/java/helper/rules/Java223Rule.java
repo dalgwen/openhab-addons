@@ -31,8 +31,6 @@ import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Extract code to execute, from diverse runnable field or from a method
@@ -42,8 +40,6 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class Java223Rule extends SimpleRule {
-
-    private static final Logger logger = LoggerFactory.getLogger(Java223Rule.class);
 
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
@@ -77,7 +73,7 @@ public class Java223Rule extends SimpleRule {
         try {
             return callable.call();
         } catch (Exception e) {
-            throw new Java223Exception("Cannot execute callable");
+            throw new Java223Exception("Cannot execute callable", e);
         }
     }
 
@@ -129,7 +125,6 @@ public class Java223Rule extends SimpleRule {
                 }
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
                     | SecurityException e) {
-                logger.error("Cannot execute method named {}", method.getName(), e);
                 throw new Java223Exception("Cannot execute method named " + method.getName(), e);
             }
         };
@@ -159,26 +154,18 @@ public class Java223Rule extends SimpleRule {
                 throw new Java223Exception("Cannot get field member " + fieldMember.getName() + " on object of class "
                         + script.getClass().getName(), e);
             }
-            if (objectToExecute == null) {
-                throw new Java223Exception("Field " + fieldMember.getName() + " is null. Cannot execute anything");
-            }
-            if (objectToExecute instanceof SimpleRule simpleRule) {
-                return execute(simpleRule, module, inputs);
-            } else if (objectToExecute instanceof Function function) {
-                return execute(function, inputs);
-            } else if (objectToExecute instanceof BiFunction bifunction) {
-                return execute(bifunction, module, inputs);
-            } else if (objectToExecute instanceof Callable callable) {
-                return execute(callable);
-            } else if (objectToExecute instanceof Runnable runnable) {
-                return execute(runnable);
-            } else if (objectToExecute instanceof Consumer consumer) {
-                return execute(consumer, inputs);
-            } else if (objectToExecute instanceof BiConsumer biconsumer) {
-                return execute(biconsumer, module, inputs);
-            } else {
-                throw new Java223Exception("Wrong type of field " + fieldType + ". Should not happened");
-            }
+            return switch (objectToExecute) {
+                case null ->
+                        throw new Java223Exception("Field " + fieldMember.getName() + " is null. Cannot execute anything");
+                case SimpleRule simpleRule -> execute(simpleRule, module, inputs);
+                case Function function -> execute(function, inputs);
+                case BiFunction bifunction -> execute(bifunction, module, inputs);
+                case Callable callable -> execute(callable);
+                case Runnable runnable -> execute(runnable);
+                case Consumer consumer -> execute(consumer, inputs);
+                case BiConsumer biconsumer -> execute(biconsumer, module, inputs);
+                default -> throw new Java223Exception("Wrong type of field " + fieldType + ". Should not happen");
+            };
         };
     }
 

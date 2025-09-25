@@ -22,7 +22,7 @@
       <scope>compile</scope>
     </dependency>
     <!-- jdt annotation classes are included because we want to be able to
-      export them to the dependencies jar -->
+      export them to the dependency jar -->
     <dependency>
       <groupId>org.eclipse.jdt</groupId>
       <artifactId>org.eclipse.jdt.annotation</artifactId>
@@ -75,6 +75,11 @@
               <excludes>
                 <exclude>freemarker/ext/ant/**</exclude>
                 <exclude>freemarker/ext/rhino/**</exclude>
+                <exclude>freemarker/ext/jython/**</exclude>
+                <exclude>freemarker/ext/servlet/**</exclude>
+                <exclude>freemarker/ext/jsp/**</exclude>
+                <exclude>freemarker/ext/dom/**</exclude>
+                <exclude>freemarker/ext/xml/**</exclude>
                 <exclude>helper/**</exclude>
               </excludes>
             </configuration>

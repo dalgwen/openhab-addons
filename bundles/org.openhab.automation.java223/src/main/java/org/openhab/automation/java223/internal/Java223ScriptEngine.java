@@ -100,12 +100,20 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
             List<JavaFileObject> toCompile = java223Strategy.getJavaFileObjectsToCompile(simpleClassName, script);
 
             // compile
-            JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics,
-                    compilationOptions, null, toCompile);
-            if (!task.call()) {
-                String message = diagnostics.getDiagnostics().stream().map(Object::toString)
-                        .collect(Collectors.joining("\n"));
-                throw new ScriptException(message);
+            try {
+                JavaCompiler.CompilationTask task = compiler.getTask(null, memoryFileManager, diagnostics,
+                        compilationOptions, null, toCompile);
+                if (!task.call()) {
+                    String message = diagnostics.getDiagnostics().stream().map(Object::toString)
+                            .collect(Collectors.joining("\n"));
+                    throw new ScriptException(message);
+                }
+            } catch (RuntimeException e) {
+                // Catching RuntimeException is no good practice, but the Javadoc of getTask and compile explicitly says
+                // that the only source of runtime error is the user-supplied code.
+                // We then keep responsibility of logging full stack trace, as ScriptException cannot contain cause:
+                logger.error("Error compiling script: {}", e.getMessage(), e);
+                throw new ScriptException(e.getMessage());
             }
 
             // declare lib dependencies (all files are supposed libraries)
@@ -153,7 +161,6 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
             default -> throw new ScriptException(name + " is not an allowed method in java223");
         };
 
-        Object compiledInstance = compiledScript.getCompiledInstance();
         for (Method method : compiledScript.getCompiledClass().getMethods()) {
             Annotation scriptLoadedOrUnloadedAnnotation = method.getAnnotation(annotation);
             if (scriptLoadedOrUnloadedAnnotation != null) {
@@ -162,6 +169,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
                             + " called by ScriptLoaded/ScriptUnloaded trigger should not have any argument");
                 } else {
                     try {
+                        Object compiledInstance = compiledScript.getCompiledInstance();
                         if (Modifier.isStatic(method.getModifiers())) {
                             method.invoke(new Object()); // new object() required (but value ignored) to avoid non-null
                                                          // check compiler error
@@ -173,8 +181,9 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
                             method.invoke(compiledInstance);
                         }
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                        logger.warn("Method {} cannot be called by ScriptLoaded/ScriptUnloaded trigger",
-                                method.getName());
+                        // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
+                        // and the caller may not log full stack trace
+                        logger.error("Error compiling script: {}", e.getMessage(), e);
                         throw new ScriptException(e);
                     }
                 }

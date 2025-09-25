@@ -116,13 +116,12 @@ public class Java223Strategy
     }
 
     /**
-     * Contrary to the original architecture, this executes method doesn't use an instance, but the CompiledScript
-     * itself. It is indeed responsible for instantiation, with the binding's data.
+     * Execute the instance with binding context
      * 
      * @param instance an instantiated script
      * @param bindings bindings data to inject
      * @return Execution result
-     * @throws ScriptException When script cannot execute
+     * @throws ScriptException When the script cannot execute
      */
     public @Nullable Object execute(Object instance, Map<String, Object> bindings) throws ScriptException {
 
@@ -131,7 +130,7 @@ public class Java223Strategy
         // inject binding's data in the script
         ClassLoader classLoader = compiledClass.getClassLoader();
         if (classLoader == null) { // should not happen
-            throw new Java223Exception("Cannot get the classloader of " + compiledClass.getName());
+            throw new ScriptException("Cannot get the classloader of " + compiledClass.getName());
         }
         BindingInjector.injectBindingsInto(classLoader, bindings, instance);
 
@@ -156,9 +155,11 @@ public class Java223Strategy
                 } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
                         | InstantiationException e) {
                     String simpleName = instance.getClass().getSimpleName();
-                    logger.error("Error executing entry point {} in {}", method.getName(), simpleName, e);
-                    throw new ScriptException(String.format("Error executing entry point %s in %s, exception %s",
-                            method.getName(), simpleName, e.getMessage()));
+                    // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
+                    // and caller sometimes does not
+                    logger.error("Error executing entry point {} in {}, exception {}", method.getName(), simpleName,
+                            e.getMessage(), e);
+                    throw new ScriptException("Cannot execute script. Entry point error");
                 }
             }
         }
@@ -305,7 +306,8 @@ public class Java223Strategy
         try {
             ClassLoader classLoader = compiledClass.getClassLoader();
             if (classLoader == null) { // should not happen
-                throw new Java223Exception("Cannot get the classloader of " + compiledClass.getName());
+                throw new Java223Exception(
+                        "Cannot get the classloader of " + compiledClass.getName() + ". Should not happen");
             }
             Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
             Object compiledInstance = constructor.newInstance(parameterValues);

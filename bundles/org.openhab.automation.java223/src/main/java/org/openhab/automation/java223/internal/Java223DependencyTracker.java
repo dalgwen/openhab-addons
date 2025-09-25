@@ -39,7 +39,9 @@ public class Java223DependencyTracker extends AbstractScriptDependencyTracker {
     public Java223DependencyTracker(@Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService) {
         super(watchService, Java223Constants.LIB_DIR.toString());
         this.watchService = watchService;
-        // Little hack: unregister because we will register again EXPLICITLY (ordering matters)
+        // Little hack: this instance was registered to the watch service inside super(). But we unregister it because
+        // we want other services to be notified first.
+        // We will re-register EXPLICITLY later (see @finalizeInitialisation)
         watchService.unregisterListener(this);
     }
 
@@ -51,6 +53,7 @@ public class Java223DependencyTracker extends AbstractScriptDependencyTracker {
     @Override
     public void deactivate() {
         super.deactivate();
+        watchService.unregisterListener(this);
     }
 
     @Override

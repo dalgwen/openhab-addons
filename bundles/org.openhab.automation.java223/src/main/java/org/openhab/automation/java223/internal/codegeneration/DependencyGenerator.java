@@ -270,7 +270,7 @@ public class DependencyGenerator {
                 newAdditionalClassesToExport.addAll(getAllSuperclasses(clazz));
                 getAllInterfaces(clazz, newAdditionalClassesToExport);
             } catch (ClassNotFoundException e) {
-                logger.warn("Cannot inspect class {} to add it as a dependancy", clazzAsString);
+                logger.warn("Cannot inspect class {} to add it as a dependency", clazzAsString);
             }
         }
 

@@ -72,7 +72,8 @@ public class SourceWriter {
             // to regenerate them thereafter
             generatedClassesSources.remove(fullPath.toString());
         } else {
-            logger.trace("Received '{}' for path '{}' - ignoring (wrong extension)", kind, fullPath);
+            logger.trace("Received '{}' for path '{}' - ignoring (wrong extension or unused event kind)", kind,
+                    fullPath);
         }
     }
 
