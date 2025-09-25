@@ -222,14 +222,45 @@ Tip: it is automatically available to scripts inheriting the Java223Script helpe
 
 ## Share value between script executions
 
-The Java223 automation bundle has an option `allowInstanceReuse`. If set to true, the engine behavior will be to reuse script instance between executions, instead of re-instantiating your script with a `new` operator every time. If you run the same script over and over, it will try to use the same instance, thus allowing you to store information in its field (in memory, so only for the duration of the openHAB process). Be careful with concurrency/race issue, as your script may run multiple times depending on the trigger.
+The Java223 automation bundle, in conjunction with openHAB, works like this:
+- receives a .java script
+- compiles it (if not already done). openHAB will then store the compilation unit for further (and fastest) reuse.
+- then, when execution is needed and asked by openHAB: 
+  - the engine will choose a constructor and instantiate the script with the `new` operator. Auto-injection of openHAB values may occur in fields or constructor parameters.
+  - the engine will execute the relevant script methods (main, etc., and @RunScript annotated methods) on the instance.
 
-Of course, for this to work, your script has to be re-executed. So, script files in the `automation/jsr223` directory **CANNOT** use this functionality, as they are only executed ONCE by nature, when openHAB starts, or when they are created or modified (which is another way of saying deleted/recreated).
-**BUT**, you should also note that Rule inner working is different: your rule code is registered as some java lambda, and so is always executed on the same instance. It means you can share information here between rules (as a field).
+When you define rules in a `.java` script in `automation/jsr223`, openHAB asks the Java223 bundle to compile and run the script immediately (and by nature, only once).
+The script is instantiated, and its methods are executed. As part of this, rules are parsed and registered in the Rule Manager.
+But, even if the script is executed only once, the rules inside define actions, and those actions will run many times: each time the corresponding trigger is fired.
+These actions are, by nature, members of an instance (a method or a field such as a Runnable). And as such, take note that they are always executed on the same instance of the script (which is the instance used to register them).
+This means that you can share states between triggered executions of rules by using fields of the script.
+
+On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and wait for further executions.
+Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or a transformation, or a profile), it will ask the Java223 bundle to run it.
+Then, two possibilities arise:
+- either this bundle reinstantiate the script with a `new` operator each time openHAB asks to run it 
+- or the bundle reuses the same instance, and then re-executes the relevant action (method, field) on it. In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM). 
+
+To choose between these possibilities, you can set the default behavior with the global option `allowInstanceReuse`.
+If set to true, the engine behavior will be to reuse the script instance between executions.
+If set to false (default), the engine will re-instantiate the script each time it is asked by openHAB to run.
 
 You can also overwrite this default behavior for individual scripts by using the `@ReuseScriptInstance` annotation on the class level.
 
 Take note that it depends on the script compilation cache, managed by openHAB. So instance reuse is not guaranteed if something triggers a recompilation of your script (for example, a dependency change).
+
+## Concurrency
+
+openHAB also prevents several executions of the same rule at the same time.
+This means, for example, that a script defined as the 'Action' part of a GUI rule cannot run concurrently, even if triggered by another rule at the same moment (The second one will fail).
+
+openHAB prevents several executions of the same script at the same time.
+This is also the case for transformations/profile (the second transformation will wait for the first to finish). This can be an issue, especially if your script takes some non-negligible time to execute.
+
+Also, for rules defined inside a `.java` script in `automation/jsr223`, remember that the 'Action' part are only lambda-like pieces of code running on a java instance.
+As openHAB does not manage the instance, there is no protection against concurrent executions (other than the "not twice the same rule" policy).
+If different rules -triggered at the same time- access the same instance fields, you may have to synchronize read/write from/to your data.
+If this is a concern for you, and if you are new to Java, look online for some good tutorials about concurrency, thread safety, and locks.
 
 
 <a id="noboilerplate"></a>
