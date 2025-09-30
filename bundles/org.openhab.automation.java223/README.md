@@ -220,7 +220,7 @@ This cache is accessible the same way a `Map<String, Object>` is.
 
 Tip: it is automatically available to scripts inheriting the Java223Script helper class.
 
-## Share value between script executions
+## Share value between executions
 
 The Java223 automation bundle, in conjunction with openHAB, works like this:
 - receives a .java script
@@ -229,11 +229,20 @@ The Java223 automation bundle, in conjunction with openHAB, works like this:
   - the engine will choose a constructor and instantiate the script with the `new` operator. Auto-injection of openHAB values may occur in fields or constructor parameters.
   - the engine will execute the relevant script methods (main, etc., and @RunScript annotated methods) on the instance.
 
+openHAB asks to compile and execute a script in `automation/jsr223` only once: at creation or modification. Such a script is never re-executed.
+
+It is different for scripts defined in the GUI or as part of transformations/profiles. They are compiled once and can be executed many times.
+
+### Rules
+
 When you define rules in a `.java` script in `automation/jsr223`, openHAB asks the Java223 bundle to compile and run the script immediately (and by nature, only once).
 The script is instantiated, and its methods are executed. As part of this, rules are parsed and registered in the Rule Manager.
-But, even if the script is executed only once, the rules inside define actions, and those actions will run many times: each time the corresponding trigger is fired.
-These actions are, by nature, members of an instance (a method or a field such as a Runnable). And as such, take note that they are always executed on the same instance of the script (which is the instance used to register them).
+But, even if the script creating them is executed only once, the rules inside define actions, and those actions will run many times: each time the corresponding trigger is fired.
+These actions have, by nature, some context around them (they are members of an instance: methods or fields such as a Runnable).
+And as such, take note that they are always executed on the same instance of the script (which is the instance used to register them).
 This means that you can share states between triggered executions of rules by using fields of the script.
+
+### Scripts
 
 On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and wait for further executions.
 Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or a transformation, or a profile), it will ask the Java223 bundle to run it.
@@ -257,8 +266,9 @@ This means, for example, that a script defined as the 'Action' part of a GUI rul
 openHAB prevents several executions of the same script at the same time.
 This is also the case for transformations/profile (the second transformation will wait for the first to finish). This can be an issue, especially if your script takes some non-negligible time to execute.
 
-Also, for rules defined inside a `.java` script in `automation/jsr223`, remember that the 'Action' part are only lambda-like pieces of code running on a java instance.
-As openHAB does not manage the instance, there is no protection against concurrent executions (other than the "not twice the same rule" policy).
+Also, for rules defined inside a `.java` script in `automation/jsr223`, remember that the 'Action' part of each rule (i.e., the code doing something) are only lambda-like pieces of code running on a java instance.
+As openHAB does not manage the instance, there is no protection against concurrent executions of different rules.
+The "cannot-execute-same-rule-twice-at-the-same-time" policy applies to one rule, so several rules defined on the same script file will share state and can access it concurrently.
 If different rules -triggered at the same time- access the same instance fields, you may have to synchronize read/write from/to your data.
 If this is a concern for you, and if you are new to Java, look online for some good tutorials about concurrency, thread safety, and locks.
 
