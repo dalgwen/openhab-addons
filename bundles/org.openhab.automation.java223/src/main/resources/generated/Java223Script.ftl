@@ -60,9 +60,9 @@ public abstract class Java223Script {
     protected @InjectBinding AudioManager audio;
 
     // from ruleSupport preset
-    protected @InjectBinding(preset = "RuleSupport", named = "automationManager") ScriptedAutomationManager automationManager;
-    protected @InjectBinding(preset = "cache", named = "sharedCache") ValueCache sharedCache;
-    protected @InjectBinding(preset = "cache", named = "privateCache") ValueCache privateCache;
+    protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
+    protected @InjectBinding(preset = "cache") ValueCache sharedCache;
+    protected @InjectBinding(preset = "cache") ValueCache privateCache;
 
     // for transformation support
     protected @Nullable Object input;

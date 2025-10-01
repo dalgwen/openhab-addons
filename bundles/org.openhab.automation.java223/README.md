@@ -213,7 +213,7 @@ Here are all functionalities of the helper-lib:
 To share value between different scripts, you can use the shared standard openHAB cache available in the `cache` preset. Auto-inject it with :
 
 ```java
-    protected @InjectBinding(preset = "cache", named = "sharedCache") ValueCache sharedCache;
+    protected @InjectBinding(preset = "cache") ValueCache sharedCache;
 ```
 
 This cache is accessible the same way a `Map<String, Object>` is.
@@ -562,10 +562,10 @@ Control automatic injection behavior by using the `@InjectBinding` annotation. Y
 public class InjectBindingExample {
 
     // inject something from a preset :
-    protected @InjectBinding(preset = "RuleSupport", named = "automationManager") ScriptedAutomationManager automationManager;
+    protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
     // disable injection even if the field name should trigger it :
     protected @InjectBinding(enable = "false") ItemRegistry itemRegistry;
-    // name your variable as you wish :
+    // name your variable as you wish by using the named parameter :
     protected @InjectBinding(named = "itemRegistry") ItemRegistry otherVariableName;
     // make it mandatory (the script will not run if the value cannot be found). Note : mandatory = true is the default value when using the annotation.
     protected @InjectBinding(mandatory = true) ThingRegistry things;
