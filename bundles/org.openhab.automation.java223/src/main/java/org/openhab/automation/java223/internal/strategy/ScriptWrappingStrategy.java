@@ -112,9 +112,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             protected @InjectBinding VoiceManager voice;
             protected @InjectBinding AudioManager audio;
 
-            protected @InjectBinding(preset = "RuleSupport", named = "automationManager") ScriptedAutomationManager automationManager;
-            protected @InjectBinding(preset = "cache", named = "sharedCache") ValueCache sharedCache;
-            protected @InjectBinding(preset = "cache", named = "privateCache") ValueCache privateCache;
+            protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
+            protected @InjectBinding(preset = "cache") ValueCache sharedCache;
+            protected @InjectBinding(preset = "cache") ValueCache privateCache;
 
             protected String input;
 
