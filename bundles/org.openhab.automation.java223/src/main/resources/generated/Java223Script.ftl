@@ -65,7 +65,7 @@ public abstract class Java223Script {
     protected @InjectBinding(preset = "cache", named = "privateCache") ValueCache privateCache;
 
     // for transformation support
-    protected @Nullable Object input;
+    protected @Nullable String input;
 
     // additional useful classes:
     protected @InjectBinding RuleManager ruleManager;

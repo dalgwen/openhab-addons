@@ -116,7 +116,7 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             protected @InjectBinding(preset = "cache", named = "sharedCache") ValueCache sharedCache;
             protected @InjectBinding(preset = "cache", named = "privateCache") ValueCache privateCache;
 
-            protected Object input;
+            protected String input;
 
             protected @InjectBinding RuleManager ruleManager;
             protected @InjectBinding ThingManager thingManager;

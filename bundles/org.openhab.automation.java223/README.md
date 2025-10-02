@@ -323,13 +323,13 @@ You can return a value. The line returning the value MUST begin with `return `, 
 You can use a Java223 script in transformations.
 A transformation is a piece of code with an input and an output. To do so, you only have to respect this contract:
 
-- you use the openHAB input value named 'input'. It is declared as an `Object`.
+- you use the openHAB input value named 'input'. It is declared as a `String`.
 - your runnable method must return a value
 
 Example of transformation appending the word "Hello" to the input, using the "no boilerplate" functionality:
 
 ```java
-return "Hello " + input.toString();
+return "Hello " + input;
 ```
 
 # Use your IDE
