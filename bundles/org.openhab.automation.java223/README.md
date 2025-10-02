@@ -244,7 +244,7 @@ This means that you can share states between triggered executions of rules by us
 
 ### Scripts
 
-On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and wait for further executions.
+On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and waits for further executions.
 Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or a transformation, or a profile), it will ask the Java223 bundle to run it.
 Then, two possibilities arise:
 - either this bundle reinstantiate the script with a `new` operator each time openHAB asks to run it 
@@ -631,7 +631,7 @@ public class InjectBindingExample {
     // inject something from a preset :
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
     // disable injection even if the field name should trigger it :
-    protected @InjectBinding(enable = "false") ItemRegistry itemRegistry;
+    protected @InjectBinding(enable = false) ItemRegistry itemRegistry;
     // name your variable as you wish by using the named parameter :
     protected @InjectBinding(named = "itemRegistry") ItemRegistry otherVariableName;
     // make it mandatory (the script will not run if the value cannot be found). Note : mandatory = true is the default value when using the annotation.
