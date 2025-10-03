@@ -582,11 +582,8 @@ public class RunAnotherRule {
 
 The thingManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it. It is also available in the base class `Java223Script`, as shown in this example.
 
-```java 
-import java.util.Map;
-import org.openhab.core.automation.RuleManager;
-
-public class DisableThing extends Java223Script {
+```java
+public class DisableThing extends helper.generated.Java223Script {
     public void main() {
         thingManager.setEnabled(_things.network_pingdevice_mything().getUID(), false);
     }
