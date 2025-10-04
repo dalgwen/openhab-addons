@@ -43,6 +43,12 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
     private static final Pattern IMPORT_PATTERN = Pattern.compile("import\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
 
     private static final String BOILERPLATE_CODE_COMMON_IMPORT = """
+            import java.time.DayOfWeek;
+            import java.time.Duration;
+            import java.time.Month;
+            import java.time.ZoneId;
+            import java.time.ZonedDateTime;
+            import java.time.temporal.ChronoUnit;
             import org.openhab.core.library.items.*;
             import org.openhab.core.library.types.*;
             import static org.openhab.core.library.types.HSBType.*;
