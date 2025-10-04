@@ -21,8 +21,7 @@
 
 		<parameter name="allowInstanceReuse" type="boolean" groupName="cache">
 			<label>Allow Script Instance Reuse</label>
-			<description>Reuse a script instance if found in the cache. Allow sharing data between subsequent executions. Note:
-				Beware of concurrency issues</description>
+			<description>Reuse a script instance if found in the cache. Allow sharing data between subsequent executions.</description>
 			<default>false</default>
 			<advanced>true</advanced>
 		</parameter>
