@@ -15,7 +15,6 @@ package org.openhab.automation.java223.internal.strategy;
 import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -40,10 +39,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Constants;
-import org.openhab.automation.java223.common.Java223Exception;
-import org.openhab.automation.java223.common.ReuseScriptInstance;
 import org.openhab.automation.java223.common.RunScript;
-import org.openhab.automation.java223.internal.Java223CompiledScript;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager.JarFileManagerFactory;
 import org.openhab.core.service.WatchService;
@@ -86,6 +82,10 @@ public class Java223Strategy
         this.additionalBindings = additionalBindings;
         this.allowInstanceReuseDefaultProperty = false;
         jarFileManagerfactory = new JarFileManagerFactory(LIB_DIR, classLoader);
+    }
+
+    public boolean getInstanceReuseDefaultProperty() {
+        return allowInstanceReuseDefaultProperty;
     }
 
     @Override
@@ -156,7 +156,7 @@ public class Java223Strategy
                         | InstantiationException e) {
                     String simpleName = instance.getClass().getSimpleName();
                     // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
-                    // and caller sometimes does not
+                    // and the caller sometimes does not log it fully.
                     logger.error("Error executing entry point {} in {}, exception {}", method.getName(), simpleName,
                             e.getMessage(), e);
                     throw new ScriptException("Cannot execute script. Entry point error");
@@ -277,49 +277,6 @@ public class Java223Strategy
             throw new IllegalArgumentException("Parent JavaFileManager should not be null");
         }
         return jarFileManagerfactory.create(parentJavaFileManager);
-    }
-
-    @SuppressWarnings("null")
-    public Object construct(Java223CompiledScript compiledScript, Map<String, Object> bindings) {
-
-        // default re-instantiation option overwritten by annotation if present
-        boolean instanceReuse = allowInstanceReuseDefaultProperty;
-        Class<?> compiledClass = compiledScript.getCompiledClass();
-
-        ReuseScriptInstance reuseAnnotation = compiledClass.getAnnotation(ReuseScriptInstance.class);
-        if (reuseAnnotation != null) {
-            instanceReuse = reuseAnnotation.value();
-        }
-
-        // if allowed, get from the cache and return
-        var alreadyExistingScriptInstance = compiledScript.getCompiledInstance();
-        if (instanceReuse && alreadyExistingScriptInstance != null) {
-            return alreadyExistingScriptInstance;
-        }
-
-        // create real instance from compiled class
-        // use the empty constructor if available, or the first one otherwise
-        Constructor<?>[] constructors = compiledClass.getDeclaredConstructors();
-        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
-                .orElseGet(() -> constructors[0]);
-
-        try {
-            ClassLoader classLoader = compiledClass.getClassLoader();
-            if (classLoader == null) { // should not happen
-                throw new Java223Exception(
-                        "Cannot get the classloader of " + compiledClass.getName() + ". Should not happen");
-            }
-            Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
-            Object compiledInstance = constructor.newInstance(parameterValues);
-            if (compiledInstance == null) { // can't be null, but null-check thinks so
-                throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
-            }
-            compiledScript.setCompiledInStance(compiledInstance);
-            return compiledInstance;
-        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-                | InvocationTargetException e) {
-            throw new Java223Exception("Cannot instantiate the script", e);
-        }
     }
 
     public void setAllowInstanceReuse(boolean allowInstanceReuse) {

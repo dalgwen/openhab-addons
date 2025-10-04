@@ -12,6 +12,9 @@
  */
 package org.openhab.automation.java223.internal;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,7 +24,9 @@ import javax.script.ScriptException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Exception;
+import org.openhab.automation.java223.common.ReuseScriptInstance;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,11 +84,22 @@ public class Java223CompiledScript extends JavaCompiledScript {
         java223Strategy.associateBindings(null, null, mergedBindings);
 
         try {
-            // instantiate the script
-            Object compiledInstance = java223Strategy.construct(this, mergedBindings);
+            // default re-instantiation option overwritten by annotation if present
+            boolean instanceReuse = java223Strategy.getInstanceReuseDefaultProperty();
+            ReuseScriptInstance reuseAnnotation = getCompiledClass().getAnnotation(ReuseScriptInstance.class);
+            if (reuseAnnotation != null) {
+                instanceReuse = reuseAnnotation.value();
+            }
+            // if allowed, get from the cache
+            var localScriptInstance = java223CompiledInstance;
+            if (!instanceReuse || localScriptInstance == null) {
+                // no cache, instantiate the script
+                localScriptInstance = construct(getCompiledClass(), mergedBindings);
+                java223CompiledInstance = localScriptInstance;
+            }
 
             // execute
-            return java223Strategy.execute(compiledInstance, mergedBindings);
+            return java223Strategy.execute(localScriptInstance, mergedBindings);
         } catch (Java223Exception e) {
             // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
             // and caller sometimes does not do it well
@@ -93,12 +109,35 @@ public class Java223CompiledScript extends JavaCompiledScript {
         }
     }
 
+    @SuppressWarnings("null")
+    private Object construct(Class<?> compiledClass, Map<String, Object> bindings) {
+
+        // create real instance from compiled class
+        // use the empty constructor if available, or the first one otherwise
+        Constructor<?>[] constructors = compiledClass.getDeclaredConstructors();
+        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
+                .orElseGet(() -> constructors[0]);
+
+        try {
+            ClassLoader classLoader = compiledClass.getClassLoader();
+            if (classLoader == null) { // should not happen
+                throw new Java223Exception(
+                        "Cannot get the classloader of " + compiledClass.getName() + ". Should not happen");
+            }
+            Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
+            Object compiledInstance = constructor.newInstance(parameterValues);
+            if (compiledInstance == null) { // can't be null, but null-check thinks so
+                throw new Java223Exception("Instantiation of compiledInstance failed. Should not happened");
+            }
+            return compiledInstance;
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                | InvocationTargetException e) {
+            throw new Java223Exception("Cannot instantiate the script", e);
+        }
+    }
+
     @Override
     public @Nullable Object getCompiledInstance() {
         return java223CompiledInstance;
-    }
-
-    public void setCompiledInStance(Object compiledInstance) {
-        this.java223CompiledInstance = compiledInstance;
     }
 }

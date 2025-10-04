@@ -80,6 +80,17 @@ You can control the injection further (i.e. overriding default behavior, or dire
 
 <a id="rules"></a>
 
+### Additional injections
+
+The Java223 bundle also provides some additional injections that are not available in the default openHAB JSR223 system.
+
+| Variable         | Description                                                                                                                 | Purpose                           |
+|------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| ruleManager      | [`org.openhab.core.automation.RuleManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/automation/rulemanager) | Run or disable/enable other rules |
+| thingManager     | [`org.openhab.core.thing.ThingManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/thing/thingmanager)         | Enable/Disable thing              |
+| metadataRegistry | [`org.openhab.core.items.MetadataRegistry`](https://www.openhab.org/javadoc/latest/org/openhab/core/items/metadataregistry) | Manage metadata                   |
+
+
 ## Defining Rules
 
 As a JSR223 openHAB language, you can define rules with the openHAB JSR223 DSL. All necessary classes and instances (SimpleRule, TriggerBuilder, automationManager instance, etc.) are, of course, exposed natively with this bundle. You can see an example of how to use it [here](https://www.openhab.org/docs/configuration/jsr223.html#example-rules-for-a-first-impression) (examples are written with other languages, but concepts and objects for Java223 are the same), or below in the [full-fledged example without helper library](#example-without-helper-library).
@@ -360,7 +371,7 @@ Tip: to access a remote openHAB installation scripts folder, you can copy, use W
 
 | Parameter Name                | Type    | Default | Label                          | Description                                                                                                                                                                                                 |
 |-------------------------------|---------|---------|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse    | Reuse an instance if found in the cache. Allow sharing data between subsequent executions. Note: Beware of concurrency issues.                                                                              |
+| `allowInstanceReuse`          | boolean | false   | Allow Script Instance Reuse    | Reuse an instance if found in the cache. Allow sharing data between subsequent executions.                                                                                                                  |
 | `enableHelper`                | boolean | true    | Enable helper generation       | Enable code generation, and copying helper and convenience libraries                                                                                                                                        |
 | `additionalBundles`           | text    | -       | Additional Bundles             | Additional bundles inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |
 | `additionalClasses`           | text    | -       | Additional Classes             | Additional classes inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |

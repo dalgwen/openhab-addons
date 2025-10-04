@@ -24,6 +24,7 @@
 			<description>Reuse a script instance if found in the cache. Allow sharing data between subsequent executions. Note:
 				Beware of concurrency issues</description>
 			<default>false</default>
+			<advanced>true</advanced>
 		</parameter>
 		<parameter name="enableHelper" type="boolean" groupName="helperLib">
 			<label>Enable Helper Library</label>
