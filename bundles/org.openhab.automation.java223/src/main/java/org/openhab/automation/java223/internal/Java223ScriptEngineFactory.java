@@ -43,6 +43,7 @@ import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptDependencyTracker;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
+import org.openhab.core.automation.module.script.ScriptEngineManager;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
@@ -114,7 +115,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
             @Reference Java223DependencyTracker dependencyTracker, @Reference RuleManager ruleManager,
-            @Reference ThingManager thingManager, @Reference MetadataRegistry metadataRegistry) {
+            @Reference ThingManager thingManager, @Reference MetadataRegistry metadataRegistry,
+            @Reference ScriptEngineManager scriptEngineManager) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -141,7 +143,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager, metadataRegistry),
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
-        scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper);
+        scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper, scriptEngineManager);
 
         try {
             this.dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,

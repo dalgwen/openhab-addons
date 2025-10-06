@@ -10,6 +10,7 @@ import org.openhab.automation.java223.common.RunScript;
 import org.openhab.core.audio.AudioManager;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.RuleRegistry;
+import org.openhab.core.automation.module.script.LifecycleScriptExtensionProvider.LifecycleTracker;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
 import org.openhab.core.automation.module.script.defaultscope.ScriptBusEvent;
 import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
@@ -56,8 +57,13 @@ public abstract class Java223Script {
     protected @InjectBinding ScriptThingActions actions;
     protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
     protected @InjectBinding ScriptExtensionManagerWrapper se;
+
+    // from audio preset
     protected @InjectBinding VoiceManager voice;
     protected @InjectBinding AudioManager audio;
+
+    // from lifecycle preset
+    protected @InjectBinding LifecycleTracker lifecycleTracker;
 
     // from ruleSupport preset
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
