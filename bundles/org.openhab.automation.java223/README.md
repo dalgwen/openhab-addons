@@ -234,6 +234,7 @@ Tip: it is automatically available to scripts inheriting the Java223Script helpe
 ## Share value between executions
 
 The Java223 automation bundle, in conjunction with openHAB, works like this:
+
 - receives a .java script
 - compiles it (if not already done). openHAB will then store the compilation unit for further (and fastest) reuse.
 - then, when execution is needed and asked by openHAB: 
@@ -258,6 +259,7 @@ This means that you can share states between triggered executions of rules by us
 On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and waits for further executions.
 Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or a transformation, or a profile), it will ask the Java223 bundle to run it.
 Then, two possibilities arise:
+
 - either this bundle reinstantiate the script with a `new` operator each time openHAB asks to run it 
 - or the bundle reuses the same instance, and then re-executes the relevant action (method, field) on it. In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM). 
 
@@ -290,7 +292,7 @@ If this is a concern for you, and if you are new to Java, look online for some g
 
 Sometimes, your 'real' (useful) code is very short, and you don't need complex logic, custom auto-injection, etc.
 In this case, you can omit the 'boilerplate' code and directly write your 'useful' code.
-Under the hood, the Java223 bundle will 'wrap' your code inside a class inheriting `Java223Script` (if you enabled the helper lib), with a bunch of standard imports (mainly item state types) and a main method.
+Under the hood, the Java223 bundle will 'wrap' your code inside a class with nearly the same content as `Java223Script` created in the helper lib, with a bunch of standard imports (mainly item state types) and a main method.
 
 For example, this one-line script is perfectly valid:
 

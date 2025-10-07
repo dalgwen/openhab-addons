@@ -82,7 +82,7 @@ public class BindingInjector {
 
     /**
      * Search what to inject into an element.
-     * Find a library, or compute a name to use as a key, then use this key to search a value in the bindings data
+     * Find a library (or compute a name to use as a key), then use this key to search for a value in the binding data
      *
      * @param sourceScriptClassLoader The class loader of the script initiating the execution
      * @param bindings a map where to find the data to inject
@@ -130,10 +130,7 @@ public class BindingInjector {
                 return null;
             }
             // has it already been instantiated and stored in the store?
-            Object valueToInject = getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType);
-            if (valueToInject != null) { // cannot be null, but null-check thinks so
-                return valueToInject;
-            }
+            return getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType);
         }
 
         // second. It's not a library, so search value in the bindings map.
@@ -148,14 +145,14 @@ public class BindingInjector {
         }
         Queue<String> namePath = new LinkedList<>(Arrays.asList(named.split("\\.")));
 
-        // third, choose where to look : in bindings, or deeper, in a preset :
+        // third, choose where to look: in bindings, or deeper, in a preset :
         Object value = bindings;
         if (injectBindingAnnotation != null
                 && !injectBindingAnnotation.preset().equals(Java223Constants.ANNOTATION_DEFAULT)) {
             ScriptExtensionManagerWrapper se = (ScriptExtensionManagerWrapper) bindings.get("scriptExtension");
             if (se != null) {
                 Map<String, Object> presetMap = se.importPreset(injectBindingAnnotation.preset());
-                if (presetMap != null) {
+                if (!presetMap.isEmpty()) {
                     value = presetMap;
                 } else {
                     logger.warn("Cannot find the preset {} for the named parameter {}",
@@ -176,7 +173,7 @@ public class BindingInjector {
                 String namePart = namePath.poll();
                 value = elementToParseAsMap.get(namePart);
                 if (value == null) {
-                    logger.trace("Cannot find an element with the key {}", namePart);
+                    logger.trace("Didn't find an element with the key {}. Ignoring", namePart);
                 }
             } else {
                 Field targetField;

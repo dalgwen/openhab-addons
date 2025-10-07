@@ -104,6 +104,7 @@ public class Java223Strategy
     public void associateBindings(@Nullable Class<?> compiledClass, @Nullable Object compiledInstance,
             Map<String, Object> bindings) {
         // adding a special self-reference to bindings: "bindings", to receive a map with all bindings
+        // noinspection CollectionAddedToSelf
         bindings.put("bindings", bindings);
         // adding some custom additional fields
         bindings.putAll(additionalBindings);
@@ -135,6 +136,7 @@ public class Java223Strategy
         BindingInjector.injectBindingsInto(classLoader, bindings, instance);
 
         // find methods to execute
+        // noinspection OptionalAssignedToNull
         Optional<Object> returned = null;
         for (Method method : instance.getClass().getMethods()) {
             // methods with a special name, or methods with a special annotation
@@ -145,6 +147,7 @@ public class Java223Strategy
                     var returnedLocal = method.invoke(instance, parameterValues);
                     // keep arbitrarily only the first returned value
                     // comparing this optional to null is OK. Null value means no method was yet executed.
+                    // noinspection OptionalAssignedToNull
                     if (returned == null || returned.isEmpty()) {
                         if (returnedLocal != null) {
                             returned = Optional.of(returnedLocal);
@@ -166,6 +169,7 @@ public class Java223Strategy
 
         // return if there was at least one execution
         // comparing this optional to null is OK. Null value means no method was executed.
+        // noinspection OptionalAssignedToNull
         if (returned != null) {
             return returned.orElse(null);
         }
@@ -196,7 +200,7 @@ public class Java223Strategy
     public void processWatchEvent(WatchService.Kind kind, Path pathEvent) {
         Path fullPath = LIB_DIR.resolve(pathEvent);
 
-        // All new .java file will be kept in memory
+        // All new .java files will be kept in memory
         if (fullPath.getFileName().toString().endsWith("." + Java223Constants.JAVA_FILE_TYPE)) {
             switch (kind) {
                 case CREATE:

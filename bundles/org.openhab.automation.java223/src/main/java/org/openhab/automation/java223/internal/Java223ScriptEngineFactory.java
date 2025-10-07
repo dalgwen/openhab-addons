@@ -36,6 +36,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
+import org.openhab.automation.java223.internal.codegeneration.InjectedCodeGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceWriter;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
@@ -43,7 +44,7 @@ import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptDependencyTracker;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
-import org.openhab.core.automation.module.script.ScriptEngineManager;
+import org.openhab.core.automation.module.script.ScriptExtensionAccessor;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
@@ -116,7 +117,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
             @Reference Java223DependencyTracker dependencyTracker, @Reference RuleManager ruleManager,
             @Reference ThingManager thingManager, @Reference MetadataRegistry metadataRegistry,
-            @Reference ScriptEngineManager scriptEngineManager) {
+            @Reference ScriptExtensionAccessor scriptExtensionAccessor) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -139,18 +140,20 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         Boolean allowInstanceReuse = ConfigParser.valueAsOrElse(properties.get("allowInstanceReuse"), Boolean.class,
                 false);
 
+        InjectedCodeGenerator injectedCodeGenerator = new InjectedCodeGenerator(scriptExtensionAccessor);
+
         osgiPackageResourceListingStrategy = this::listClassResources;
         java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager, metadataRegistry),
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
-        scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper, scriptEngineManager);
+        scriptWrappingStrategy = new ScriptWrappingStrategy(injectedCodeGenerator);
 
         try {
             this.dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,
                     additionalClassesConfig, bundleContext);
             this.sourceWriter = new SourceWriter(LIB_DIR);
-            this.sourceGenerator = new SourceGenerator(sourceWriter, dependencyGenerator, itemRegistry, thingRegistry,
-                    bundleContext);
+            this.sourceGenerator = new SourceGenerator(sourceWriter, dependencyGenerator, injectedCodeGenerator,
+                    itemRegistry, thingRegistry, bundleContext);
             generateOrDeleteHelpers();
         } catch (IOException e) {
             throw new Java223Exception("Cannot create or delete helper library / class files in lib directory", e);
@@ -232,7 +235,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         enableHelper = ConfigParser.valueAsOrElse(properties.get("enableHelper"), Boolean.class, true);
         this.startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
 
-        scriptWrappingStrategy.setEnableHelper(enableHelper);
         this.writeWaitTime = stabilityGenerationWaitTime;
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         dependencyGenerator.setAdditionalConfig(additionalBundlesConfig, additionalClassesConfig);

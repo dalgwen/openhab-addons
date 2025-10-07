@@ -158,12 +158,12 @@ public class Java223Rule extends SimpleRule {
                 case null ->
                         throw new Java223Exception("Field " + fieldMember.getName() + " is null. Cannot execute anything");
                 case SimpleRule simpleRule -> execute(simpleRule, module, inputs);
-                case Function function -> execute(function, inputs);
-                case BiFunction bifunction -> execute(bifunction, module, inputs);
-                case Callable callable -> execute(callable);
+                case Function<?, ?> function -> execute((Function<Map<String, Object>, Object>) function, inputs);
+                case BiFunction<?, ?, ?> bifunction -> execute((BiFunction<Action, Map<String, Object>, Object>) bifunction, module, inputs);
+                case Callable<?> callable -> execute((Callable<Object>) callable);
                 case Runnable runnable -> execute(runnable);
-                case Consumer consumer -> execute(consumer, inputs);
-                case BiConsumer biconsumer -> execute(biconsumer, module, inputs);
+                case Consumer<?> consumer -> execute((Consumer<Map<String, Object>>) consumer, inputs);
+                case BiConsumer<?, ?> biconsumer -> execute((BiConsumer<Action, Map<String, Object>>) biconsumer, module, inputs);
                 default -> throw new Java223Exception("Wrong type of field " + fieldType + ". Should not happen");
             };
         };
