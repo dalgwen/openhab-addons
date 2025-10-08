@@ -13,8 +13,11 @@
 package helper.rules.eventinfo;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.types.State;
+
+import java.time.ZonedDateTime;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
@@ -29,11 +32,18 @@ public class ItemStateUpdate extends EventInfo {
     @InjectBinding(named = "event.itemState")
     protected @NonNullByDefault({}) State state;
 
+    @InjectBinding(mandatory = false)
+    protected @Nullable ZonedDateTime lastStateUpdate;
+
     public String getItemName() {
         return itemName;
     }
 
     public State getState() {
         return state;
+    }
+
+    public @Nullable ZonedDateTime getLastStateUpdate() {
+        return lastStateUpdate;
     }
 }

@@ -18,7 +18,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.automation.java223.common.InjectBinding;
 
 /**
- * Base class : DTO object to facilitate input injection when used as an argument in a rule annotated method
+ * Base class: DTO object to facilitate input injection when used as an argument in a rule-annotated method
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -26,9 +26,15 @@ import org.openhab.automation.java223.common.InjectBinding;
 public abstract class EventInfo {
 
     @InjectBinding()
-    protected @NonNullByDefault({}) Map<String, ?> inputs;
+    protected @NonNullByDefault({}) Map<String, ?> bindings;
+
+    protected @NonNullByDefault({}) String module;
 
     public Map<String, ?> getAllInputs() {
-        return inputs;
+        return bindings;
+    }
+
+    public String getModule() {
+        return module;
     }
 }

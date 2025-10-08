@@ -78,6 +78,15 @@ The variable name is used to find the correct value to inject, so take care of y
 
 You can control the injection further (i.e. overriding default behavior, or directly injecting something from a preset) with the @InjectBinding annotation. See [example](#injectbinding).
 
+| InjectBinding parameter | Description                                                                                                                                                                                                                                                                                                                           |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| enable                  | Prevent injection. Useful if you want to do it yourself.                                                                                                                                                                                                                                                                              |
+| named                   | Use this to specify the key used to get the value. If not specified, the field name will be use, or the type definition for libraries. You can also use a special 'path traversal' syntaxic sugar for getting field of field. Example 'event.itemName' will get the event object, and use java reflection to get its field 'itemName' |
+| preset                  | Use this field to inject value from a specific preset.                                                                                                                                                                                                                                                                                |
+| mandatory               | If set to true (which is the default), the injection will fail if the variable is not found.                                                                                                                                                                                                                                          |
+| defaultValue            | The default value to inject if the variable is not found. If not set, the injection will fail if the variable is not found.                                                                                                                                                                                                           |
+| recursive               | For library only. If set to true (default), the library injected will be parsed and its field also injected.                                                                                                                                                                                                                          |
+
 <a id="rules"></a>
 
 ### Additional injections
@@ -199,7 +208,7 @@ public class MyRule extends Java223Script {
     @Rule(name = "detecting.people", description = "Detecting people and light")
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = OnOffType.ON.toString())
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = OnOffType.ON.toString())
-    public void myRule(ItemStateChange inputs) { // <-- HERE, strongly typed parameter
+    public void myRule(ItemStateUpdate inputs) { // <-- HERE, strongly typed parameter
         _items.my_bulb_item.send(OnOffType.ON);
         logger.info("Movement detected at " + inputs.getItemName()); // inputs.getItemName() give me the triggering detector name
     }
@@ -214,7 +223,7 @@ Here are all functionalities of the helper-lib:
 - You can add (multiple) `@Condition` to a Rule. It exposes a pre-condition for the rule to execute. Check the `helper.rules.annotation` package
 - `@Trigger`, `@Conditions`, `@Rule` have many parameters. Some parameters add functionality; others can overwrite default behavior (for example, using the method name for the label of a rule).
 - Pre-made event objects that you can use as a parameter in a rule are defined in the package `helper.rules.eventinfo`. You can define your own if some are missing (do not hesitate to make a Pull Request)
-- If you want all the triggering event input parameters in a map for a rule, you can use the parameter `Map<String, ?> inputs`.
+- If you want all the triggering event input parameters in a map for a rule, you can use the parameter `Map<String, ?> bindings` in the rule method.`.
 - You can set the `@Rule` annotation on a method, but also on many types of field containing code to execute, such as Function, Runnable... Take a look at the class `Java223Rule` for an exhaustive list of what is supported. You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
 
 <a id="sharedcache"></a>
@@ -499,6 +508,7 @@ The method parameter is a strongly typed library element (`ItemStateChange`) and
 Instead of the default (the method name used for the label of the rule), it has a description, and a dedicated name for the label, and both will be shown on the openHAB GUI.
 
 ```java
+import helper.rules.eventinfo.ItemStateUpdate;
 import ...;
 
 public class MyRule extends Java223Script {
@@ -506,7 +516,7 @@ public class MyRule extends Java223Script {
     @Rule(name = "detecting.people", description = "Detecting people and light")
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = OnOffType.ON.toString())
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = OnOffType.ON.toString())
-    public void myRule(ItemStateChange inputs) { // here, strongly typed parameter
+    public void myRule(ItemStateUpdate inputs) { // here, a strongly typed parameter
         _items.my_bulb_item.send(OnOffType.ON);
         logger.info("Movement detected at {}", inputs.getItemName());
     }

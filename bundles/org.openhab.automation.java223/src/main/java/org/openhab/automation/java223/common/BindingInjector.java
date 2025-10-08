@@ -65,14 +65,14 @@ public class BindingInjector {
     }
 
     private static void injectBindingsInto(ClassLoader sourceScriptClassLoader, Map<String, Object> bindings,
-            Object objectToInjectInto, Map<Class<?>, Object> libAlreadyInstanciated)
+            Object objectToInjectInto, Map<Class<?>, Object> libAlreadyInstantiated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 
         Class<?> clazz = objectToInjectInto.getClass();
 
         for (Field field : getAllFields(clazz)) {
             Object valueToInject = extractBindingValueForElement(sourceScriptClassLoader, bindings, field,
-                    libAlreadyInstanciated);
+                    libAlreadyInstantiated);
             if (valueToInject != null) {
                 field.setAccessible(true);
                 field.set(objectToInjectInto, valueToInject);
@@ -129,8 +129,9 @@ public class BindingInjector {
                 // no injection
                 return null;
             }
+            boolean recursive = libraryAnnotation == null || libraryAnnotation.recursive();
             // has it already been instantiated and stored in the store?
-            return getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType);
+            return getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType, recursive);
         }
 
         // second. It's not a library, so search value in the bindings map.
@@ -227,14 +228,14 @@ public class BindingInjector {
     public static <T> T getOrInstantiateObject(ClassLoader classLoader, Map<String, Object> bindings,
             Class<T> fieldType) {
         try {
-            return getOrInstantiateObject(classLoader, bindings, new HashMap<>(), fieldType);
+            return getOrInstantiateObject(classLoader, bindings, new HashMap<>(), fieldType, true);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new Java223Exception("Cannot instantiate " + fieldType.getName(), e);
         }
     }
 
     private static <T> T getOrInstantiateObject(ClassLoader classLoader, Map<String, Object> bindings,
-            Map<Class<?>, Object> libAlreadyInstantiated, Class<T> fieldType)
+            Map<Class<?>, Object> libAlreadyInstantiated, Class<T> fieldType, boolean recursive)
             throws InstantiationException, IllegalAccessException, InvocationTargetException {
         Object valueToInject = libAlreadyInstantiated.get(fieldType);
         if (valueToInject == null) { // not instantiated, create it
@@ -248,8 +249,10 @@ public class BindingInjector {
             if (valueToInject != null) { // cannot be null, but null-check thinks so
                 // store it to avoid multiple instantiation
                 libAlreadyInstantiated.put(fieldType, valueToInject);
-                // and then also use injection into it
-                injectBindingsInto(classLoader, bindings, valueToInject, libAlreadyInstantiated);
+                if (recursive) {
+                    // and then also use injection into it
+                    injectBindingsInto(classLoader, bindings, valueToInject, libAlreadyInstantiated);
+                }
             }
         }
         if (valueToInject == null) { // cannot be null, but null-check thinks so

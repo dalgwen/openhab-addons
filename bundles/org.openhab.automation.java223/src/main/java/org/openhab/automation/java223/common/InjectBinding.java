@@ -59,4 +59,9 @@ public @interface InjectBinding {
      * @return True if the value searched MUST be present in the openHAB binding
      */
     boolean mandatory() default true;
+
+    /**
+     * if true, the injected value will also be inspected to be injected recursively.
+     */
+    boolean recursive() default true;
 }

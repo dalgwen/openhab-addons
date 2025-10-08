@@ -171,11 +171,11 @@ public class Java223Rule extends SimpleRule {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Object execute(Action module, Map<String, ?> inputs) {
+    public Object execute(Action module, Map<String, ?> bindings) {
         // special self reference :
-        ((Map<String, Object>) inputs).put("inputs", inputs);
+        ((Map<String, Object>) bindings).put("bindings", bindings);
         // actual call :
-        Object value = codeToExecute.apply(module, (Map<String, Object>) inputs);
+        Object value = codeToExecute.apply(module, (Map<String, Object>) bindings);
         return value != null ? value : "";
     }
 }
