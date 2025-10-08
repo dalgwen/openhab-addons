@@ -254,8 +254,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
 
     @Override
     public List<String> getScriptTypes() {
-        String[] types = { Java223Constants.JAVA_FILE_TYPE };
-        return Arrays.asList(types);
+        return List.of(Java223Constants.JAVA_FILE_TYPE);
     }
 
     @Override
