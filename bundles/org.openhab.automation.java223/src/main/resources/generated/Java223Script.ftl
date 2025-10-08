@@ -41,7 +41,6 @@ ${fieldsDeclaration}
     protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
     protected @InjectBinding ScriptExtensionManagerWrapper se;
 
-    // from ruleSupport preset
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
     protected @InjectBinding(preset = "cache") ValueCache sharedCache;
     protected @InjectBinding(preset = "cache") ValueCache privateCache;

@@ -281,7 +281,7 @@ public class BindingInjector {
      * @param classLoader the source script class loader
      * @param executable Method or constructor
      * @param bindings The map used to search the appropriate value to inject
-     * @param libAlreadyInstanciated To avoid looping the instantiation of libraries
+     * @param libAlreadyInstantiated To avoid looping the instantiation of libraries
      * @return An array of parameter values that fits the executable
      * @throws InstantiationException If instantiation of the parameter doesn't work
      * @throws IllegalAccessException If reflexion fails
@@ -289,15 +289,15 @@ public class BindingInjector {
      * @throws InvocationTargetException If reflexion fails
      */
     public static Object @Nullable [] getParameterValuesFor(ClassLoader classLoader, Executable executable,
-            Map<String, Object> bindings, @Nullable Map<Class<?>, Object> libAlreadyInstanciated)
+            Map<String, Object> bindings, @Nullable Map<Class<?>, Object> libAlreadyInstantiated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         Parameter[] parameters = executable.getParameters();
         Object @Nullable [] parameterValues = new Object[parameters.length];
-        Map<Class<?>, Object> libAlreadyInstanciatedLocal = libAlreadyInstanciated != null ? libAlreadyInstanciated
+        Map<Class<?>, Object> libAlreadyInstantiatedLocal = libAlreadyInstantiated != null ? libAlreadyInstantiated
                 : new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
             parameterValues[i] = extractBindingValueForElement(classLoader, bindings, parameters[i],
-                    libAlreadyInstanciatedLocal);
+                    libAlreadyInstantiatedLocal);
         }
         return parameterValues;
     }
