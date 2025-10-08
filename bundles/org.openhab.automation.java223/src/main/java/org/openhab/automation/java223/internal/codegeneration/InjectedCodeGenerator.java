@@ -116,11 +116,6 @@ public class InjectedCodeGenerator {
                 Package aPackage = clazz.getPackage();
                 String packageName = aPackage != null ? aPackage.getName() : null;
 
-                // TODO fix why can't we import org.openhab.core.library.unit ??
-                if ("org.openhab.core.library.unit".equals(packageName)) {
-                    return null;
-                }
-
                 if (packageName != null && !packageName.isEmpty()) {
                     return new ImportAndDeclaration("import " + canonicalName + ";", null);
                 } else {
