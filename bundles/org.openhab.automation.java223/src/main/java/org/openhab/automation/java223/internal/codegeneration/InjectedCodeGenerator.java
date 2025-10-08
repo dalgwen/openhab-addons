@@ -26,7 +26,6 @@ import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.module.script.ScriptExtensionAccessor;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.ThingRegistry;
-import org.openhab.core.thing.binding.ThingActions;
 import org.openhab.core.voice.VoiceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,10 +100,10 @@ public class InjectedCodeGenerator {
         switch (value) {
             case Class<?> clazz -> {
                 String canonicalName = clazz.getCanonicalName();
-
-                // not directly accessible from scripts (internal classes)
-                if (ThingActions.class.isAssignableFrom(clazz)) {
-                    return null;
+                try {
+                    Class.forName(canonicalName, false, getClass().getClassLoader());
+                } catch (ClassNotFoundException e) {
+                    return null; // not directly accessible from scripts (internal classes)
                 }
 
                 // Primitive types (e.g., int.class), array types (e.g., String[].class),
@@ -148,7 +147,7 @@ public class InjectedCodeGenerator {
                     return getImportAndDeclaration(key, interfaces[0]);
                 } else {
                     logger.warn(
-                            "Cannot found an appropriate class for declaring the injected field {} : {}. We pick the first one",
+                            "Cannot find an appropriate interface for declaring the injected field {} : {}. We pick the first one",
                             key, value.getClass());
                     return getImportAndDeclaration(key, interfaces[0]);
                 }
