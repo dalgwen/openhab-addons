@@ -500,6 +500,35 @@ public class M {
     }
 }
 ```
+## UI Based Rules
+
+When creating a rule over MainUI and only the action is written in Java, the inputs from the trigger are available over the `bindings` variable:
+
+```yaml
+triggers:
+  - id: "1"
+    configuration:
+      itemName: r
+    type: core.ItemStateChangeTrigger
+actions:
+  - inputs: {}
+    id: "2"
+    configuration:
+      type: java
+      script: >-
+        public class anything {
+            org.openhab.core.thing.ThingRegistry things; // from the "default" preset
+            public Object main(java.util.Map<String, Object> bindings) { // use bindings to get access to all variables
+                org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("Bindings");
+                logger.error("Is things the same as bindings('things')? " + Boolean.valueOf(things == bindings.get("things"))); // true
+                logger.error("lastStateUpdate as reported by the trigger: " + bindings.get("lastStateUpdate") + " is of " + bindings.get("lastStateUpdate").getClass());
+                for (var e : bindings.entrySet()) // print all useful and not so useful injected context
+                    logger.error(e.getKey() + " -> " + e.getValue());
+                return null;
+            }
+        }
+    type: script.ScriptAction
+```
 
 ## Create a rule with several triggers and options
 
@@ -561,7 +590,6 @@ public class MethodInjectionExample {
 ### Constructor parameter input injection
 
 ```java
-import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.library.items.SwitchItem;
 import org.openhab.core.library.types.OnOffType;
