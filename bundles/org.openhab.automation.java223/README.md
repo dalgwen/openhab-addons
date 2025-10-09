@@ -301,7 +301,10 @@ If this is a concern for you, and if you are new to Java, look online for some g
 
 Sometimes, your 'real' (useful) code is very short, and you don't need complex logic, custom auto-injection, etc.
 In this case, you can omit the 'boilerplate' code and directly write your 'useful' code.
-Under the hood, the Java223 bundle will 'wrap' your code inside a class with nearly the same content as `Java223Script` created in the helper lib, with a bunch of standard imports (mainly item state types) and a main method.
+
+Under the hood, the Java223 bundle will 'wrap' your code inside a class with nearly the same content as `Java223Script` 
+(you can inspect `Java223Script` in the helper lib: a bunch of standard imports such as item state types, injection utility methods,
+the generated -if enabled- helper classes, and a main method wrapping your code).
 
 For example, this one-line script is perfectly valid:
 
@@ -319,16 +322,68 @@ import static org.openhab.core.library.types.IncreaseDecreaseType.*;
 [other imports...]
 
 public class WrappedJavaScript extends Java223Script {
+
+    protected Logger logger = LoggerFactory.getLogger(this.getClass());
+
+    protected @InjectBinding Map<String, Object> bindings;
+    protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
+    protected @InjectBinding ScriptExtensionManagerWrapper se;
+    protected @InjectBinding AudioManager audio;
+    protected @InjectBinding ItemRegistry ir;
+    protected @InjectBinding ItemRegistry itemRegistry;
+    protected @InjectBinding LifecycleTracker lifecycleTracker;
+    protected @InjectBinding Map<String, State> items;
+    protected @InjectBinding RuleRegistry rules;
+    protected @InjectBinding ScriptBusEvent events;
+    protected @InjectBinding ScriptThingActions actions;
+    protected @InjectBinding ThingRegistry things;
+    protected @InjectBinding VoiceManager voice;
+    protected static final IncreaseDecreaseType DECREASE = IncreaseDecreaseType.DECREASE;
+    protected static final IncreaseDecreaseType INCREASE = IncreaseDecreaseType.INCREASE;
+    protected static final NextPreviousType NEXT = NextPreviousType.NEXT;
+    protected static final NextPreviousType PREVIOUS = NextPreviousType.PREVIOUS;
+    protected static final OnOffType OFF = OnOffType.OFF;
+    protected static final OnOffType ON = OnOffType.ON;
+    protected static final OpenClosedType CLOSED = OpenClosedType.CLOSED;
+    protected static final OpenClosedType OPEN = OpenClosedType.OPEN;
+    protected static final PlayPauseType PAUSE = PlayPauseType.PAUSE;
+    protected static final PlayPauseType PLAY = PlayPauseType.PLAY;
+    protected static final RefreshType REFRESH = RefreshType.REFRESH;
+    protected static final RewindFastforwardType FASTFORWARD = RewindFastforwardType.FASTFORWARD;
+    protected static final RewindFastforwardType REWIND = RewindFastforwardType.REWIND;
+    protected static final StopMoveType MOVE = StopMoveType.MOVE;
+    protected static final StopMoveType STOP = StopMoveType.STOP;
+    protected static final UnDefType NULL = UnDefType.NULL;
+    protected static final UnDefType UNDEF = UnDefType.UNDEF;
+    protected static final UpDownType DOWN = UpDownType.DOWN;
+    protected static final UpDownType UP = UpDownType.UP;
+    
     public Object main() {
         _items.myitem().send(ON); // let there be light
         return null;
     }
+
+    /**
+     * Use this method to manually inject binding value in an object of your choice.
+     */
+    public void injectBindings(Object objectToInjectInto) {
+        BindingInjector.injectBindingsInto(this.getClass().getClassLoader(), bindings, objectToInjectInto);
+    }
+
+    /**
+     * Use this method to instantiate one of your libraries with all binding values injected if you can't use auto-injection.
+     * This can be especially useful for one-liner script because they can't declare a library as a class member or method parameter.
+     * @param clazz
+     * @return The instantiated class
+     */
+    public <T> T createAndInjectBindings(Class<T> clazz) {
+        return BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
+    }
+    
 }
 ```
 
 This 'wrapping' will take place if nowhere in your code a trimmed line starts with `public class`.
-
-If you disabled the helper library, and so the `Java223Script` class is not available, the 'wrapping' will happen with a verbose equivalent. 
 
 If you need to import some class, you can also do it. The import statements (lines starting with `import `) will be parsed and moved at the beginning of the resulting wrapper script, before the wrapping class and method.
 
@@ -337,7 +392,7 @@ You can return a value. The line returning the value MUST begin with `return `, 
 **Note that**, because your code is wrapped, the following functionalities are not available:
 
 - definition of methods (your code is already inside one)
-- customize the auto-injection (because class field members or method parameters happen outside the method body). You have to rely on what is already injected by the parent `Java223Script`.
+- customize the auto-injection (because class field members or method parameters happen outside the method body). You have to rely on what is already injected by the wrapped script.
 - instance reuse, while happening if set to true, is nearly useless (as you cannot declare fields in the wrapper class, you so cannot use them to share data)
 
 ## Transformation
@@ -500,6 +555,7 @@ public class M {
     }
 }
 ```
+
 ## UI Based Rules
 
 When creating a rule over MainUI and only the action is written in Java, the inputs from the trigger are available over the `bindings` variable:

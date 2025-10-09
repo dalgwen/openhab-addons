@@ -33,7 +33,7 @@ public class Items {
     }
 </#list>
     
-    protected Item getItem(String itemId) {
+    public Item getItem(String itemId) {
         if (itemRegistry != null) {
             return itemRegistry.get(itemId);
         }

@@ -146,7 +146,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager, metadataRegistry),
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
-        scriptWrappingStrategy = new ScriptWrappingStrategy(injectedCodeGenerator);
+        scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper, injectedCodeGenerator);
 
         try {
             this.dependencyGenerator = new DependencyGenerator(LIB_DIR, additionalBundlesConfig,
@@ -235,6 +235,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         enableHelper = ConfigParser.valueAsOrElse(properties.get("enableHelper"), Boolean.class, true);
         this.startupGuardTime = ConfigParser.valueAsOrElse(properties.get("startupGuardTime"), Integer.class, 60000);
 
+        scriptWrappingStrategy.setEnableHelper(enableHelper);
         this.writeWaitTime = stabilityGenerationWaitTime;
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         dependencyGenerator.setAdditionalConfig(additionalBundlesConfig, additionalClassesConfig);

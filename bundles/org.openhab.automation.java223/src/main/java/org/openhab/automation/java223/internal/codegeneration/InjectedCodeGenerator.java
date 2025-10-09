@@ -41,6 +41,7 @@ public class InjectedCodeGenerator {
     private final Logger logger = LoggerFactory.getLogger(InjectedCodeGenerator.class);
 
     private final String imports;
+    private final String importsForSuperClass;
     private final String injectedField;
 
     // We cannot easily find what types to write for those bindings, so we define some exceptions here:
@@ -49,13 +50,16 @@ public class InjectedCodeGenerator {
             getEntry("rules", RuleRegistry.class), getEntry("things", ThingRegistry.class),
             getEntry("itemRegistry", ItemRegistry.class), getEntry("ir", ItemRegistry.class),
             new AbstractMap.SimpleEntry<>("items", new ImportAndDeclaration("import java.util.Map;",
-                    "protected @InjectBinding Map<String, State> items;")));
+                    "protected @InjectBinding Map<String, State> items;", ImportIsFor.ALL)));
 
     public InjectedCodeGenerator(ScriptExtensionAccessor scriptExtensionAccessor) {
         Map<String, Object> defaultPresets = scriptExtensionAccessor.findDefaultPresets("");
         List<@Nullable ImportAndDeclaration> importAndDeclarations = parseBindings(defaultPresets);
         this.imports = importAndDeclarations.stream().filter(Objects::nonNull).map(ImportAndDeclaration::importLine)
                 .distinct().sorted().collect(Collectors.joining("\n"));
+        this.importsForSuperClass = importAndDeclarations.stream().filter(Objects::nonNull)
+                .filter(id -> id.importIsFor == ImportIsFor.ALL).map(ImportAndDeclaration::importLine).distinct()
+                .sorted().collect(Collectors.joining("\n"));
         this.injectedField = importAndDeclarations.stream().filter(Objects::nonNull)
                 .map(ImportAndDeclaration::declaration).filter(Objects::nonNull).filter(Predicate.not(String::isEmpty))
                 .distinct().map("    "::concat).sorted().collect(Collectors.joining("\n"));
@@ -67,11 +71,15 @@ public class InjectedCodeGenerator {
 
     private static ImportAndDeclaration getImportAndDeclaration(String key, Class<?> clazz) {
         return new ImportAndDeclaration("import " + clazz.getCanonicalName() + ";",
-                "protected @InjectBinding " + clazz.getSimpleName() + " " + key + ";");
+                "protected @InjectBinding " + clazz.getSimpleName() + " " + key + ";", ImportIsFor.ALL);
     }
 
     public String getDefaultPresetImportList() {
         return imports;
+    }
+
+    public String getDefaultPresetImportListForSuperClass() {
+        return importsForSuperClass;
     }
 
     public String getInjectedFieldsDeclaration() {
@@ -103,6 +111,8 @@ public class InjectedCodeGenerator {
                 try {
                     Class.forName(canonicalName, false, getClass().getClassLoader());
                 } catch (ClassNotFoundException e) {
+                    logger.debug("Cannot find class {} in classpath, and so cannot use it in the script context",
+                            canonicalName);
                     return null; // not directly accessible from scripts (internal classes)
                 }
 
@@ -117,18 +127,21 @@ public class InjectedCodeGenerator {
                 String packageName = aPackage != null ? aPackage.getName() : null;
 
                 if (packageName != null && !packageName.isEmpty()) {
-                    return new ImportAndDeclaration("import " + canonicalName + ";", null);
+                    return new ImportAndDeclaration("import " + canonicalName + ";", null,
+                            ImportIsFor.WRAPPER_CLASS_ONLY);
                 } else {
                     // Class is in the default package, no import statement needed.
                     return null;
                 }
             }
             case Enum<?> enumMember -> {
-                Class<?> enumClass = enumMember.getDeclaringClass();
-                String enumCanonicalName = enumClass.getCanonicalName();
                 String memberName = enumMember.name();
+                String simpleName = enumMember.getDeclaringClass().getSimpleName();
 
-                return new ImportAndDeclaration("import static " + enumCanonicalName + "." + memberName + ";", null);
+                return new ImportAndDeclaration(
+                        "import " + enumMember.getDeclaringClass().getCanonicalName() + ";", "protected static final "
+                                + simpleName + " " + memberName + " = " + simpleName + "." + memberName + ";",
+                        ImportIsFor.ALL);
             }
             default -> {
                 ImportAndDeclaration importAndDeclaration = OVERWRITE_BINDINGS_TYPE.get(key);
@@ -150,6 +163,11 @@ public class InjectedCodeGenerator {
         }
     }
 
-    public record ImportAndDeclaration(String importLine, @Nullable String declaration) {
+    public static enum ImportIsFor {
+        ALL,
+        WRAPPER_CLASS_ONLY;
+    }
+
+    public record ImportAndDeclaration(String importLine, @Nullable String declaration, ImportIsFor importIsFor) {
     }
 }

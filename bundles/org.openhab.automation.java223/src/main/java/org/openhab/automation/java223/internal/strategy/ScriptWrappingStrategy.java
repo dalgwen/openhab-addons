@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.internal.codegeneration.InjectedCodeGenerator;
+import org.openhab.automation.java223.internal.codegeneration.SourceGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,8 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
 public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
     private static final Logger logger = LoggerFactory.getLogger(ScriptWrappingStrategy.class);
+
+    private Boolean enableHelper;
 
     private static final Pattern NAME_PATTERN = Pattern.compile("public\\s+class\\s+.*");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("package\\s+[A-Za-z][A-Za-z0-9_$.]*;\\s*");
@@ -79,6 +82,13 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
                 protected @InjectBinding MetadataRegistry metadataRegistry;
             """;
 
+    private static final String BOILERPLATE_CODE_HELPER_INJECTION = String.format("""
+                 protected @InjectBinding %s.Items _items;
+                 protected @InjectBinding %s.Actions _actions;
+                 protected @InjectBinding %s.Things _things;
+            """, SourceGenerator.getGeneratedPackageName(), SourceGenerator.getGeneratedPackageName(),
+            SourceGenerator.getGeneratedPackageName());
+
     private static final String BOILERPLATE_CODE_BEGIN_MAIN = """
 
                 public Object main() {
@@ -86,12 +96,21 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
     private static final String BOILERPLATE_CODE_AFTER = """
                 }
+
+                public void injectBindings(Object objectToInjectInto) {
+                    BindingInjector.injectBindingsInto(this.getClass().getClassLoader(), bindings, objectToInjectInto);
+                }
+
+                public <T> T createAndInjectBindings(Class<T> clazz) {
+                    return BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
+                }
             }
             """;
 
     private final InjectedCodeGenerator injectedCodeGenerator;
 
-    public ScriptWrappingStrategy(InjectedCodeGenerator injectedCodeGenerator) {
+    public ScriptWrappingStrategy(Boolean enableHelper, InjectedCodeGenerator injectedCodeGenerator) {
+        this.enableHelper = enableHelper;
         this.injectedCodeGenerator = injectedCodeGenerator;
     }
 
@@ -136,6 +155,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
         modifiedScript.append(injectedCodeGenerator.getDefaultPresetImportList());
         modifiedScript.append(BOILERPLATE_CODE_BEGIN_CLASS);
         modifiedScript.append(injectedCodeGenerator.getInjectedFieldsDeclaration());
+        if (enableHelper) {
+            modifiedScript.append(BOILERPLATE_CODE_HELPER_INJECTION);
+        }
         modifiedScript.append(BOILERPLATE_CODE_BEGIN_MAIN);
         modifiedScript.append(String.join("\n", scriptLines));
         modifiedScript.append("\n");
@@ -146,5 +168,9 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
         String returnedScript = modifiedScript.toString();
         logger.trace("Full script wrapped {}", returnedScript);
         return returnedScript;
+    }
+
+    public void setEnableHelper(Boolean enableHelper) {
+        this.enableHelper = enableHelper;
     }
 }

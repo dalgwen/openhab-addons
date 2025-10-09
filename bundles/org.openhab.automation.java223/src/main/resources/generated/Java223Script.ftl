@@ -11,6 +11,7 @@ import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAuto
 import org.openhab.core.automation.module.script.rulesupport.shared.ValueCache;
 import org.openhab.core.items.MetadataRegistry;
 import org.openhab.core.thing.ThingManager;
+import org.openhab.core.types.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import helper.rules.RuleAnnotationParser;
@@ -37,9 +38,9 @@ public abstract class Java223Script {
     protected @InjectBinding Map<String, Object> bindings;
 
     // default preset
-${fieldsDeclaration}
     protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
     protected @InjectBinding ScriptExtensionManagerWrapper se;
+${fieldsDeclaration}
 
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
     protected @InjectBinding(preset = "cache") ValueCache sharedCache;

@@ -30,7 +30,7 @@ public class Things {
     }
 </#list>
     
-    protected Thing getThing(String stringUID) {
+    public Thing getThing(String stringUID) {
         if (things != null) {
             return things.get(new ThingUID(stringUID));
         } else {

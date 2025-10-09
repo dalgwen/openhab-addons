@@ -117,7 +117,13 @@ public class SourceWriter {
         return !newSource.equals(previousSource);
     }
 
-    protected String getPackageName(String... packagePath) {
+    /**
+     * Get the full package name from the given package array path
+     * 
+     * @param packagePath Package path
+     * @return The full package name
+     */
+    public static String getPackageName(String... packagePath) {
         return HELPER_PACKAGE + "." + String.join(".", packagePath);
     }
 }

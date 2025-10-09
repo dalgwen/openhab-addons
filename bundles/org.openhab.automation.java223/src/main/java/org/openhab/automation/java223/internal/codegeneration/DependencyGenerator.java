@@ -63,12 +63,13 @@ public class DependencyGenerator {
             "org.openhab.core.model.script.actions", "org.openhab.core.model.rule", "org.openhab.core.persistence",
             "org.openhab.core.persistence.extensions", "org.openhab.core.thing", "org.openhab.core.thing.events",
             "org.openhab.core.thing.binding", "org.openhab.core.transform", "org.openhab.core.transform.actions",
-            "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson", "org.openhab.core.library.unit");
+            "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson", "org.openhab.core.library.unit",
+            "tech.units.indriya");
 
     private static final Set<String> DEFAULT_CLASSES_DEPENDENCIES = Set.of("org.eclipse.jdt.annotation.NonNull",
             "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable",
             "org.eclipse.jdt.annotation.DefaultLocation", "org.slf4j.LoggerFactory", "org.slf4j.Logger",
-            "org.slf4j.Marker");
+            "org.slf4j.Marker", "javax.measure.spi.SystemOfUnits");
 
     private final Path libDir;
     // bundle
