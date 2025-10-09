@@ -379,7 +379,6 @@ public class WrappedJavaScript extends Java223Script {
     public <T> T createAndInjectBindings(Class<T> clazz) {
         return BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
     }
-    
 }
 ```
 
@@ -498,7 +497,6 @@ This example shows how to use JSR223 from openHAB without utilizing the code, ge
 import java.util.*;
 import org.openhab.automation.java223.common.InjectBinding;
 import org.openhab.core.automation.Action;
-import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.module.script.defaultscope.ScriptThingActions;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -517,20 +515,11 @@ public class M {
 
     public Object main() {
         automationManager.addRule(new SimpleRule() {
-            @Override public String getName() {
-                return "abc"; //If not implemented, openHAB will assign random name
-            }
-
-            @Override public String getDescription() {
-                return "If getDescription() is not implemented, openHAB will assign empty string as description";
-            }
-
-            @Override public String getUID() {
-                return "1-2-3-uid"; //If not implemented, openHAB will assign random UID
-            }
-
-            @Override public List<Trigger> getTriggers() {
-                return Collections.singletonList(TriggerBuilder.create().withId("trig1").withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(Collections.singletonMap("itemName", "r"))).build());
+            {
+                name = "abc"; //If not set, openHAB will assign random name
+                description = "When description is not set, openHAB will assign empty string as description";
+                uid = "1-2-3-uid"; //If not set, openHAB will assign random UID
+                triggers = List.of(TriggerBuilder.create().withId("trig1").withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(Map.of("itemName", "r"))).build());
             }
 
             @Override public Object execute(Action module, Map<String, ?> inputs) {
