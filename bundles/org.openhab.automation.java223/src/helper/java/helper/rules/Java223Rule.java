@@ -129,7 +129,7 @@ public class Java223Rule extends SimpleRule {
                 }
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
                     | SecurityException e) {
-                throw new Java223Exception("Cannot execute method named " + method.getName());
+                throw new Java223Exception("Cannot execute method named " + method.getName(), e);
             }
         };
     }

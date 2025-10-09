@@ -150,6 +150,7 @@ public class BindingInjector {
 
         // third, choose where to look: in bindings, or deeper, in a preset :
         Object value = bindings;
+        boolean found = false;
         if (injectBindingAnnotation != null
                 && !injectBindingAnnotation.preset().equals(Java223Constants.ANNOTATION_DEFAULT)) {
             ScriptExtensionManagerWrapper se = (ScriptExtensionManagerWrapper) bindings.get("scriptExtension");
@@ -172,35 +173,33 @@ public class BindingInjector {
                 logger.debug("Find null value for the path {}", named);
                 break;
             }
+            String namePart = namePath.poll();
             if (value instanceof Map<?, ?> elementToParseAsMap) {
-                String namePart = namePath.poll();
                 value = elementToParseAsMap.get(namePart);
-                if (value == null) {
+                if (elementToParseAsMap.containsKey(namePart)) {
+                    found = true;
+                } else {
                     logger.trace("Didn't find an element with the key {}. Ignoring", namePart);
                 }
             } else {
-                Field targetField;
                 try {
-                    String namePart = namePath.poll();
                     if (namePart != null) {
-                        targetField = getFieldDeep(value.getClass(), namePart);
+                        Field targetField = getFieldDeep(value.getClass(), namePart);
                         targetField.setAccessible(true);
                         value = targetField.get(value);
-                    } else {
-                        logger.warn("Cannot map a value to the path {}", named);
-                        value = null;
-                        break;
+                        found = true;
                     }
                 } catch (NoSuchFieldException | SecurityException e) {
-                    logger.warn("Cannot map a value to the path {}", named);
+                    logger.debug("Cannot map a value to the path {}", named);
                     value = null;
+                    found = false;
                     break;
                 }
             }
         }
 
         // fifth, check if it is mandatory
-        if (value == null && injectBindingAnnotation != null && injectBindingAnnotation.mandatory()) {
+        if (!found && injectBindingAnnotation != null && injectBindingAnnotation.mandatory()) {
             throw new Java223Exception("There is no value found for parameter/field named " + named
                     + ", but it is mandatory. We cannot inject it");
         } else if (value == null) {
