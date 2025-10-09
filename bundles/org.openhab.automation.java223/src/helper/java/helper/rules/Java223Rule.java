@@ -31,6 +31,8 @@ import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Extract code to execute, from diverse runnable field or from a method
@@ -40,6 +42,8 @@ import org.openhab.core.automation.module.script.rulesupport.shared.simple.Simpl
  */
 @NonNullByDefault
 public class Java223Rule extends SimpleRule {
+
+    Logger logger = LoggerFactory.getLogger(Java223Rule.class);
 
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
@@ -125,7 +129,7 @@ public class Java223Rule extends SimpleRule {
                 }
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
                     | SecurityException e) {
-                throw new Java223Exception("Cannot execute method named " + method.getName(), e);
+                throw new Java223Exception("Cannot execute method named " + method.getName());
             }
         };
     }
@@ -175,7 +179,14 @@ public class Java223Rule extends SimpleRule {
         // special self reference :
         ((Map<String, Object>) bindings).put("bindings", bindings);
         // actual call :
-        Object value = codeToExecute.apply(module, (Map<String, Object>) bindings);
-        return value != null ? value : "";
+        try {
+            Object value = codeToExecute.apply(module, (Map<String, Object>) bindings);
+            return value != null ? value : "";
+        } catch(Java223Exception e) {
+            // why do we do this? Because openHAB sometimes doesn't log the full stack trace exception.
+            // so we took care of it before rethrowing it as a raw exception.
+            logger.error("Cannot execute action", e);
+            throw new Java223Exception("Cannot execute action");
+        }
     }
 }

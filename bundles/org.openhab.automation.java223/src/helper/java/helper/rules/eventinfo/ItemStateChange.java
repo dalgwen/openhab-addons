@@ -29,16 +29,14 @@ public class ItemStateChange extends EventInfo {
     @InjectBinding(named = "event.itemName")
     protected @NonNullByDefault({}) String itemName;
 
-    @InjectBinding()
+    @InjectBinding
     protected @NonNullByDefault({}) State oldState;
 
-    @InjectBinding()
+    @InjectBinding
     protected @NonNullByDefault({}) State newState;
 
-    @InjectBinding(mandatory = false)
     protected @Nullable ZonedDateTime lastStateChange;
 
-    @InjectBinding(mandatory = false)
     protected @Nullable ZonedDateTime lastStateUpdate;
 
     public String getItemName() {

@@ -32,7 +32,6 @@ public class ItemStateUpdate extends EventInfo {
     @InjectBinding(named = "event.itemState")
     protected @NonNullByDefault({}) State state;
 
-    @InjectBinding(mandatory = false)
     protected @Nullable ZonedDateTime lastStateUpdate;
 
     public String getItemName() {

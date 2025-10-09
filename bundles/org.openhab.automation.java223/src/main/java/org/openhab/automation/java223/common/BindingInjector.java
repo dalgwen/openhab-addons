@@ -12,7 +12,6 @@
  */
 package org.openhab.automation.java223.common;
 
-import java.lang.reflect.AccessFlag;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;

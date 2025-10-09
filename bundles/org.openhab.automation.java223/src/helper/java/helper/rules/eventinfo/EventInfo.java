@@ -25,7 +25,7 @@ import org.openhab.automation.java223.common.InjectBinding;
 @NonNullByDefault
 public abstract class EventInfo {
 
-    @InjectBinding()
+    @InjectBinding
     protected @NonNullByDefault({}) Map<String, ?> bindings;
 
     protected @NonNullByDefault({}) String module;
