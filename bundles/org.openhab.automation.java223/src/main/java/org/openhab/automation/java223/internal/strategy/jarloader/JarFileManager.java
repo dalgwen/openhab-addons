@@ -156,7 +156,7 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
             try {
                 this.md5Digest = MessageDigest.getInstance("MD5");
             } catch (NoSuchAlgorithmException e) {
-                throw new Java223Exception("Cannot instanciate md5 digest. Should not happen");
+                throw new Java223Exception("Cannot instantiate md5 digest. Should not happen");
             }
         }
 
