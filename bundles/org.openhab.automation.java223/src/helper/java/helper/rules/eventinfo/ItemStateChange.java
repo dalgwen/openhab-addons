@@ -35,10 +35,10 @@ public class ItemStateChange extends EventInfo {
     @InjectBinding()
     protected @NonNullByDefault({}) State newState;
 
-    @InjectBinding(mandatory = false)
+    @InjectBinding(mandatory = false) // available since openHAB 5.0
     protected @Nullable ZonedDateTime lastStateChange;
 
-    @InjectBinding(mandatory = false)
+    @InjectBinding(mandatory = false) // available since openHAB 5.0
     protected @Nullable ZonedDateTime lastStateUpdate;
 
     public String getItemName() {
