@@ -14,11 +14,11 @@ package org.openhab.automation.java223.internal;
 
 import static org.openhab.core.automation.module.script.ScriptEngineFactory.CONTEXT_KEY_DEPENDENCY_LISTENER;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -32,10 +32,9 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.automation.java223.common.ScriptLoadedTrigger;
-import org.openhab.automation.java223.common.ScriptUnloadedTrigger;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,49 +145,31 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     }
 
     @Override
-    public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args) throws ScriptException {
-
+    public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args)
+            throws ScriptException, NoSuchMethodException {
         // here we assume (from OpenHAB usual behavior) that the script engine served only once and so the wanted
         // compiled script is the last (and only) one
         Java223CompiledScript compiledScript = this.lastCompiledScript;
         if (compiledScript == null || name == null) {
             return null;
         }
-
-        Class<? extends Annotation> annotation = switch (name) {
-            case "scriptLoaded" -> ScriptLoadedTrigger.class;
-            case "scriptUnloaded" -> ScriptUnloadedTrigger.class;
-            default -> throw new ScriptException(name + " is not an allowed method in java223");
-        };
-
-        for (Method method : compiledScript.getCompiledClass().getMethods()) {
-            Annotation scriptLoadedOrUnloadedAnnotation = method.getAnnotation(annotation);
-            if (scriptLoadedOrUnloadedAnnotation != null) {
-                if (method.getParameters().length != 0) {
-                    throw new ScriptException("Method " + method.getName()
-                            + " called by ScriptLoaded/ScriptUnloaded trigger should not have any argument");
-                } else {
-                    try {
-                        Object compiledInstance = compiledScript.getCompiledInstance();
-                        if (Modifier.isStatic(method.getModifiers())) {
-                            method.invoke(new Object()); // new object() required (but value ignored) to avoid non-null
-                                                         // check compiler error
-                        } else if (compiledInstance == null) {
-                            logger.debug(
-                                    "Calling ScriptLoaded/ScriptUnloaded {} method from a script not yet instantiated is ignored. Use a static modifier",
-                                    method.getName());
-                        } else {
-                            method.invoke(compiledInstance);
-                        }
-                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                        // keep responsibility of logging full stack trace, as ScriptException cannot contain cause
-                        // and the caller may not log full stack trace
-                        logger.error("Error compiling script: {}", e.getMessage(), e);
-                        throw new ScriptException(e);
-                    }
-                }
+        Class<?>[] classes = Arrays.stream(args).map(Object::getClass).toArray(Class[]::new);
+        Method method = compiledScript.getCompiledClass().getMethod(name, classes);
+        try {
+            if (Modifier.isStatic(method.getModifiers())) {
+                return method.invoke((@NonNull Object) null, args);
             }
+
+            Object compiledInstance = compiledScript.getCompiledInstance();
+            if (compiledInstance != null) {
+                return method.invoke(compiledInstance, args);
+            }
+            logger.debug("Calling {} method from a script not yet instantiated is ignored. Use a static modifier",
+                    name);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new ScriptException(e);
         }
+
         return null;
     }
 
