@@ -49,7 +49,6 @@ import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
 import org.openhab.core.items.ItemRegistry;
-import org.openhab.core.items.MetadataRegistry;
 import org.openhab.core.items.events.ItemAddedEvent;
 import org.openhab.core.items.events.ItemRemovedEvent;
 import org.openhab.core.service.WatchService;
@@ -116,8 +115,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
             @Reference Java223DependencyTracker dependencyTracker, @Reference RuleManager ruleManager,
-            @Reference ThingManager thingManager, @Reference MetadataRegistry metadataRegistry,
-            @Reference ScriptExtensionAccessor scriptExtensionAccessor) {
+            @Reference ThingManager thingManager, @Reference ScriptExtensionAccessor scriptExtensionAccessor) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -143,7 +141,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         InjectedCodeGenerator injectedCodeGenerator = new InjectedCodeGenerator(scriptExtensionAccessor);
 
         osgiPackageResourceListingStrategy = this::listClassResources;
-        java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager, metadataRegistry),
+        java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager),
                 bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper, injectedCodeGenerator);
@@ -289,10 +287,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
      *
      * @return Additional data to use when binding
      */
-    private Map<String, Object> getAdditionalBindings(RuleManager ruleManager, ThingManager thingManager,
-            MetadataRegistry metadataRegistry) {
+    private Map<String, Object> getAdditionalBindings(RuleManager ruleManager, ThingManager thingManager) {
         return Map.of(Java223Constants.RULE_MANAGER, ruleManager, //
-                Java223Constants.METADATA_REGISTRY, metadataRegistry, //
                 Java223Constants.THING_MANAGER, thingManager);
     }
 

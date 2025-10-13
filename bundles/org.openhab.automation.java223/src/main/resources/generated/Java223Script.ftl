@@ -9,7 +9,6 @@ import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
 import org.openhab.core.automation.module.script.rulesupport.shared.ValueCache;
-import org.openhab.core.items.MetadataRegistry;
 import org.openhab.core.thing.ThingManager;
 import org.openhab.core.types.State;
 import org.slf4j.Logger;
@@ -26,7 +25,7 @@ ${imports}
  * Features:
  * - Standard JSR223 OpenHAB bindings already declared as fields for immediate access
  * - Auto execution of a parsing rule method (internalParseRules calling RuleAnnotationParser)
- * - Additional shortcut to useful services (automationManager, sharedCache, ruleManager, metadataRegistry)
+ * - Additional shortcut to useful services (automationManager, sharedCache, ruleManager)
  * - Include other generated helper classes (_items, _actions, _things)
  */
 public abstract class Java223Script {
@@ -52,7 +51,6 @@ ${fieldsDeclaration}
     // additional useful classes:
     protected @InjectBinding RuleManager ruleManager;
     protected @InjectBinding ThingManager thingManager;
-    protected @InjectBinding MetadataRegistry metadataRegistry;
 
     // generated classes
     protected @InjectBinding Items _items;

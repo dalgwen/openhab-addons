@@ -28,7 +28,6 @@ public class Java223Constants {
 
     public static final String JAVA_FILE_TYPE = "java";
     public static final String JAR_FILE_TYPE = "jar";
-    public static final String METADATA_REGISTRY = "metadataRegistry";
     public static final String RULE_MANAGER = "ruleManager";
     public static final String THING_MANAGER = "thingManager";
 
