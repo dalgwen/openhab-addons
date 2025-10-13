@@ -16,6 +16,8 @@ import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -44,34 +46,50 @@ public class InjectedCodeGenerator {
     private final String importsForSuperClass;
     private final String injectedField;
 
+    private final Map<String, Set<String>> enumByType;
+
     // We cannot easily find what types to write for those bindings, so we define some exceptions here:
-    private static final Map<String, ImportAndDeclaration> OVERWRITE_BINDINGS_TYPE = Map.ofEntries(
+    private static final Map<String, BindingsParsingResult> OVERWRITE_BINDINGS_TYPE = Map.ofEntries(
             getEntry("audio", AudioManager.class), getEntry("voice", VoiceManager.class),
             getEntry("rules", RuleRegistry.class), getEntry("things", ThingRegistry.class),
             getEntry("itemRegistry", ItemRegistry.class), getEntry("ir", ItemRegistry.class),
-            new AbstractMap.SimpleEntry<>("items", new ImportAndDeclaration("import java.util.Map;",
-                    "protected @InjectBinding Map<String, State> items;", ImportIsFor.ALL)));
+            new AbstractMap.SimpleEntry<>("items", new BindingsParsingResult("import java.util.Map;",
+                    "protected @InjectBinding Map<String, State> items;", ImportIsFor.ALL, null, null)));
 
     public InjectedCodeGenerator(ScriptExtensionAccessor scriptExtensionAccessor) {
         Map<String, Object> defaultPresets = scriptExtensionAccessor.findDefaultPresets("");
-        List<@Nullable ImportAndDeclaration> importAndDeclarations = parseBindings(defaultPresets);
-        this.imports = importAndDeclarations.stream().filter(Objects::nonNull).map(ImportAndDeclaration::importLine)
+        List<@Nullable BindingsParsingResult> bindingsParsingResults = parseBindings(defaultPresets);
+        this.imports = bindingsParsingResults.stream().filter(Objects::nonNull).map(BindingsParsingResult::importLine)
                 .distinct().sorted().collect(Collectors.joining("\n"));
-        this.importsForSuperClass = importAndDeclarations.stream().filter(Objects::nonNull)
-                .filter(id -> id.importIsFor == ImportIsFor.ALL).map(ImportAndDeclaration::importLine).distinct()
+        this.importsForSuperClass = bindingsParsingResults.stream().filter(Objects::nonNull)
+                .filter(id -> id.importIsFor == ImportIsFor.ALL).map(BindingsParsingResult::importLine).distinct()
                 .sorted().collect(Collectors.joining("\n"));
-        this.injectedField = importAndDeclarations.stream().filter(Objects::nonNull)
-                .map(ImportAndDeclaration::declaration).filter(Objects::nonNull).filter(Predicate.not(String::isEmpty))
+        this.injectedField = bindingsParsingResults.stream().filter(Objects::nonNull)
+                .map(BindingsParsingResult::declaration).filter(Objects::nonNull).filter(Predicate.not(String::isEmpty))
                 .distinct().map("    "::concat).sorted().collect(Collectors.joining("\n"));
+        this.enumByType = bindingsParsingResults.stream().filter(Objects::nonNull)
+                .map(InjectedCodeGenerator::getNonNullEnumTypeAndValue).filter(Optional::isPresent).map(Optional::get)
+                .collect(Collectors.groupingBy(EnumTypeAndValue::enumType,
+                        Collectors.mapping(EnumTypeAndValue::enumMember, Collectors.toSet())));
     }
 
-    private static Map.Entry<String, ImportAndDeclaration> getEntry(String key, Class<?> clazz) {
+    private static Optional<EnumTypeAndValue> getNonNullEnumTypeAndValue(BindingsParsingResult bpr) {
+        String enumType = bpr.enumType;
+        String enumMember = bpr.enumMember;
+        if (enumType != null && enumMember != null) {
+            return Optional.of(new EnumTypeAndValue(enumType, enumMember));
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    private static Map.Entry<String, BindingsParsingResult> getEntry(String key, Class<?> clazz) {
         return new AbstractMap.SimpleEntry<>(key, getImportAndDeclaration(key, clazz));
     }
 
-    private static ImportAndDeclaration getImportAndDeclaration(String key, Class<?> clazz) {
-        return new ImportAndDeclaration("import " + clazz.getCanonicalName() + ";",
-                "protected @InjectBinding " + clazz.getSimpleName() + " " + key + ";", ImportIsFor.ALL);
+    private static BindingsParsingResult getImportAndDeclaration(String key, Class<?> clazz) {
+        return new BindingsParsingResult("import " + clazz.getCanonicalName() + ";",
+                "protected @InjectBinding " + clazz.getSimpleName() + " " + key + ";", ImportIsFor.ALL, null, null);
     }
 
     public String getDefaultPresetImportList() {
@@ -86,22 +104,26 @@ public class InjectedCodeGenerator {
         return injectedField;
     }
 
-    private List<@Nullable ImportAndDeclaration> parseBindings(Map<String, Object> defaultPresets) {
+    public Map<String, Set<String>> getEnumByType() {
+        return enumByType;
+    }
+
+    private List<@Nullable BindingsParsingResult> parseBindings(Map<String, Object> defaultPresets) {
         // create a list of imports for each binding found
         return defaultPresets.entrySet().stream().map(this::generateImportAndDeclaration).distinct().toList();
     }
 
     /**
-     * Generates a Java import statement for a given Class or enum member.
+     * Generates a Java import statement for a given Class or enum member, with optional enum information.
      * Reject action
      *
      * @param parameter The Class object or an enum member.
-     * @return A String representing the import statement, or an empty string if no import is applicable
-     *         (e.g., for primitive types, arrays, or classes in the default package).
+     * @return A String representing the would-be import statement, or an empty string if no import is applicable
+     *         (e.g., for primitive types, arrays, or classes in the default package). Also with enum information added.
      * @throws IllegalArgumentException if the parameter is null or not a Class or an enum member.
      */
     @Nullable
-    private ImportAndDeclaration generateImportAndDeclaration(Map.Entry<String, Object> parameter) {
+    private BindingsParsingResult generateImportAndDeclaration(Map.Entry<String, Object> parameter) {
         String key = parameter.getKey();
         Object value = parameter.getValue();
 
@@ -127,8 +149,8 @@ public class InjectedCodeGenerator {
                 String packageName = aPackage != null ? aPackage.getName() : null;
 
                 if (packageName != null && !packageName.isEmpty()) {
-                    return new ImportAndDeclaration("import " + canonicalName + ";", null,
-                            ImportIsFor.WRAPPER_CLASS_ONLY);
+                    return new BindingsParsingResult("import " + canonicalName + ";", null,
+                            ImportIsFor.WRAPPER_CLASS_ONLY, null, null);
                 } else {
                     // Class is in the default package, no import statement needed.
                     return null;
@@ -138,15 +160,15 @@ public class InjectedCodeGenerator {
                 String memberName = enumMember.name();
                 String simpleName = enumMember.getDeclaringClass().getSimpleName();
 
-                return new ImportAndDeclaration(
+                return new BindingsParsingResult(
                         "import " + enumMember.getDeclaringClass().getCanonicalName() + ";", "protected static final "
                                 + simpleName + " " + memberName + " = " + simpleName + "." + memberName + ";",
-                        ImportIsFor.ALL);
+                        ImportIsFor.ALL, simpleName, memberName);
             }
             default -> {
-                ImportAndDeclaration importAndDeclaration = OVERWRITE_BINDINGS_TYPE.get(key);
-                if (importAndDeclaration != null) {
-                    return importAndDeclaration;
+                BindingsParsingResult bindingsParsingResult = OVERWRITE_BINDINGS_TYPE.get(key);
+                if (bindingsParsingResult != null) {
+                    return bindingsParsingResult;
                 }
                 Class<?>[] interfaces = value.getClass().getInterfaces();
                 if (interfaces.length == 0) { // directly import class name
@@ -168,6 +190,10 @@ public class InjectedCodeGenerator {
         WRAPPER_CLASS_ONLY;
     }
 
-    public record ImportAndDeclaration(String importLine, @Nullable String declaration, ImportIsFor importIsFor) {
+    public record BindingsParsingResult(String importLine, @Nullable String declaration, ImportIsFor importIsFor,
+            @Nullable String enumType, @Nullable String enumMember) {
+    }
+
+    public record EnumTypeAndValue(String enumType, String enumMember) {
     }
 }

@@ -177,6 +177,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             sourceGenerator.generateActions(startupGuardTime);
             sourceGenerator.generateItems(startupGuardTime);
             sourceGenerator.generateJava223Script();
+            sourceGenerator.generateEnumStrings();
             dependencyGenerator.createCoreDependencies();
         } else {
             sourceGenerator.cleanGeneratedFiles(sourceWriter.getHelperPath());

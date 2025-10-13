@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.openhab.core.automation.module.script.internal.defaultscope.ItemRegis
 import org.openhab.core.internal.items.DefaultStateDescriptionFragmentProvider;
 import org.openhab.core.internal.items.ItemRegistryImpl;
 import org.openhab.core.items.MetadataRegistry;
+import org.openhab.core.library.types.OnOffType;
 
 /**
  * Test for generating code for imports and default injected field member.
@@ -58,6 +60,9 @@ class InjectedCodeGeneratorTest {
         ItemRegistryImpl itemRegistry = new ItemRegistryImpl(medataRegistry, defaultStateDescriptionFragmentProvider);
         defaultPresets.put("ir", itemRegistry);
         defaultPresets.put("items", new ItemRegistryDelegate(itemRegistry));
+        defaultPresets.put("ON", OnOffType.ON);
+        defaultPresets.put("OFF", OnOffType.OFF);
+
         Mockito.when(scripExtensionAccessor.findDefaultPresets("")).thenReturn(defaultPresets);
 
         // when
@@ -72,5 +77,7 @@ class InjectedCodeGeneratorTest {
         List<String> defaultPresetImportList = Arrays
                 .stream(injectedCodeGenerator.getDefaultPresetImportList().split("\n")).map(String::strip).toList();
         assertThat(defaultPresetImportList).contains("import org.openhab.core.items.ItemRegistry;");
+
+        assertThat(injectedCodeGenerator.getEnumByType()).containsEntry("OnOffType", Set.of("ON", "OFF"));
     }
 }
