@@ -139,14 +139,14 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     }
 
     @Override
-    public @Nullable Object invokeMethod(@Nullable Object o, @Nullable String name, Object @Nullable... args)
-            throws NoSuchMethodException {
+    @NonNullByDefault({})
+    public Object invokeMethod(Object o, String name, Object... args) throws NoSuchMethodException {
         throw new NoSuchMethodException("not implemented");
     }
 
     @Override
-    public @Nullable Object invokeFunction(@Nullable String name, Object @Nullable... args)
-            throws ScriptException, NoSuchMethodException {
+    @NonNullByDefault({})
+    public Object invokeFunction(String name, Object... args) throws ScriptException, NoSuchMethodException {
         // here we assume (from OpenHAB usual behavior) that the script engine served only once and so the wanted
         // compiled script is the last (and only) one
         Java223CompiledScript compiledScript = this.lastCompiledScript;
@@ -165,7 +165,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         }
         try {
             if (Modifier.isStatic(method.getModifiers())) {
-                return method.invoke((Object) null, localArgs);
+                return method.invoke((@NonNull Object) null, localArgs);
             }
 
             Object compiledInstance = compiledScript.getCompiledInstance();
