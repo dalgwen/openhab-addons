@@ -177,7 +177,7 @@ The helper library is totally optional, but you should seriously consider using 
 It consists of two parts: dynamically .java generated files, and a JAR file with some already compiled classes.
 
 If you do not want to use the helper library, you can completely disable it by setting the `enableHelper` setting to `false`.
-Nothing (code, lib) will be generated/copied in the lib directory. 
+Nothing (code, lib) will be generated/copied in the lib directory.
 
 ### Java dynamic classes
 
@@ -221,8 +221,8 @@ The best way to use this functionality is to extend the `Java223Script`, as it a
 When combined with all the aforementioned helpers, see how easy it is to define a rule:
 
 ```java
-import helper.generated.Items;
 import helper.generated.EnumStrings;
+import helper.generated.Items;
 import helper.generated.Java223Script;
 import helper.rules.annotations.ItemStateUpdateTrigger;
 import helper.rules.annotations.Rule;
@@ -237,7 +237,7 @@ public class MyRule extends Java223Script {
 }
 ```
 
-This rule above is triggered by an 'ON' state update of an item linked to a detector, and then light a bulb:
+This rule above is triggered by an 'ON' state update of an item linked to a detector, and then lights a bulb:
 **Here really shines the JSR223 for Java: no random 'magic' strings, full auto-completion from your IDE, strongly typed code and no misspelling mistake possible.**
 
 You can also use automatic injection **in your rule method parameter**.
@@ -245,12 +245,12 @@ It is especially useful for having strongly typed parameter.
 Take a look at this rule, triggered by two different detectors:
 
 ```java
-import helper.rules.eventinfo.ItemStateUpdate;
+import helper.generated.EnumStrings;
+import helper.generated.Items;
 import helper.generated.Java223Script;
 import helper.rules.annotations.ItemStateUpdateTrigger;
-import helper.generated.Items;
-import helper.generated.EnumStrings;
 import helper.rules.annotations.Rule;
+import helper.rules.eventinfo.ItemStateUpdate;
 
 public class MyRule extends Java223Script {
 
@@ -267,7 +267,7 @@ public class MyRule extends Java223Script {
 Here, `ItemStateChange` is available in the helper-lib.jar.
 As it is a Java223 library class like others, it leverages the autoinjection feature: its fields are automatically injected with the corresponding parameter given by openHAB.
 So, by using the right event object for your trigger, such as `ItemStateChange` in this example, you don't have to check the documentation to search for how the event parameter you need is named, and you won't miss the parameter because you misspelled it.
-You should find in the package `helper.rules.eventinfo.ItemStateUpdate`, the other event objects matching the triggers of your rules.
+You should find in the package `helper.rules.eventinfo`, the other event objects matching the triggers of your rules.
 
 Here are all functionalities of the helper-lib:
 
@@ -304,7 +304,7 @@ To understand sharing value, we have to know how the Java223 automation bundle, 
 
 - it receives a .java script
 - the bundle compiles it (if not already done). openHAB will then store the compilation unit for further (and fastest) reuse.
-- then, when execution is needed and asked by openHAB: 
+- then, when execution is needed and asked by openHAB:
   - the engine will choose a constructor and instantiate the script with the `new` operator.
   Auto-injection of openHAB values may occur in fields or constructor parameters.
   - the engine will execute the relevant script methods (main, etc., and @RunScript annotated methods) on the instance.
@@ -331,9 +331,9 @@ On the opposite, when you define a `java` script (for example in the GUI), the s
 Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or a transformation, or a profile), it will ask the Java223 bundle to run it.
 Then, two possibilities arise:
 
-- either this bundle reinstantiates the script with a `new` operator each time openHAB asks to run it 
+- either this bundle reinstantiates the script with a `new` operator each time openHAB asks to run it
 - or the bundle reuses the same instance and then re-executes the relevant action (method, field) on it.
-In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM). 
+In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM).
 
 To choose between these possibilities, you can set the default behavior with the global option `allowInstanceReuse`.
 If set to true, the engine behavior will be to reuse the script instance between executions.
@@ -416,7 +416,7 @@ public class WrappedJavaScript extends Java223Script {
     protected static final UnDefType UNDEF = UnDefType.UNDEF;
     protected static final UpDownType DOWN = UpDownType.DOWN;
     protected static final UpDownType UP = UpDownType.UP;
-    
+
     public Object main() {
         _items.myitem().send(ON); // let there be light
         return null;
@@ -541,12 +541,12 @@ A one-liner also works:
 
 ## Create a simple rule
 
-This rule is triggered only by an 'ON' state update of an item linked to a detector, and then light a bulb.
+This rule is triggered only by an 'ON' state update of an item linked to a detector, and then lights a bulb.
 
 ```java
-import helper.generated.Java223Script;
 import helper.generated.EnumStrings;
 import helper.generated.Items;
+import helper.generated.Java223Script;
 
 public class MyRule extends Java223Script {
 
@@ -658,9 +658,9 @@ Additionally, instead of the default (the method name used for the label of the 
 ```java
 import org.openhab.core.library.types.OnOffType;
 
+import helper.generated.EnumStrings;
 import helper.generated.Items;
 import helper.generated.Java223Script;
-import helper.generated.EnumStrings;
 import helper.rules.annotations.ItemStateUpdateTrigger;
 import helper.rules.annotations.Rule;
 import helper.rules.eventinfo.ItemStateUpdate;
@@ -704,11 +704,13 @@ public class FieldInjectionExample {
 
 ```java
 import org.openhab.core.items.ItemRegistry;
-import org.openhab.core.library.types.OnOffType;
+import static org.openhab.core.library.types.OnOffType.ON;
 
 public class MethodInjectionExample {
     public void main(ItemRegistry itemRegistry) {  // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
-        itemRegistry.getItem("myitem").send(OnOffType.ON);
+        try {
+            ((org.openhab.core.library.items.SwitchItem)itemRegistry.getItem("myitem")).send(ON);
+        } catch (org.openhab.core.items.ItemNotFoundException e) {}
     }
 }
 ```
@@ -747,7 +749,7 @@ First, inject the ruleManager in your script, then use it with the `runNow` meth
 
 Tip: The ruleManager is already declared as a field in the Java223Script helper class that you can inherit.
 
-```java 
+```java
 import java.util.Map;
 import org.openhab.core.automation.RuleManager;
 
@@ -783,8 +785,8 @@ Control automatic injection behavior by using the `@InjectBinding` annotation.
 You can use it on field or on method/constructor parameter.
 
 ```java
-import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
+import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.ThingRegistry;
 import helper.rules.annotations.InjectBinding;
 
@@ -798,7 +800,7 @@ public class InjectBindingExample {
     protected @InjectBinding(named = "itemRegistry") ItemRegistry otherVariableName;
     // make it mandatory (the script will not run if the value cannot be found). Note: mandatory = true is the default value when using the annotation.
     protected @InjectBinding(mandatory = true) ThingRegistry things;
-    
+
     public void main(ItemRegistry itemRegistry) {
         myItemRegistry.get("myitem");
     }
