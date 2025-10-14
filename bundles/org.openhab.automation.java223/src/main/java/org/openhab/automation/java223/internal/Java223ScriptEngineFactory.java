@@ -159,7 +159,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             throw new Java223Exception("Cannot create or delete helper library / class files in lib directory", e);
         }
 
-        // first building of internal in memory lib representation
+        // first building of internal in-memory lib representation
         java223Strategy.scanLibDirectory();
         // When a lib changes, notify
         watchService.registerListener(this, LIB_DIR);

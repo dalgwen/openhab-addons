@@ -13,6 +13,7 @@
 
 package helper.rules;
 
+import static org.apache.commons.codec.digest.DigestUtils.md5Hex;
 import static org.openhab.automation.java223.common.Java223Constants.ANNOTATION_DEFAULT;
 
 import java.lang.annotation.Annotation;
@@ -21,6 +22,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -106,8 +109,14 @@ public class RuleAnnotationParser {
             Map.entry(GenericEventCondition.class, "core.GenericEventCondition"),
             Map.entry(TimeOfDayCondition.class, "core.TimeOfDayCondition"));
 
+    /**
+     * Parse annotated method in a script and create rule accordingly
+     * @param script the script to parse
+     * @param name the name of the caller. Used for rule id unique name generation, so should also be unique.
+     * @param automationManager the automation manager to add the rule to
+     */
     @SuppressWarnings({ "unused", "null" })
-    public static void parse(Object script, ScriptedAutomationManager automationManager)
+    public static void parse(Object script, String name, ScriptedAutomationManager automationManager)
             throws IllegalArgumentException, RuleParserException {
         Class<?> c = script.getClass();
 
@@ -149,7 +158,8 @@ public class RuleAnnotationParser {
             simpleRule.setDescription(ruleDescription);
 
             // uid
-            simpleRule.setUid(chooseFirstOk(ra.uid()));
+            String defaultUid = sanitizeId(ruleName + "_" + md5Hex(name));
+            simpleRule.setUid(chooseFirstOk(ra.uid(), defaultUid));
 
             // tags
             simpleRule.setTags(Set.of(ra.tags()));
@@ -245,6 +255,31 @@ public class RuleAnnotationParser {
     }
 
     private static String sanitizeTriggerId(String ruleName, int index) {
-        return (ruleName + "_" + index).replaceAll("\\.", "_");
+        return sanitizeId(ruleName + "_" + index);
+    }
+
+    private static String sanitizeId(String id) {
+        return id.replaceAll("[^a-zA-Z0-9_]", "_");
+    }
+
+    /**
+     * Encodes a string with MD5 and returns the hexadecimal result.
+     *
+     * @param input The string to encode.
+     * @return The MD5 hash of the input string as a hexadecimal string.
+     */
+    private static String md5Hex(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] messageDigest = md.digest(input.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : messageDigest) {
+                hexString.append(String.format("%02x", b));
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // This should ideally not happen as MD5 is a standard algorithm
+           return ("MD5 algorithm not found. Should not happen");
+        }
     }
 }

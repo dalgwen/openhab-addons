@@ -12,6 +12,8 @@
  */
 package org.openhab.automation.java223.internal;
 
+import static org.openhab.core.automation.module.script.ScriptTransformationService.OPENHAB_TRANSFORMATION_SCRIPT;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
@@ -25,6 +27,7 @@ import javax.script.ScriptException;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
+import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.automation.java223.common.ReuseScriptInstance;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
@@ -72,6 +75,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
         if (context == null) {
             throw new IllegalArgumentException("ScriptContext must not be null");
         }
+
         Bindings globalBindings = context.getBindings(ScriptContext.GLOBAL_SCOPE);
         Bindings engineBindings = context.getBindings(ScriptContext.ENGINE_SCOPE);
         Map<String, Object> mergedBindings = new HashMap<>();
@@ -81,6 +85,8 @@ public class Java223CompiledScript extends JavaCompiledScript {
         if (engineBindings != null) {
             mergedBindings.putAll(engineBindings);
         }
+        String identifier = getIdentifier(context);
+        mergedBindings.put(Java223Constants.JAVA_223_IDENTIFIER, identifier);
         java223Strategy.associateBindings(null, null, mergedBindings);
 
         try {
@@ -107,6 +113,23 @@ public class Java223CompiledScript extends JavaCompiledScript {
             // and sending only the message upstream
             throw new ScriptException(e.getMessage());
         }
+    }
+
+    private static String getIdentifier(ScriptContext context) {
+        Object fileName = context.getAttribute("javax.script.filename");
+        Object ruleUID = context.getAttribute("ruleUID");
+        Object ohEngineIdentifier = context.getAttribute("oh.engine-identifier");
+        String identifier = "stack";
+        if (fileName != null) {
+            identifier = fileName.toString().replaceAll("^.*[/\\\\]", "");
+        } else if (ruleUID != null) {
+            identifier = ruleUID.toString();
+        } else if (ohEngineIdentifier != null) {
+            if (ohEngineIdentifier.toString().startsWith(OPENHAB_TRANSFORMATION_SCRIPT)) {
+                identifier = ohEngineIdentifier.toString().replaceAll(OPENHAB_TRANSFORMATION_SCRIPT, "transformation.");
+            }
+        }
+        return identifier;
     }
 
     @SuppressWarnings("null")

@@ -4,6 +4,7 @@ package ${packageName};
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.InjectBinding;
+import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.RunScript;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
@@ -65,7 +66,7 @@ ${fieldsDeclaration}
     @RunScript
     public void internalParseRules() {
         try {
-            RuleAnnotationParser.parse(this, automationManager);
+            RuleAnnotationParser.parse(this, (String) bindings.get(Java223Constants.JAVA_223_IDENTIFIER), automationManager);
         } catch (IllegalArgumentException | RuleParserException e) {
             logger.error("Cannot parse rules", e);
         }
