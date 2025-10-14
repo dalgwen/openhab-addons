@@ -153,16 +153,24 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         if (compiledScript == null || name == null) {
             return null;
         }
-        Class<?>[] classes = Arrays.stream(args).map(Object::getClass).toArray(Class[]::new);
-        Method method = compiledScript.getCompiledClass().getMethod(name, classes);
+        var localArgs = args == null ? new Object[0] : args;
+        Class<?>[] argClasses = Arrays.stream(localArgs).map(Object::getClass).toArray(Class[]::new);
+
+        Method method = null;
+        try {
+            method = compiledScript.getCompiledClass().getMethod(name, argClasses);
+        } catch (NoSuchMethodException e) { // second attempt, to get a possible scriptLoaded without argument
+            method = compiledScript.getCompiledClass().getMethod(name);
+            localArgs = new Object[0];
+        }
         try {
             if (Modifier.isStatic(method.getModifiers())) {
-                return method.invoke((@NonNull Object) null, args);
+                return method.invoke((Object) null, localArgs);
             }
 
             Object compiledInstance = compiledScript.getCompiledInstance();
             if (compiledInstance != null) {
-                return method.invoke(compiledInstance, args);
+                return method.invoke(compiledInstance, localArgs);
             }
             logger.debug("Calling {} method from a script not yet instantiated is ignored. Use a static modifier",
                     name);

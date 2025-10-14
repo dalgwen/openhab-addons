@@ -186,17 +186,11 @@ These classes are dynamic and contain information about your openHAB setup.
 
 You will get several java files in the package `helper.generated` :
 
-- Items.java: contains all your item names as static String and label as their Javadoc.
-Also contains methods to directly get the Item, cast to the right Class. (see [example](#itemsandthings))
-- Things.java: contains all your Thing UID as static String, with label as their Javadoc.
-Also contains methods to directly get the Thing. (see [example](#itemsandthings))
-- Actions.java: contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions))
-<a id="java223script"></a>
-- Java223Script.java: this abstract class is very handy.
-In fact, you may consider inheriting it in all your scripts.
-It already contains all openHAB inputs variables, as well as some other useful shortcuts.
-- EnumStrings.java: this class is just a simple store for direct String representations of various enums used by openHAB.
-It is especially useful for Rule annotations configuration which requires static strings.
+- Items.java: contains all your item names as static String and label as their Javadoc. Also contains methods to directly get the Item, cast to the right Class. (see [example](#itemsandthings))
+- Things.java: contains all your Thing UID as static String, with label as their Javadoc. Also contains methods to directly get the Thing. (see [example](#itemsandthings))
+- Actions.java: contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions)) <a id="java223script"></a>
+- Java223Script.java: this abstract class is very handy. In fact, you may consider inheriting it in all your scripts. It already contains all openHAB inputs variables, as well as some other useful shortcuts.
+- EnumStrings.java: this class is just a simple store for direct String representations of various enums used by openHAB. It is especially useful for Rule annotations configuration which requires static strings.
 
 As these files are no more, no less, standard Java223 library files, you can use them as candidates for auto-injection in your script.
 Be careful though, do not use the variable names `items`, `things`, or `actions`, as they are already reserved as openHAB input values for the ItemRegistry, ThingsRegistry, and ScriptThingActions respectively.
@@ -271,18 +265,12 @@ You should find in the package `helper.rules.eventinfo`, the other event objects
 
 Here are all functionalities of the helper-lib:
 
-- Many different `@Trigger` classes.
-Check the `helper.rules.annotation` package for a list.
-- You can add (multiple) `@Condition` to a Rule.
-It exposes a pre-condition for the rule to execute.
-Check the `helper.rules.annotation` package
-- `@Trigger`, `@Conditions`, `@Rule` have many parameters.
-Some parameters add functionality; others can overwrite default behavior (for example, instead of using the method name for the label of a rule, you can override it with a custom label).
+- Many different `@Trigger` classes. Check the `helper.rules.annotation` package for a list.
+- You can add (multiple) `@Condition` to a Rule. It exposes a pre-condition for the rule to execute. Check the `helper.rules.annotation` package
+- `@Trigger`, `@Conditions`, `@Rule` have many parameters. Some parameters add functionality; others can overwrite default behavior (for example, instead of using the method name for the label of a rule, you can override it with a custom label).
 - Pre-made event objects that you can use as a parameter in a rule are defined in the package `helper.rules.eventinfo`.
 - If you want all the triggering event input parameters in a map for a rule, you can use the parameter `Map<String, ?> bindings` in the rule method.
-- You can set the `@Rule` annotation on a method, but also on many types of field containing code to execute, such as Function, Runnable...
-Take a look at the class `Java223Rule` for an exhaustive list of what is supported.
-You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
+- You can set the `@Rule` annotation on a method, but also on many types of field containing code to execute, such as Function, Runnable... Take a look at the class `Java223Rule` for an exhaustive list of what is supported. You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
 
 <a id="sharedcache"></a>
 
@@ -332,8 +320,7 @@ Then, each time openHAB needs it (as an action to run in a GUI-defined rule, or 
 Then, two possibilities arise:
 
 - either this bundle reinstantiates the script with a `new` operator each time openHAB asks to run it
-- or the bundle reuses the same instance and then re-executes the relevant action (method, field) on it.
-In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM).
+- or the bundle reuses the same instance and then re-executes the relevant action (method, field) on it. In this case, you can share data or states between executions (of course, only for the duration of the openHAB JVM)
 
 To choose between these possibilities, you can set the default behavior with the global option `allowInstanceReuse`.
 If set to true, the engine behavior will be to reuse the script instance between executions.

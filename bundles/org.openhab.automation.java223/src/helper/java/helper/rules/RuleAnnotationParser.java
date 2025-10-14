@@ -13,7 +13,6 @@
 
 package helper.rules;
 
-import static org.apache.commons.codec.digest.DigestUtils.md5Hex;
 import static org.openhab.automation.java223.common.Java223Constants.ANNOTATION_DEFAULT;
 
 import java.lang.annotation.Annotation;
