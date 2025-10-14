@@ -191,7 +191,7 @@ public class BindingInjector {
                 if (elementToParseAsMap.containsKey(namePart)) {
                     found = true;
                 } else {
-                    logger.trace("Didn't find an element with the key {}. Ignoring", namePart);
+                    logger.trace("Didn't find an element with the key '{}'. Ignoring (not an error)", namePart);
                 }
             } else {
                 try {
