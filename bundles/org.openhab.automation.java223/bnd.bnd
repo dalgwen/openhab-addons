@@ -9,6 +9,7 @@ org.openhab.core.automation,\
 org.openhab.core.automation.util,\
 org.openhab.core.automation.module.script,\
 org.openhab.core.automation.module.script.defaultscope,\
+org.openhab.core.automation.module.script.providersupport.shared,\
 org.openhab.core.automation.module.script.rulesupport.shared,\
 org.openhab.core.automation.module.script.rulesupport.shared.simple,\
 org.openhab.core.common,\
