@@ -35,16 +35,15 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
+import org.openhab.automation.java223.common.ServiceGetter;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.codegeneration.InjectedCodeGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceGenerator;
 import org.openhab.automation.java223.internal.codegeneration.SourceWriter;
 import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
-import org.openhab.core.automation.RuleManager;
 import org.openhab.core.automation.module.script.ScriptDependencyTracker;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
-import org.openhab.core.automation.module.script.ScriptExtensionAccessor;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
@@ -52,7 +51,6 @@ import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.items.events.ItemAddedEvent;
 import org.openhab.core.items.events.ItemRemovedEvent;
 import org.openhab.core.service.WatchService;
-import org.openhab.core.thing.ThingManager;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.events.ThingAddedEvent;
@@ -114,8 +112,8 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     public Java223ScriptEngineFactory(BundleContext bundleContext, Map<String, Object> properties,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
-            @Reference Java223DependencyTracker dependencyTracker, @Reference RuleManager ruleManager,
-            @Reference ThingManager thingManager, @Reference ScriptExtensionAccessor scriptExtensionAccessor) {
+            @Reference Java223DependencyTracker dependencyTracker,
+            @Reference InjectedCodeGenerator injectedCodeGenerator, @Reference ServiceGetter serviceGetter) {
 
         try {
             Files.createDirectories(LIB_DIR);
@@ -138,11 +136,9 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
         Boolean allowInstanceReuse = ConfigParser.valueAsOrElse(properties.get("allowInstanceReuse"), Boolean.class,
                 false);
 
-        InjectedCodeGenerator injectedCodeGenerator = new InjectedCodeGenerator(scriptExtensionAccessor);
-
         osgiPackageResourceListingStrategy = this::listClassResources;
-        java223Strategy = new Java223Strategy(getAdditionalBindings(ruleManager, thingManager),
-                bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader());
+        java223Strategy = new Java223Strategy(bundleContext.getBundle().adapt(BundleWiring.class).getClassLoader(),
+                serviceGetter);
         java223Strategy.setAllowInstanceReuse(allowInstanceReuse);
         scriptWrappingStrategy = new ScriptWrappingStrategy(enableHelper, injectedCodeGenerator);
 
@@ -281,16 +277,6 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
             throw new Java223Exception("Null script engine returned. Should not happened");
         }
         return scriptEngine;
-    }
-
-    /**
-     * Additional data to put into bindings so the scripts could use them.
-     *
-     * @return Additional data to use when binding
-     */
-    private Map<String, Object> getAdditionalBindings(RuleManager ruleManager, ThingManager thingManager) {
-        return Map.of(Java223Constants.RULE_MANAGER, ruleManager, //
-                Java223Constants.THING_MANAGER, thingManager);
     }
 
     private Collection<String> listClassResources(String packageName) {

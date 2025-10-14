@@ -18,6 +18,7 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +46,8 @@ import ch.obermuhlner.scriptengine.java.MemoryClassLoader;
 public class BindingInjector {
 
     private static final Logger logger = LoggerFactory.getLogger(BindingInjector.class);
+
+    private static final Set<Type> unsupportedTypes = new HashSet<>();
 
     /**
      * Smart injection of bindings value into an object.
@@ -119,6 +122,15 @@ public class BindingInjector {
         }
 
         // step zero: exclusion case
+        if (unsupportedTypes.contains(fieldType)) { // avoid multiple reflection tests by caching the excluded types
+            return null;
+        } else {
+            if (fieldType.isPrimitive() || fieldType.getPackage().getName().startsWith("java.lang")
+                    || fieldType.isArray() || fieldType.isAnnotation()) {
+                unsupportedTypes.add(fieldType);
+                return null;
+            }
+        }
         InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
         if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
             return null;
@@ -136,8 +148,8 @@ public class BindingInjector {
             return getOrInstantiateObject(classLoader, bindings, libAlreadyInstantiated, fieldType, recursive);
         }
 
-        // second. It's not a library, so search value in the bindings map.
-        // Choose a name to search as a key in the binding map
+        // second. It's not a library, so we will search value in the binding map.
+        // 2.a Choose a name to search as a key in the binding map
         // the name can be a path inside the object
         String named;
         if (injectBindingAnnotation != null
@@ -148,7 +160,7 @@ public class BindingInjector {
         }
         Queue<String> namePath = new LinkedList<>(Arrays.asList(named.split("\\.")));
 
-        // third, choose where to look: in bindings, or deeper, in a preset :
+        // 2.b, choose where to look: in bindings, or deeper, in a preset :
         Object value = bindings;
         boolean found = false;
         if (injectBindingAnnotation != null
@@ -167,7 +179,7 @@ public class BindingInjector {
             }
         }
 
-        // fourth, browse deep inside the object if there is a path to traverse
+        // 2.c, browse deep inside the object if there is a path to traverse
         while (!namePath.isEmpty()) {
             if (value == null) {
                 logger.debug("Find null value for the path {}", named);
@@ -198,7 +210,14 @@ public class BindingInjector {
             }
         }
 
-        // fifth, check if it is mandatory
+        // third, search for an osgi service
+        if (value == null) {
+            ServiceGetter serviceGetter = (ServiceGetter) bindings.get(Java223Constants.SERVICE_GETTER);
+            value = serviceGetter.getService(fieldType);
+            found = value != null;
+        }
+
+        // fourth, check if it is mandatory
         if (!found && injectBindingAnnotation != null && injectBindingAnnotation.mandatory()) {
             throw new Java223Exception("There is no value found for parameter/field named " + named
                     + ", but it is mandatory. We cannot inject it");

@@ -70,12 +70,14 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
                 protected @InjectBinding Map<String, Object> bindings;
 
+                protected String input;
+
+                protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
+                protected @InjectBinding ScriptExtensionManagerWrapper se;
+
                 protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
                 protected @InjectBinding(preset = "cache") ValueCache sharedCache;
                 protected @InjectBinding(preset = "cache") ValueCache privateCache;
-
-                protected String input;
-
                 protected @InjectBinding RuleManager ruleManager;
                 protected @InjectBinding ThingManager thingManager;
             """;

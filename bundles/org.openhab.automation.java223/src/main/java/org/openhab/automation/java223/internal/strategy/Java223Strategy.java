@@ -40,6 +40,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
 import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.RunScript;
+import org.openhab.automation.java223.common.ServiceGetter;
 import org.openhab.automation.java223.internal.codegeneration.DependencyGenerator;
 import org.openhab.automation.java223.internal.strategy.jarloader.JarFileManager.JarFileManagerFactory;
 import org.openhab.core.service.WatchService;
@@ -67,9 +68,6 @@ public class Java223Strategy
 
     private static final List<String> METHOD_NAMES_TO_EXECUTE = Arrays.asList("eval", "main", "run", "exec");
 
-    // Additional bindings, not in the openhab JSR 223 specification
-    private final Map<String, Object> additionalBindings;
-
     // Keeping a list of .java files libraries in the lib directory
     private static final Map<String, JavaFileObject> librariesByPath = Collections.synchronizedMap(new HashMap<>());
 
@@ -78,9 +76,11 @@ public class Java223Strategy
 
     private boolean allowInstanceReuseDefaultProperty;
 
-    public Java223Strategy(Map<String, Object> additionalBindings, ClassLoader classLoader) {
-        this.additionalBindings = additionalBindings;
+    private final ServiceGetter serviceGetter;
+
+    public Java223Strategy(ClassLoader classLoader, ServiceGetter serviceGetter) {
         this.allowInstanceReuseDefaultProperty = false;
+        this.serviceGetter = serviceGetter;
         jarFileManagerfactory = new JarFileManagerFactory(LIB_DIR, classLoader);
     }
 
@@ -106,8 +106,8 @@ public class Java223Strategy
         // adding a special self-reference to bindings: "bindings", to receive a map with all bindings
         // noinspection CollectionAddedToSelf
         bindings.put("bindings", bindings);
-        // adding some custom additional fields
-        bindings.putAll(additionalBindings);
+        // adding a special service getter for the script to access OSGi services
+        bindings.put(Java223Constants.SERVICE_GETTER, serviceGetter);
     }
 
     @Override

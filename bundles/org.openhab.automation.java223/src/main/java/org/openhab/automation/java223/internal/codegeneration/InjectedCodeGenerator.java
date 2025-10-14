@@ -29,6 +29,9 @@ import org.openhab.core.automation.module.script.ScriptExtensionAccessor;
 import org.openhab.core.items.ItemRegistry;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.voice.VoiceManager;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +41,7 @@ import org.slf4j.LoggerFactory;
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
+@Component(service = InjectedCodeGenerator.class)
 public class InjectedCodeGenerator {
 
     private final Logger logger = LoggerFactory.getLogger(InjectedCodeGenerator.class);
@@ -56,7 +60,8 @@ public class InjectedCodeGenerator {
             new AbstractMap.SimpleEntry<>("items", new BindingsParsingResult("import java.util.Map;",
                     "protected @InjectBinding Map<String, State> items;", ImportIsFor.ALL, null, null)));
 
-    public InjectedCodeGenerator(ScriptExtensionAccessor scriptExtensionAccessor) {
+    @Activate
+    public InjectedCodeGenerator(@Reference ScriptExtensionAccessor scriptExtensionAccessor) {
         Map<String, Object> defaultPresets = scriptExtensionAccessor.findDefaultPresets("");
         List<@Nullable BindingsParsingResult> bindingsParsingResults = parseBindings(defaultPresets);
         this.imports = bindingsParsingResults.stream().filter(Objects::nonNull).map(BindingsParsingResult::importLine)

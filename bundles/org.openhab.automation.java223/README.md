@@ -6,6 +6,7 @@ Features :
 
 - full JSR 223 support (use in files, in GUI, transformations, inline rule action, etc...)
 - auto-injection of openHAB variable/preset for simplicity
+- use all OSGi services from the openHAB runtime
 - library support for sharing code (.jar and .java)
 - rule annotations are available in the helper library for easy rule creation
 - helper library files: auto generation for items, things, and actions, with strong typing and ease of use
@@ -86,7 +87,7 @@ There are three input injection possibilities:
 
 The variable name is used to find the correct value to inject, so take care of your spelling (full reference in [official documentation about openHAB JSR223 support](https://www.openhab.org/docs/configuration/jsr223.html#scriptextension-objects-all-jsr223-languages) ), or inherit the [Java223Script helper class](#java223script) to directly have the right variable names.
 
-### Advanced injection
+### Advanced injection control
 
 You can control the injection further (i.e. overriding default behavior, or directly injecting something from a preset) with the @InjectBinding annotation. See [example](#injectbinding).
 
@@ -95,20 +96,26 @@ You can control the injection further (i.e. overriding default behavior, or dire
 | enable                  | If false, will prevent injection. Useful if you don't want an useless parsing of your class field.                                                                                                                                                                                                                                         |
 | named                   | Use this to specify the key used to get the value. If not specified, the field name will be used, or the type definition for libraries. You can also use a special 'path traversal' syntaxic sugar for getting field inside field. Example 'event.itemName' will get the event object, and use java reflection to get its field 'itemName' |
 | preset                  | Use this field to inject value from a specific preset.                                                                                                                                                                                                                                                                                     |
-| mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                     |
+| mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                        |
 | recursive               | For library only. If set to true (default), the library injected will be parsed and its field also injected.                                                                                                                                                                                                                               |
 
 <a id="rules"></a>
 
-### Additional injections
+### Inject or get OSGi services
 
-The Java223 bundle also provides some additional injections that are not available in the default openHAB JSR223 system.
+You can also inject any OSGi services available in the openHAB runtime.
+You only have to declare a variable with the type of the service you want, and the bundle will provide the implementation.
 
-| Variable         | Description                                                                                                                 | Purpose                           |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
-| ruleManager      | [`org.openhab.core.automation.RuleManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/automation/rulemanager) | Run or disable/enable other rules |
-| thingManager     | [`org.openhab.core.thing.ThingManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/thing/thingmanager)         | Enable/Disable thing              |
+For instance, these two services are injected by default in the Java223Script helper class and so are directly available if you inherit it:
 
+| Variable         | Description                                                                                                                    | Purpose                           |
+|------------------|--------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| ruleManager      | [`org.openhab.core.automation.RuleManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/automation/rulemanager)    | Run or disable/enable other rules |
+| thingManager     | [`org.openhab.core.thing.ThingManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/thing/thingmanager)            | Enable/Disable thing              |
+
+You can also programmatically get any OSGi service available in the openHAB runtime by using the `getService` method of the `Java223Script` helper class.
+
+See [example](#osgiinjection)
 
 ## Defining Rules
 
@@ -188,7 +195,7 @@ You will get several java files in the package `helper.generated` :
 
 - Items.java: contains all your item names as static String and label as their Javadoc. Also contains methods to directly get the Item, cast to the right Class. (see [example](#itemsandthings))
 - Things.java: contains all your Thing UID as static String, with label as their Javadoc. Also contains methods to directly get the Thing. (see [example](#itemsandthings))
-- Actions.java: contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions)) <a id="java223script"></a>
+- Actions.java: contains strongly typed, ready to use methods, to get the actions available on your things. (see [example](#actions)) <a id="java223script"></a>. Actions.java is your entry point to get real Actions implementation available in subpackages.
 - Java223Script.java: this abstract class is very handy. In fact, you may consider inheriting it in all your scripts. It already contains all openHAB inputs variables, as well as some other useful shortcuts.
 - EnumStrings.java: this class is just a simple store for direct String representations of various enums used by openHAB. It is especially useful for Rule annotations configuration which requires static strings.
 
@@ -494,7 +501,7 @@ Tip: to access a remote openHAB installation scripts folder, you can copy, use W
 | `additionalBundles`           | text    | -       | Additional Bundles             | Additional bundles inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |
 | `additionalClasses`           | text    | -       | Additional Classes             | Additional classes inserted in convenience-dependencies.jar, concatenated by ",".                                                                                                                           |
 | `stabilityGenerationWaitTime` | integer | 10000   | Stability Generation Wait Time | Delay (in ms) before writing generated classes. Each new generation triggering event further delays the generation. Useful to prevent multiple code generations when many Things activate at the same time. |
-| `startupGuardTime`            | integer | 60000   | Startup Guard Time             | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system.  |
+| `startupGuardTime`            | integer | 60000   | Startup Guard Time             | Delay (in ms) before overwriting previously generated classes, at startup. Useful to not replace files from previous openHAB run with incomplete generation from a not fully loaded system.                 |
 
 
 # Examples
@@ -726,22 +733,24 @@ public class ConstructorInjectionExample {
 }
 ```
 
-<a id="runrule"></a>
+<a id="osgiinjection"></a>
 
-## Run another rule or script
+## Injection of OSGi services
+
+You can inject any OSGi services into your scripts.
+Useful examples are the RuleManager and the ThingManager, and they are already available if you extends the `Java223Script` class.
+
+### Run another rule or script with the OSGi service RuleManager
 
 You may want to run another rule or a script.
-The ruleManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
 First, inject the ruleManager in your script, then use it with the `runNow` method and the `UID` of the rule.
-
-Tip: The ruleManager is already declared as a field in the Java223Script helper class that you can inherit.
 
 ```java
 import java.util.Map;
 import org.openhab.core.automation.RuleManager;
 
 public class RunAnotherRule {
-    public void main(RuleManager ruleManager) {
+    public void main(RuleManager ruleManager) { // <-- Injection by the constructor. RuleManager is an OSGi service and so is available as a candidate for injection
         // simple execution :
         ruleManager.runNow("myruleid");
         // execution with parameters in a key / value map :
@@ -751,17 +760,33 @@ public class RunAnotherRule {
 }
 ```
 
-## Disable a thing
+### Disable a thing with the OSGi service ThingManager
 
-The thingManager is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
-It is also available in the base class `Java223Script`, as shown in this example.
+As with the RuleManager, you first inject it (or use the inherited field from Java223Script), and then you can disable a thing with the `ThingManager` service.
 
 ```java
-public class DisableThing extends helper.generated.Java223Script {
+public class DisableThing extends helper.generated.Java223Script { //  <-- Java223Script already has a thingManager field
     public void main() {
         thingManager.setEnabled(_things.network_pingdevice_mything().getUID(), false);
     }
 }
+```
+
+### Use the OSGi ServiceGetter
+
+If you don't want to use injection, you can get an OSGi service programmatically by using the `getService` method in the `helper.generated.Java223Script` class.
+
+```java
+    ThingManager tm = getService(ThingManager.class);
+```
+
+Or you can get a special (non-openHAB JSR223 standard) service by querying the binding for the key `serviceGetter`, and then use it to get any OSGi service.
+
+```java
+import org.openhab.automation.java223.common.ServiceGetter;
+
+ServiceGetter sGetter = ((ServiceGetter) bindings.get('serviceGetter'));
+ThingManager tm = sGetter.getService(ThingManager.class);
 ```
 
 <a id="injectbinding"></a>

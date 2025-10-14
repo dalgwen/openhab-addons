@@ -37,23 +37,22 @@ public abstract class Java223Script {
     // all OpenHAB input as a convenience object:
     protected @InjectBinding Map<String, Object> bindings;
 
+    // for transformation support
+    protected @Nullable String input;
+
     // default preset
     protected @InjectBinding ScriptExtensionManagerWrapper scriptExtension;
     protected @InjectBinding ScriptExtensionManagerWrapper se;
 ${fieldsDeclaration}
 
+    // needed for rule support
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
+
+    // not default preset, but handy (cache, additional shortcuts to useful OSGi services, generated classes)
     protected @InjectBinding(preset = "cache") ValueCache sharedCache;
     protected @InjectBinding(preset = "cache") ValueCache privateCache;
-
-    // for transformation support
-    protected @Nullable String input;
-
-    // additional useful classes:
     protected @InjectBinding RuleManager ruleManager;
     protected @InjectBinding ThingManager thingManager;
-
-    // generated classes
     protected @InjectBinding Items _items;
     protected @InjectBinding Actions _actions;
     protected @InjectBinding Things _things;
@@ -86,5 +85,14 @@ ${fieldsDeclaration}
      */
     public <T> T createAndInjectBindings(Class<T> clazz) {
         return BindingInjector.getOrInstantiateObject(this.getClass().getClassLoader(), bindings, clazz);
+    }
+
+    /**
+    * Get any OSGi service in the openHAB runtime
+    * @param serviceClass The targeted service class
+    * @return Instance of the OSGi service
+    */
+    public <T> T getService(Class<T> serviceClass) {
+        return ((org.openhab.automation.java223.common.ServiceGetter) bindings.get(Java223Constants.SERVICE_GETTER)).getService(serviceClass);
     }
 }

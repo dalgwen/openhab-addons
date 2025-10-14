@@ -29,8 +29,7 @@ public class Java223Constants {
     public static final String JAVA_FILE_TYPE = "java";
     public static final String JAR_FILE_TYPE = "jar";
     public static final String JAVA_223_IDENTIFIER = "java223-identifier";
-    public static final String RULE_MANAGER = "ruleManager";
-    public static final String THING_MANAGER = "thingManager";
+    public static final String SERVICE_GETTER = "serviceGetter";
 
     public static final String ANNOTATION_DEFAULT = "\u0002\u0003";
 
