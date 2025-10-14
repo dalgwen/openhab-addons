@@ -54,7 +54,6 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
             import org.openhab.core.automation.module.script.ScriptExtensionManagerWrapper;
             import org.openhab.core.automation.module.script.rulesupport.shared.ScriptedAutomationManager;
             import org.openhab.core.automation.module.script.rulesupport.shared.ValueCache;
-            import org.openhab.core.items.MetadataRegistry;
             import org.openhab.core.library.items.*;
             import org.openhab.core.thing.ThingManager;
             import org.slf4j.Logger;
@@ -79,7 +78,6 @@ public class ScriptWrappingStrategy implements ScriptInterceptorStrategy {
 
                 protected @InjectBinding RuleManager ruleManager;
                 protected @InjectBinding ThingManager thingManager;
-                protected @InjectBinding MetadataRegistry metadataRegistry;
             """;
 
     private static final String BOILERPLATE_CODE_HELPER_INJECTION = String.format("""

@@ -108,7 +108,6 @@ The Java223 bundle also provides some additional injections that are not availab
 |------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
 | ruleManager      | [`org.openhab.core.automation.RuleManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/automation/rulemanager) | Run or disable/enable other rules |
 | thingManager     | [`org.openhab.core.thing.ThingManager`](https://www.openhab.org/javadoc/latest/org/openhab/core/thing/thingmanager)         | Enable/Disable thing              |
-| metadataRegistry | [`org.openhab.core.items.MetadataRegistry`](https://www.openhab.org/javadoc/latest/org/openhab/core/items/metadataregistry) | Manage metadata                   |
 
 
 ## Defining Rules
@@ -775,37 +774,6 @@ public class DisableThing extends helper.generated.Java223Script {
     }
 }
 ```
-
-## Use metadata
-
-The metadataRegistry is not a standard JSR223 variable, but the Java223 automation bundle can nonetheless inject it.
-For example, this script overwrites Google Assistant metadata every time it is executed (so, at each openHAB startup), effectively keeping this file as some kind of external 'database' where you can store all your metadata.
-
-```java 
-import org.openhab.core.items.MetadataRegistry;
-import org.openhab.core.items.MetadataKey;
-import org.openhab.core.items.Metadata;
-import java.util.Map;
-
-public class MetadataDatabase {
-
-    protected MetadataRegistry metadataRegistry; // <-- auto-injection here
-
-    public void main() {
-        create("ga", Items.lock, "Lock", Map.of("name", "Front door"));
-        create("ga", Items.room_light, "Light", Map.of("name", "Master bedroom light"));
-    }
-    
-    private void create(String namespace, String itemName, String value, Map<String, Object> configuration) {
-        MetadataKey metadataKey = new MetadataKey(namespace, itemName);
-        metadataRegistry.remove(metadataKey);
-        metadataRegistry.add(new Metadata(metadataKey, value, configuration));
-    }
-}
-```
-
-Tip: The metadataRegistry is already declared as a field in the Java223Script helper class that you can inherit.
-
 
 <a id="injectbinding"></a>
 
