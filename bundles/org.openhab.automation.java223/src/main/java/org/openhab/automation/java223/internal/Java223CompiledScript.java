@@ -16,7 +16,6 @@ import static org.openhab.core.automation.module.script.ScriptTransformationServ
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -137,9 +136,19 @@ public class Java223CompiledScript extends JavaCompiledScript {
 
         // create real instance from compiled class
         // use the empty constructor if available, or the first one otherwise
-        Constructor<?>[] constructors = compiledClass.getDeclaredConstructors();
-        Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
-                .orElseGet(() -> constructors[0]);
+        final boolean unnamedPackage = compiledClass.getPackageName().isEmpty();
+        Constructor<?> constructor;
+        try {
+            constructor = unnamedPackage ? compiledClass.getDeclaredConstructor() : compiledClass.getConstructor();
+        } catch (NoSuchMethodException e) {
+            Constructor<?>[] ctors = unnamedPackage ? compiledClass.getDeclaredConstructors()
+                    : compiledClass.getConstructors();
+            if (ctors.length == 0)
+                throw new Java223Exception("No public constructor in " + compiledClass.getCanonicalName());
+            constructor = ctors[0];
+        }
+        if (unnamedPackage)
+            constructor.trySetAccessible();
 
         try {
             ClassLoader classLoader = compiledClass.getClassLoader();

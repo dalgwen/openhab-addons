@@ -138,12 +138,16 @@ public class Java223Strategy
         // find methods to execute
         // noinspection OptionalAssignedToNull
         Optional<Object> returned = null;
-        for (Method method : instance.getClass().getMethods()) {
+        final boolean unnamedPackage = instance.getClass().getPackageName().isEmpty();
+        for (Method method : unnamedPackage ? instance.getClass().getDeclaredMethods()
+                : instance.getClass().getMethods()) {
             // methods with a special name, or methods with a special annotation
             if (METHOD_NAMES_TO_EXECUTE.contains(method.getName()) || method.getAnnotation(RunScript.class) != null) {
                 try {
                     Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, method, bindings,
                             null);
+                    if (unnamedPackage)
+                        method.trySetAccessible();
                     var returnedLocal = method.invoke(instance, parameterValues);
                     // keep arbitrarily only the first returned value
                     // comparing this optional to null is OK. Null value means no method was yet executed.
