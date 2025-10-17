@@ -233,7 +233,7 @@ public class MyRule extends Java223Script {
     @Rule
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     public void myRule() {
-        _items.my_bulb_item.send(ON);
+        _items.my_bulb_item().send(ON);
     }
 }
 ```
@@ -259,7 +259,7 @@ public class MyRule extends Java223Script {
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = EnumStrings.OnOffType.ON)
     public void myRule(ItemStateUpdate inputs) { // <-- HERE, strongly typed parameter
-        _items.my_bulb_item.send(ON);
+        _items.my_bulb_item().send(ON);
         logger.info("Movement detected at " + inputs.getItemName()); // inputs.getItemName() gives the triggering detector name
     }
 }
@@ -547,7 +547,7 @@ public class MyRule extends Java223Script {
     @Rule
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     public void myRule() {
-        _items.my_bulb_item.send(OnOffType.ON);
+        _items.my_bulb_item().send(OnOffType.ON);
     }
 }
 ```
