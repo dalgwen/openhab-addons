@@ -155,8 +155,17 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         var localArgs = args == null ? new Object[0] : args;
         Class<?>[] argClasses = Arrays.stream(localArgs).map(Object::getClass).toArray(Class[]::new);
 
-        Method method = null;
-        method = compiledScript.getCompiledClass().getMethod(name, argClasses);
+        Method method;
+        if (compiledScript.getCompiledClass().getPackageName().isEmpty())
+            try {
+                method = compiledScript.getCompiledClass().getDeclaredMethod(name, argClasses);
+                method.trySetAccessible();
+            } catch (NoSuchMethodException e) {
+                method = compiledScript.getCompiledClass().getMethod(name, argClasses);
+            }
+        else
+            method = compiledScript.getCompiledClass().getMethod(name, argClasses);
+
         try {
             if (Modifier.isStatic(method.getModifiers())) {
                 return method.invoke(new Object(), localArgs); // new object() required (but value ignored) to avoid

@@ -55,7 +55,7 @@ A Java223 script does not need to have any dependency to anything in order to be
 
 ```java
 public class SimpleClass {
-    public void main() {
+    void main() {
         int sum = 2 + 2;
     }
 }
@@ -150,7 +150,7 @@ For example, if we imagine a library `MyLibrary` that need access to the items a
 ...
     ItemRegistry ir; // <- auto-injected in your script
     ThingRegistry things; // <- auto-injected in your script
-    public void main() {
+    void main() {
         var myUsefulParameter1 = ...
         var myUsefulParameter2 = ...
         MyLibrary myLib = new MyLibrary();
@@ -167,7 +167,7 @@ It can even work recursively: a lib can reference another lib, itself referencin
 Getting back to our example : As the library instantiation and injection with the items and things registries are taken care of, the same code can then become:
 
 ```java
-    public void main(MyLibrary myLib) { // <- myLib will be instantiated by the bundle, and auto-injected with the openHAB input variables declared in it. (You can also use other injection methods)
+    void main(MyLibrary myLib) { // <- myLib will be instantiated by the bundle, and auto-injected with the openHAB input variables declared in it. (You can also use other injection methods)
         var myUsefulParameter1 = ...
         var myUsefulParameter2 = ...
         myLib.doSomethingInteresting(myUsefulParameter1, myUsefulParameter2); // <-- myLib already have been instantiated and injected with registries reference, and so we do not need to pass them here
@@ -232,7 +232,7 @@ public class MyRule extends Java223Script {
 
     @Rule
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
-    public void myRule() {
+    void myRule() {
         _items.my_bulb_item.send(ON);
     }
 }
@@ -258,7 +258,7 @@ public class MyRule extends Java223Script {
     @Rule(name = "detecting.people", description = "Detecting people and light")
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = EnumStrings.OnOffType.ON)
-    public void myRule(ItemStateUpdate inputs) { // <-- HERE, strongly typed parameter
+    void myRule(ItemStateUpdate inputs) { // <-- HERE, strongly typed parameter
         _items.my_bulb_item.send(ON);
         logger.info("Movement detected at " + inputs.getItemName()); // inputs.getItemName() gives the triggering detector name
     }
@@ -512,7 +512,7 @@ Tip: to access a remote openHAB installation scripts folder, you can copy, use W
 import helper.generated.Java223Script;
 
 public class BasicExample extends Java223Script {
-    public void main() {
+    void main() {
         _items.myitem().send(ON); // let there be light
     }
 }
@@ -546,7 +546,7 @@ public class MyRule extends Java223Script {
 
     @Rule
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
-    public void myRule() {
+    void myRule() {
         _items.my_bulb_item.send(OnOffType.ON);
     }
 }
@@ -579,7 +579,7 @@ public class M {
     ItemRegistry ir;
     ScriptThingActions actions;
 
-    public Object main() {
+    Object main() {
         automationManager.addRule(new SimpleRule() {
             {
                 name = "abc"; //If not set, openHAB will assign random name
@@ -629,7 +629,7 @@ actions:
       script: >-
         public class anything {
             org.openhab.core.thing.ThingRegistry things; // from the "default" preset
-            public Object main(java.util.Map<String, Object> bindings) { // use bindings to get access to all variables
+            Object main(java.util.Map<String, Object> bindings) { // use bindings to get access to all variables
                 org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("Bindings");
                 logger.error("Is things the same as bindings('things')? " + Boolean.valueOf(things == bindings.get("things"))); // true
                 logger.error("lastStateUpdate as reported by the trigger: " + bindings.get("lastStateUpdate") + " is of " + bindings.get("lastStateUpdate").getClass());
@@ -664,7 +664,7 @@ public class MyRule extends Java223Script {
     @Rule(name = "detecting.people", description = "Detecting people and light")
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = EnumStrings.OnOffType.ON)
-    public void myRule(ItemStateUpdate inputs) { // here, a strongly typed parameter
+    void myRule(ItemStateUpdate inputs) { // here, a strongly typed parameter
         _items.my_bulb_item.send(ON);
         logger.info("Movement detected at {}", inputs.getItemName());
     }
@@ -686,7 +686,7 @@ import org.openhab.core.library.types.OnOffType;
 
 public class FieldInjectionExample {
     ItemRegistry itemRegistry; // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
-    public void main() {
+    void main() {
         ((SwitchItem)itemRegistry).get("myitem").send(OnOffType.ON);
     }
 }
@@ -701,7 +701,7 @@ import org.openhab.core.items.ItemRegistry;
 import static org.openhab.core.library.types.OnOffType.ON;
 
 public class MethodInjectionExample {
-    public void main(ItemRegistry itemRegistry) {  // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
+    void main(ItemRegistry itemRegistry) {  // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
         try {
             ((org.openhab.core.library.items.SwitchItem)itemRegistry.getItem("myitem")).send(ON);
         } catch (org.openhab.core.items.ItemNotFoundException e) {}
@@ -723,11 +723,11 @@ public class ConstructorInjectionExample {
     // Alternatively, by using @InjectBinding(enable=false) you can prevent the Java223 bundle from even trying to inject an openHAB value.
     ItemRegistry myItemRegistry;
 
-    public ConstructorInjectionExample(ItemRegistry itemRegistry) { // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
+    ConstructorInjectionExample(ItemRegistry itemRegistry) { // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
        this.myItemRegistry = itemRegistry;
     }
 
-    public void main() {
+    void main() {
         ((SwitchItem)myItemRegistry.get("myitem")).send(OnOffType.ON);
     }
 }
@@ -750,7 +750,7 @@ import java.util.Map;
 import org.openhab.core.automation.RuleManager;
 
 public class RunAnotherRule {
-    public void main(RuleManager ruleManager) { // <-- Injection by the constructor. RuleManager is an OSGi service and so is available as a candidate for injection
+    void main(RuleManager ruleManager) { // <-- Injection by the constructor. RuleManager is an OSGi service and so is available as a candidate for injection
         // simple execution :
         ruleManager.runNow("myruleid");
         // execution with parameters in a key / value map :
@@ -766,7 +766,7 @@ As with the RuleManager, you first inject it (or use the inherited field from Ja
 
 ```java
 public class DisableThing extends helper.generated.Java223Script { //  <-- Java223Script already has a thingManager field
-    public void main() {
+    void main() {
         thingManager.setEnabled(_things.network_pingdevice_mything().getUID(), false);
     }
 }
@@ -813,7 +813,7 @@ public class InjectBindingExample {
     // make it mandatory (the script will not run if the value cannot be found).
     protected @InjectBinding(mandatory = true) ThingRegistry things;
 
-    public void main(ItemRegistry itemRegistry) {
+    void main(ItemRegistry itemRegistry) {
         myItemRegistry.get("myitem");
     }
 }
@@ -861,7 +861,7 @@ import org.openhab.core.items.ItemRegistry;
 public class MyGreatLibrary {
     ItemRegistry itemRegistry; // will be auto-injected if instantiation is taken care of by the bundle
 
-    public void myUsefullLibraryMethod(String itemName) {
+    void myUsefullLibraryMethod(String itemName) {
         itemRegistry.get(itemName);
         //something usefull...
     }
@@ -876,7 +876,7 @@ public class MyScript {
 
     MyGreatLibrary mylib; // will be auto-instantiated and then auto-injected with all necessary openHAB input value
 
-    public void exec() {
+    void exec() {
         mylib.myUsefullLibraryMethod("myitemName");
     }
 }
@@ -896,7 +896,7 @@ import helper.generated.Java223Script;
 public class ItemsAndThingAccessExample extends Java223Script { // <-- take the Java223Script class as a base class
                                                                 // to access _items and _things more easily
 
-    public void exec() {
+    void exec() {
         _items.myLightItem().send(ON); // <-- light on !
         logger.info(_things.zwave_device_2ecfa3a2_node68().getStatus().toString()); // <-- get thing info
     }
@@ -916,7 +916,7 @@ import helper.generated.Things;
 public class ActionExample extends Java223Script { // <-- take the Java223Script class as a base class
                                                    // to access _actions more easily
 
-    public void exec() {
+    void exec() {
         _actions.getSmsmodem_SMSModemActions(Things.mySMSthing).sendSMS("+3312345678", "Hello world");
     }
 }
