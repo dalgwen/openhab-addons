@@ -95,7 +95,7 @@ You can control the injection further (i.e. overriding default behavior, or dire
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | enable                  | If false, will prevent injection. Useful if you don't want an useless parsing of your class field.                                                                                                                                                                                                                                         |
 | named                   | Use this to specify the key used to get the value. If not specified, the field name will be used, or the type definition for libraries. You can also use a special 'path traversal' syntaxic sugar for getting field inside field. Example 'event.itemName' will get the event object, and use java reflection to get its field 'itemName' |
-| preset                  | Use this field to inject value from a specific preset.                                                                                                                                                                                                                                                                                     |
+| preset                  | Use this field to inject value from a specific preset. Some presets may be difficult to work with. You can use tricks nonetheless (see [example](#presetadvanceduse)).                                                                                                                                                                     |
 | mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                        |
 | recursive               | For library only. If set to true (default), the library injected will be parsed and its field also injected.                                                                                                                                                                                                                               |
 
@@ -810,7 +810,7 @@ public class InjectBindingExample {
     protected @InjectBinding(enable = false) ItemRegistry itemRegistry;
     // name your variable as you wish by using the 'named' parameter :
     protected @InjectBinding(named = "itemRegistry") ItemRegistry otherVariableName;
-    // make it mandatory (the script will not run if the value cannot be found). Note: mandatory = true is the default value when using the annotation.
+    // make it mandatory (the script will not run if the value cannot be found).
     protected @InjectBinding(mandatory = true) ThingRegistry things;
 
     public void main(ItemRegistry itemRegistry) {
@@ -818,6 +818,36 @@ public class InjectBindingExample {
     }
 }
 ```
+
+<a id="presetadvanceduse"></a>
+
+## Preset advanced use and tricks
+
+Sometimes presets can collide with each other. Or they can provide unavailable class implementations. 
+For instance, `itemRegistry` is offered in two different forms, by both the `default` and `provider` presets. You can use those tricks:
+
+- As the key is `itemRegistry` in both cases, you should take special care of your naming to avoid collision (use the `named` parameter)
+- Class `ProviderItemRegistryDelegate` is the implementation provided by the preset `provider`. It provides an additional method to add an Item, `addPermanent`, but some dependency of this class isn't available at runtime (internal class). So your script can't compile if you use it directly. You can use the public interface and use java reflection tricks to access the otherwise unavailable methods.
+
+This example is of no particular real use, but it shows the possibilities.
+
+```java
+import org.openhab.core.items.ItemRegistry;
+import org.openhab.core.library.items.SwitchItem;
+// import  org.openhab.core.automation.module.script.providersupport.shared.ProviderItemRegistryDelegate; <-- won't work because it refers to internal classes
+
+public class PresetAdvancedUse {
+
+    @InjectBinding ItemRegistry itemRegistry; // <-- from the default preset
+    @InjectBinding(named="itemRegistry", preset="provider") ItemRegistry itemRegistryFromProvider; // <-- from the provider preset. We can only use the interface for the type declaration, not the ProviderItemRegistryDelegate type. 
+    
+    public void main() throws NoSuchMethodException, SecurityException, IllegalAccessException {
+        // use java reflection to access the unavailable method 'addPermanent(Item item)':
+        itemRegistryFromProvider.getClass().getMethod("addPermanent", Item.class).invoke(itemRegistryFromProvider, new SwitchItem("SillyExample"));
+    }
+}
+```
+
 
 <a id="libraryautoinjection"></a>
 
