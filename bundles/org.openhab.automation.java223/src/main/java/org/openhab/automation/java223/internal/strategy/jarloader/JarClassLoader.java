@@ -55,10 +55,10 @@ public class JarClassLoader extends ClassLoader {
     }
 
     /**
-     * Has this ClassLoader loaded this class in its memory
+     * Has this ClassLoader loaded this class in its memory?
      *
      * @param name The name of the Class to test
-     * @return true if this ClassLoader already load the class
+     * @return true if this ClassLoader has already loaded the class
      */
     public boolean isLoadedClass(String name) {
         String path = name.replace('.', '/').concat(".class");
