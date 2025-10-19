@@ -47,8 +47,6 @@ public class BindingInjector {
 
     private static final Logger logger = LoggerFactory.getLogger(BindingInjector.class);
 
-    private static final Set<Type> unsupportedTypes = new HashSet<>();
-
     /**
      * Smart injection of bindings value into an object.
      *
@@ -122,14 +120,8 @@ public class BindingInjector {
         }
 
         // step zero: exclusion case
-        if (unsupportedTypes.contains(fieldType)) { // avoid multiple reflection tests by caching the excluded types
+        if (fieldType.isArray() || fieldType.isAnnotation()) {
             return null;
-        } else {
-            if (fieldType.isPrimitive() || fieldType.getPackage().getName().startsWith("java.lang")
-                    || fieldType.isArray() || fieldType.isAnnotation()) {
-                unsupportedTypes.add(fieldType);
-                return null;
-            }
         }
         InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
         if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
