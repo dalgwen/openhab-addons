@@ -12,6 +12,7 @@
  */
 package org.openhab.automation.java223.common;
 
+import java.lang.reflect.AccessFlag;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
@@ -71,11 +72,11 @@ public class BindingInjector {
         Class<?> clazz = objectToInjectInto.getClass();
 
         for (Field field : getAllFields(clazz)) {
-            field.setAccessible(true);
-            if (field.get(objectToInjectInto) == null) { // inject value only in an empty field
+            if (!field.accessFlags().contains(AccessFlag.FINAL)) { // inject value only in non-final fields
                 Object valueToInject = extractBindingValueForElement(sourceScriptClassLoader, bindings, field,
                         libAlreadyInstantiated);
                 if (valueToInject != null) {
+                    field.setAccessible(true);
                     field.set(objectToInjectInto, valueToInject);
                 }
             }
