@@ -15,7 +15,7 @@ Features :
 - designed to be easily used with your favorite IDE
 
 It makes heavy use of Eric Obermühlner's Java JSR 223 ScriptEngine [java-scriptengine](https://github.com/eobermuhlner/java-scriptengine),
-and is partially based on work from other openHAB contributors who created their own JSR 223 java automation bundle (many thanks to them).
+and is partially based on work from other openHAB contributors who created their own JSR 223 Java automation bundle (many thanks to them).
 
 # What can you do?
 
@@ -56,7 +56,7 @@ See the [rules](#rules) section for more information on how to create a rule.
 
 ## Execution
 
-A Java223 script does not need any dependency to be compiled and executed. It can just be a plain, simple java class like this one:
+A Java223 script does not need any dependency to be compiled and executed. It can just be a plain, simple Java class like this one:
 
 ```java
 public class SimpleClass {
@@ -68,7 +68,7 @@ public class SimpleClass {
 
 (In fact, it can even be a simpler one-liner, see the [no boilerplate section](#noboilerplate))
 
-When openHAB presents a java script to the Java223 automation bundle, it searches for methods with name `main`, `eval`, `run`, `exec`, or any methods annotated with `@RunScript`, and then runs them (from here we will refer to those as the "runnable methods").
+When openHAB presents a Java script to the Java223 automation bundle, it searches for methods with name `main`, `eval`, `run`, `exec`, or any methods annotated with `@RunScript`, and then runs them (from here we will refer to those as the "runnable methods").
 Returning a value is supported but optional. That's all you need for a basic script.
 
 A note about the context: each script has its own context, its own ClassLoader.
@@ -201,7 +201,7 @@ Nothing (code, lib) will be generated/copied in the lib directory.
 The Java223 bundle generates some ready-to-use library classes in the `automation\lib\java` directory.
 These classes are dynamic and contain detailed information about your openHAB setup.
 
-You will get several java files in the package `helper.generated` :
+You will get several Java files in the package `helper.generated` :
 
 - Items.java: contains all your item names as static String and label as their Javadoc. Also contains methods to directly get the Item, cast to the right Class. (see [example](#itemsandthings))
 - Things.java: contains all your Thing UID as static String, with label as their Javadoc. Also contains methods to directly get the Thing. (see [example](#itemsandthings))
@@ -316,13 +316,13 @@ The script is instantiated, and its methods are executed.
 As part of this, rules are parsed and registered in the Rule Manager.
 But, even if the script _creating them_ is executed only once, the rules inside define _actions_, and those actions will run many times: each time the corresponding trigger is fired.
 These actions have, by nature, some context around them (as they are methods or fields, they belong to an instance).
-And as such, their code can access field of the script instance (which is the instance used to register them).
+And as such, their code can access fields of the script instance (which is the instance used to register them).
 This means that you can share states between triggered executions of rules by using fields of the script used to create the rules.
 
 #### Share in Scripts
 
 On the opposite, when you define a `java` script (for example in the GUI), the script is compiled and waits for further (possibly many) executions.
-Each new execution is taken care of by the java223 bundle, which has then to choose between two behaviors:
+Each new execution is taken care of by the Java223 bundle, which has then to choose between two behaviors:
 
 - instantiate the script with a `new` operator each time openHAB asks to run it
 - or reuse the same instance and then re-execute the relevant action (method, field) on it. In this case, you can share data or states between executions
@@ -503,13 +503,18 @@ The inner working is like this:
 - the bundle compiles it (if not already done). openHAB will then store the compilation unit for further (and fastest) reuse.
 - then, when execution is needed and asked by openHAB:
     - The bundle needs an instance:
-        - the engine will choose a constructor and instantiate the script with the `new` operator.
-          Auto-injection (see next section) of openHAB values may occur in fields or constructor parameters.
-        - **OR** the engine will reuse an existing instance
-    - the engine will then execute the relevant script methods (`main`, etc., and any `@RunScript` annotated methods) on the instance. Inherited methods/fields are also included.
+        - The engine will choose a constructor and instantiate the script with the `new` operator.
+          Auto-injection of openHAB values may occur in constructor parameters.
+        - **OR**
+        - The engine will reuse an existing instance
+    - the engine will then execute the relevant script methods (`main`, etc., and any `@RunScript` annotated methods) on the instance. Inherited methods/fields are also included. Auto-injection will occur on fields and method parameters.
 
+What is the right method for your use case?
 As you can imagine, instance reuse is handy if you have costly operations to run once, for example, when dealing with network connections or with an embedded SQLite database.
-You can also use this to share value or state between executions of your script.
+You can also use this to share value or state between successive executions of your script.
+BUT be careful, as stated above, injection on **constructor parameters** will only happen when the instance is first created.
+So **do not choose** instance reuse if you want to use injection of circumstantial value to happen (such as 'input' or 'event') on constructor parameters.
+If you don't choose instance reuse, you won't have any side effect, but you lose the possibility of sharing data and the performance boost gained (which is only meaningful if your constructor is heavy).
 
 To choose between these two instantiation possibilities, you can set the default behavior with the global option `allowInstanceReuse`.
 If set to false (default), the engine will re-instantiate the script each time it is asked by openHAB to run.
@@ -526,18 +531,18 @@ So instance reuse is not possible if something triggers a recompilation of your 
 
 You can control the injection further (i.e. overriding default behavior, or directly injecting something from a preset) with the @InjectBinding annotation. See [example](#injectbinding).
 
-| InjectBinding parameter | Description                                                                                                                                                                                                                                                                                                                                                 |
-|-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| enable                  | If false, will prevent injection. Useful if you don't want an useless parsing of your class field. Also useful when using field typed to classes from external third party jar not made for this.                                                                                                                                                           |
-| named                   | Use this to specify the key used to get the value. If not specified, the field name will be used, or the type definition for libraries or OSGi services. You can also use a special 'path traversal' syntaxic sugar for getting field inside field. Example 'event.itemName' will get the event object, and use java reflection to get its field 'itemName' |
-| preset                  | Use this field to inject value from a specific preset. Some presets may be difficult to work with. You can use tricks nonetheless (see [example](#presetadvanceduse)).                                                                                                                                                                                      |
-| mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                                         |
-| recursive               | For library only. If set to true (default), the library injected will be parsed and its field also injected.                                                                                                                                                                                                                                                |
+| InjectBinding parameter | Description                                                                                                                                                                                                                                                                                                                                                  |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| enable                  | If false, will prevent injection. Useful if you don't want an useless parsing of your class field. Also useful when using field typed to classes from external third party jar not made for this.                                                                                                                                                            |
+| named                   | Use this to specify the key used to get the value. If not specified, the field name will be used, or the type definition for libraries or OSGi services. You can also use a special 'path traversal' syntaxic sugar for getting field inside field. Example 'event.itemName' will get the event object, and use Java reflection to get its field 'itemName'. |
+| preset                  | Use this field to inject value from a specific preset. Some presets may be difficult to work with. You can use tricks nonetheless (see [example](#presetadvanceduse)).                                                                                                                                                                                       |
+| mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                                          |
+| recursive               | For library only. If set to true (default), the library injected will be parsed and its fields also injected. And so on, etc.                                                                                                                                                                                                                                |
 
 Take note that this annotation is **NOT** mandatory for injection to happen. Injection **WILL** happen if **ONE** of the following conditions is respected:
 
-- The variable name is a valid openHAB input.
-- The variable type is a library class (see [library](#libraryinjection) for more information).
+- The variable name is a valid openHAB input
+- The variable type is a library class (see [library](#libraryinjection) for more information)
 - The variable type is an OSGi service running in the openHAB runtime (see [osgi injection](#osgiinjection))
 - The variable name doesn't point to a valid openHAB input, BUT the combination of the 'named' (optional) and 'preset' parameter of the @InjectBinding annotation points to a valid openHAB input
 
@@ -564,7 +569,7 @@ And adding a plain, empty, `@InjectBinding` annotation with no parameter is equi
 Regarding concurrency, openHAB has several peculiarities about the way rules are executed.
 If you think your code is at risk when being executed multiple times at the same moment, then you should read the main openHAB documentation about rules carefully.
 
-Also, for rules defined inside a `.java` script in `automation/jsr223`, remember that the 'Action' part of each rule (i.e., the code doing something) are only lambda-like pieces of code running on a java instance.
+Also, for rules defined inside a `.java` script in `automation/jsr223`, remember that the 'Action' part of each rule (i.e., the code doing something) are only lambda-like pieces of code running on a Java instance.
 As openHAB does not manage the instance, there is no protection against concurrent executions of different rules.
 The openHAB policy preventing a rule from running twice at the same time applies to one rule, so several rules defined on the same script file will share state and can access the script instance concurrently.
 If different rules -triggered at the same time- access the same instance fields, you may have to synchronize read/write from/to your data.
@@ -733,7 +738,7 @@ public class MyRule extends Java223Script {
     @ItemStateUpdateTrigger(itemName = Items.my_detector_item, state = EnumStrings.OnOffType.ON)
     @ItemStateUpdateTrigger(itemName = Items.my_otherdetector_item, state = EnumStrings.OnOffType.ON)
     public void myRule(ItemStateUpdate inputs) { // here, a strongly typed parameter
-        _items.my_bulb_item.send(ON);
+        _items.my_bulb_item().send(ON);
         logger.info("Movement detected at {}", inputs.getItemName());
     }
 }
@@ -895,7 +900,7 @@ Sometimes presets can collide with each other. Or they can provide unavailable c
 For instance, `itemRegistry` is offered in two different forms, by both the `default` and `provider` presets. You can use those tricks:
 
 - As the key is `itemRegistry` in both cases, you should take special care of your naming to avoid collision (use the `named` parameter)
-- Class `ProviderItemRegistryDelegate` is the implementation provided by the preset `provider`. It provides an additional method to add an Item, `addPermanent`, but some dependency of this class isn't available at runtime (internal class). So your script can't compile if you use it directly. You can use the public interface and use java reflection tricks to access the otherwise unavailable methods.
+- Class `ProviderItemRegistryDelegate` is the implementation provided by the preset `provider`. It provides an additional method to add an Item, `addPermanent`, but some dependency of this class isn't available at runtime (internal class). So your script can't compile if you use it directly. You can use the public interface and use Java reflection tricks to access the otherwise unavailable methods.
 
 This example is of no particular real use, but it shows the possibilities.
 
@@ -910,7 +915,7 @@ public class PresetAdvancedUse {
     @InjectBinding(named="itemRegistry", preset="provider") ItemRegistry itemRegistryFromProvider; // <-- from the provider preset. We can only use the interface for the type declaration, not the ProviderItemRegistryDelegate type. 
     
     public void main() throws NoSuchMethodException, SecurityException, IllegalAccessException {
-        // use java reflection to access the unavailable method 'addPermanent(Item item)':
+        // use Java reflection to access the unavailable method 'addPermanent(Item item)':
         itemRegistryFromProvider.getClass().getMethod("addPermanent", Item.class).invoke(itemRegistryFromProvider, new SwitchItem("SillyExample"));
     }
 }
