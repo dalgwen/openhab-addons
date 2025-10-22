@@ -69,6 +69,7 @@ public class SimpleClass {
 (In fact, it can even be a simpler one-liner, see the [no boilerplate section](#noboilerplate))
 
 When openHAB presents a Java script to the Java223 automation bundle, it searches for methods with name `main`, `eval`, `run`, `exec`, or any methods annotated with `@RunScript`, and then runs them (from here we will refer to those as the "runnable methods").
+Files in `automation/jsr223` can perform their logic in the constructor and are not required to have a runnable method.
 Returning a value is supported but optional. That's all you need for a basic script.
 
 A note about the context: each script has its own context, its own ClassLoader.
