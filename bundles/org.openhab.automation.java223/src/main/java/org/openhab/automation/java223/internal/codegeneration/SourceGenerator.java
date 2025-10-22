@@ -301,9 +301,6 @@ public class SourceGenerator {
             newlyGeneratedThingActionsFiles.add(sourceWriter.getPath(packageName, simpleClassName));
         }
 
-        // delete old files (those that we didn't generate)
-        cleanOldGeneratedThingActionsFiles(newlyGeneratedThingActionsFiles);
-
         // adding classes to the lib of exported dependencies
         dependencyGenerator.setClassesToAddToDependenciesLib(allClassesToImport);
 
@@ -326,6 +323,10 @@ public class SourceGenerator {
         templateActionFactory.process(context, writer);
 
         sourceWriter.replaceHelperFileIfNotEqual(SourceWriter.getPackageName(GENERATED), "Actions", writer.toString());
+
+        // delete old files (those that we didn't generate)
+        cleanOldGeneratedThingActionsFiles(newlyGeneratedThingActionsFiles);
+
         return null;
     }
 
@@ -337,7 +338,7 @@ public class SourceGenerator {
                         cleanGeneratedFiles(path);
                         deleteDirIfEmpty(path);
                     } else {
-                        if (isAJavaGeneratedFile(path)) {
+                        if (isAJavaGeneratedFile(path) && Files.isWritable(path)) {
                             Files.delete(path);
                         }
                     }
