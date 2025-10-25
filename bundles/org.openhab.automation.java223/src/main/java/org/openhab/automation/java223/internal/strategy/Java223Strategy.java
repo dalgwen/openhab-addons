@@ -173,6 +173,10 @@ public class Java223Strategy
         if (returned != null) {
             return returned.orElse(null);
         }
+        if (bindings.containsKey("javax.script.filename")) {
+            logger.trace("No runnable method found in {}", bindings.get("javax.script.filename"));
+            return null;
+        }
 
         throw new ScriptException(String.format(
                 "cannot execute: %s doesn't have a method named eval/main/run, or a RunScript annotated method",
