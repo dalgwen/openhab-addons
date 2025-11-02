@@ -1,0 +1,619 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="voltronic"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<thing-type id="inverter">
+		<label>Voltronic Inverter</label>
+		<description>Axpert, Effekta, MPP Solar, No Name, Voltacon Inverter</description>
+		<!-- <semantic-equipment-tag>Inverter</semantic-equipment-tag> since OH 5.0 -->
+		<channel-groups>
+			<channel-group id="qmod" typeId="qmod"/>
+			<channel-group id="qpigs" typeId="qpigs"/>
+			<channel-group id="qpiws" typeId="qpiws"/>
+			<channel-group id="qflag" typeId="qflag"/>
+			<channel-group id="qpiri" typeId="qpiri"/>
+		</channel-groups>
+		<representation-property>Serial Number</representation-property>
+		<config-description>
+			<parameter name="port" type="text" required="true">
+				<label>Serial or USB port</label>
+				<context>serial-port</context>
+				<limitToOptions>false</limitToOptions>
+				<description><![CDATA[Where is the cable plugged, e.g. <em>/dev/hidraw0<em>]]></description>
+			</parameter>
+			<parameter name="refreshInterval" type="integer" unit="ms" min="1">
+				<label>Refresh Interval</label>
+				<description>How long to wait between data polling cycles.</description>
+				<default>750</default>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<!-- QMOD -->
+	<channel-type id="mode">
+		<item-type>String</item-type>
+		<label>Mode</label>
+		<description><![CDATA[One of <strong>P</strong>ower On, <strong>S</strong>tand By, <strong>L</strong>ine, <strong>B</strong>attery, <strong>F</strong>ault, <strong>H</strong> for Power Saving, <strong>D</strong> for Shutdown, <strong>C</strong>harge, B<strong>Y</strong>pass, <strong>E</strong>co]]></description>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="P">Power On</option>
+				<option value="S">Stand By</option>
+				<option value="L">⚛Line</option>
+				<option value="B">🔋︎Battery</option>
+				<option value="F">Fault</option>
+				<option value="H">Power Saving</option>
+				<option value="D">⭘Shutdown</option>
+				<option value="C">⚡︎Charge</option>
+				<option value="Y">Bypass</option>
+				<option value="E">🌿︎Eco</option>
+			</options>
+		</state>
+	</channel-type>
+	<!-- QPIGS -->
+	<channel-type id="measurement-frequency">
+		<item-type>Number:Frequency</item-type>
+		<label>Channel type for Frequency</label>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Frequency</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+	<channel-type id="measurement-apparentpower">
+		<item-type unitHint="VA">Number:Power</item-type>
+		<label>Load Apparent Power</label>
+		<description>How much apparent power is the output from the inverter</description>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Power</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="measurement-power">
+		<item-type>Number:Power</item-type>
+		<label>Channel type for power as integer</label>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Power</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="outputLoad">
+		<item-type unitHint="%">Number:Dimensionless</item-type>
+		<label>Output Load</label>
+		<description>Maximum of percent of active power and percent of apparent power</description>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Info</tag>
+		</tags>
+		<state readOnly="true"/>
+	</channel-type>
+	<channel-type id="electric-voltage-2digits">
+		<item-type>Number:ElectricPotential</item-type>
+		<label>Battery Voltage from Solar Charge Controller (SCC)</label>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Voltage</tag>
+		</tags>
+		<state readOnly="true" pattern="%.2f %unit%"/>
+	</channel-type>
+	<channel-type id="batteryLevel">
+		<item-type unitHint="%">Number:Dimensionless</item-type>
+		<label>Battery Level</label>
+		<category>Battery</category>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Energy</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="heatSinkTemperature">
+		<item-type>Number:Temperature</item-type>
+		<label>Inverter Heat Sink Temperature</label>
+		<category>Temperature</category>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Temperature</tag>
+		</tags>
+		<state readOnly="true"/>
+	</channel-type>
+	<channel-type id="measurement-current">
+		<item-type>Number:ElectricCurrent</item-type>
+		<label>Electric Current rendered as integer</label>
+		<category>Energy</category>
+		<tags>
+			<tag>Measurement</tag>
+			<tag>Current</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="chargingMode">
+		<item-type>String</item-type>
+		<label>Charging Mode</label>
+		<description>How is the system charging</description>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="0">Do nothing</option>
+				<option value="5">Charging with ⚛AC</option>
+				<option value="6">Charging with 🌞︎SCC</option>
+				<option value="7">Charging with 🌞︎SCC and ⚛AC</option>
+				<option value="8">Charging unknown</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="qpigs-binaryStatus">
+		<item-type>Switch</item-type>
+		<label>One of two states</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%s"/>
+	</channel-type>
+	<!-- QPIWS -->
+	<channel-type id="warnings"> <!-- and faults -->
+		<item-type>String</item-type>
+		<label>Anomalies</label>
+		<category>Alarm</category>
+		<tags>
+			<tag>Alarm</tag>
+			<tag>Info</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="0">PV Loss (Reserved)</option>
+				<option value="1">Inverter fault</option>
+				<option value="2">Bus over</option>
+				<option value="3">Bus under</option>
+				<option value="4">Bus Soft Fail</option>
+				<option value="5">No grid</option>
+				<option value="6">OPVShort</option>
+				<option value="7">Inverter voltage too high</option>
+				<option value="8">Inverter voltage too low</option>
+				<option value="9">Over temperature</option>
+				<option value="10">Fan locked</option>
+				<option value="11">Battery voltage high</option>
+				<option value="12">Battery low alarm</option>
+				<option value="13">13</option>
+				<option value="14">Battery under shutdown</option>
+				<option value="15">Battery derating</option>
+				<option value="16">Over load</option>
+				<option value="17">Eeprom fault</option>
+				<option value="18">Inverter Over Current</option>
+				<option value="19">Inverter Soft Fail</option>
+				<option value="20">Self Test Fail</option>
+				<option value="21">OP DC Voltage Over</option>
+				<option value="22">Bat Open</option>
+				<option value="23">Current Sensor Fail</option>
+				<option value="24">Battery Short</option>
+				<option value="25">Power limit</option>
+				<option value="26">PV voltage high</option>
+				<option value="27">MPPT overload fault</option>
+				<option value="28">MPPT overload warning</option>
+				<option value="29">Battery too low to charge</option>
+				<option value="30">DC/DC Over Current</option>
+			</options>
+		</state>
+	</channel-type>
+	<!-- QFLAG -->
+	<channel-type id="qflag-switch">
+		<item-type>Switch</item-type>
+		<label>Label must be present per XML validation</label>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Mode</tag>
+		</tags>
+		<autoUpdatePolicy>veto</autoUpdatePolicy>
+	</channel-type>
+	<channel-type id="qflag-backlight">
+		<item-type>Switch</item-type>
+		<label>Backlight</label>
+		<description><![CDATA[Menu <em>20</em>]]></description>
+		<category>Light</category>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Light</tag>
+		</tags>
+		<autoUpdatePolicy>veto</autoUpdatePolicy>
+	</channel-type>
+	<!-- QPIRI -->
+	<channel-type id="status-voltage">
+		<item-type>Number:ElectricPotential</item-type>
+		<label>Voltage as Status</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Voltage</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+	<channel-type id="status-current">
+		<item-type>Number:ElectricCurrent</item-type>
+		<label>Current as Status</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Current</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+	<channel-type id="setpoint-frequency">
+		<item-type>Number:Frequency</item-type>
+		<label>AC Output Rating Frequency</label>
+		<description><![CDATA[Menu <em>09</em>]]></description>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Frequency</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+	<channel-type id="status-apparentpower">
+		<item-type unitHint="VA">Number:Power</item-type>
+		<label>Output Rating Apparent Power</label>
+		<description>AC Output Rating Apparent Power</description>
+		<tags>
+			<tag>Status</tag>
+			<tag>Power</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="status-power">
+		<item-type>Number:Power</item-type>
+		<label>AC Output Rating Active/Real Power</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Power</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="setpoint-voltage">
+		<item-type>Number:ElectricPotential</item-type>
+		<label>Voltage as Setpoint</label>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Voltage</tag>
+		</tags>
+		<state readOnly="true" pattern="%.1f %unit%"/>
+	</channel-type>
+	<channel-type id="batteryType">
+		<item-type>String</item-type>
+		<label>Battery Type</label>
+		<description><![CDATA[Menu <em>05</em>]]></description>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="0">AGM</option>
+				<option value="1">Flooded</option>
+				<option value="2">User</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="setpoint-current">
+		<item-type>Number:ElectricCurrent</item-type>
+		<label>Current as Setpoint</label>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Current</tag>
+		</tags>
+		<state readOnly="true" pattern="%d %unit%"/>
+	</channel-type>
+	<channel-type id="inputVoltageRange">
+		<item-type>Switch</item-type>
+		<label>Input Voltage Range</label>
+		<description><![CDATA[Menu <em>03</em>]]></description>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%s">
+			<options>
+				<option value="OFF">Appliance 90-290 Vac</option>
+				<option value="ON">UPS 170-280 Vac</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="outputSourcePriority">
+		<item-type>Number:Dimensionless</item-type>
+		<label>Output Source Priority</label>
+		<description><![CDATA[Menu <em>01</em>]]></description>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state>
+			<options>
+				<option value="0">⚛Utility first</option>
+				<option value="1">🌞︎Solar first</option>
+				<option value="2">🌞︎Solar first, then 🔋︎Battery, finally ⚛Utility</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="chargerSourcePriority">
+		<item-type>Number:Dimensionless</item-type>
+		<label>Charger Source Priority</label>
+		<description><![CDATA[Menu <em>16</em>]]></description>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state>
+			<options>
+				<option value="0">⚛Utility First</option>
+				<option value="1">🌞︎Solar First</option>
+				<option value="2">🌞︎Solar + ⚛Utility</option>
+				<option value="3">🌞︎Only solar charging permitted</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="parallelMaxNum">
+		<item-type>Number:Dimensionless</item-type>
+		<label>Parallel Max Num</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%d"/>
+	</channel-type>
+	<channel-type id="machineType">
+		<item-type>String</item-type>
+		<label>Machine Type</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="00">Grid tie</option>
+				<option value="01">Off Grid</option>
+				<option value="10">Hybrid</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="topology">
+		<item-type>Switch</item-type>
+		<label>Topology</label>
+		<tags>
+			<tag>Status</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%s">
+			<options>
+				<option value="OFF">Without Transformer</option>
+				<option value="ON">With Transformer</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="outputMode">
+		<item-type>String</item-type>
+		<label>Output Mode</label>
+		<description><![CDATA[For 4000/5000 (Menu <em>28</em>)]]></description>
+		<tags>
+			<tag>Setpoint</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true">
+			<options>
+				<option value="0">Single Machine Output</option>
+				<option value="1">Parallel Output</option>
+				<option value="2">Phase 1 of 3 Phase Output</option>
+				<option value="3">Phase 2 of 3 Phase Output</option>
+				<option value="4">Phase 3 of 3 Phase Output</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="pvConditionForParallel">
+		<item-type>Switch</item-type>
+		<label>PV Condition for Parallel</label>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%s">
+			<options>
+				<option value="OFF">As long as one unit of inverters has connect PV, parallel system will consider PV OK</option>
+				<option value="ON">Only All of inverters have connect PV, parallel system will consider PV OK</option>
+			</options>
+		</state>
+	</channel-type>
+	<channel-type id="pvPowerBalance">
+		<item-type>Switch</item-type>
+		<label>PV Power Balance</label>
+		<description><![CDATA[Menu <em>31</em>]]></description>
+		<tags>
+			<tag>Switch</tag>
+			<tag>Mode</tag>
+		</tags>
+		<state readOnly="true" pattern="%s">
+			<options>
+				<option value="OFF">PV input max current will be the max charged current</option>
+				<option value="ON">PV input max power will be the sum of the max charged power and loads power</option>
+			</options>
+		</state>
+	</channel-type>
+
+	<channel-group-type id="qmod">
+		<label>Information obtained with the QMOD command</label>
+		<channels>
+			<channel id="mode" typeId="mode"/>
+		</channels>
+	</channel-group-type>
+	<channel-group-type id="qpigs">
+		<label>Device General Status Parameters (QPIGS command)</label>
+		<channels>
+			<channel id="gridVoltage" typeId="system.electric-voltage">
+				<label>Grid voltage</label>
+			</channel>
+			<channel id="gridFrequency" typeId="measurement-frequency">
+				<label>Frequency of the Grid</label>
+			</channel>
+			<channel id="outputVoltage" typeId="system.electric-voltage">
+				<label>AC Output Potential from the Inverter</label>
+			</channel>
+			<channel id="outputFrequency" typeId="measurement-frequency">
+				<label>AC Output Frequency from the Inverter</label>
+			</channel>
+			<channel id="outputApparentPower" typeId="measurement-apparentpower"/>
+			<channel id="outputActivePower" typeId="measurement-power">
+				<label>Load Active/Real Power</label>
+			</channel>
+			<channel id="outputLoad" typeId="outputLoad"/>
+			<channel id="busVoltage" typeId="system.electric-voltage">
+				<label>Bus Voltage</label>
+			</channel>
+			<channel id="batteryVoltage" typeId="system.electric-voltage">
+				<label>Battery Voltage</label>
+			</channel>
+			<channel id="batteryLevel" typeId="batteryLevel"/>
+			<channel id="heatSinkTemperature" typeId="heatSinkTemperature"/>
+			<channel id="inputCurrent" typeId="measurement-current">
+				<label>What electric current produce the PV</label>
+			</channel>
+			<channel id="inputVoltage" typeId="system.electric-voltage">
+				<label>How much potential have the PV</label>
+			</channel>
+			<channel id="sccVoltage" typeId="electric-voltage-2digits"/>
+			<channel id="batteryChargingCurrent" typeId="measurement-current">
+				<label>Battery Charging Current, negative number means discharging</label>
+			</channel>
+			<channel id="chargingMode" typeId="chargingMode"/>
+			<channel id="loadStatus" typeId="qpigs-binaryStatus">
+				<label>Load Status</label>
+			</channel>
+			<channel id="batteryVoltageToSteady" typeId="qpigs-binaryStatus">
+				<label>Battery voltage to steady while charging</label>
+			</channel>
+			<channel id="inputPower" typeId="measurement-power">
+				<label>How much power produce PV currently</label>
+			</channel>
+		</channels>
+	</channel-group-type>
+	<channel-group-type id="qpiws">
+		<label>Information obtained with the QPIWS command</label>
+		<category>Alarm</category>
+		<channels>
+			<channel id="warnings" typeId="warnings">
+				<label>Warnings</label>
+			</channel>
+			<channel id="faults" typeId="warnings">
+				<label>Faults</label>
+			</channel>
+		</channels>
+	</channel-group-type>
+	<channel-group-type id="qpiri">
+		<label>Device Rating Information (QPIRI command)</label>
+		<description>The status is pulled on thing initialization and when any element in this or QFLAG group is changed from
+			within openHAB: changing a setting with the buttons on the inverter does not push the update to openHAB.</description>
+		<channels>
+			<channel id="gridRatingVoltage" typeId="status-voltage">
+				<label>Grid Rating Voltage</label>
+			</channel>
+			<channel id="gridRatingCurrent" typeId="status-current">
+				<label>Grid Rating Current</label>
+			</channel>
+			<channel id="outputRatingVoltage" typeId="status-voltage">
+				<label>AC Output Rating Voltage</label>
+			</channel>
+			<channel id="outputRatingFrequency" typeId="setpoint-frequency"/>
+			<channel id="outputRatingCurrent" typeId="status-current">
+				<label>AC Output Rating Current</label>
+			</channel>
+			<channel id="outputRatingApparentPower" typeId="status-apparentpower"/>
+			<channel id="outputRatingActivePower" typeId="status-power">
+			</channel>
+			<channel id="batteryRatingVoltage" typeId="status-voltage">
+				<label>Battery Rating Voltage</label>
+			</channel>
+			<channel id="batteryRechargeVoltage" typeId="setpoint-voltage">
+				<label>Battery Recharge Voltage</label>
+				<description><![CDATA[Under this potential the inverter will shut down. (Menu <em>12</em>)]]></description>
+			</channel>
+			<channel id="batteryUnderVoltage" typeId="setpoint-voltage">
+				<label>Battery Under Voltage</label>
+				<description><![CDATA[When voltage falls below, mode switches from Battery to Line.  (Menu <em>29</em>)]]></description>
+			</channel>
+			<channel id="batteryBulkVoltage" typeId="setpoint-voltage">
+				<label>Battery Bulk Voltage</label>
+				<description><![CDATA[Menu <em>26</em>]]></description>
+			</channel>
+			<channel id="batteryFloatVoltage" typeId="setpoint-voltage">
+				<label>Battery Float Voltage</label>
+				<description><![CDATA[Menu <em>27</em>]]></description>
+			</channel>
+			<channel id="batteryType" typeId="batteryType"/>
+			<channel id="maxACChargingCurrent" typeId="setpoint-current">
+				<label>Current max charging current from grid</label>
+				<description><![CDATA[Menu <em>11</em>]]></description>
+			</channel>
+			<channel id="maxChargingCurrent" typeId="setpoint-current">
+				<label>Current max charging current from PV and grid</label>
+				<description><![CDATA[Menu <em>02</em>]]></description>
+
+			</channel>
+			<channel id="inputVoltageRange" typeId="inputVoltageRange"/>
+			<channel id="outputSourcePriority" typeId="outputSourcePriority"/>
+			<channel id="chargerSourcePriority" typeId="chargerSourcePriority"/>
+			<channel id="parallelMaxNum" typeId="parallelMaxNum"/>
+			<channel id="machineType" typeId="machineType"/>
+			<channel id="topology" typeId="topology"/>
+			<channel id="outputMode" typeId="outputMode"/>
+			<channel id="batteryRedischargeVoltage" typeId="setpoint-voltage">
+				<label>Battery Redischarge Voltage</label>
+				<description><![CDATA[Under this level the Low Battery warning appears.  Above this voltage mode switches from line to battery.  (Menu <em>13</em>)]]>
+				</description>
+			</channel>
+			<channel id="pvConditionForParallel" typeId="pvConditionForParallel"/>
+			<channel id="pvPowerBalance" typeId="pvPowerBalance"/>
+		</channels>
+	</channel-group-type>
+	<channel-group-type id="qflag">
+		<label>Information obtained with the QFLAG command</label>
+		<description>The status is pulled on thing initialization and when any element in this or the QPIRI group is changed
+			from within openHAB: changing a flag with the buttons on the inverter does not push the update to openHAB.</description>
+		<channels>
+			<channel id="mute" typeId="system.mute">
+				<description><![CDATA[Menu <em>18</em>]]></description>
+				<autoUpdatePolicy>veto</autoUpdatePolicy>
+			</channel>
+			<channel id="overloadBypass" typeId="qflag-switch">
+				<label>Overload Bypass Function</label>
+				<description><![CDATA[Menu <em>23</em>]]></description>
+			</channel>
+			<channel id="powerSaving" typeId="qflag-switch">
+				<label>Power Saving</label>
+				<description><![CDATA[Menu <em>04</em>]]></description>
+			</channel>
+			<channel id="lcdReturn" typeId="qflag-switch">
+				<label>LCD display returns to default page after 1 minute inactivity</label>
+				<description><![CDATA[Menu <em>19</em>]]></description>
+			</channel>
+			<channel id="overloadRestart" typeId="qflag-switch">
+				<label>Overload Restart</label>
+				<description><![CDATA[Menu <em>06</em>]]></description>
+			</channel>
+			<channel id="overtemperatureRestart" typeId="qflag-switch">
+				<label>Over Temperature Restart</label>
+				<description><![CDATA[Menu <em>07</em>]]></description>
+			</channel>
+			<channel id="backlight" typeId="qflag-backlight"/>
+			<channel id="alarm" typeId="qflag-switch">
+				<label>Alarm on when primary source interrupt</label>
+				<description><![CDATA[Menu <em>22</em>]]></description>
+			</channel>
+			<channel id="faultCode" typeId="qflag-switch">
+				<label>Fault Code Record</label>
+				<description><![CDATA[Menu <em>25</em>]]></description>
+			</channel>
+		</channels>
+	</channel-group-type>
+</thing:thing-descriptions>
