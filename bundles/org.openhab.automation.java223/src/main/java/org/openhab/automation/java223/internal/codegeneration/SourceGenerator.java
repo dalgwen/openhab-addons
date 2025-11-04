@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +39,9 @@ import java.util.stream.Stream;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.annotation.RuleAction;
+import org.openhab.core.automation.type.ActionType;
+import org.openhab.core.automation.type.ModuleTypeRegistry;
+import org.openhab.core.automation.type.Output;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.ItemRegistry;
@@ -74,6 +78,7 @@ public class SourceGenerator {
 
     private final ItemRegistry itemRegistry;
     private final ThingRegistry thingRegistry;
+    private final ModuleTypeRegistry moduleTypeRegistry;
     private final BundleContext bundleContext;
 
     private final SourceWriter sourceWriter;
@@ -104,10 +109,11 @@ public class SourceGenerator {
      */
     public SourceGenerator(SourceWriter sourceWriter, DependencyGenerator dependencyGenerator,
             InjectedCodeGenerator injectedCodeGenerator, ItemRegistry itemRegistry, ThingRegistry thingRegistry,
-            BundleContext bundleContext) {
+            ModuleTypeRegistry moduleTypeRegistry, BundleContext bundleContext) {
         this.sourceWriter = sourceWriter;
         this.itemRegistry = itemRegistry;
         this.thingRegistry = thingRegistry;
+        this.moduleTypeRegistry = moduleTypeRegistry;
         this.bundleContext = bundleContext;
         this.dependencyGenerator = dependencyGenerator;
         this.injectedCodeGenerator = injectedCodeGenerator;
@@ -227,6 +233,7 @@ public class SourceGenerator {
     private Void internalGenerateActions() throws IOException, TemplateException {
         logger.debug("Generating actions");
         List<ThingActions> thingActions;
+        Collection<ActionType> actions = moduleTypeRegistry.getActions();
         try {
             Set<Class<?>> classes = new HashSet<>();
             thingActions = bundleContext.getServiceReferences(ThingActions.class, null).stream()
@@ -271,14 +278,14 @@ public class SourceGenerator {
             for (Method method : methods) {
                 String name = method.getName();
                 String returnValue = parseArgumentType(method.getGenericReturnType(), classesToImport);
+                ActionType actionType = findActionType(actions, scope, name);
 
-                List<String> parametersType = Arrays.stream(method.getGenericParameterTypes())
-                        .map(pt -> parseArgumentType(pt, classesToImport)).toList();
-                List<String> parametersClass = Arrays.stream(method.getParameterTypes())
-                        .map(pt -> parseArgumentType(pt, classesToImport)).toList();
+                List<ParameterDTO> parameters = mergeParameterInfos(method, actionType, classesToImport);
 
-                MethodDTO methodDTO = new MethodDTO(returnValue, name, parametersType, parametersClass);
-                logger.trace("Found method '{}' with parameters '{}' and return value '{}'.", name, parametersType,
+                List<Output> outputs = actionType == null ? Collections.emptyList() : actionType.getOutputs();
+                String description = actionType == null ? "" : safe(actionType.getDescription());
+                MethodDTO methodDTO = new MethodDTO(returnValue, outputs, name, description, parameters);
+                logger.trace("Found method '{}' with parameters '{}' and return value '{}'.", name, parameters,
                         returnValue);
 
                 methodsDTO.add(methodDTO);
@@ -328,6 +335,61 @@ public class SourceGenerator {
         cleanOldGeneratedThingActionsFiles(newlyGeneratedThingActionsFiles);
 
         return null;
+    }
+
+    private @Nullable ActionType findActionType(Collection<ActionType> actions, String scope, String name) {
+        for (ActionType actionType : actions) {
+            String shouldStartWith = scope + "." + name + "#";
+            if (actionType.getUID().startsWith(shouldStartWith)) {
+                return actionType;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Build parameters DTO for method generation
+     * 
+     * @param method The method to inspect
+     * @param actionType The action, found in the module registry
+     * @param classesToImport This method will add to this set all classes to import in the generated code.
+     * @return All parameters in a convenient DTO format
+     */
+    private List<ParameterDTO> mergeParameterInfos(Method method, @Nullable ActionType actionType,
+            Set<String> classesToImport) {
+        List<String> parametersType = Arrays.stream(method.getGenericParameterTypes())
+                .map(pt -> parseArgumentType(pt, classesToImport)).toList();
+        List<String> parametersClass = Arrays.stream(method.getParameterTypes())
+                .map(pt -> parseArgumentType(pt, classesToImport)).toList();
+
+        if (parametersType.size() != parametersClass.size()) {
+            throw new IllegalArgumentException(
+                    "The number of parameters type and class doesn't match. Shouldn't happen. Method: "
+                            + method.getName());
+        }
+
+        List<ParameterDTO> parameters = new ArrayList<>(parametersType.size());
+        for (int i = 0; i < parametersType.size(); i++) {
+            String name = null;
+            String description = null;
+            if (actionType != null) {
+                try {
+                    name = actionType.getInputs().get(i).getName();
+                    description = actionType.getInputs().get(i).getDescription();
+                } catch (IndexOutOfBoundsException e) {
+                    logger.warn(
+                            "Inputs found in module registry and real Action class doesn't have the same parameter number!");
+                }
+            }
+            parameters.add(
+                    new ParameterDTO(parametersType.get(i), parametersClass.get(i), safe(name), safe(description)));
+        }
+
+        return parameters;
+    }
+
+    private String safe(@Nullable String s) {
+        return s == null ? "" : s;
     }
 
     public void cleanGeneratedFiles(Path directory) throws IOException {
@@ -470,8 +532,11 @@ public class SourceGenerator {
         return lastDotIndex == -1 ? Optional.empty() : Optional.of(fullName.substring(lastDotIndex + 1));
     }
 
-    public record MethodDTO(String returnValueType, String name, List<String> parameterTypes,
-            List<String> nonGenericParameterTypes) {
+    public record MethodDTO(String returnValueType, List<Output> outputs, String name, String description,
+            List<ParameterDTO> parameters) {
+    }
+
+    public record ParameterDTO(String type, String nonGenericType, String name, String description) {
     }
 
     public record InternalGenerator(Callable<@Nullable Void> generator, String generatedFileName) {

@@ -44,6 +44,7 @@ import org.openhab.automation.java223.internal.strategy.Java223Strategy;
 import org.openhab.automation.java223.internal.strategy.ScriptWrappingStrategy;
 import org.openhab.core.automation.module.script.ScriptDependencyTracker;
 import org.openhab.core.automation.module.script.ScriptEngineFactory;
+import org.openhab.core.automation.type.ModuleTypeRegistry;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.events.Event;
 import org.openhab.core.events.EventSubscriber;
@@ -112,7 +113,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
     public Java223ScriptEngineFactory(BundleContext bundleContext, Map<String, Object> properties,
             @Reference(target = WatchService.CONFIG_WATCHER_FILTER) WatchService watchService,
             @Reference ItemRegistry itemRegistry, @Reference ThingRegistry thingRegistry,
-            @Reference Java223DependencyTracker dependencyTracker,
+            @Reference ModuleTypeRegistry moduleTypeRegistry, @Reference Java223DependencyTracker dependencyTracker,
             @Reference InjectedCodeGenerator injectedCodeGenerator, @Reference ServiceGetter serviceGetter) {
 
         try {
@@ -147,7 +148,7 @@ public class Java223ScriptEngineFactory extends JavaScriptEngineFactory
                     additionalClassesConfig, bundleContext);
             this.sourceWriter = new SourceWriter(LIB_DIR);
             this.sourceGenerator = new SourceGenerator(sourceWriter, dependencyGenerator, injectedCodeGenerator,
-                    itemRegistry, thingRegistry, bundleContext);
+                    itemRegistry, thingRegistry, moduleTypeRegistry, bundleContext);
             generateOrDeleteHelpers();
         } catch (IOException e) {
             throw new Java223Exception("Cannot create or delete helper library / class files in lib directory", e);

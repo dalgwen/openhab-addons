@@ -34,25 +34,28 @@ public class ${simpleClassName} {
     }
 
 <#list methods as method><#if (method.returnValueType() != "void")>
+    /**
+    * ${method.description()}<#list method.parameters() as parameter>
+    * @param ${parameter.name()} ${parameter.description()}</#list>
+    <#if (method.returnValueType() != "void")>* @return <#list method.outputs() as output> ${output.name} - ${output.description}<#sep> # </#list></#if>
+    */
     @SuppressWarnings("unchecked")</#if>
-    public ${method.returnValueType()} ${method.name()}(<#list method.parameterTypes() as parameter>${parameter} p${parameter?counter}<#sep>, </#list>) {
+    public ${method.returnValueType()} ${method.name()}(<#list method.parameters() as parameter>${parameter.type()} ${parameter.name()}<#sep>, </#list>) {
         if (thingActions == null) {
             thingActions = scriptThingActions.get(SCOPE, thingUID);
             if (thingActions == null) {
                 throw new Java223Exception("Action is null. Thing " + thingUID + " may be of the wrong type, or not initialized ?");
             }
         }
-        
+
         try {
             Class<?> thingActionClass = thingActions.getClass();
-<#if (method.parameterTypes()?size > 0)>
-            Method method = thingActionClass.getMethod("${method.name()}", <#list method.nonGenericParameterTypes() as parameter>${parameter}.class<#sep>, </#list>);
-            <#if (method.returnValueType() != "void")>@SuppressWarnings("unused")
-            Object returnValue = </#if>method.invoke(thingActions, <#list 1..method.parameterTypes()?size as i>p${i}<#sep>, </#list>);
+<#if (method.parameters()?size > 0)>
+            Method method = thingActionClass.getMethod("${method.name()}", <#list method.parameters() as parameter>${parameter.nonGenericType()}.class<#sep>, </#list>);
+            <#if (method.returnValueType() != "void")>Object returnValue = </#if>method.invoke(thingActions, <#list method.parameters() as parameter>${parameter.name()}<#sep>, </#list>);
 <#else>
             Method method = thingActionClass.getMethod("${method.name()}");
-            <#if (method.returnValueType() != "void")>@SuppressWarnings("unused")
-            Object returnValue = </#if>method.invoke(thingActions);
+            <#if (method.returnValueType() != "void")>Object returnValue = </#if>method.invoke(thingActions);
 </#if>
 <#if (method.returnValueType() != "void")>
             return (${method.returnValueType()}) returnValue;
