@@ -33,12 +33,12 @@ public class ${simpleClassName} {
         this.thingUID = thingUID;
     }
 
-<#list methods as method><#if (method.returnValueType() != "void")>
+<#list methods as method>
     /**
     * ${method.description()}<#list method.parameters() as parameter>
-    * @param ${parameter.name()} ${parameter.description()}</#list>
-    <#if (method.returnValueType() != "void")>* @return <#list method.outputs() as output> ${output.name} - ${output.description}<#sep> # </#list></#if>
-    */
+    * @param ${parameter.name()} ${parameter.description()}</#list><#if (method.returnValueType() != "void")>
+    * @return <#list method.outputs() as output> ${output.name} - ${output.description}<#sep> # </#list></#if>
+    */<#if (method.returnValueType() != "void") && method.returnValueType()?contains("<")>
     @SuppressWarnings("unchecked")</#if>
     public ${method.returnValueType()} ${method.name()}(<#list method.parameters() as parameter>${parameter.type()} ${parameter.name()}<#sep>, </#list>) {
         if (thingActions == null) {
