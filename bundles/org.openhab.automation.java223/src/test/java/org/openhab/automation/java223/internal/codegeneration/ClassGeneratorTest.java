@@ -70,7 +70,7 @@ public class ClassGeneratorTest {
 
     public static class FakeType implements Type {
 
-        private String type;
+        private final String type;
 
         public FakeType(String type) {
             this.type = type;

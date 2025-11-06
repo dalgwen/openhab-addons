@@ -16,15 +16,23 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import helper.rules.annotations.Debounce;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
@@ -44,11 +52,19 @@ import org.slf4j.LoggerFactory;
 public class Java223Rule extends SimpleRule {
 
     Logger logger = LoggerFactory.getLogger(Java223Rule.class);
+    private static final ZonedDateTime OLD = ZonedDateTime.of(2000, 1, 1, 1, 1, 1, 0, ZoneId.systemDefault());
 
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
 
     private final BiFunction<Action, Map<String, Object>, @Nullable Object> codeToExecute;
+    @Nullable
+    private final Debounce debounce;
+    @Nullable
+    private ZonedDateTime executionTimeStamp= null;
+    @Nullable
+    private ScheduledFuture<@Nullable Object> futureAction;
+    private final ScheduledExecutorService execService = Executors.newScheduledThreadPool(2);
 
     public void setUid(String uid) {
         if (!uid.isBlank()) {
@@ -57,23 +73,23 @@ public class Java223Rule extends SimpleRule {
     }
 
     @Nullable
-    public Object execute(SimpleRule simpleRule, Action module, Map<String, Object> inputs) {
+    public Object fieldExecution(SimpleRule simpleRule, Action module, Map<String, Object> inputs) {
         return simpleRule.execute(module, inputs);
     }
 
     @Nullable
-    public Object execute(Function<Map<String, Object>, Object> function, Map<String, Object> inputs) {
+    public Object fieldExecution(Function<Map<String, Object>, Object> function, Map<String, Object> inputs) {
         return function.apply(inputs);
     }
 
     @Nullable
-    public Object execute(BiFunction<Action, Map<String, Object>, Object> function, Action module,
-            Map<String, Object> inputs) {
+    public Object fieldExecution(BiFunction<Action, Map<String, Object>, Object> function, Action module,
+                                 Map<String, Object> inputs) {
         return function.apply(module, inputs);
     }
 
     @Nullable
-    public Object execute(Callable<Object> callable) {
+    public Object fieldExecution(Callable<Object> callable) {
         try {
             return callable.call();
         } catch (Exception e) {
@@ -82,21 +98,26 @@ public class Java223Rule extends SimpleRule {
     }
 
     @Nullable
-    public Object execute(Runnable runnable) {
+    public Object fieldExecution(Runnable runnable) {
         runnable.run();
         return null;
     }
 
     @Nullable
-    public Object execute(Consumer<Map<String, Object>> consumer, Map<String, Object> inputs) {
+    public Object fieldExecution(Consumer<Map<String, Object>> consumer, Map<String, Object> inputs) {
         consumer.accept(inputs);
         return null;
     }
 
     @Nullable
-    public Object execute(BiConsumer<Action, Map<String, Object>> consumer, Action module, Map<String, Object> inputs) {
+    public Object fieldExecution(BiConsumer<Action, Map<String, Object>> consumer, Action module, Map<String, Object> inputs) {
         consumer.accept(module, inputs);
         return null;
+    }
+
+    public Java223Rule( BiFunction<Action, Map<String, Object>, @Nullable Object> code, Debounce debounce) {
+        this.codeToExecute = code;
+        this.debounce = debounce;
     }
 
     /**
@@ -107,13 +128,15 @@ public class Java223Rule extends SimpleRule {
      */
     public Java223Rule(Object script, Method method) {
         Parameter[] parameters = method.getParameters();
-        codeToExecute = (module, inputs) -> {
+       this.debounce = method.getAnnotation(Debounce.class);
+       this.codeToExecute = (module, inputs) -> {
             try {
                 if (method.getParameters().length == 0) {
                     return method.invoke(script);
                 } else {
                     Object @Nullable [] parameterValues = new Object @Nullable [parameters.length];
                     for (int i = 0; i < parameters.length; i++) {
+                        // special case for injecting the module
                         if (parameters[i].getType().equals(Action.class)) {
                             parameterValues[i] = module;
                         } else {
@@ -143,14 +166,14 @@ public class Java223Rule extends SimpleRule {
     @SuppressWarnings({ "unchecked" })
     public Java223Rule(Object script, Field fieldMember) throws RuleParserException {
         Class<?> fieldType = fieldMember.getType();
-
+        this.debounce = fieldMember.getAnnotation(Debounce.class);
         if (ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().noneMatch(fieldType::isAssignableFrom)) {
             throw new RuleParserException("Field member " + fieldMember.getName() + " cannot be of class " + fieldType
                     + ". Must be " + ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().map(Class::getSimpleName)
                             .collect(Collectors.joining(" or ")));
         }
 
-        codeToExecute = (module, inputs) -> {
+        this.codeToExecute = (module, inputs) -> {
             Object objectToExecute;
             try {
                 objectToExecute = fieldMember.get(script);
@@ -161,13 +184,13 @@ public class Java223Rule extends SimpleRule {
             return switch (objectToExecute) {
                 case null ->
                         throw new Java223Exception("Field " + fieldMember.getName() + " is null. Cannot execute anything");
-                case SimpleRule simpleRule -> execute(simpleRule, module, inputs);
-                case Function<?, ?> function -> execute((Function<Map<String, Object>, Object>) function, inputs);
-                case BiFunction<?, ?, ?> bifunction -> execute((BiFunction<Action, Map<String, Object>, Object>) bifunction, module, inputs);
-                case Callable<?> callable -> execute((Callable<Object>) callable);
-                case Runnable runnable -> execute(runnable);
-                case Consumer<?> consumer -> execute((Consumer<Map<String, Object>>) consumer, inputs);
-                case BiConsumer<?, ?> biconsumer -> execute((BiConsumer<Action, Map<String, Object>>) biconsumer, module, inputs);
+                case SimpleRule simpleRule -> fieldExecution(simpleRule, module, inputs);
+                case Function<?, ?> function -> fieldExecution((Function<Map<String, Object>, Object>) function, inputs);
+                case BiFunction<?, ?, ?> bifunction -> fieldExecution((BiFunction<Action, Map<String, Object>, Object>) bifunction, module, inputs);
+                case Callable<?> callable -> fieldExecution((Callable<Object>) callable);
+                case Runnable runnable -> fieldExecution(runnable);
+                case Consumer<?> consumer -> fieldExecution((Consumer<Map<String, Object>>) consumer, inputs);
+                case BiConsumer<?, ?> biconsumer -> fieldExecution((BiConsumer<Action, Map<String, Object>>) biconsumer, module, inputs);
                 default -> throw new Java223Exception("Wrong type of field " + fieldType + ". Should not happen");
             };
         };
@@ -180,13 +203,75 @@ public class Java223Rule extends SimpleRule {
         ((Map<String, Object>) bindings).put("bindings", bindings);
         // actual call :
         try {
-            Object value = codeToExecute.apply(module, (Map<String, Object>) bindings);
-            return value != null ? value : "";
+            Debounce debounceLocal = debounce;
+            if (debounceLocal != null) {
+                debounceExecution(debounceLocal, module, (Map<String, Object>) bindings);
+                // as execution is in another thread, we cannot have the return value
+                return "";
+            } else {
+                var value = codeToExecute.apply(module, (Map<String, Object>) bindings);
+                return value != null ? value : "";
+            }
         } catch(Java223Exception e) {
             // why do we do this? Because openHAB sometimes doesn't log the full stack trace exception.
             // so we took care of it before rethrowing it as a raw exception.
             logger.error("Cannot execute action", e);
             throw new Java223Exception("Cannot execute action");
+        }
+    }
+
+    private void debounceExecution(Debounce debounce, Action module, Map<String, Object> bindings) {
+        ZonedDateTime now = ZonedDateTime.now();
+
+        switch (debounce.type()) {
+            case FIRST_ONLY -> {
+                // in this case, we will cancel all executions after the first, during the debouncing period.
+                ZonedDateTime lastExec = executionTimeStamp;
+                lastExec = lastExec != null ? lastExec : OLD;
+                if (lastExec.plus(debounce.value(), ChronoUnit.MILLIS).isBefore(now)) {
+                    executionTimeStamp = now;
+                    // execute immediately in a separate thread to avoid blocking the rule execution. The
+                    // purpose of this is to debounce, so we assume the user doesn't want blocking behavior.
+                    execService.execute( () -> codeToExecute.apply(module, bindings));
+                } else {
+                    logger.debug("Debounced action (first only");
+                }
+            }
+            case LAST_ONLY -> {
+                // in this case, we will only execute the last action during the debouncing period.
+                // first compute the remaining delay. executionTimeStamp is the starting triggering event time.
+                long remainingDelay = debounce.value();
+                @Nullable ZonedDateTime startingExecTimeStamp = executionTimeStamp;
+                if (startingExecTimeStamp != null) {
+                    remainingDelay = debounce.value() - ChronoUnit.MILLIS.between(startingExecTimeStamp, now);
+                } else {
+                    executionTimeStamp = now;
+                }
+
+                // Second, cancel the previous scheduled action (if any)
+                @Nullable ScheduledFuture<@Nullable Object> futureActionLocal = futureAction;
+                if (futureActionLocal != null) {
+                    futureActionLocal.cancel(false);
+                }
+
+                // Third, schedule
+                futureAction = execService.schedule( () -> {
+                    futureAction = null;
+                    return codeToExecute.apply(module, bindings);
+                }, remainingDelay, TimeUnit.MILLISECONDS);
+            }
+            case STABLE -> {
+                // in this case, we will wait for a stable state (rule not triggered during the wanted delay)
+                // and execute the last one
+                @Nullable ScheduledFuture<@Nullable Object> futureActionLocal = futureAction;
+                if (futureActionLocal != null) {
+                    futureActionLocal.cancel(false);
+                }
+                futureAction = execService.schedule( () -> {
+                    futureAction = null;
+                    return codeToExecute.apply(module, bindings);
+                }, debounce.value(), TimeUnit.MILLISECONDS);
+            }
         }
     }
 }

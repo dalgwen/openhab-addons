@@ -290,7 +290,7 @@ Here are all functionalities of the helper-lib:
 - Pre-made event objects that you can use as a parameter in a rule are defined in the package `helper.rules.eventinfo`.
 - If you want all the triggering event input parameters in a map for a rule, you can use the parameter `Map<String, ?> bindings` as a rule method parameter.
 - You can set the `@Rule` annotation on a method, but also on many types of field containing code to execute, such as Function, Runnable... Take a look at the class `Java223Rule` for an exhaustive list of what is supported. You can even switch the value of the field containing code at runtime, thus making the code your rule execute even more dynamic.
-
+- A `@Debounce` annotation can be used to debounce between rule execution. Several types are available, look at the Javadoc for more information.
 
 ## Sharing values
 
