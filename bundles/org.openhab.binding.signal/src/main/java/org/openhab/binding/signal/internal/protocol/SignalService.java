@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2024 Contributors to the openHAB project
+ * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -168,7 +168,7 @@ public class SignalService {
             } catch (AccountCheckException e) {
                 throw new IOException(e);
             } catch (NoClassDefFoundError e) {
-                String message = "Cannot find class " + e.getMessage() +  ". Report error";
+                String message = "Cannot find class " + e.getMessage() + ". Report error";
                 throw new ClassNotFoundException(message, e);
             }
             this.manager = newManager;
@@ -303,8 +303,8 @@ public class SignalService {
         try {
             List<String> attachments = attachment == null ? List.of() : List.of(attachment);
             sendResults = managerFinal.sendMessage(
-                    new Message(message, attachments, false, Collections.emptyList(), Optional.empty(), Optional.empty(),
-                            Collections.emptyList(), Optional.empty(), List.of()),
+                    new Message(message, attachments, false, Collections.emptyList(), Optional.empty(),
+                            Optional.empty(), Collections.emptyList(), Optional.empty(), List.of()),
                     Collections.singleton(recipient), notify);
         } catch (IOException | AttachmentInvalidException | NotAGroupMemberException | GroupNotFoundException
                 | GroupSendingNotAllowedException | UnregisteredRecipientException | InvalidStickerException e) {
@@ -318,11 +318,11 @@ public class SignalService {
                 if (!result.isSuccess()) {
                     logger.warn("Cannot send message to {}, cause {}", address,
                             result.isIdentityFailure() ? "identity"
-                            : result.isInvalidPreKeyFailure() ? "prekey"
-                            : result.isNetworkFailure() ? "network"
-                            : result.isRateLimitFailure() ? "rate"
-                            : result.isUnregisteredFailure() ? "recipient unregistered"
-                            : "unknown");
+                                    : result.isInvalidPreKeyFailure() ? "prekey"
+                                            : result.isNetworkFailure() ? "network"
+                                                    : result.isRateLimitFailure() ? "rate"
+                                                            : result.isUnregisteredFailure() ? "recipient unregistered"
+                                                                    : "unknown");
                     return new DeliveryReport(DeliveryStatus.FAILED, address);
                 }
             }
