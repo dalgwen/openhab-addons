@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2024 Contributors to the openHAB project
+ * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -53,9 +53,10 @@ public class SignalActions implements ThingActions {
     }
 
     @RuleAction(label = "Send Message With Signal", description = "Send a message with Signal")
-    public @ActionOutputs({@ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignal(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
+    public @ActionOutputs({
+            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending") }) Map<String, Object> sendSignal(
+                    @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
+                    @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
         Map<String, Object> resultMap = new HashMap<>();
         if (recipient != null && !recipient.isEmpty() && message != null) {
             DeliveryReport report = handler.send(recipient, message);
@@ -87,10 +88,11 @@ public class SignalActions implements ThingActions {
     }
 
     @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
-    public @ActionOutputs({@ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignalImage(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
-            @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
+    public @ActionOutputs({
+            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending") }) Map<String, Object> sendSignalImage(
+                    @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
+                    @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
+                    @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
         Map<String, Object> resultMap = new HashMap<>();
 
         if (recipient != null && !recipient.isEmpty() && image != null) {
