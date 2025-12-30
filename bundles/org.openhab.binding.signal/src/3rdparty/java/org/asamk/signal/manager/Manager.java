@@ -162,6 +162,8 @@ public interface Manager extends Closeable {
 
     List<Group> getGroups();
 
+    List<Group> getGroups(Collection<GroupId> groupIds);
+
     SendGroupMessageResults quitGroup(
             GroupId groupId,
             Set<RecipientIdentifier.Single> groupAdmins
@@ -216,6 +218,7 @@ public interface Manager extends Closeable {
             RecipientIdentifier.Single targetAuthor,
             long targetSentTimestamp,
             Set<RecipientIdentifier> recipients,
+            final boolean notifySelf,
             final boolean isStory
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException;
 
@@ -231,6 +234,29 @@ public interface Manager extends Closeable {
             MessageEnvelope.Sync.MessageRequestResponse.Type type,
             Set<RecipientIdentifier> recipientIdentifiers
     );
+
+    SendMessageResults sendPollCreateMessage(
+            final String question,
+            final boolean allowMultiple,
+            final List<String> options,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException;
+
+    SendMessageResults sendPollVoteMessage(
+            final RecipientIdentifier.Single targetAuthor,
+            final long targetSentTimestamp,
+            final List<Integer> optionIndexes,
+            final int voteCount,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException;
+
+    SendMessageResults sendPollTerminateMessage(
+            final long targetSentTimestamp,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException;
 
     void hideRecipient(RecipientIdentifier.Single recipient);
 
