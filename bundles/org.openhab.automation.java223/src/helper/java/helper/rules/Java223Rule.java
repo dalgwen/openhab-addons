@@ -36,6 +36,7 @@ import helper.rules.annotations.Debounce;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
+import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -200,7 +201,7 @@ public class Java223Rule extends SimpleRule {
     @Override
     public Object execute(Action module, Map<String, ?> bindings) {
         // special self reference :
-        ((Map<String, Object>) bindings).put("bindings", bindings);
+        ((Map<String, Object>) bindings).put(Java223Constants.BINDINGS, bindings);
         // actual call :
         try {
             Debounce debounceLocal = debounce;

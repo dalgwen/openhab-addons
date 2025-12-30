@@ -12,6 +12,7 @@
  */
 package org.openhab.automation.java223.internal.strategy;
 
+import static org.openhab.automation.java223.common.Java223Constants.BINDINGS;
 import static org.openhab.automation.java223.common.Java223Constants.LIB_DIR;
 
 import java.io.IOException;
@@ -105,7 +106,7 @@ public class Java223Strategy
             Map<String, Object> bindings) {
         // adding a special self-reference to bindings: "bindings", to receive a map with all bindings
         // noinspection CollectionAddedToSelf
-        bindings.put("bindings", bindings);
+        bindings.put(BINDINGS, bindings);
         // adding a special service getter for the script to access OSGi services
         bindings.put(Java223Constants.SERVICE_GETTER, serviceGetter);
     }

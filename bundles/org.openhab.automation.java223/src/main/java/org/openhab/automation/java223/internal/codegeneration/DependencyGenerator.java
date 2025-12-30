@@ -51,9 +51,11 @@ public class DependencyGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyGenerator.class);
 
-    private static final Set<String> DEFAULT_DEPENDENCIES = Set.of("org.openhab.automation.java223.common",
+    private static final Set<String> DEFAULT_DEPENDENCIES = Set.of(
+            "org.openhab.automation.java223.common",
             "org.openhab.core.audio", "org.openhab.core.automation", "org.openhab.core.automation.events",
             "org.openhab.core.automation.util", "org.openhab.core.automation.module.script",
+            "org.openhab.core.automation.module.script.action",
             "org.openhab.core.automation.module.script.defaultscope",
             "org.openhab.core.automation.module.script.rulesupport.shared",
             "org.openhab.core.automation.module.script.rulesupport.shared.simple", "org.openhab.core.common",
@@ -69,6 +71,7 @@ public class DependencyGenerator {
     private static final Set<String> DEFAULT_CLASSES_DEPENDENCIES = Set.of("org.eclipse.jdt.annotation.NonNull",
             "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable",
             "org.eclipse.jdt.annotation.DefaultLocation", "org.slf4j.LoggerFactory", "org.slf4j.Logger",
+            "javax.measure.Quantity", "javax.measure.Unit",
             "org.slf4j.Marker", "javax.measure.spi.SystemOfUnits");
 
     private final Path libDir;
@@ -184,8 +187,8 @@ public class DependencyGenerator {
             return;
         }
         List<String> exportedPackages = Arrays.stream(exportPackage //
-                .split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) // split only on comma not in double quotes
-                .map(s -> s.split(";")[0]) // get only package name and drop uses, version, etc.
+                .split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) // split only on comma, not in double quotes
+                .map(s -> s.split(";")[0]) // get only the package name and drop uses, version, etc.
                 .map(b -> b.replace(".", "/")).toList();
         Set<String> dependenciesWithSlash = dependencies.stream().map(b -> b.replace(".", "/"))
                 .collect(Collectors.<String> toSet());

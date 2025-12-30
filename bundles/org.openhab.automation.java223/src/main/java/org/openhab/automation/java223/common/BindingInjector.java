@@ -203,10 +203,14 @@ public class BindingInjector {
         }
 
         // third, search for an osgi service
-        if (value == null) {
+        if (value == null && !found) {
             ServiceGetter serviceGetter = (ServiceGetter) bindings.get(Java223Constants.SERVICE_GETTER);
-            value = serviceGetter.getService(fieldType);
-            found = value != null;
+            if (serviceGetter == null) {
+                logger.trace("Cannot find a service getter in bindings. Probably in a rule action. Skipping service lookup");
+            } else {
+                value = serviceGetter.getService(fieldType);
+                found = value != null;
+            }
         }
 
         // fourth, check if it is mandatory
