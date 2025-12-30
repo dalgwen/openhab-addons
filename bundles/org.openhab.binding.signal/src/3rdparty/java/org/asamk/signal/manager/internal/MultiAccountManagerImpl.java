@@ -5,6 +5,8 @@ import org.asamk.signal.manager.MultiAccountManager;
 import org.asamk.signal.manager.ProvisioningManager;
 import org.asamk.signal.manager.RegistrationManager;
 import org.asamk.signal.manager.SignalAccountFiles;
+import org.asamk.signal.manager.api.AccountCheckException;
+import org.asamk.signal.manager.api.NotRegisteredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +52,7 @@ public class MultiAccountManagerImpl implements MultiAccountManager {
         }
     }
 
-    void addManager(final Manager m) {
+    private void addManager(final Manager m) {
         synchronized (managers) {
             if (managers.contains(m)) {
                 return;
@@ -95,7 +97,21 @@ public class MultiAccountManagerImpl implements MultiAccountManager {
     @Override
     public Manager getManager(final String number) {
         synchronized (managers) {
-            return managers.stream().filter(m -> m.getSelfNumber().equals(number)).findFirst().orElse(null);
+            final var manager = managers.stream()
+                    .filter(m -> m.getSelfNumber().equals(number))
+                    .findFirst()
+                    .orElse(null);
+            if (manager != null) {
+                return manager;
+            }
+            try {
+                final var newManager = signalAccountFiles.initManager(number);
+                managers.add(newManager);
+                return newManager;
+            } catch (IOException | NotRegisteredException | AccountCheckException e) {
+                logger.warn("Failed to load new manager", e);
+                return null;
+            }
         }
     }
 
@@ -123,10 +139,20 @@ public class MultiAccountManagerImpl implements MultiAccountManager {
 
     @Override
     public void close() {
+        final List<Thread> closeThreads;
         synchronized (managers) {
-            for (var m : new ArrayList<>(managers)) {
-                m.close();
+            closeThreads = new ArrayList<>(managers).stream()
+                    .map(m -> Thread.ofPlatform().name("manager-close-" + m.getSelfNumber()).start(m::close))
+                    .toList();
+        }
+
+        for (final var t : closeThreads) {
+            try {
+                t.join();
+            } catch (InterruptedException ignored) {
             }
+        }
+        synchronized (managers) {
             managers.clear();
         }
     }

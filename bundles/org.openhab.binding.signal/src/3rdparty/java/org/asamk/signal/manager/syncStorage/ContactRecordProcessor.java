@@ -172,16 +172,22 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
             e164 = firstNonEmpty(remote.e164, local.e164);
         }
 
+        final var remoteProfileKey = remote.profileKey.size() == 0
+                || KeyUtils.profileKeyOrNull(remote.profileKey.toByteArray()) == null
+                ? ByteString.EMPTY
+                : remote.profileKey;
         final var mergedBuilder = remote.newBuilder()
                 .aci(local.aci.isEmpty() ? remote.aci : local.aci)
+                .aciBinary(firstNonEmpty(local.aciBinary, remote.aciBinary))
                 .e164(e164)
                 .pni(pni)
+                .pniBinary(pni.isEmpty() ? ByteString.EMPTY : PNI.parseOrThrow(pni).toByteStringWithoutPrefix())
                 .givenName(profileGivenName)
                 .familyName(profileFamilyName)
                 .systemGivenName(account.isPrimaryDevice() ? local.systemGivenName : remote.systemGivenName)
                 .systemFamilyName(account.isPrimaryDevice() ? local.systemFamilyName : remote.systemFamilyName)
                 .systemNickname(remote.systemNickname)
-                .profileKey(firstNonEmpty(remote.profileKey, local.profileKey))
+                .profileKey(firstNonEmpty(remoteProfileKey, local.profileKey))
                 .username(firstNonEmpty(remote.username, local.username))
                 .identityState(identityState)
                 .identityKey(identityKey)
@@ -331,9 +337,16 @@ public class ContactRecordProcessor extends DefaultStorageRecordProcessor<Signal
     public int compare(SignalContactRecord lhsRecord, SignalContactRecord rhsRecord) {
         final var lhs = lhsRecord.getProto();
         final var rhs = rhsRecord.getProto();
-        if ((!lhs.aci.isEmpty() && Objects.equals(lhs.aci, rhs.aci)) || (
+        if ((
+                (!lhs.aci.isEmpty() && Objects.equals(lhs.aci, rhs.aci)) || (
+                        lhs.aciBinary.size() != 0 && Objects.equals(lhs.aciBinary, rhs.aciBinary)
+                )
+        ) || (
                 !lhs.e164.isEmpty() && Objects.equals(lhs.e164, rhs.e164)
-        ) || (!lhs.pni.isEmpty() && Objects.equals(lhs.pni, rhs.pni))) {
+        ) || (
+                (!lhs.pni.isEmpty() && Objects.equals(lhs.pni, rhs.pni) && lhs.pniBinary == rhs.pniBinary)
+                        || (lhs.pniBinary.size() != 0 && Objects.equals(lhs.pniBinary, rhs.pniBinary))
+        )) {
             return 0;
         } else {
             return 1;

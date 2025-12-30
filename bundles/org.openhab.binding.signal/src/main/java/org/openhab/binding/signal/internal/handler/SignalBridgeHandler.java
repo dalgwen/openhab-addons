@@ -170,11 +170,13 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
                 }
             }
         } catch (IncompleteRegistrationException e) {
+            logger.debug("Incomplete registration: {}", e.getMessage());
             String message = "Incomplete registration: " + e.getMessage();
             getConfig().remove(SignalBindingConstants.PROPERTY_QRCODE);
             checkScheduled.cancel(false);
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
         } catch (IOException e) {
+            logger.error("Error during initialization", e);
             String message = e.getClass().getSimpleName() + " - " + e.getMessage();
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
         } catch (ClassNotFoundException e) {

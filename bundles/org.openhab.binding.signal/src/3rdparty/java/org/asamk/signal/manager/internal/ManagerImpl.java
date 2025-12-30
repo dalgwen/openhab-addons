@@ -91,6 +91,7 @@ import org.asamk.signal.manager.util.KeyUtils;
 import org.asamk.signal.manager.util.MimeUtils;
 import org.asamk.signal.manager.util.PhoneNumberFormatter;
 import org.asamk.signal.manager.util.StickerUtils;
+import org.signal.core.util.Base64;
 import org.signal.libsignal.protocol.InvalidMessageException;
 import org.signal.libsignal.usernames.BaseUsernameException;
 import org.slf4j.Logger;
@@ -100,6 +101,7 @@ import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServicePreview;
 import org.whispersystems.signalservice.api.messages.SignalServiceReceiptMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceTypingMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.ServiceId.ACI;
 import org.whispersystems.signalservice.api.push.ServiceId.PNI;
@@ -113,10 +115,12 @@ import org.whispersystems.signalservice.internal.util.Hex;
 import org.whispersystems.signalservice.internal.util.Util;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -474,12 +478,30 @@ public class ManagerImpl implements Manager {
                     logger.debug("Failed to decrypt device name, maybe plain text?", e);
                 }
             }
+            final var createdAt = getPlaintextCreatedAt(d);
             return new Device(d.getId(),
                     deviceName,
-                    d.getCreated(),
+                    createdAt == null ? 0 : createdAt,
                     d.getLastSeen(),
                     d.getId() == account.getDeviceId());
         }).toList();
+    }
+
+    private Long getPlaintextCreatedAt(DeviceInfo d) {
+        final var DECRYPTION_INFO = "deviceCreatedAt";
+        var identityKey = account.getAciIdentityKeyPair().getPrivateKey();
+        try {
+
+            var associatedData = new ByteArrayOutputStream();
+            associatedData.write(d.getId());
+            associatedData.write(ByteBuffer.allocate(4).putInt(d.getRegistrationId()).array());
+            var createdAtPlaintext = identityKey.open(Base64.decode(d.getCreatedAtCiphertext()
+                    .getBytes(StandardCharsets.UTF_8)), DECRYPTION_INFO, associatedData.toByteArray());
+            return ByteBuffer.wrap(createdAtPlaintext).getLong();
+        } catch (Exception e) {
+            logger.warn("Failed while reading the protobuf.", e);
+            return null;
+        }
     }
 
     @Override
@@ -517,6 +539,11 @@ public class ManagerImpl implements Manager {
     @Override
     public List<Group> getGroups() {
         return context.getGroupHelper().getGroups().stream().map(this::toGroup).toList();
+    }
+
+    @Override
+    public List<Group> getGroups(Collection<GroupId> groupIds) {
+        return context.getGroupHelper().getGroups(groupIds).stream().map(this::toGroup).toList();
     }
 
     private Group toGroup(final GroupInfo groupInfo) {
@@ -733,11 +760,9 @@ public class ManagerImpl implements Manager {
             final var recipientId = context.getRecipientHelper().resolveRecipient(sender);
             final var result = context.getSendHelper().sendReceiptMessage(receiptMessage, recipientId);
 
-            final var serviceId = account.getRecipientAddressResolver()
-                    .resolveRecipientAddress(recipientId)
-                    .serviceId();
-            if (serviceId.isPresent()) {
-                context.getSyncHelper().sendSyncReceiptMessage(serviceId.get(), receiptMessage);
+            final var aci = account.getRecipientAddressResolver().resolveRecipientAddress(recipientId).aci();
+            if (aci.isPresent()) {
+                context.getSyncHelper().sendSyncReceiptMessage(aci.get(), receiptMessage);
             }
             return new SendMessageResults(timestamp, Map.of(sender, List.of(toSendMessageResult(result))));
         } catch (UnregisteredRecipientException e) {
@@ -936,6 +961,7 @@ public class ManagerImpl implements Manager {
             RecipientIdentifier.Single targetAuthor,
             long targetSentTimestamp,
             Set<RecipientIdentifier> recipients,
+            final boolean notifySelf,
             final boolean isStory
     ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException {
         var targetAuthorRecipientId = context.getRecipientHelper().resolveRecipient(targetAuthor);
@@ -948,7 +974,7 @@ public class ManagerImpl implements Manager {
             messageBuilder.withStoryContext(new SignalServiceDataMessage.StoryContext(authorServiceId,
                     targetSentTimestamp));
         }
-        return sendMessage(messageBuilder, recipients, false);
+        return sendMessage(messageBuilder, recipients, notifySelf);
     }
 
     @Override
@@ -1033,11 +1059,55 @@ public class ManagerImpl implements Manager {
     }
 
     @Override
+    public SendMessageResults sendPollCreateMessage(
+            final String question,
+            final boolean allowMultiple,
+            final List<String> options,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException {
+        final var pollCreate = new SignalServiceDataMessage.PollCreate(question, allowMultiple, options);
+        final var messageBuilder = SignalServiceDataMessage.newBuilder().withPollCreate(pollCreate);
+        return sendMessage(messageBuilder, recipients, notifySelf);
+    }
+
+    @Override
+    public SendMessageResults sendPollVoteMessage(
+            final RecipientIdentifier.Single targetAuthor,
+            final long targetSentTimestamp,
+            final List<Integer> optionIndexes,
+            final int voteCount,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException {
+        final var targetAuthorRecipientId = context.getRecipientHelper().resolveRecipient(targetAuthor);
+        final var authorServiceId = context.getRecipientHelper()
+                .resolveSignalServiceAddress(targetAuthorRecipientId)
+                .getServiceId();
+        final var pollVote = new SignalServiceDataMessage.PollVote(authorServiceId,
+                targetSentTimestamp,
+                optionIndexes,
+                voteCount);
+        final var messageBuilder = SignalServiceDataMessage.newBuilder().withPollVote(pollVote);
+        return sendMessage(messageBuilder, recipients, notifySelf);
+    }
+
+    @Override
+    public SendMessageResults sendPollTerminateMessage(
+            final long targetSentTimestamp,
+            final Set<RecipientIdentifier> recipients,
+            final boolean notifySelf
+    ) throws IOException, NotAGroupMemberException, GroupNotFoundException, GroupSendingNotAllowedException, UnregisteredRecipientException {
+        final var pollTerminate = new SignalServiceDataMessage.PollTerminate(targetSentTimestamp);
+        final var messageBuilder = SignalServiceDataMessage.newBuilder().withPollTerminate(pollTerminate);
+        return sendMessage(messageBuilder, recipients, notifySelf);
+    }
+
+    @Override
     public void hideRecipient(final RecipientIdentifier.Single recipient) {
         final var recipientIdOptional = context.getRecipientHelper().resolveRecipientOptional(recipient);
         if (recipientIdOptional.isPresent()) {
             context.getContactHelper().setContactHidden(recipientIdOptional.get(), true);
-            account.removeRecipient(recipientIdOptional.get());
             syncRemoteStorage();
         }
     }
@@ -1313,7 +1383,7 @@ public class ManagerImpl implements Manager {
             Optional<Integer> maxMessages,
             ReceiveMessageHandler handler
     ) throws IOException, AlreadyReceivingException {
-        receiveMessages(timeout.orElse(Duration.ofMinutes(1)), timeout.isPresent(), maxMessages.orElse(null), handler);
+        receiveMessages(timeout, maxMessages.orElse(null), handler);
     }
 
     @Override
@@ -1331,8 +1401,7 @@ public class ManagerImpl implements Manager {
     }
 
     private void receiveMessages(
-            Duration timeout,
-            boolean returnOnTimeout,
+            Optional<Duration> timeout,
             Integer maxMessages,
             ReceiveMessageHandler handler
     ) throws IOException, AlreadyReceivingException {
@@ -1344,7 +1413,7 @@ public class ManagerImpl implements Manager {
             receiveThread = Thread.currentThread();
         }
         try {
-            context.getReceiveHelper().receiveMessages(timeout, returnOnTimeout, maxMessages, (envelope, e) -> {
+            context.getReceiveHelper().receiveMessages(timeout, maxMessages, (envelope, e) -> {
                 passReceivedMessageToHandlers(envelope, e);
                 handler.handleMessage(envelope, e);
             });

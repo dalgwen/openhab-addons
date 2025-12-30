@@ -86,7 +86,7 @@ public class SyncHelper {
                 .sendSyncMessage(SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.STORAGE_MANIFEST));
     }
 
-    public void sendSyncReceiptMessage(ServiceId sender, SignalServiceReceiptMessage receiptMessage) {
+    public void sendSyncReceiptMessage(ServiceId.ACI sender, SignalServiceReceiptMessage receiptMessage) {
         if (receiptMessage.isReadReceipt()) {
             final var readMessages = receiptMessage.getTimestamps()
                     .stream()
@@ -154,7 +154,7 @@ public class SyncHelper {
 
         try {
             try (OutputStream fos = new FileOutputStream(contactsFile)) {
-                var out = new DeviceContactsOutputStream(fos);
+                var out = new DeviceContactsOutputStream(fos, false, true);
                 for (var contactPair : account.getContactStore().getContacts()) {
                     final var recipientId = contactPair.first();
                     final var contact = contactPair.second();
