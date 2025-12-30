@@ -15,7 +15,10 @@ import org.whispersystems.signalservice.api.crypto.SealedSenderAccess;
 import org.whispersystems.signalservice.api.crypto.UnidentifiedAccess;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.asamk.signal.manager.util.Utils.handleResponseException;
@@ -56,8 +59,15 @@ public class UnidentifiedAccessHelper {
         return SealedSenderAccess.forIndividual(getAccessFor(recipient, noRefresh));
     }
 
-    public List<UnidentifiedAccess> getAccessFor(List<RecipientId> recipients) {
-        return recipients.stream().map(this::getAccessFor).toList();
+    public Map<RecipientId, UnidentifiedAccess> getAccessFor(Collection<RecipientId> recipients) {
+        final var result = new HashMap<RecipientId, UnidentifiedAccess>();
+        for (final var recipient : recipients) {
+            final var access = this.getAccessFor(recipient);
+            if (access != null) {
+                result.put(recipient, access);
+            }
+        }
+        return result;
     }
 
     private @Nullable UnidentifiedAccess getAccessFor(RecipientId recipient) {
@@ -84,16 +94,17 @@ public class UnidentifiedAccessHelper {
         }
 
         try {
-            return new UnidentifiedAccess(recipientUnidentifiedAccessKey, senderCertificate, false);
+            return new UnidentifiedAccess(recipientUnidentifiedAccessKey, senderCertificate.getSerialized(), false);
         } catch (InvalidCertificateException e) {
             return null;
         }
     }
 
-    private byte[] getSenderCertificateFor(final RecipientId recipientId) {
+    public SenderCertificate getSenderCertificateFor(final RecipientId recipientId) {
         final var sharingMode = account.getConfigurationStore().getPhoneNumberSharingMode();
         if (sharingMode == PhoneNumberSharingMode.EVERYBODY || (
-                sharingMode == PhoneNumberSharingMode.CONTACTS
+                recipientId != null
+                        && sharingMode == PhoneNumberSharingMode.CONTACTS
                         && account.getContactStore().getContact(recipientId) != null
         )) {
             logger.trace("Using normal sender certificate for message to {}", recipientId);
@@ -104,33 +115,33 @@ public class UnidentifiedAccessHelper {
         }
     }
 
-    private byte[] getSenderCertificateForPhoneNumberPrivacy() {
+    private SenderCertificate getSenderCertificateForPhoneNumberPrivacy() {
         if (privacySenderCertificate != null && System.currentTimeMillis() < (
                 privacySenderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER
         )) {
-            return privacySenderCertificate.getSerialized();
+            return privacySenderCertificate;
         }
         try {
             final var certificate = handleResponseException(dependencies.getCertificateApi()
                     .getSenderCertificateForPhoneNumberPrivacy());
             privacySenderCertificate = new SenderCertificate(certificate);
-            return certificate;
+            return privacySenderCertificate;
         } catch (IOException | InvalidCertificateException e) {
             logger.warn("Failed to get sender certificate (pnp), ignoring: {}", e.getMessage());
             return null;
         }
     }
 
-    private byte[] getSenderCertificate() {
+    private SenderCertificate getSenderCertificate() {
         if (senderCertificate != null && System.currentTimeMillis() < (
                 senderCertificate.getExpiration() - CERTIFICATE_EXPIRATION_BUFFER
         )) {
-            return senderCertificate.getSerialized();
+            return senderCertificate;
         }
         try {
             final var certificate = handleResponseException(dependencies.getCertificateApi().getSenderCertificate());
             this.senderCertificate = new SenderCertificate(certificate);
-            return certificate;
+            return senderCertificate;
         } catch (IOException | InvalidCertificateException e) {
             logger.warn("Failed to get sender certificate, ignoring: {}", e.getMessage());
             return null;

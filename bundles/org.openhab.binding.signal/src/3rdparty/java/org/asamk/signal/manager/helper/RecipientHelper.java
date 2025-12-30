@@ -95,7 +95,10 @@ public class RecipientHelper {
             try {
                 return resolveRecipientByUsernameOrLink(username, false);
             } catch (Exception e) {
-                return null;
+                throw new UnregisteredRecipientException(new org.asamk.signal.manager.api.RecipientAddress(null,
+                        null,
+                        null,
+                        username));
             }
         }
         throw new AssertionError("Unexpected RecipientIdentifier: " + recipient);
@@ -113,7 +116,8 @@ public class RecipientHelper {
         }
         if (forceRefresh) {
             try {
-                final var aci = handleResponseException(dependencies.getUsernameApi().getAciByUsername(finalUsername));
+                @SuppressWarnings("unchecked") final var aci = (ACI) handleResponseException(dependencies.getUsernameApi()
+                        .getAciByUsername(finalUsername));
                 return account.getRecipientStore().resolveRecipientTrusted(aci, finalUsername.getUsername());
             } catch (NonSuccessfulResponseCodeException e) {
                 if (e.code == 404) {
@@ -128,7 +132,9 @@ public class RecipientHelper {
         }
         return account.getRecipientStore().resolveRecipientByUsername(finalUsername.getUsername(), () -> {
             try {
-                return handleResponseException(dependencies.getUsernameApi().getAciByUsername(finalUsername));
+                @SuppressWarnings("unchecked") final var result = (ACI) handleResponseException(dependencies.getUsernameApi()
+                        .getAciByUsername(finalUsername));
+                return result;
             } catch (Exception e) {
                 return null;
             }
