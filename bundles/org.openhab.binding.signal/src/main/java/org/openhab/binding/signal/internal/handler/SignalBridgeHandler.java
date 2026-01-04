@@ -14,6 +14,7 @@ package org.openhab.binding.signal.internal.handler;
 
 import static org.openhab.binding.signal.internal.SignalBindingConstants.PHOTO_EXTENSIONS;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -45,6 +46,7 @@ import org.openhab.binding.signal.internal.protocol.MessageListener;
 import org.openhab.binding.signal.internal.protocol.ProvisionType;
 import org.openhab.binding.signal.internal.protocol.SignalService;
 import org.openhab.binding.signal.internal.protocol.StateListener;
+import org.openhab.core.OpenHAB;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -71,6 +73,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
     private final ThingTypeUID thingTypeUID;
 
     private HttpClient httpClient;
+
+    private static final String SIGNAL_DIRECTORY = "signal";
 
     public static final List<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = List.of(
             SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE,
@@ -116,7 +120,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
                 ? ProvisionType.LINKED
                 : ProvisionType.MAIN;
         try {
-            this.signalService = new SignalService(this, this, config.phoneNumber, config.captcha,
+            this.signalService = new SignalService(this, this, new File(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY), config.phoneNumber, config.captcha,
                     config.verificationCode, config.verificationCodeMethod, config.deviceName, provisionType,
                     config.userAgent);
         } catch (IOException e) {
