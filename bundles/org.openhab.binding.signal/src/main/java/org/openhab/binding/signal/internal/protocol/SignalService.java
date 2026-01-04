@@ -79,7 +79,6 @@ public class SignalService {
 
     private final Logger logger = LoggerFactory.getLogger(SignalService.class);
 
-    private static final String SIGNAL_DIRECTORY = "signal";
     private static final int MAX_BACKOFF_COUNTER = 9;
     public static final String DEFAULT_USER_AGENT = "Signal-Android/7.63.2 signal-cli";
     public static final String NOTE_TO_SELF = "SELF";
@@ -112,7 +111,7 @@ public class SignalService {
     private static SignalAccountFiles signalAccountsFiles = null;
     private static final ReentrantLock initializeLock = new ReentrantLock();
 
-    public SignalService(MessageListener messageListener, StateListener connectionStateListener, String phoneNumber,
+    public SignalService(MessageListener messageListener, StateListener connectionStateListener, File dataLocation, String phoneNumber,
             @Nullable String captcha, @Nullable String verificationCode,
             @Nullable RegistrationType verificationCodeMethod, String deviceName, ProvisionType provisionType,
             @Nullable String userAgent) throws IOException {
@@ -120,19 +119,18 @@ public class SignalService {
         this.connectionStateListener = connectionStateListener;
         this.phoneNumber = phoneNumber;
         this.captcha = captcha == null ? null : captcha.isBlank() ? null : captcha;
-        this.verificationCode = verificationCode == null ? verificationCode
-                : verificationCode.isBlank() ? null : verificationCode;
+        this.verificationCode = (verificationCode != null && !verificationCode.isBlank()) ? verificationCode : null;
         this.verificationCodeMethod = verificationCodeMethod == null ? RegistrationType.TextMessage
                 : verificationCodeMethod;
         this.deviceName = deviceName;
         this.provisionType = provisionType;
-        String resovedUserAgent = userAgent != null && !userAgent.isBlank() ? userAgent : DEFAULT_USER_AGENT;
+        String resolvedUserAgent = userAgent != null && !userAgent.isBlank() ? userAgent : DEFAULT_USER_AGENT;
 
         initializeLock.lock(); // class wide lock. init this just once :
         try {
             if (signalAccountsFiles == null) {
-                signalAccountsFiles = new SignalAccountFiles(new File(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY),
-                        SERVICE_ENVIRONMENT, resovedUserAgent, SETTINGS);
+                signalAccountsFiles = new SignalAccountFiles(dataLocation,
+                        SERVICE_ENVIRONMENT, resolvedUserAgent, SETTINGS);
             }
         } finally {
             initializeLock.unlock();
@@ -149,7 +147,7 @@ public class SignalService {
             }
             try {
                 newManager = signalAccountsFilesFinal.initManager(this.phoneNumber);
-                // ignore stories attachments, and send read receipt
+                // ignore stories attachments and send read receipt
                 newManager.setReceiveConfig(new ReceiveConfig(true, true, true));
             } catch (NotRegisteredException e) {
                 if (provisionType == ProvisionType.MAIN) {
