@@ -187,6 +187,14 @@
                         <exclude>/libsignal_jni.so</exclude>
                         <exclude>/libsignal_jni.dylib</exclude>
                         <exclude>/signal_jni.dll</exclude>
+            <exclude>/libsignal_jni_aarch64.dylib</exclude>
+            <exclude>/libsignal_jni_amd64.dylib</exclude>
+            <exclude>/libsignal_jni_amd64.so</exclude>
+            <exclude>/libsignal_jni_testing_aarch64.dylib</exclude>
+            <exclude>/libsignal_jni_testing_amd64.dylib</exclude>
+            <exclude>/libsignal_jni_testing_amd64.so</exclude>
+            <exclude>/signal_jni_amd64.dll</exclude>
+            <exclude>/signal_jni_testing_amd64.dll</exclude>
                     </excludes>
                 </configuration>
             </plugin>
