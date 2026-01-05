@@ -14,11 +14,10 @@
         <bundle start-level="80">mvn:com.googlecode.libphonenumber/libphonenumber/8.13.50</bundle>
         <bundle start-level="80">mvn:com.google.protobuf/protobuf-javalite/3.25.5</bundle>
         <bundle start-level="80">mvn:com.squareup.okhttp3/okhttp-jvm/5.2.1</bundle>
-        <bundle start-level="80">mvn:io.reactivex.rxjava3/rxjava/3.0.13</bundle>
         <bundle start-level="80">mvn:org.reactivestreams/reactive-streams/1.0.4</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-annotations/2.18.2</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-core/2.18.2</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-databind/2.18.2</bundle>
-
+        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-annotations/2.19.2</bundle>
+        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-core/2.19.2</bundle>
+        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-databind/2.19.2</bundle>
+        <bundle start-level="80">mvn:org.jetbrains.kotlin/kotlin-osgi-bundle/2.1.0</bundle>
 	</feature>
 </features>
