@@ -36,7 +36,7 @@ public @interface InjectBinding {
      *
      * @return If the binding should not be injected in the annotated element
      */
-    boolean enable() default true;
+    boolean disable() default false;
 
     /**
      * If set, use this name. Else try to get the name from the code.
@@ -53,8 +53,10 @@ public @interface InjectBinding {
     String preset() default ANNOTATION_DEFAULT;
 
     /**
-     * If true and no value to inject is found, the binding process will fail with an exception.
-     * If false, null value are allowed.
+     * If true and no value to inject are found, the binding process will fail with an exception.
+     * When using this annotation, "true" is the default.
+     * If you don't use the annotation, the parameter is NOT mandatory)
+     * If false, a null value is allowed.
      *
      * @return True if the value searched MUST be present in the openHAB binding
      */

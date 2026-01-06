@@ -29,8 +29,8 @@ import ch.obermuhlner.scriptengine.java.compilation.ScriptInterceptorStrategy;
  * Wraps a script in boilerplate code if not present.
  * Must respect some conditions to be wrapped correctly:
  * - must not contain "public class"
- * - line containing import must start with "import "
- * - you can globally return a value, but take care to put the "return " keyword at the beginning of its own line
+ * - line containing import must start with "import"
+ * - you can globally return a value, but take care to put the "return" keyword at the beginning of its own line
  * - you cannot declare a method (in fact, your script is already wrapped inside a method)
  *
  * @author Gwendal Roulleau - Initial contribution

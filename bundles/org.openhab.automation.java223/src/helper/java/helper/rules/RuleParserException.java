@@ -15,12 +15,15 @@ package helper.rules;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
+import java.io.Serial;
+
 /**
  * @author Gwendal Roulleau - Initial contribution
  */
 @NonNullByDefault
 public class RuleParserException extends Exception {
 
+    @Serial
     private static final long serialVersionUID = 5744217657057910494L;
 
     RuleParserException(String message, Throwable e) {

@@ -182,11 +182,11 @@ public class RuleAnnotationParser {
 
             // log everything
             if (logger.isDebugEnabled()) {
-                logger.debug("field {}", memberName);
-                logger.debug("@Rule(name = {}", ruleName);
+                logger.debug("Parsing result field {}", memberName);
+                logger.debug("Parsing result @Rule(name = {})", ruleName);
                 for (Trigger trigger : simpleRule.getTriggers()) {
-                    logger.debug("Trigger(id = {}, uid = {})", trigger.getId(), trigger.getTypeUID());
-                    logger.debug("Configuration: {}", trigger.getConfiguration());
+                    logger.debug("Parsing result Trigger(id = {}, uid = {})", trigger.getId(), trigger.getTypeUID());
+                    logger.debug("Parsing result Configuration: {}", trigger.getConfiguration());
                 }
             }
 

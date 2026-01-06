@@ -101,7 +101,6 @@ public class BindingInjector {
         }
     }
 
-    @SuppressWarnings({ "null", "unused" })
     private static @Nullable Object extractBindingValueForElement(ClassLoader classLoader, Map<String, Object> bindings,
             AnnotatedElement annotatedElement, Map<Class<?>, Object> libAlreadyInstantiated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
@@ -119,20 +118,21 @@ public class BindingInjector {
             return null;
         }
 
-        // step zero: exclusion case
+        // step zero: exclusion cases
         if (fieldType.isArray() || fieldType.isAnnotation()) {
             return null;
         }
-        InjectBinding injectBindingAnnotation = annotatedElement.getAnnotation(InjectBinding.class);
-        if (injectBindingAnnotation != null && !injectBindingAnnotation.enable()) {
+        Optional<InjectBinding> injectBindingAnnotation = Optional
+                .ofNullable(annotatedElement.getAnnotation(InjectBinding.class));
+        if (injectBindingAnnotation.isPresent() && injectBindingAnnotation.get().disable()) {
             return null;
         }
 
         // first, special case, is the field a library?
         if (containsLibrary(classLoader, fieldType.getName())) { // it's a library
             InjectBinding libraryAnnotation = fieldType.getAnnotation(InjectBinding.class);
-            if (libraryAnnotation != null && !libraryAnnotation.enable()) { // but it's disabled at class level
-                // no injection
+            if (libraryAnnotation != null && libraryAnnotation.disable()) { // but it's disabled at class level,
+                // so no injection
                 return null;
             }
             boolean recursive = libraryAnnotation == null || libraryAnnotation.recursive();
@@ -144,9 +144,9 @@ public class BindingInjector {
         // 2.a Choose a name to search as a key in the binding map
         // the name can be a path inside the object
         String named;
-        if (injectBindingAnnotation != null
-                && !injectBindingAnnotation.named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
-            named = injectBindingAnnotation.named();
+        if (injectBindingAnnotation.isPresent()
+                && !injectBindingAnnotation.get().named().equals(Java223Constants.ANNOTATION_DEFAULT)) {
+            named = injectBindingAnnotation.get().named();
         } else {
             named = codeName;
         }
@@ -155,16 +155,16 @@ public class BindingInjector {
         // 2.b, choose where to look: in bindings, or deeper, in a preset :
         Object value = bindings;
         boolean found = false;
-        if (injectBindingAnnotation != null
-                && !injectBindingAnnotation.preset().equals(Java223Constants.ANNOTATION_DEFAULT)) {
+        if (injectBindingAnnotation.isPresent()
+                && !injectBindingAnnotation.get().preset().equals(Java223Constants.ANNOTATION_DEFAULT)) {
             ScriptExtensionManagerWrapper se = (ScriptExtensionManagerWrapper) bindings.get("scriptExtension");
             if (se != null) {
-                Map<String, Object> presetMap = se.importPreset(injectBindingAnnotation.preset());
+                Map<String, Object> presetMap = se.importPreset(injectBindingAnnotation.get().preset());
                 if (!presetMap.isEmpty()) {
                     value = presetMap;
                 } else {
                     logger.warn("Cannot find the preset {} for the named parameter {}",
-                            injectBindingAnnotation.preset(), named);
+                            injectBindingAnnotation.get().preset(), named);
                 }
             } else {
                 logger.warn("Cannot find scriptExtension in bindings. Should not happen");
@@ -205,12 +205,14 @@ public class BindingInjector {
         // third, search for an osgi service
         if (value == null) {
             ServiceGetter serviceGetter = (ServiceGetter) bindings.get(Java223Constants.SERVICE_GETTER);
-            value = serviceGetter.getService(fieldType);
+            if (serviceGetter != null) {
+                value = serviceGetter.getService(fieldType);
+            }
             found = value != null;
         }
 
         // fourth, check if it is mandatory
-        if (!found && injectBindingAnnotation != null && injectBindingAnnotation.mandatory()) {
+        if (!found && injectBindingAnnotation.isPresent() && injectBindingAnnotation.get().mandatory()) {
             throw new Java223Exception("There is no value found for parameter/field named " + named
                     + ", but it is mandatory. We cannot inject it");
         } else if (value == null) {
@@ -229,6 +231,7 @@ public class BindingInjector {
     /**
      * Retrieves an existing instance of the specified type from cached bindings or creates a new instance
      * of the specified type if none exists. If a new instance is created, bindings are injected into it.
+     * Not used internally, but available for user scripting (utility method taking care of implementation quirk)
      *
      * @param <T> The type of the object to retrieve or instantiate
      * @param classLoader The origin script class loader
@@ -237,6 +240,7 @@ public class BindingInjector {
      * @return An instance of the specified type
      * @throws Java223Exception If an instance of the specified type cannot be instantiated
      */
+    @SuppressWarnings("unused")
     public static <T> T getOrInstantiateObject(ClassLoader classLoader, Map<String, Object> bindings,
             Class<T> fieldType) {
         try {
@@ -251,10 +255,11 @@ public class BindingInjector {
             throws InstantiationException, IllegalAccessException, InvocationTargetException {
         Object valueToInject = libAlreadyInstantiated.get(fieldType);
         if (valueToInject == null) { // not instantiated, create it
-            Constructor<?>[] constructors = (Constructor<?>[]) fieldType.getDeclaredConstructors();
+            Constructor<?>[] constructors = fieldType.getDeclaredConstructors();
             // use the empty constructor if available, or the first one
             Constructor<?> constructor = Arrays.stream(constructors).filter(c -> c.getParameterCount() == 0).findFirst()
                     .orElseGet(() -> constructors[0]);
+            @Nullable
             Object[] parameterValues = getParameterValuesFor(classLoader, constructor, bindings,
                     libAlreadyInstantiated);
             valueToInject = constructor.newInstance(parameterValues);
@@ -275,20 +280,20 @@ public class BindingInjector {
         return valueToInject1;
     }
 
+    // Check if a classLoader contains a library
     private static boolean containsLibrary(ClassLoader classLoader, String name) {
         // scripts are constructed by the Java223Strategy and by JavaScriptEngine
         // we know that the ClassLoader is a MemoryClassLoader (contains all .java lib + the script)
         // and that the parent is a JarClassLoader (contains all .jar lib).
         // so we ask them if they loaded the class themselves
-        var memoryClassLoader = (MemoryClassLoader) Optional.ofNullable(classLoader)
-                .orElseThrow(() -> new IllegalArgumentException("ClassLoader cannot be null"));
+        var memoryClassLoader = (MemoryClassLoader) classLoader;
         var parentJarClassLoader = (JarClassLoader) Optional.ofNullable(memoryClassLoader.getParent())
                 .orElseThrow(() -> new IllegalArgumentException("ClassLoader cannot be null"));
         return parentJarClassLoader.isLoadedClass(name) || memoryClassLoader.isLoadedClass(name);
     }
 
     /**
-     * Find the appropriate parameters value in the bindings map, for the executable to run.
+     * Find the appropriate parameters value in the binding map for the executable to run.
      *
      * @param classLoader the source script class loader
      * @param executable Method or constructor
@@ -300,11 +305,12 @@ public class BindingInjector {
      * @throws IllegalArgumentException If reflexion fails
      * @throws InvocationTargetException If reflexion fails
      */
-    public static Object @Nullable [] getParameterValuesFor(ClassLoader classLoader, Executable executable,
+    public static @Nullable Object[] getParameterValuesFor(ClassLoader classLoader, Executable executable,
             Map<String, Object> bindings, @Nullable Map<Class<?>, Object> libAlreadyInstantiated)
             throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         Parameter[] parameters = executable.getParameters();
-        Object @Nullable [] parameterValues = new Object[parameters.length];
+        @Nullable
+        Object[] parameterValues = new Object[parameters.length];
         Map<Class<?>, Object> libAlreadyInstantiatedLocal = libAlreadyInstantiated != null ? libAlreadyInstantiated
                 : new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
@@ -314,6 +320,14 @@ public class BindingInjector {
         return parameterValues;
     }
 
+    /**
+     * Browse all hierarchy to find a field with the specified name.
+     * 
+     * @param _clazz the class to browse
+     * @param fieldName the name of the field to find
+     * @return the field
+     * @throws NoSuchFieldException if the field cannot be found
+     */
     private static Field getFieldDeep(Class<?> _clazz, String fieldName) throws NoSuchFieldException {
         Class<?> clazz = _clazz;
         while (clazz != null && clazz != Object.class) {

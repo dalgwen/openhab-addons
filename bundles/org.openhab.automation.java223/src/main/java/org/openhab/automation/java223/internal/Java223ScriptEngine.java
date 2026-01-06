@@ -108,7 +108,8 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
                 }
             } catch (RuntimeException e) {
                 // Catching RuntimeException is no good practice, but the Javadoc of getTask and compile explicitly says
-                // that the only source of runtime error is the user-supplied code.
+                // that the ONLY source of runtime error is the user-supplied code. So catching it is OK and doesn't
+                // mean that we are meddling with something we shouldn't.
                 // We then keep responsibility of logging full stack trace, as ScriptException cannot contain cause:
                 logger.error("Error compiling script: {}", e.getMessage(), e);
                 throw new ScriptException(e.getMessage());
@@ -155,8 +156,7 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
         var localArgs = args == null ? new Object[0] : args;
         Class<?>[] argClasses = Arrays.stream(localArgs).map(Object::getClass).toArray(Class[]::new);
 
-        Method method = null;
-        method = compiledScript.getCompiledClass().getMethod(name, argClasses);
+        Method method = compiledScript.getCompiledClass().getMethod(name, argClasses);
         try {
             if (Modifier.isStatic(method.getModifiers())) {
                 return method.invoke(new Object(), localArgs); // new object() required (but value ignored) to avoid
@@ -178,13 +178,11 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     }
 
     @Override
-    @SuppressWarnings("null")
     public <T> T getInterface(@Nullable Class<T> clazz) {
         return null;
     }
 
     @Override
-    @SuppressWarnings("null")
     public <T> T getInterface(@Nullable Object o, @Nullable Class<T> clazz) {
         return null;
     }

@@ -18,7 +18,7 @@ import org.openhab.core.thing.events.ChannelTriggeredEvent;
 
 /**
  * @author Gwendal Roulleau - Initial contribution
- *         DTO object to facilitate input injection when used as an argument in a rule annotated method
+ *         DTO object to facilitate input injection when used as an argument in a rule-annotated method
  */
 @NonNullByDefault
 public class ChannelEvent extends EventInfo {

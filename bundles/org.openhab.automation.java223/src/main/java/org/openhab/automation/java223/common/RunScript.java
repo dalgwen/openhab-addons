@@ -21,7 +21,7 @@ import java.lang.annotation.Target;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * Mark method to be run by the java223 script engine
+ * Mark a method to be run by the java223 script engine
  *
  * @author Gwendal Roulleau - Initial contribution
  */

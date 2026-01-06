@@ -97,10 +97,20 @@ public class InjectedCodeGenerator {
                 "protected @InjectBinding " + clazz.getSimpleName() + " " + key + ";", ImportIsFor.ALL, null, null);
     }
 
+    /**
+     * Get all default imports. For the wrapped scripts (one-liner)
+     * 
+     * @return the imports to write at the top of the wrapped class
+     */
     public String getDefaultPresetImportList() {
         return imports;
     }
 
+    /**
+     * Get default imports, restricted for the super class (i.e., Java223Script)
+     * 
+     * @return the imports to write at the top of the generated class
+     */
     public String getDefaultPresetImportListForSuperClass() {
         return importsForSuperClass;
     }
@@ -133,7 +143,10 @@ public class InjectedCodeGenerator {
         Object value = parameter.getValue();
 
         switch (value) {
-            case Class<?> clazz -> {
+            case Class<?> clazz -> { // the binding value is a class reference. We will generate an import statement,
+                // but for wrapped classes only (i.e., one-liner)
+                // (example : "import java.time.Duration;" is useless for the Java223Script super class,
+                // but it can be useful for user-defined one-liner)
                 String canonicalName = clazz.getCanonicalName();
                 try {
                     Class.forName(canonicalName, false, getClass().getClassLoader());
@@ -161,7 +174,7 @@ public class InjectedCodeGenerator {
                     return null;
                 }
             }
-            case Enum<?> enumMember -> {
+            case Enum<?> enumMember -> { // the binding value is an enum member
                 String memberName = enumMember.name();
                 String simpleName = enumMember.getDeclaringClass().getSimpleName();
 
@@ -170,7 +183,7 @@ public class InjectedCodeGenerator {
                                 + simpleName + " " + memberName + " = " + simpleName + "." + memberName + ";",
                         ImportIsFor.ALL, simpleName, memberName);
             }
-            default -> {
+            default -> { // the binding value is an object
                 BindingsParsingResult bindingsParsingResult = OVERWRITE_BINDINGS_TYPE.get(key);
                 if (bindingsParsingResult != null) {
                     return bindingsParsingResult;
@@ -190,9 +203,13 @@ public class InjectedCodeGenerator {
         }
     }
 
-    public static enum ImportIsFor {
+    /**
+     * The generated import code can be for
+     */
+    public enum ImportIsFor {
         ALL,
-        WRAPPER_CLASS_ONLY;
+        // Wrapped classes (i.e., one-liner) will have additional useful import for direct use
+        WRAPPER_CLASS_ONLY
     }
 
     public record BindingsParsingResult(String importLine, @Nullable String declaration, ImportIsFor importIsFor,

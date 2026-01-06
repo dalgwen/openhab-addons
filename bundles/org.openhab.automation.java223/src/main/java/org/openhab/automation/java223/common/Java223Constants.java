@@ -31,6 +31,7 @@ public class Java223Constants {
     public static final String JAVA_223_IDENTIFIER = "java223-identifier";
     public static final String SERVICE_GETTER = "serviceGetter";
 
+    // Placeholder (sort of) to express emptiness
     public static final String ANNOTATION_DEFAULT = "\u0002\u0003";
 
     public static final Path LIB_DIR = Path.of(OpenHAB.getConfigFolder(), "automation", "lib", JAVA_FILE_TYPE);

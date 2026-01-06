@@ -75,6 +75,7 @@ import ch.obermuhlner.scriptengine.java.packagelisting.PackageResourceListingStr
  *
  * @author Gwendal Roulleau - Initial contribution
  */
+@SuppressWarnings("unused")
 @Component(service = { ScriptEngineFactory.class, Java223ScriptEngineFactory.class,
         EventSubscriber.class }, configurationPid = "automation.java223")
 @NonNullByDefault

@@ -19,7 +19,7 @@ public class Items {
 <#if item.getLabel()??>
     /** ${item.getLabel()} */
 </#if>
-    @InjectBinding(enable = false)
+    @InjectBinding(disable = true)
     public static final String ${item.getName()} = "${item.getName()}";
 
 </#list>

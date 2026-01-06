@@ -16,7 +16,7 @@ import ${classToImport};
 </#if>
 </#list>
 
-@InjectBinding(enable = false)
+@InjectBinding(disable = true)
 public class ${simpleClassName} {
 
     protected static Logger logger = LoggerFactory.getLogger(${simpleClassName}.class);

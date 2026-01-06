@@ -48,7 +48,7 @@ ${fieldsDeclaration}
     // needed for rule support
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
 
-    // not default preset, but handy (cache, additional shortcuts to useful OSGi services, generated classes)
+    // not the default preset, but handy (cache, additional shortcuts to useful OSGi services, generated classes)
     protected @InjectBinding(preset = "cache") ValueCache sharedCache;
     protected @InjectBinding(preset = "cache") ValueCache privateCache;
     protected @InjectBinding RuleManager ruleManager;

@@ -1,13 +1,13 @@
 /**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
- *
+ * <p>
  * See the NOTICE file(s) distributed with this work for additional
  * information.
- *
+ * <p>
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0
- *
+ * <p>
  * SPDX-License-Identifier: EPL-2.0
  */
 package helper.rules;
@@ -52,16 +52,22 @@ import org.slf4j.LoggerFactory;
 public class Java223Rule extends SimpleRule {
 
     Logger logger = LoggerFactory.getLogger(Java223Rule.class);
+
+    // Dummy reference date for "never executed" debouncer
     private static final ZonedDateTime OLD = ZonedDateTime.of(2000, 1, 1, 1, 1, 1, 0, ZoneId.systemDefault());
 
+    // Field type acceptable as container for rule code to execute
     private static final Set<Class<?>> ACCEPTABLE_FIELD_MEMBER_CLASSES = Set.of(SimpleRule.class, Function.class,
             BiFunction.class, Callable.class, Runnable.class, Consumer.class, BiConsumer.class);
 
+    // Store the code to execute when the rule is triggered
     private final BiFunction<Action, Map<String, Object>, @Nullable Object> codeToExecute;
+
+    // Params used for the debounce function
     @Nullable
     private final Debounce debounce;
     @Nullable
-    private ZonedDateTime executionTimeStamp= null;
+    private ZonedDateTime executionTimeStamp = null;
     @Nullable
     private ScheduledFuture<@Nullable Object> futureAction;
     private final ScheduledExecutorService execService = Executors.newScheduledThreadPool(2);
@@ -72,24 +78,20 @@ public class Java223Rule extends SimpleRule {
         }
     }
 
-    @Nullable
-    public Object fieldExecution(SimpleRule simpleRule, Action module, Map<String, Object> inputs) {
+    private Object fieldExecution(SimpleRule simpleRule, Action module, Map<String, Object> inputs) {
         return simpleRule.execute(module, inputs);
     }
 
-    @Nullable
-    public Object fieldExecution(Function<Map<String, Object>, Object> function, Map<String, Object> inputs) {
+    private Object fieldExecution(Function<Map<String, Object>, Object> function, Map<String, Object> inputs) {
         return function.apply(inputs);
     }
 
-    @Nullable
-    public Object fieldExecution(BiFunction<Action, Map<String, Object>, Object> function, Action module,
-                                 Map<String, Object> inputs) {
+    private Object fieldExecution(BiFunction<Action, Map<String, Object>, Object> function, Action module,
+                                  Map<String, Object> inputs) {
         return function.apply(module, inputs);
     }
 
-    @Nullable
-    public Object fieldExecution(Callable<Object> callable) {
+    private Object fieldExecution(Callable<Object> callable) {
         try {
             return callable.call();
         } catch (Exception e) {
@@ -98,24 +100,24 @@ public class Java223Rule extends SimpleRule {
     }
 
     @Nullable
-    public Object fieldExecution(Runnable runnable) {
+    private Object fieldExecution(Runnable runnable) {
         runnable.run();
         return null;
     }
 
     @Nullable
-    public Object fieldExecution(Consumer<Map<String, Object>> consumer, Map<String, Object> inputs) {
+    private Object fieldExecution(Consumer<Map<String, Object>> consumer, Map<String, Object> inputs) {
         consumer.accept(inputs);
         return null;
     }
 
     @Nullable
-    public Object fieldExecution(BiConsumer<Action, Map<String, Object>> consumer, Action module, Map<String, Object> inputs) {
+    private Object fieldExecution(BiConsumer<Action, Map<String, Object>> consumer, Action module, Map<String, Object> inputs) {
         consumer.accept(module, inputs);
         return null;
     }
 
-    public Java223Rule( BiFunction<Action, Map<String, Object>, @Nullable Object> code, Debounce debounce) {
+    public Java223Rule(BiFunction<Action, Map<String, Object>, @Nullable Object> code, Debounce debounce) {
         this.codeToExecute = code;
         this.debounce = debounce;
     }
@@ -128,13 +130,13 @@ public class Java223Rule extends SimpleRule {
      */
     public Java223Rule(Object script, Method method) {
         Parameter[] parameters = method.getParameters();
-       this.debounce = method.getAnnotation(Debounce.class);
-       this.codeToExecute = (module, inputs) -> {
+        this.debounce = method.getAnnotation(Debounce.class);
+        this.codeToExecute = (module, inputs) -> {
             try {
                 if (method.getParameters().length == 0) {
                     return method.invoke(script);
                 } else {
-                    Object @Nullable [] parameterValues = new Object @Nullable [parameters.length];
+                    @Nullable Object [] parameterValues = new Object [parameters.length];
                     for (int i = 0; i < parameters.length; i++) {
                         // special case for injecting the module
                         if (parameters[i].getType().equals(Action.class)) {
@@ -151,7 +153,7 @@ public class Java223Rule extends SimpleRule {
                     return method.invoke(script, parameterValues);
                 }
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                    | SecurityException e) {
+                     | SecurityException e) {
                 throw new Java223Exception("Cannot execute method named " + method.getName(), e);
             }
         };
@@ -163,14 +165,14 @@ public class Java223Rule extends SimpleRule {
      * @param script The instance to execute the method on
      * @param fieldMember The field member containing some code to execute
      */
-    @SuppressWarnings({ "unchecked" })
+    @SuppressWarnings({"unchecked"})
     public Java223Rule(Object script, Field fieldMember) throws RuleParserException {
         Class<?> fieldType = fieldMember.getType();
         this.debounce = fieldMember.getAnnotation(Debounce.class);
         if (ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().noneMatch(fieldType::isAssignableFrom)) {
             throw new RuleParserException("Field member " + fieldMember.getName() + " cannot be of class " + fieldType
                     + ". Must be " + ACCEPTABLE_FIELD_MEMBER_CLASSES.stream().map(Class::getSimpleName)
-                            .collect(Collectors.joining(" or ")));
+                    .collect(Collectors.joining(" or ")));
         }
 
         this.codeToExecute = (module, inputs) -> {
@@ -185,12 +187,15 @@ public class Java223Rule extends SimpleRule {
                 case null ->
                         throw new Java223Exception("Field " + fieldMember.getName() + " is null. Cannot execute anything");
                 case SimpleRule simpleRule -> fieldExecution(simpleRule, module, inputs);
-                case Function<?, ?> function -> fieldExecution((Function<Map<String, Object>, Object>) function, inputs);
-                case BiFunction<?, ?, ?> bifunction -> fieldExecution((BiFunction<Action, Map<String, Object>, Object>) bifunction, module, inputs);
+                case Function<?, ?> function ->
+                        fieldExecution((Function<Map<String, Object>, Object>) function, inputs);
+                case BiFunction<?, ?, ?> bifunction ->
+                        fieldExecution((BiFunction<Action, Map<String, Object>, Object>) bifunction, module, inputs);
                 case Callable<?> callable -> fieldExecution((Callable<Object>) callable);
                 case Runnable runnable -> fieldExecution(runnable);
                 case Consumer<?> consumer -> fieldExecution((Consumer<Map<String, Object>>) consumer, inputs);
-                case BiConsumer<?, ?> biconsumer -> fieldExecution((BiConsumer<Action, Map<String, Object>>) biconsumer, module, inputs);
+                case BiConsumer<?, ?> biconsumer ->
+                        fieldExecution((BiConsumer<Action, Map<String, Object>>) biconsumer, module, inputs);
                 default -> throw new Java223Exception("Wrong type of field " + fieldType + ". Should not happen");
             };
         };
@@ -212,9 +217,9 @@ public class Java223Rule extends SimpleRule {
                 var value = codeToExecute.apply(module, (Map<String, Object>) bindings);
                 return value != null ? value : "";
             }
-        } catch(Java223Exception e) {
+        } catch (Java223Exception e) {
             // why do we do this? Because openHAB sometimes doesn't log the full stack trace exception.
-            // so we took care of it before rethrowing it as a raw exception.
+            // so we took care of it before rethrowing it.
             logger.error("Cannot execute action", e);
             throw new Java223Exception("Cannot execute action");
         }
@@ -232,7 +237,7 @@ public class Java223Rule extends SimpleRule {
                     executionTimeStamp = now;
                     // execute immediately in a separate thread to avoid blocking the rule execution. The
                     // purpose of this is to debounce, so we assume the user doesn't want blocking behavior.
-                    execService.execute( () -> codeToExecute.apply(module, bindings));
+                    execService.execute(() -> codeToExecute.apply(module, bindings));
                 } else {
                     logger.debug("Debounced action (first only");
                 }
@@ -255,7 +260,7 @@ public class Java223Rule extends SimpleRule {
                 }
 
                 // Third, schedule
-                futureAction = execService.schedule( () -> {
+                futureAction = execService.schedule(() -> {
                     futureAction = null;
                     return codeToExecute.apply(module, bindings);
                 }, remainingDelay, TimeUnit.MILLISECONDS);
@@ -267,7 +272,7 @@ public class Java223Rule extends SimpleRule {
                 if (futureActionLocal != null) {
                     futureActionLocal.cancel(false);
                 }
-                futureAction = execService.schedule( () -> {
+                futureAction = execService.schedule(() -> {
                     futureAction = null;
                     return codeToExecute.apply(module, bindings);
                 }, debounce.value(), TimeUnit.MILLISECONDS);

@@ -39,6 +39,7 @@ import ch.obermuhlner.scriptengine.java.JavaScriptEngine;
 
 /**
  * Custom java compiled script instance wrapping additional information
+ * and adding functionality.
  *
  * @author Gwendal Roulleau - Initial contribution
  */
@@ -85,6 +86,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
         if (engineBindings != null) {
             mergedBindings.putAll(engineBindings);
         }
+        // add an origin identifier in the bindings for the user scripts to use
         String identifier = getIdentifier(context);
         mergedBindings.put(Java223Constants.JAVA_223_IDENTIFIER, identifier);
         java223Strategy.associateBindings(null, null, mergedBindings);
@@ -96,7 +98,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
             if (reuseAnnotation != null) {
                 instanceReuse = reuseAnnotation.value();
             }
-            // if allowed, get from the cache
+            // if allowed, get the cached instance
             var localScriptInstance = java223CompiledInstance;
             if (!instanceReuse || localScriptInstance == null) {
                 // no cache, instantiate the script
@@ -115,6 +117,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
         }
     }
 
+    // get the identifier for the script, marking origin
     private static String getIdentifier(ScriptContext context) {
         Object fileName = context.getAttribute("javax.script.filename");
         Object ruleUID = context.getAttribute("ruleUID");
@@ -132,7 +135,6 @@ public class Java223CompiledScript extends JavaCompiledScript {
         return identifier;
     }
 
-    @SuppressWarnings("null")
     private Object construct(Class<?> compiledClass, Map<String, Object> bindings) {
 
         // create real instance from compiled class
@@ -147,6 +149,7 @@ public class Java223CompiledScript extends JavaCompiledScript {
                 throw new Java223Exception(
                         "Cannot get the classloader of " + compiledClass.getName() + ". Should not happen");
             }
+            @Nullable
             Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, constructor, bindings, null);
             Object compiledInstance = constructor.newInstance(parameterValues);
             if (compiledInstance == null) { // can't be null, but null-check thinks so

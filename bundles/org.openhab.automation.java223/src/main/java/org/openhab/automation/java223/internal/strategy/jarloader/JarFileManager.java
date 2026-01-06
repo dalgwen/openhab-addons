@@ -75,7 +75,6 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         return classLoader;
     }
 
-    @SuppressWarnings({ "null", "unused" })
     @Override
     public @NonNullByDefault({}) Iterable<JavaFileObject> list(@Nullable Location location,
             @Nullable String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
@@ -92,7 +91,6 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         return mergedFileObjects;
     }
 
-    @SuppressWarnings({ "unused", "null" })
     @Override
     public JavaFileObject getJavaFileForOutput(@Nullable Location location, @Nullable String className,
             @Nullable Kind kind, @Nullable FileObject sibling) throws IOException {
@@ -103,7 +101,6 @@ public class JarFileManager<M extends JavaFileManager> extends ForwardingJavaFil
         return fileManager.getJavaFileForOutput(location, className, kind, sibling);
     }
 
-    @SuppressWarnings({ "unused", "null" })
     @Override
     public String inferBinaryName(@Nullable Location location, @Nullable JavaFileObject file) {
         if (file instanceof JarFileObject) {

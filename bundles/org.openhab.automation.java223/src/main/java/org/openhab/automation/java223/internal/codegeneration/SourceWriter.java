@@ -112,7 +112,7 @@ public class SourceWriter {
         }
     }
 
-    protected boolean sourceHasChangeOrIsNew(String packageName, String className, String newSource) {
+    private boolean sourceHasChangeOrIsNew(String packageName, String className, String newSource) {
         String previousSource = generatedClassesSources.put(getPath(packageName, className).toString(), newSource);
         return !newSource.equals(previousSource);
     }

@@ -27,6 +27,7 @@ import org.osgi.service.component.annotations.Component;
  */
 @Component(service = ServiceGetter.class)
 @NonNullByDefault
+@SuppressWarnings("unused")
 public class ServiceGetterImpl implements ServiceGetter {
 
     private final BundleContext bundleContext;

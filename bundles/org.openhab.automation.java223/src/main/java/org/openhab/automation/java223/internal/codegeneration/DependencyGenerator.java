@@ -51,6 +51,7 @@ public class DependencyGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(DependencyGenerator.class);
 
+    // A set of default dependencies to export
     private static final Set<String> DEFAULT_DEPENDENCIES = Set.of("org.openhab.automation.java223.common",
             "org.openhab.core.audio", "org.openhab.core.automation", "org.openhab.core.automation.events",
             "org.openhab.core.automation.util", "org.openhab.core.automation.module.script",
@@ -66,15 +67,17 @@ public class DependencyGenerator {
             "org.openhab.core.types", "org.openhab.core.voice", "com.google.gson", "org.openhab.core.library.unit",
             "tech.units.indriya");
 
+    // A set of default classes to export
     private static final Set<String> DEFAULT_CLASSES_DEPENDENCIES = Set.of("org.eclipse.jdt.annotation.NonNull",
             "org.eclipse.jdt.annotation.NonNullByDefault", "org.eclipse.jdt.annotation.Nullable",
             "org.eclipse.jdt.annotation.DefaultLocation", "org.slf4j.LoggerFactory", "org.slf4j.Logger",
             "org.slf4j.Marker", "javax.measure.spi.SystemOfUnits");
 
+    // target library directory
     private final Path libDir;
-    // bundle
+    // additional bundle to export
     private String additionalBundlesConfig;
-    // individual classes
+    // individual additional classes to export
     private String additionalClassesConfig;
     private final BundleContext bundleContext;
 
@@ -83,8 +86,8 @@ public class DependencyGenerator {
     /**
      *
      * @param libDir The target library directory
-     * @param additionalBundlesConfig Bundle to inspect. We will extract classes from it.
-     * @param additionalClassesConfig Individual classes to add to the exported JAR
+     * @param additionalBundlesConfig Additional bundle to inspect. We will extract classes from it.
+     * @param additionalClassesConfig Additional individual classes to add to the exported JAR.
      * @param bundleContext OSGI Bundle context
      */
     public DependencyGenerator(Path libDir, String additionalBundlesConfig, String additionalClassesConfig,
@@ -108,46 +111,48 @@ public class DependencyGenerator {
         try (FileOutputStream outFile = new FileOutputStream(libDir.resolve(CONVENIENCE_DEPENDENCIES_JAR).toFile())) {
             Manifest manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-            JarOutputStream target = new JarOutputStream(outFile, manifest);
 
-            Set<String> dependencies = new HashSet<>(DEFAULT_DEPENDENCIES);
-            dependencies.addAll(Arrays.asList(additionalBundlesConfig.split(",")));
+            try (JarOutputStream target = new JarOutputStream(outFile, manifest)) {
 
-            Set<String> searchIn = new HashSet<>();
-            // search all dependencies
-            for (String packageName : dependencies) {
-                // a bundle can have the exact name of the package we search, but also the name of a parent package
-                // so we add them all in our list of search
-                String[] packageComponents = packageName.split("\\.");
-                for (int i = 1; i <= packageComponents.length; i++) {
-                    searchIn.add(String.join(".", Arrays.copyOfRange(packageComponents, 0, i)));
+                Set<String> dependencies = new HashSet<>(DEFAULT_DEPENDENCIES);
+                dependencies.addAll(Arrays.asList(additionalBundlesConfig.split(",")));
+
+                Set<String> searchIn = new HashSet<>();
+                // search all dependencies
+                for (String packageName : dependencies) {
+                    // a bundle can have the exact name of the package we search, but also the name of a parent package,
+                    // so we add them all in our list of search
+                    String[] packageComponents = packageName.split("\\.");
+                    for (int i = 1; i <= packageComponents.length; i++) {
+                        searchIn.add(String.join(".", Arrays.copyOfRange(packageComponents, 0, i)));
+                    }
                 }
-            }
 
-            // browse all bundle and search for matches with the list established above
-            Set<String> packagesSuccessfullyExported = new HashSet<>();
-            for (Bundle bundle : bundleContext.getBundles()) {
-                if (searchIn.contains(bundle.getSymbolicName())) { // matches !
-                    copyExportedPackagesByBundleInspection(dependencies, bundle, target, packagesSuccessfullyExported);
+                // browse all bundle and search for matches with the list established above
+                Set<String> packagesSuccessfullyExported = new HashSet<>();
+                for (Bundle bundle : bundleContext.getBundles()) {
+                    if (searchIn.contains(bundle.getSymbolicName())) { // matches !
+                        copyExportedPackagesByBundleInspection(dependencies, bundle, target,
+                                packagesSuccessfullyExported);
+                    }
                 }
-            }
 
-            // we want to warn about the list of packages we didn't find
-            if (logger.isWarnEnabled()) {
-                Set<String> packagesNotFound = new HashSet<>(DEFAULT_DEPENDENCIES);
-                packagesSuccessfullyExported.stream().map(s -> s.replaceAll("/", ".")).toList()
-                        .forEach(packagesNotFound::remove);
-                for (String remainingPackage : packagesNotFound) {
-                    logger.warn("Failed to found classes to export in package {}", remainingPackage);
+                // we want to warn about the list of packages we didn't find
+                if (logger.isWarnEnabled()) {
+                    Set<String> packagesNotFound = new HashSet<>(DEFAULT_DEPENDENCIES);
+                    packagesSuccessfullyExported.stream().map(s -> s.replaceAll("/", ".")).toList()
+                            .forEach(packagesNotFound::remove);
+                    for (String remainingPackage : packagesNotFound) {
+                        logger.warn("Failed to found classes to export in package {}", remainingPackage);
+                    }
                 }
+
+                // now the individual classes :
+                Set<String> classesDependencies = new HashSet<>(DEFAULT_CLASSES_DEPENDENCIES);
+                classesDependencies.addAll(Arrays.asList(additionalClassesConfig.split(",")));
+                classesDependencies.addAll(additionalClassesToExport);
+                copyExportedClassesByClassLoader(classesDependencies, target);
             }
-
-            Set<String> classesDependencies = new HashSet<>(DEFAULT_CLASSES_DEPENDENCIES);
-            classesDependencies.addAll(Arrays.asList(additionalClassesConfig.split(",")));
-            classesDependencies.addAll(additionalClassesToExport);
-            copyExportedClassesByClassLoader(classesDependencies, target);
-
-            target.close();
         } catch (IOException e) {
             logger.warn("Failed to create dependencies jar in '{}': {}", libDir, e.getMessage());
         }
@@ -184,8 +189,8 @@ public class DependencyGenerator {
             return;
         }
         List<String> exportedPackages = Arrays.stream(exportPackage //
-                .split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) // split only on comma not in double quotes
-                .map(s -> s.split(";")[0]) // get only package name and drop uses, version, etc.
+                .split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) // split only on comma, not in double quotes
+                .map(s -> s.split(";")[0]) // get only the package name and drop uses, version, etc.
                 .map(b -> b.replace(".", "/")).toList();
         Set<String> dependenciesWithSlash = dependencies.stream().map(b -> b.replace(".", "/"))
                 .collect(Collectors.<String> toSet());
@@ -276,7 +281,7 @@ public class DependencyGenerator {
         }
 
         newAdditionalClassesToExport.removeIf(this::excludeFromExport);
-        // check if there is new classes :
+        // check if there are new classes :
         newAdditionalClassesToExport.removeAll(additionalClassesToExport);
         if (!newAdditionalClassesToExport.isEmpty()) {
             additionalClassesToExport.addAll(newAdditionalClassesToExport);

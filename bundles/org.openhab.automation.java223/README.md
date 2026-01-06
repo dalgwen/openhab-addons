@@ -534,7 +534,7 @@ You can control the injection further (i.e. overriding default behavior, or dire
 
 | InjectBinding parameter | Description                                                                                                                                                                                                                                                                                                                                                  |
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| enable                  | If false, will prevent injection. Useful if you don't want an useless parsing of your class field. Also useful when using field typed to classes from external third party jar not made for this.                                                                                                                                                            |
+| disable                 | If true, will prevent injection. Useful if you don't want an useless parsing of your class field. Also useful when using field typed to classes from external third party jar not made for this.                                                                                                                                                             |
 | named                   | Use this to specify the key used to get the value. If not specified, the field name will be used, or the type definition for libraries or OSGi services. You can also use a special 'path traversal' syntaxic sugar for getting field inside field. Example 'event.itemName' will get the event object, and use Java reflection to get its field 'itemName'. |
 | preset                  | Use this field to inject value from a specific preset. Some presets may be difficult to work with. You can use tricks nonetheless (see [example](#presetadvanceduse)).                                                                                                                                                                                       |
 | mandatory               | If set to true (which is the default when adding @InjectBinding) and the variable is not found, then the injection will fail, you will see an error log, and the script won't execute. You should use when you want to "fail fast".                                                                                                                          |
@@ -794,7 +794,7 @@ import org.openhab.core.library.types.OnOffType;
 
 public class ConstructorInjectionExample {
     // The injection WON'T happen here because the variable name is not the name of an available openHAB input.
-    // Alternatively, by using @InjectBinding(enable=false) you can prevent the Java223 bundle from even trying to inject an openHAB value.
+    // Alternatively, by using @InjectBinding(disable=true) you can prevent the Java223 bundle from even trying to inject an openHAB value.
     ItemRegistry myItemRegistry;
 
     public ConstructorInjectionExample(ItemRegistry itemRegistry) { // <-- the injection will happen here, 'itemRegistry' is a valid openHAB input name
@@ -881,7 +881,7 @@ public class InjectBindingExample {
     // inject something from a preset :
     protected @InjectBinding(preset = "RuleSupport") ScriptedAutomationManager automationManager;
     // disable injection even if the field name should trigger it :
-    protected @InjectBinding(enable = false) ItemRegistry itemRegistry;
+    protected @InjectBinding(disable = true) ItemRegistry itemRegistry;
     // name your variable as you wish by using the 'named' parameter :
     protected @InjectBinding(named = "itemRegistry") ItemRegistry otherVariableName;
     // make it mandatory (the script will not run if the value cannot be found).

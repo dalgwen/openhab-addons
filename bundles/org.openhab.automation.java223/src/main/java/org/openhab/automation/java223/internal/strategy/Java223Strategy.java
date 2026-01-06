@@ -74,6 +74,7 @@ public class Java223Strategy
     NameStrategy nameStrategy = new DefaultNameStrategy();
     JarFileManagerFactory jarFileManagerfactory;
 
+    // Allow instance reuse by default
     private boolean allowInstanceReuseDefaultProperty;
 
     private final ServiceGetter serviceGetter;
@@ -142,6 +143,7 @@ public class Java223Strategy
             // methods with a special name, or methods with a special annotation
             if (METHOD_NAMES_TO_EXECUTE.contains(method.getName()) || method.getAnnotation(RunScript.class) != null) {
                 try {
+                    @Nullable
                     Object[] parameterValues = BindingInjector.getParameterValuesFor(classLoader, method, bindings,
                             null);
                     var returnedLocal = method.invoke(instance, parameterValues);
