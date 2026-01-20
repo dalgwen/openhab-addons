@@ -1,3 +1,4 @@
+package org.openhab.binding.signal.internal.protocol.service;
 /*
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
@@ -10,21 +11,24 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.signal.internal;
+
+import java.io.Serial;
+import java.util.Optional;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
- * The {@link SignalBridgeConfiguration} class contains fields mapping bridge configuration parameters.
+ * To notify fatal error
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
-@NonNullByDefault
-public class SignalBridgeConfiguration {
+public class UnrecoverableException extends Exception {
+    public UnrecoverableException(String message, Exception cause) {
+        super(message, cause);
+    }
 
-    // account bridge configuration
-    public String phoneNumber = "";
-    public Boolean enableReaction = false;
-    // linked bridge configuration
-    public String deviceName = "openHAB";
+    public UnrecoverableException(String message) {
+        super(message);
+    }
 }

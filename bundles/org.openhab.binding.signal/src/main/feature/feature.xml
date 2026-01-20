@@ -1,22 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <features name="org.openhab.binding.signal-${project.version}" xmlns="http://karaf.apache.org/xmlns/features/v1.4.0">
-	<!-- The feature name DOES NOT start with openhab, despite the coding rules. It is OK! There is a weird behavior in the way openHAB handles KAR file
-		(there is an autodeletion feature if the KAR file is not registered in the addon file). To avoid this, we change the name. You have to build the project without the name check. Use -Dspotless.check.skip=true -DskipChecks=true -DskipTests -Dcheckstyle.skip -Dspotless.check.skip=true -->
-	<feature name="marketplace-openhab-binding-signal" description="Signal Binding" version="${project.version}">
+	<feature name="openhab-binding-signal" description="Signal Binding" version="${project.version}">
 		<feature>openhab-runtime-base</feature>
-		<bundle start-level="80">mvn:org.xerial/sqlite-jdbc/3.51.0.0</bundle>
 		<bundle start-level="81">mvn:org.openhab.addons.bundles/org.openhab.binding.signal/${project.version}</bundle>
-        <bundle start-level="80">mvn:org.bouncycastle/bcpkix-jdk18on/1.81</bundle>
-        <bundle start-level="80">mvn:org.bouncycastle/bcprov-jdk18on/1.81</bundle>
-        <bundle start-level="80">mvn:org.bouncycastle/bcutil-jdk18on/1.81</bundle>
-        <bundle start-level="80">mvn:com.zaxxer/HikariCP/7.0.2</bundle>
-        <bundle start-level="80">mvn:com.googlecode.libphonenumber/libphonenumber/8.13.50</bundle>
-        <bundle start-level="80">mvn:com.squareup.okhttp3/okhttp-jvm/5.2.1</bundle>
-        <bundle start-level="80">mvn:com.squareup.okio/okio-jvm/3.16.2</bundle>
-        <bundle start-level="80">mvn:org.reactivestreams/reactive-streams/1.0.4</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-annotations/2.19.2</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-core/2.19.2</bundle>
-        <bundle start-level="80">mvn:com.fasterxml.jackson.core/jackson-databind/2.19.2</bundle>
-        <bundle start-level="80">mvn:org.jetbrains.kotlin/kotlin-osgi-bundle/2.1.0</bundle>
+<!--		<bundle start-level="80">mvn:org.apache.commons/commons-compress/1.28.0</bundle>-->
+<!--		<bundle start-level="80">mvn:commons-codec/commons-codec/1.19.0</bundle>-->
+<!--		<bundle start-level="80">mvn:commons-io/commons-io/2.21.0</bundle>-->
+<!--		<bundle start-level="80">mvn:org.apache.commons/commons-lang3/3.20.0</bundle>-->
 	</feature>
 </features>

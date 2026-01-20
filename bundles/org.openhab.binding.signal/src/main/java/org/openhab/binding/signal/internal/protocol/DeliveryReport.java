@@ -12,13 +12,10 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
-import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.whispersystems.signalservice.api.util.UuidUtil;
 
 /**
- *
  * DeliveryReport DTO for reporting status delivery
  *
  * @author Gwendal ROULLEAU - Initial contribution
@@ -36,27 +33,20 @@ public class DeliveryReport {
     public DeliveryReport(DeliveryStatus deliveryStatus, RecipientAddress recipientAddress) {
         super();
         this.deliveryStatus = deliveryStatus;
-        this.aci = recipientAddress.uuid().map(uuid -> uuid.toString()).orElse(null);
+        this.aci = recipientAddress.uuid().orElse(null);
         this.e164 = recipientAddress.number().orElse(null);
     }
 
     public DeliveryReport(DeliveryStatus deliveryStatus, String id) {
         super();
         this.deliveryStatus = deliveryStatus;
-        if (UuidUtil.isUuid(id)) {
+        if (RecipientAddress.isUuid(id)) {
             this.aci = id;
             this.e164 = null;
         } else {
             this.e164 = id;
             this.aci = null;
         }
-    }
-
-    public DeliveryReport(DeliveryStatus deliveryStatus, String e164, String aci) {
-        super();
-        this.deliveryStatus = deliveryStatus;
-        this.aci = aci;
-        this.e164 = e164;
     }
 
     public DeliveryStatus getDeliveryStatus() {
@@ -71,5 +61,14 @@ public class DeliveryReport {
     @Nullable
     public String getE164() {
         return e164;
+    }
+
+    @Override
+    public String toString() {
+        return "DeliveryReport{" +
+                "deliveryStatus=" + deliveryStatus +
+                ", aci='" + aci + '\'' +
+                ", e164='" + e164 + '\'' +
+                '}';
     }
 }

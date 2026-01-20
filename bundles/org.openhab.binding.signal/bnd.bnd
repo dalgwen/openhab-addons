@@ -1,4 +1,0 @@
-Bundle-SymbolicName: ${project.artifactId}
-DynamicImport-Package: *
-Import-Package: !android.os,*
--removeheaders: Private-Package

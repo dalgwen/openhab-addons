@@ -12,18 +12,27 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
+import java.io.Serial;
 
 /**
- * DeliveryStatus enum for delivery report status
+ *
+ * Used when the response has an error element
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
-@NonNullByDefault
-public enum DeliveryStatus {
-    UNKNOWN,
-    FAILED,
-    SENT,
-    DELIVERED,
-    READ
+public class JsonResponseException extends Exception {
+
+    @Serial
+    private static final long serialVersionUID = 3091625747064284241L;
+
+    private final JsonResponse.Error error;
+
+    public JsonResponseException(String message, JsonResponse.Error error) {
+        super(message);
+        this.error = error;
+    }
+
+    public JsonResponse.Error getError() {
+        return error;
+    }
 }
