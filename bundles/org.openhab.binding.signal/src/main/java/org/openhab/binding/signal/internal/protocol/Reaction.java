@@ -10,21 +10,31 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.signal.internal;
+package org.openhab.binding.signal.internal.protocol;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- * The {@link SignalBridgeConfiguration} class contains fields mapping bridge configuration parameters.
+ * Reaction to a massage
  *
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
-public class SignalBridgeConfiguration {
+public class Reaction {
 
-    // account bridge configuration
-    public String phoneNumber = "";
-    public Boolean enableReaction = false;
-    // linked bridge configuration
-    public String deviceName = "openHAB";
+    boolean remove;
+    String emoji;
+
+    public Reaction(boolean remove, String emoji) {
+        this.remove = remove;
+        this.emoji = emoji;
+    }
+
+    public boolean isRemove() {
+        return remove;
+    }
+
+    public String getEmoji() {
+        return emoji;
+    }
 }
