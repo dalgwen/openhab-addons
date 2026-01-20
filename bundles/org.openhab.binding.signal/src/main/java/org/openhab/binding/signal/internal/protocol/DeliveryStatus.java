@@ -15,7 +15,6 @@ package org.openhab.binding.signal.internal.protocol;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
- *
  * DeliveryStatus enum for delivery report status
  *
  * @author Gwendal ROULLEAU - Initial contribution

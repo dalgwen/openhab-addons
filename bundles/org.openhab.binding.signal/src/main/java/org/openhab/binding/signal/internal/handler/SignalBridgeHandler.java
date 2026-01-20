@@ -14,7 +14,6 @@ package org.openhab.binding.signal.internal.handler;
 
 import static org.openhab.binding.signal.internal.SignalBindingConstants.PHOTO_EXTENSIONS;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -22,31 +21,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import org.asamk.signal.manager.api.MessageEnvelope.Data.Reaction;
-import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalBridgeConfiguration;
 import org.openhab.binding.signal.internal.SignalConversationDiscoveryService;
-import org.openhab.binding.signal.internal.actions.SignalActions;
-import org.openhab.binding.signal.internal.protocol.AttachmentCreationException;
-import org.openhab.binding.signal.internal.protocol.AttachmentUtils;
-import org.openhab.binding.signal.internal.protocol.DeliveryReport;
-import org.openhab.binding.signal.internal.protocol.DeliveryStatus;
-import org.openhab.binding.signal.internal.protocol.IncompleteRegistrationException;
-import org.openhab.binding.signal.internal.protocol.MessageListener;
-import org.openhab.binding.signal.internal.protocol.ProvisionType;
-import org.openhab.binding.signal.internal.protocol.SignalService;
-import org.openhab.binding.signal.internal.protocol.StateListener;
-import org.openhab.core.OpenHAB;
+import org.openhab.binding.signal.internal.actions.SignalActionsLinked;
+import org.openhab.binding.signal.internal.actions.SignalActionsMain;
+import org.openhab.binding.signal.internal.protocol.*;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -66,51 +53,44 @@ import org.slf4j.LoggerFactory;
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
-public class SignalBridgeHandler extends BaseBridgeHandler implements StateListener, MessageListener {
+public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAccountEventListener {
 
     private final Logger logger = LoggerFactory.getLogger(SignalBridgeHandler.class);
 
     private final ThingTypeUID thingTypeUID;
-
-    private HttpClient httpClient;
-
-    private static final String SIGNAL_DIRECTORY = "signal";
+    private final HttpClient httpClient;
 
     public static final List<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = List.of(
             SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE,
             SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE);
 
     /**
-     * The signal account responsible for the communication with whispersystem
+     * The signal account responsible for the communication with whisper
      */
+    protected SignalAccountManager signalAccountManager;
     @Nullable
-    protected SignalService signalService;
-    private ReentrantLock lockStartAndStop = new ReentrantLock();
-
-    /**
-     * A scheduled watchdog check
-     */
-    private @NonNullByDefault({}) ScheduledFuture<?> checkScheduled;
+    protected SignalAccount signalAccount;
+    private final ReentrantLock lockStartAndStop = new ReentrantLock();
 
     private @NonNullByDefault({}) SignalBridgeConfiguration config;
 
     // we keep a list of sender for autodiscovery
-    private Set<String> senders = new HashSet<String>();
+    private final Set<String> senders = new HashSet<>();
     private @Nullable SignalConversationDiscoveryService discoveryService;
 
-    private boolean shouldRun = false;
-    private AtomicBoolean isStarting = new AtomicBoolean(false);
+    private final AtomicBoolean isStarting = new AtomicBoolean(false);
+
 
     @Override
     public void dispose() {
-        shouldRun = false;
-        scheduler.execute(this::stopService);
+        scheduler.execute(this::stopAccount);
     }
 
-    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID, HttpClient httpClient) {
+    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID, HttpClient httpClient, SignalAccountManager signalAccountManager) {
         super(bridge);
         this.thingTypeUID = thingTypeUID;
         this.httpClient = httpClient;
+        this.signalAccountManager = signalAccountManager;
     }
 
     @Override
@@ -119,19 +99,72 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
         ProvisionType provisionType = thingTypeUID.equals(SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE)
                 ? ProvisionType.LINKED
                 : ProvisionType.MAIN;
+
+        signalAccount = signalAccountManager.getSignalAccount(this, config.phoneNumber, config.deviceName, provisionType);
+
+        scheduler.execute(this::checkAccount);
+    }
+
+    public void register(String captcha, RegistrationType registrationType) throws IOException {
+        SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal == null) {
+            throw new IOException("Cannot register if service not ready");
+        }
+        signalAccountLocal.register(captcha, registrationType);
+    }
+
+
+    public void registerLinked() throws IOException, IncompleteRegistrationException {
+        SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal == null) {
+            throw new IOException("Cannot register if service not ready");
+        }
+        String deviceLinkUri = signalAccountLocal.registerLinked();
+        qrCodeToScan(deviceLinkUri);
+        scheduler.execute(() -> {
+            try {
+                signalAccountLocal.finishLink(deviceLinkUri);
+                updateStatus(ThingStatus.ONLINE);
+            } catch (IOException | IncompleteRegistrationException e) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Not registered. Did you scan the QR code?");
+            }
+        });
+    }
+
+    public void verify(String verificationCode) throws IncompleteRegistrationException, IOException {
+        SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal == null) {
+            throw new IOException("Cannot register if service not ready");
+        }
+        signalAccountLocal.verify(verificationCode);
+    }
+
+    public void checkAccount() {
+        lockStartAndStop.lock();
         try {
-            this.signalService = new SignalService(this, this, new File(OpenHAB.getUserDataFolder(), SIGNAL_DIRECTORY), config.phoneNumber, config.captcha,
-                    config.verificationCode, config.verificationCodeMethod, config.deviceName, provisionType,
-                    config.userAgent);
+            //TODO simplify ?
+            if (!isStarting.getAndSet(true)) {
+                SignalAccount signalAccountFinal = signalAccount;
+                if (signalAccountFinal != null) {
+                    logger.debug("Now trying to start Signal for account {}", getId());
+                    signalAccountFinal.check();
+                    updateStatus(ThingStatus.ONLINE);
+                }
+            }
+        } catch (IncompleteRegistrationException e) {
+            logger.debug("Incomplete registration: {}", e.getMessage());
+            String message = "Incomplete registration: " + e.getMessage();
+            getConfig().remove(SignalBindingConstants.PROPERTY_QRCODE);
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
         } catch (IOException e) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Error during initialization : " + e.getMessage());
+            logger.error("Error during initialization", e);
+            String message = e.getClass().getSimpleName() + " - " + e.getMessage();
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
+        } finally {
+            isStarting.set(false);
+            lockStartAndStop.unlock();
         }
-        shouldRun = true;
-        if (checkScheduled == null || (checkScheduled.isDone())) {
-            checkScheduled = scheduler.scheduleWithFixedDelay(this::checkAndStartServiceIfNeeded, 0, 15,
-                    TimeUnit.SECONDS);
-        }
+
     }
 
     @SuppressWarnings("null")
@@ -140,61 +173,15 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
                 .map(handler -> (SignalConversationHandler) handler).collect(Collectors.toSet());
     }
 
-    private void stopService() {
+    private void stopAccount() {
         lockStartAndStop.lock();
         try {
-            if (checkScheduled != null) {
-                checkScheduled.cancel(true);
-            }
-            SignalService signalServiceFinal = signalService;
-            if (signalServiceFinal != null) {
-                signalServiceFinal.stop();
-            }
+            signalAccountManager.removeSignalAccount(config.phoneNumber);
         } finally {
             lockStartAndStop.unlock();
         }
     }
 
-    private void checkAndStartServiceIfNeeded() {
-        lockStartAndStop.lock();
-        try {
-            if (!isStarting.getAndSet(true)) {
-                if (shouldRun && !isRunning()) {
-                    logger.debug("Initializing signal");
-                    // ensure the underlying modem is stopped before trying to (re)starting it :
-                    SignalService signalServiceFinal = signalService;
-                    if (signalServiceFinal != null) {
-                        signalServiceFinal.stop();
-                        logger.debug("Now trying to start Signal for account {}", getId());
-                        signalServiceFinal.start();
-                        logger.info("Signal {} started", getId());
-                    } else {
-                        logger.error("Signal service should not be null here !");
-                    }
-                }
-            }
-        } catch (IncompleteRegistrationException e) {
-            logger.debug("Incomplete registration: {}", e.getMessage());
-            String message = "Incomplete registration: " + e.getMessage();
-            getConfig().remove(SignalBindingConstants.PROPERTY_QRCODE);
-            checkScheduled.cancel(false);
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, message);
-        } catch (IOException e) {
-            logger.error("Error during initialization", e);
-            String message = e.getClass().getSimpleName() + " - " + e.getMessage();
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, message);
-        } catch (ClassNotFoundException e) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.HANDLER_INITIALIZING_ERROR, e.getMessage());
-        } finally {
-            isStarting.set(false);
-            lockStartAndStop.unlock();
-        }
-    }
-
-    public boolean isRunning() {
-        SignalService signalServiceFinal = signalService;
-        return signalServiceFinal != null && signalServiceFinal.isReceivingThreadRunning();
-    }
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
@@ -209,7 +196,13 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
             }
         }
 
-        String sender = recipientAddress != null ? recipientAddress.getLegacyIdentifier() : null;
+        String sender = null;
+        if (recipientAddress != null) {
+            sender = recipientAddress.number().orElse(null);
+            if (sender == null) {
+                sender = recipientAddress.uuid().orElse(null);
+            }
+        }
         logger.debug("Receiving new message from {}", sender != null ? sender : "unknown");
 
         // channel trigger
@@ -230,10 +223,10 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
     public void reactionReceived(@Nullable RecipientAddress sender, Reaction reaction) {
         if (config.enableReaction) {
             String newMessageBody;
-            if (reaction.isRemove() == false) {
-                newMessageBody = "#REACTION_ADDED#" + reaction.emoji();
+            if (!reaction.isRemove()) {
+                newMessageBody = "#REACTION_ADDED#" + reaction.getEmoji();
             } else {
-                newMessageBody = "#REACTION_REMOVED#" + reaction.emoji();
+                newMessageBody = "#REACTION_REMOVED#" + reaction.getEmoji();
             }
             messageReceived(sender, newMessageBody);
         }
@@ -245,23 +238,22 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
         for (SignalConversationHandler child : getChildHandlers()) {
             child.checkAndUpdateDeliveryStatus(deliveryReport);
         }
-
         String sender = Optional.ofNullable(deliveryReport.getE164())
                 .orElse(Optional.ofNullable(deliveryReport.getAci()).orElse("unknown"));
         logger.debug("Receiving delivery status from {}", sender);
     }
 
     /**
-     * Send message
+     * Send a message
      *
      * @param recipient The recipient for the message
      * @param text The message content
      */
     public DeliveryReport send(String recipient, String text) {
         logger.debug("Sending message to {}", recipient);
-        SignalService signalServiceFinal = signalService;
-        if (signalServiceFinal != null) {
-            DeliveryReport deliveryReport = signalServiceFinal.send(recipient, text, null);
+        SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal != null) {
+            DeliveryReport deliveryReport = signalAccountLocal.send(recipient, text, null);
             deliveryStatusReceived(deliveryReport);
             return deliveryReport;
         } else {
@@ -270,16 +262,16 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
     }
 
     /**
-     * Send image
+     * Send an image
      *
      * @param recipient The recipient for the message
-     * @param image The image to sent. Use a scheme at the beginning (either file:, http:, base64
+     * @param image The image to send. Use a scheme at the beginning (either file:, http:, base64
      */
     public DeliveryReport sendImage(String recipient, String image, @Nullable String text) {
         logger.debug("Sending photo message to {}", recipient);
-        SignalService signalServiceFinal = signalService;
+        SignalAccount signalAccountFinal = signalAccount;
 
-        if (signalServiceFinal == null) {
+        if (signalAccountFinal == null) {
             throw new IllegalStateException("Cannot send message if service not ready");
         }
 
@@ -303,15 +295,15 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
                 attachment = imageSafe;
             } else {
                 throw new AttachmentCreationException("Scheme not supported for attachment "
-                        + image.substring(0, image.length() < 100 ? image.length() : 100));
+                        + image.substring(0, Math.min(image.length(), 100)));
             }
         } catch (AttachmentCreationException e) {
             logger.debug("Cannot attach image: {}", e.getMessage());
-            signalServiceFinal.send(recipient, "Cannot attach image: " + e.getMessage(), null);
+            signalAccountFinal.send(recipient, "Cannot attach image: " + e.getMessage(), null);
             return new DeliveryReport(DeliveryStatus.FAILED, recipient);
         }
 
-        return signalServiceFinal.send(recipient, text == null ? "" : text, attachment);
+        return signalAccountFinal.send(recipient, text == null ? "" : text, attachment);
     }
 
     /**
@@ -325,7 +317,14 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
 
     @Override
     public Collection<Class<? extends ThingHandlerService>> getServices() {
-        return Set.of(SignalActions.class, SignalConversationDiscoveryService.class);
+
+        ProvisionType provisionType = thingTypeUID.equals(SignalBindingConstants.SIGNALLINKEDBRIDGE_THING_TYPE)
+                ? ProvisionType.LINKED
+                : ProvisionType.MAIN;
+        return switch (provisionType) {
+            case MAIN -> Set.of(SignalActionsMain.class);
+            case LINKED -> Set.of(SignalActionsLinked.class);
+        };
     }
 
     public String getId() {
@@ -338,11 +337,11 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
     }
 
     @Override
-    public void newStateEvent(ConnectionState connectionState, @Nullable String detailledMessage) {
+    public void newStateEvent(ConnectionState connectionState, @Nullable String detailedMessage) {
         switch (connectionState) {
             case AUTH_FAILED:
                 String message = "Signal library reported an authentication error on the account " + getId()
-                        + ((detailledMessage != null) ? ". " + detailledMessage : "");
+                        + ((detailedMessage != null) ? ". " + detailedMessage : "");
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, message);
                 break;
             case CONNECTED:
@@ -355,7 +354,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
             case DISCONNECTED:
                 logger.debug("Signal library reported the service for {} is stopped", getId());
                 if (thing.getStatus() != ThingStatus.OFFLINE) {
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, detailledMessage);
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, detailedMessage);
                 }
                 break;
         }
@@ -373,14 +372,24 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements StateListe
 
     @Override
     public void handleRemoval() {
-        if (signalService != null) {
+        @Nullable SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal != null) {
             try {
-                signalService.deleteAccount();
-            } catch (Exception e) {
+                signalAccountLocal.deleteAccount();
+            } catch (Exception e) { //TODO avoir generic exception
                 logger.warn("Error during signal account removal", e);
             }
         }
-        stopService();
+        // do it AFTER deletion, as we need the underlying signal-cli to run in order to delete it
+        // (stopping means the service could stop beforehand)
+        stopAccount();
         updateStatus(ThingStatus.REMOVED);
+    }
+
+    public void updateProfile() throws IOException {
+        @Nullable SignalAccount signalAccountLocal = signalAccount;
+        if (signalAccountLocal != null) {
+            signalAccountLocal.updateProfile();
+        }
     }
 }

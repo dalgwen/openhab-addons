@@ -24,7 +24,6 @@ import org.eclipse.jetty.client.util.FutureResponseListener;
 import org.eclipse.jetty.http.HttpMethod;
 
 /**
- *
  * Utility class for creating attachements in dataURI format
  *
  * @author Gwendal ROULLEAU - Initial contribution
@@ -33,10 +32,8 @@ import org.eclipse.jetty.http.HttpMethod;
 public class AttachmentUtils {
 
     private static String createDataUriFromData(byte[] data, String mimeType) {
-        StringBuffer result = new StringBuffer();
-        result.append("data:").append(mimeType).append(";filename=image;base64,")
-                .append(Base64.getEncoder().encodeToString(data));
-        return result.toString();
+        return "data:" + mimeType + ";filename=image;base64," +
+                Base64.getEncoder().encodeToString(data);
     }
 
     public static String createAttachmentFromHttp(HttpClient httpClient, String httpUrl)

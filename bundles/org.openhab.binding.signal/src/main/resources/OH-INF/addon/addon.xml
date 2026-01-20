@@ -7,4 +7,24 @@
 	<name>Signal Binding</name>
 	<description>This binding handles a connection to the Signal network.</description>
 
+	<config-description uri="binding:signal">
+		<parameter name="kind" type="text">
+			<description>Signal-cli integration mode: Managed (let the binding handle the CLI download/install), Local (you provide the binary path), or network mode (TCP)</description>
+			<label>Kind Of Signal-cli Integration</label>
+			<limitToOptions>true</limitToOptions>
+			<default>MANAGED</default>
+			<options>
+				<option value="LOCAL">Local</option>
+				<option value="MANAGED">Managed</option>
+				<option value="NETWORK">Network</option>
+			</options>
+		</parameter>
+		<parameter name="configuration" type="text">
+			<description>If Kind is "Network", then put here the network url (host:port). If kind is "Local", put the full path to the signal-cli binary, if "Managed", put the version wanted or let empty. For Local and Managed, you can add suffix key/value pairs as environment variables.</description>
+			<label>Kind-Related Configuration Parameter</label>
+			<default>auto</default>
+		</parameter>
+
+	</config-description>
+
 </addon:addon>

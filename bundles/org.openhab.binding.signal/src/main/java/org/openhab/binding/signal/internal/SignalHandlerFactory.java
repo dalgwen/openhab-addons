@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.signal.internal;
 
+import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -21,6 +23,11 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.signal.internal.handler.SignalBridgeHandler;
 import org.openhab.binding.signal.internal.handler.SignalConversationHandler;
+import org.openhab.binding.signal.internal.protocol.IncompleteRegistrationException;
+import org.openhab.binding.signal.internal.protocol.SignalAccount;
+import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
+import org.openhab.core.config.core.ConfigParser;
+import org.openhab.core.config.core.ConfigurableService;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.thing.Bridge;
@@ -32,7 +39,10 @@ import org.openhab.core.thing.binding.ThingHandler;
 import org.openhab.core.thing.binding.ThingHandlerFactory;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The {@link SignalHandlerFactory} is responsible for creating things and thing
@@ -41,19 +51,28 @@ import org.osgi.service.component.annotations.Reference;
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @Component(configurationPid = "binding.signal", service = ThingHandlerFactory.class)
+@ConfigurableService(category = "binding", label = "Signal", description_uri = "binding:signal")
 @NonNullByDefault
 public class SignalHandlerFactory extends BaseThingHandlerFactory {
+
+    private final Logger logger = LoggerFactory.getLogger(BaseThingHandlerFactory.class);
 
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Stream
             .concat(SignalBridgeHandler.SUPPORTED_THING_TYPES_UIDS.stream(),
                     Stream.of(SignalConversationHandler.SUPPORTED_THING_TYPES_UIDS))
             .collect(Collectors.toSet());
 
-    private HttpClient httpClient;
+    private final HttpClient httpClient;
+    private final SignalAccountManager signalAccountManager;
 
     @Activate
-    public SignalHandlerFactory(@Reference final HttpClientFactory httpClientFactory) {
+    public SignalHandlerFactory(@Reference final HttpClientFactory httpClientFactory, Map<String, ?> config) {
         this.httpClient = httpClientFactory.getCommonHttpClient();
+        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND), SignalConfiguration.Kind.class, SignalConfiguration.Kind.LOCAL);
+        String signalCliConnectionConfiguration = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
+        signalAccountManager = new SignalAccountManager();
+        SignalService signalService = SignalService.createSignalService(signalAccountManager, kind, signalCliConnectionConfiguration, httpClient);
+        signalAccountManager.setSignalService(signalService);
     }
 
     @Override
@@ -65,7 +84,7 @@ public class SignalHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
         if (SignalBridgeHandler.SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID)) {
-            return new SignalBridgeHandler((Bridge) thing, thingTypeUID, httpClient);
+            return new SignalBridgeHandler((Bridge) thing, thingTypeUID, httpClient, signalAccountManager);
         } else if (SignalConversationHandler.SUPPORTED_THING_TYPES_UIDS.equals(thingTypeUID)) {
             return new SignalConversationHandler(thing);
         }
@@ -96,5 +115,20 @@ public class SignalHandlerFactory extends BaseThingHandlerFactory {
 
     public static ThingUID getSignalConversationUID(ThingTypeUID thingTypeUID, String recipient, ThingUID bridgeUID) {
         return new ThingUID(thingTypeUID, recipient, bridgeUID.getId());
+    }
+
+    @Modified
+    protected void modified(Map<String, ?> config) {
+        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND), SignalConfiguration.Kind.class, SignalConfiguration.Kind.LOCAL);
+        String signalCliConnectionConfiguration = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
+        SignalService newSignalService = SignalService.createSignalService(signalAccountManager, kind, signalCliConnectionConfiguration, httpClient);
+        signalAccountManager.setSignalService(newSignalService);
+        for (SignalAccount account : signalAccountManager.getAllAccounts()) {
+            try {
+                account.check();
+            } catch (IncompleteRegistrationException | IOException e) {
+                logger.warn("Account not ready");
+            }
+        }
     }
 }

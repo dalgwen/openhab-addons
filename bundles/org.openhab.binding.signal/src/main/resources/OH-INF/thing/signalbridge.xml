@@ -21,37 +21,11 @@
 			<parameter name="phoneNumber" type="text" required="true">
 				<label>Telephone Number</label>
 				<description>Telephone Number, international format.</description>
-				<default></default>
-			</parameter>
-			<parameter name="captcha" type="text" required="false">
-				<label>Captcha</label>
-				<description>May be asked by Signal. See documentation to provide one.</description>
-				<default></default>
-			</parameter>
-			<parameter name="verificationCodeMethod" type="text" required="false">
-				<label>Verification Code Method</label>
-				<description>Choose how to receive the verification code.</description>
-				<limitToOptions>true</limitToOptions>
-				<default>TextMessage</default>
-				<options>
-					<option value="TextMessage">Text Message</option>
-					<option value="PhoneCall">Phone Call</option>
-				</options>
-			</parameter>
-			<parameter name="verificationCode" type="text" required="false">
-				<label>Verification Code</label>
-				<description>Received by SMS or vocal message upon ongoing registration.</description>
-				<default></default>
 			</parameter>
 			<parameter name="enableReaction" type="boolean" required="false">
 				<label>Enable Reaction</label>
 				<description>If true, also receive reaction emoji.</description>
 				<default>false</default>
-			</parameter>
-			<parameter name="userAgent" type="text" required="false">
-				<label>User Agent</label>
-				<description>Overwrite the user agent sent to Signal Server</description>
-				<advanced>true</advanced>
 			</parameter>
 		</config-description>
 	</bridge-type>
@@ -68,7 +42,6 @@
 			<parameter name="phoneNumber" type="text" required="true">
 				<label>Telephone Number</label>
 				<description>Telephone Number, international format.</description>
-				<default></default>
 			</parameter>
 			<parameter name="deviceName" type="text" required="false">
 				<label>Device Name</label>

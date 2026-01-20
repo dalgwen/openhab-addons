@@ -12,12 +12,12 @@
  */
 package org.openhab.binding.signal.internal.handler;
 
-import org.asamk.signal.manager.api.RecipientAddress;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalConversationConfiguration;
 import org.openhab.binding.signal.internal.protocol.DeliveryReport;
+import org.openhab.binding.signal.internal.protocol.RecipientAddress;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
@@ -31,7 +31,6 @@ import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.whispersystems.signalservice.api.util.UuidUtil;
 
 /**
  * The {@link SignalConversationHandler} is responsible for managing
@@ -57,7 +56,7 @@ public class SignalConversationHandler extends BaseThingHandler {
 
     public String getRecipient() {
         String recipient = config.recipient.trim();
-        if (UuidUtil.isUuid(recipient)) {
+        if (RecipientAddress.isUuid(recipient)) {
             return recipient;
         } else {
             if (recipient.startsWith("+")) {
@@ -90,9 +89,9 @@ public class SignalConversationHandler extends BaseThingHandler {
 
     protected void checkAndReceive(RecipientAddress address, String message) {
         String conversationRecipient = getRecipient();
-        // is the recipient the one handled by this conversation ? :
-        String uuid = address.uuid().orElse(RecipientAddress.UNKNOWN_UUID).toString();
-        String number = address.getLegacyIdentifier();
+        // is the recipient the one handled by this conversation ?:
+        String uuid = address.uuid().orElse(RecipientAddress.UNKNOWN_UUID.toString());
+        String number = address.number().orElse("+0123456789");
         if (conversationRecipient.equals(uuid) || conversationRecipient.equals(number)) {
             updateState(SignalBindingConstants.CHANNEL_RECEIVED, new StringType(message));
         }
@@ -100,7 +99,7 @@ public class SignalConversationHandler extends BaseThingHandler {
 
     protected void checkAndUpdateDeliveryStatus(DeliveryReport deliveryReport) {
         String conversationRecipient = getRecipient();
-        // is the recipient the one handled by this conversation ? :
+        // is the recipient the one handled by this conversation ?:
         String uuid = deliveryReport.getAci();
         String number = deliveryReport.getE164();
         if (conversationRecipient.equals(uuid) || conversationRecipient.equals(number)) {
