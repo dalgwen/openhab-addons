@@ -24,6 +24,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.audio.AudioSink;
+import org.openhab.core.audio.AudioSource;
 import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
@@ -110,6 +111,9 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
 
     @Nullable
     private ServiceRegistration<AudioSink> audioSinkServiceRegistration;
+    @Nullable
+    private ServiceRegistration<AudioSource> audioSourceServiceRegistration;
+    private VoiceAssistantMessageHandler voiceAssistantMessageHandler;
 
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
@@ -166,6 +170,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 ValveStateResponse.class);
         registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
                 ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
+        voiceAssistantMessageHandler = new VoiceAssistantMessageHandler(this);
     }
 
     private void registerMessageHandler(String entityType,
@@ -230,6 +235,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 audioSinkServiceRegistration = null;
             }
 
+            // AudioSource
+            if (audioSourceServiceRegistration != null) {
+                audioSourceServiceRegistration.unregister();
+                audioSourceServiceRegistration = null;
+            }
+
             connectionState = ConnectionState.UNINITIALIZED;
 
             thingActionClassLoader = null;
@@ -262,6 +273,31 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         audioSinkServiceRegistration = bundleContext.registerService(AudioSink.class, audioSink,
                 new java.util.Hashtable<>());
         logger.info("[{}] Registered AudioSink for ESPHome device", logPrefix);
+    }
+
+    /**
+     * Registers an AudioSource for this ESPHome device if voice assistant support is available.
+     * This is called when the device supports voice assistant with microphone streaming.
+     */
+    public void registerAudioSource() {
+        if (audioSourceServiceRegistration != null) {
+            // Already registered
+            return;
+        }
+
+        logger.info("[{}] Registering AudioSource for ESPHome voice assistant device", logPrefix);
+        org.openhab.core.audio.AudioFormat audioFormat = new org.openhab.core.audio.AudioFormat(
+                org.openhab.core.audio.AudioFormat.CONTAINER_NONE, org.openhab.core.audio.AudioFormat.CODEC_PCM_SIGNED,
+                false, 16, null, 16000L, 1);
+        try {
+            ESPHomeAudioSource audioSource = new ESPHomeAudioSource(thing.getUID().getAsString(), audioFormat);
+            voiceAssistantMessageHandler.setAudioSource(audioSource);
+            audioSourceServiceRegistration = bundleContext.registerService(AudioSource.class, audioSource,
+                    new java.util.Hashtable<>());
+            logger.info("[{}] Registered AudioSource for ESPHome device", logPrefix);
+        } catch (java.io.IOException e) {
+            logger.error("[{}] Failed to create AudioSource: {}", logPrefix, e.getMessage());
+        }
     }
 
     /**
@@ -527,6 +563,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 frameHelper.close();
                 frameHelper = null;
             }
+        } else if (message instanceof VoiceAssistantAudio voiceAssistantAudio) {
+            voiceAssistantMessageHandler.handleVoiceAssistantAudio(voiceAssistantAudio);
         } else if (message instanceof SubscribeLogsResponse subscribeLogsResponse) {
             deviceLogger.info("[{}] {}", logPrefix, subscribeLogsResponse.getMessage().toStringUtf8());
         } else if (message instanceof HomeassistantActionRequest serviceResponse) {
