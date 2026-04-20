@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.bluetooth.BluetoothAdapter;
+import org.openhab.core.audio.AudioHTTPServer;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandlerFactory;
@@ -74,8 +75,10 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
     private final MonitoredScheduledThreadPoolExecutor scheduler;
     private final KeySequentialExecutor packetExecutor;
     private final ConnectionSelector connectionSelector;
+    private @Nullable AudioHTTPServer audioHTTPServer;
 
     private final Map<ThingUID, ESPHomeHandler> esphomeHandlers = new ConcurrentHashMap<>();
+    private final Map<ThingUID, ServiceRegistration<?>> audioSinkRegistrations = new HashMap<>();
 
     @Activate
     public ESPHomeHandlerFactory(@Reference ESPChannelTypeProvider dynamicChannelTypeProvider,
@@ -109,7 +112,7 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
         if (BindingConstants.THING_TYPE_DEVICE.equals(thingTypeUID)) {
             ESPHomeHandler handler = new ESPHomeHandler(thing, connectionSelector, dynamicChannelTypeProvider,
                     stateDescriptionProvider, eventSubscriber, scheduler, packetExecutor, eventPublisher,
-                    defaultEncryptionKey, getBundleContext());
+                    defaultEncryptionKey, getBundleContext(), audioHTTPServer);
             esphomeHandlers.put(thing.getUID(), handler);
             return handler;
         } else if (BindingConstants.THING_TYPE_BLE_PROXY.equals(thingTypeUID)) {
@@ -164,7 +167,21 @@ public class ESPHomeHandlerFactory extends BaseThingHandlerFactory {
                 serviceReg.unregister();
             }
         }
+        // Unregister AudioSink if present
+        ServiceRegistration<?> audioReg = audioSinkRegistrations.remove(thingHandler.getThing().getUID());
+        if (audioReg != null) {
+            audioReg.unregister();
+        }
         super.removeHandler(thingHandler);
+    }
+
+    @Reference
+    protected void setAudioHTTPServer(AudioHTTPServer audioHTTPServer) {
+        this.audioHTTPServer = audioHTTPServer;
+    }
+
+    protected void unsetAudioHTTPServer(AudioHTTPServer audioHTTPServer) {
+        this.audioHTTPServer = null;
     }
 
     public void onDeviceReappeared(List<String> deviceIds) {

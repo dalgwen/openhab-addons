@@ -22,6 +22,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.audio.AudioHTTPServer;
+import org.openhab.core.audio.AudioSink;
 import org.openhab.core.events.AbstractEvent;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.thing.*;
@@ -79,6 +81,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private final String defaultEncryptionKey;
     private final BundleContext bundleContext;
+    private final @Nullable AudioHTTPServer audioHTTPServer;
     private @Nullable ESPHomeConfiguration config;
     private @Nullable EncryptedFrameHelper frameHelper;
     @Nullable
@@ -105,11 +108,14 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     @Nullable
     private ClassLoader thingActionClassLoader;
 
+    @Nullable
+    private ServiceRegistration<AudioSink> audioSinkServiceRegistration;
+
     public ESPHomeHandler(Thing thing, ConnectionSelector connectionSelector,
             ESPChannelTypeProvider dynamicChannelTypeProvider, ESPStateDescriptionProvider stateDescriptionProvider,
             ESPHomeEventSubscriber eventSubscriber, MonitoredScheduledThreadPoolExecutor executorService,
             KeySequentialExecutor packetProcessor, EventPublisher eventPublisher, @Nullable String defaultEncryptionKey,
-            BundleContext bundleContext) {
+            BundleContext bundleContext, @Nullable AudioHTTPServer audioHTTPServer) {
         super(thing);
         this.connectionSelector = connectionSelector;
         this.dynamicChannelTypeProvider = dynamicChannelTypeProvider;
@@ -121,6 +127,7 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
         this.eventPublisher = eventPublisher;
         this.defaultEncryptionKey = defaultEncryptionKey;
         this.bundleContext = bundleContext;
+        this.audioHTTPServer = audioHTTPServer;
 
         // Register message handlers for each type of message pairs
         registerMessageHandler(EntityTypes.SELECT, new SelectMessageHandler(this), ListEntitiesSelectResponse.class,
@@ -157,6 +164,8 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
                 LockStateResponse.class);
         registerMessageHandler(EntityTypes.VALVE, new ValveMessageHandler(this), ListEntitiesValveResponse.class,
                 ValveStateResponse.class);
+        registerMessageHandler(EntityTypes.MEDIA_PLAYER, new MediaPlayerMessageHandler(this),
+                ListEntitiesMediaPlayerResponse.class, MediaPlayerStateResponse.class);
     }
 
     private void registerMessageHandler(String entityType,
@@ -215,6 +224,12 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
             // ThingActions
             clearThingActions();
 
+            // AudioSink
+            if (audioSinkServiceRegistration != null) {
+                audioSinkServiceRegistration.unregister();
+                audioSinkServiceRegistration = null;
+            }
+
             connectionState = ConnectionState.UNINITIALIZED;
 
             thingActionClassLoader = null;
@@ -225,6 +240,37 @@ public class ESPHomeHandler extends BaseThingHandler implements CommunicationLis
     private void clearThingActions() {
         thingActionServiceRegistrations.stream().filter(e -> e != null).forEach(ServiceRegistration::unregister);
         thingActionServiceRegistrations.clear();
+    }
+
+    /**
+     * Registers an AudioSink for this ESPHome device if audio support is available.
+     * This is called when a media player entity is discovered.
+     *
+     * @param callbackUrl the callback URL for serving audio streams
+     */
+    public void registerAudioSink(@Nullable String callbackUrl) {
+        if (audioSinkServiceRegistration != null) {
+            // Already registered
+            return;
+        }
+        if (audioHTTPServer == null) {
+            logger.warn("[{}] Cannot register AudioSink: AudioHTTPServer not available", logPrefix);
+            return;
+        }
+
+        ESPHomeAudioSink audioSink = new ESPHomeAudioSink(this, audioHTTPServer, callbackUrl);
+        audioSinkServiceRegistration = bundleContext.registerService(AudioSink.class, audioSink,
+                new java.util.Hashtable<>());
+        logger.info("[{}] Registered AudioSink for ESPHome device", logPrefix);
+    }
+
+    /**
+     * Returns the bundle context for this handler.
+     *
+     * @return the bundle context
+     */
+    public BundleContext getBundleContext() {
+        return bundleContext;
     }
 
     @Override
