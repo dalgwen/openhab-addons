@@ -76,7 +76,6 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
     @Override
     public Java223CompiledScript compile(@Nullable String originalScript) throws ScriptException {
         try {
-
             if (originalScript == null) {
                 throw new ScriptException("script cannot be null");
             }
@@ -179,11 +178,11 @@ public class Java223ScriptEngine extends JavaScriptEngine implements Invocable {
 
     @Override
     public <T> T getInterface(@Nullable Class<T> clazz) {
-        return null;
+        throw new UnsupportedOperationException("Not implemented");
     }
 
     @Override
     public <T> T getInterface(@Nullable Object o, @Nullable Class<T> clazz) {
-        return null;
+        throw new UnsupportedOperationException("Not implemented");
     }
 }

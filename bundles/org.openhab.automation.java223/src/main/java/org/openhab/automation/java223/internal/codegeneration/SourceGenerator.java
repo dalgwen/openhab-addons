@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -268,7 +269,10 @@ public class SourceGenerator {
             String scope = scopeAnnotation.name();
             String simpleClassName = clazz.getSimpleName();
             String packageName = SourceWriter.getPackageName(GENERATED, scope);
-            actionsByScope.computeIfAbsent(scope, (key -> new HashSet<>())).add(packageName + "." + simpleClassName);
+            Set<String> strings = actionsByScope.computeIfAbsent(scope, (key -> new HashSet<>()));
+            if (strings != null) { // never null but check thinks so
+                strings.add(packageName + "." + simpleClassName);
+            }
 
             logger.trace("Processing class '{}' in package '{}'", simpleClassName, clazz.getPackageName());
 
@@ -281,7 +285,7 @@ public class SourceGenerator {
             for (Method method : methods) {
                 String name = method.getName();
                 String returnValue = parseArgumentType(method.getGenericReturnType(), classesToImport);
-                ActionType actionType = findActionType(actions, scope, name);
+                ActionType actionType = findActionType(actions, scope, name, method);
 
                 List<ParameterDTO> parameters = mergeParameterInfos(method, actionType, classesToImport);
 
@@ -343,10 +347,22 @@ public class SourceGenerator {
         return null;
     }
 
-    private @Nullable ActionType findActionType(Collection<ActionType> actions, String scope, String name) {
-        for (ActionType actionType : actions) {
+    private @Nullable ActionType findActionType(Collection<ActionType> actions, String scope, String name,
+            Method method) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        actionType: for (ActionType actionType : actions) {
             String shouldStartWith = scope + "." + name + "#";
-            if (actionType.getUID().startsWith(shouldStartWith)) {
+            if (actionType.getUID().startsWith(shouldStartWith)
+                    && parameterTypes.length == actionType.getInputs().size()) {
+                // now verify method parameters
+                for (int i = 0; i < actionType.getInputs().size(); i++) {
+                    String parameterFromActionType = actionType.getInputs().get(i).getType();
+                    String parameterFromMethod = parameterTypes[i].getTypeName();
+                    if (!parameterFromActionType.equals(parameterFromMethod)) {
+                        continue actionType;
+                    }
+                }
+                // all parameters are ok, we found the action type
                 return actionType;
             }
         }
@@ -522,7 +538,7 @@ public class SourceGenerator {
 
         @SuppressWarnings("unchecked")
         TemplateMethodModelEx tmm = (args) -> escapeName(
-                ((List<freemarker.ext.beans.StringModel>) args).getFirst().getWrappedObject().toString());
+                ((List<freemarker.ext.beans.GenericObjectModel>) args).getFirst().getWrappedObject().toString());
         context.put("escapeName", tmm);
 
         StringWriter writer = new StringWriter();
@@ -533,7 +549,7 @@ public class SourceGenerator {
     }
 
     private static String capitalize(String minusString) {
-        return minusString.substring(0, 1).toUpperCase() + minusString.substring(1);
+        return minusString.substring(0, 1).toUpperCase(Locale.FRANCE) + minusString.substring(1);
     }
 
     private static String escapeName(String textToEscape) {

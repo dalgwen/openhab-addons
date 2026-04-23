@@ -1,13 +1,13 @@
 /**
  * Copyright (c) 2010-2026 Contributors to the openHAB project
- * <p>
+ *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
- * <p>
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0
- * <p>
+ *
  * SPDX-License-Identifier: EPL-2.0
  */
 package helper.rules;
@@ -36,6 +36,7 @@ import helper.rules.annotations.Debounce;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.automation.java223.common.BindingInjector;
+import org.openhab.automation.java223.common.Java223Constants;
 import org.openhab.automation.java223.common.Java223Exception;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
@@ -205,7 +206,7 @@ public class Java223Rule extends SimpleRule {
     @Override
     public Object execute(Action module, Map<String, ?> bindings) {
         // special self reference :
-        ((Map<String, Object>) bindings).put("bindings", bindings);
+        ((Map<String, Object>) bindings).put(Java223Constants.BINDINGS, bindings);
         // actual call :
         try {
             Debounce debounceLocal = debounce;
