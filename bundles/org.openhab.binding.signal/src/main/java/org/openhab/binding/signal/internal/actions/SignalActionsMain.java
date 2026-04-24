@@ -26,21 +26,9 @@ import java.util.Map;
  */
 @NonNullByDefault
 @ThingActionsScope(name = "signal")
-public class SignalActionsMain implements ThingActions {
+public class SignalActionsMain extends SignalActionsMessages {
 
     private final Logger logger = org.slf4j.LoggerFactory.getLogger(SignalActionsMain.class);
-
-    private @NonNullByDefault({}) SignalBridgeHandler handler;
-
-    @Override
-    public void setThingHandler(@Nullable ThingHandler handler) {
-        this.handler = (SignalBridgeHandler) handler;
-    }
-
-    @Override
-    public @Nullable ThingHandler getThingHandler() {
-        return handler;
-    }
 
     @RuleAction(label = "Register account", description = "Try to register a new number to the signal service")
     public @ActionOutputs({
@@ -124,78 +112,4 @@ public class SignalActionsMain implements ThingActions {
             throw new IllegalArgumentException("Instance is not an SignalActionsMain class.");
         }
     }
-
-
-    @RuleAction(label = "Send Message With Signal", description = "Send a message with Signal")
-    public @ActionOutputs({
-            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignalMain(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
-        Map<String, Object> resultMap = new HashMap<>();
-        if (recipient != null && !recipient.isEmpty() && message != null) {
-            DeliveryReport report = handler.send(recipient, message);
-            switch (report.deliveryStatus) {
-                case DELIVERED:
-                case READ:
-                case SENT:
-                    resultMap.put("RESULT", "OK");
-                    break;
-                case FAILED:
-                case UNKNOWN:
-                    resultMap.put("RESULT", "KO");
-                    break;
-            }
-        } else {
-            resultMap.put("RESULT", "KO");
-            logger.error("Signal cannot send a message with no recipient or text");
-        }
-        return resultMap;
-    }
-
-    public static Map<String, Object> sendSignalMain(@Nullable ThingActions actions, @Nullable String recipient,
-                                                 @Nullable String message) {
-        if (actions instanceof SignalActionsMain) {
-            return ((SignalActionsMain) actions).sendSignalMain(recipient, message);
-        } else {
-            throw new IllegalArgumentException("Instance is not an SignalActionsMessage class.");
-        }
-    }
-
-    @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
-    public @ActionOutputs({
-            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignalImageMain(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
-            @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
-        Map<String, Object> resultMap = new HashMap<>();
-
-        if (recipient != null && !recipient.isEmpty() && image != null) {
-            DeliveryReport report = handler.sendImage(recipient, image, text);
-            switch (report.deliveryStatus) {
-                case DELIVERED:
-                case READ:
-                case SENT:
-                    resultMap.put("RESULT", "OK");
-                    break;
-                case FAILED:
-                case UNKNOWN:
-                    resultMap.put("RESULT", "KO");
-                    break;
-            }
-        } else {
-            logger.error("Signal cannot send a photo with no recipient or text");
-            resultMap.put("RESULT", "KO");
-        }
-        return resultMap;
-    }
-
-    public static Map<String, Object> sendSignalImageMain(@Nullable ThingActions actions, @Nullable String recipient,
-                                                      @Nullable String image, @Nullable String text) {
-        if (actions instanceof SignalActionsMain) {
-            return ((SignalActionsMain) actions).sendSignalImageMain(recipient, image, text);
-        } else {
-            throw new IllegalArgumentException("Instance is not an SignalActionsMessage class.");
-        }
-    }
-
 }
