@@ -108,7 +108,8 @@ public class MusicAssistantHandlerFactory extends BaseThingHandlerFactory {
 
             // Register the player as an audio sink
             logger.trace("Registering an audio sink for player thing {}", thing.getUID());
-            MusicAssistantAudioSink audioSink = new MusicAssistantAudioSink(playerHandler, audioHTTPServer, callbackUrl);
+            MusicAssistantAudioSink audioSink = new MusicAssistantAudioSink(playerHandler, audioHTTPServer,
+                    callbackUrl);
             ServiceRegistration<AudioSink> audioSinkRegistration = bundleContext.registerService(AudioSink.class,
                     audioSink, new Hashtable<>());
             audioSinkRegistrations.put(thing.getUID().toString(), audioSinkRegistration);

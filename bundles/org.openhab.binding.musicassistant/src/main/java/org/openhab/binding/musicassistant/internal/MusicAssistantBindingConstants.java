@@ -28,8 +28,10 @@ public class MusicAssistantBindingConstants {
     public static final String BINDING_ID = "musicassistant";
 
     // List of all Thing Type UIDs
-    public static final ThingTypeUID MUSICASSISTANTPLAYER_THING_TYPE = new ThingTypeUID(BINDING_ID, "musicassistantplayer");
-    public static final ThingTypeUID MUSICASSISTANTSERVER_THING_TYPE = new ThingTypeUID(BINDING_ID, "musicassistantserver");
+    public static final ThingTypeUID MUSICASSISTANTPLAYER_THING_TYPE = new ThingTypeUID(BINDING_ID,
+            "musicassistantplayer");
+    public static final ThingTypeUID MUSICASSISTANTSERVER_THING_TYPE = new ThingTypeUID(BINDING_ID,
+            "musicassistantserver");
 
     // List of all Server Channel Ids
     public static final String CHANNEL_FAVORITES_LIST = "favoritesList";

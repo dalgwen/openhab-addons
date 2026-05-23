@@ -49,8 +49,8 @@ import org.slf4j.LoggerFactory;
  */
 @Component(scope = ServiceScope.PROTOTYPE, service = MusicAssistantPlayerDiscoveryService.class)
 @NonNullByDefault
-public class MusicAssistantPlayerDiscoveryService extends AbstractThingHandlerDiscoveryService<MusicAssistantServerHandler>
-        implements MusicAssistantPlayerEventListener {
+public class MusicAssistantPlayerDiscoveryService extends
+        AbstractThingHandlerDiscoveryService<MusicAssistantServerHandler> implements MusicAssistantPlayerEventListener {
     private final Logger logger = LoggerFactory.getLogger(MusicAssistantPlayerDiscoveryService.class);
 
     private static final int TIMEOUT = 60;
@@ -107,7 +107,8 @@ public class MusicAssistantPlayerDiscoveryService extends AbstractThingHandlerDi
     public void playerAdded(MusicAssistantPlayer player) {
         ThingUID bridgeUID = thingHandler.getThing().getUID();
 
-        ThingUID thingUID = new ThingUID(MUSICASSISTANTPLAYER_THING_TYPE, bridgeUID, player.macAddress.replace(":", ""));
+        ThingUID thingUID = new ThingUID(MUSICASSISTANTPLAYER_THING_TYPE, bridgeUID,
+                player.macAddress.replace(":", ""));
 
         if (!playerThingExists(thingUID)) {
             logger.debug("Player added {}: {} ", player.macAddress, player.name);
