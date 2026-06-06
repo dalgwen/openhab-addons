@@ -12,12 +12,10 @@
  */
 package org.openhab.binding.signal.internal.downloader;
 
-import java.io.Serial;
-import java.util.Optional;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.protocol.service.UnrecoverableException;
+
+import java.io.Serial;
 
 /**
  * To notify fatal download error
@@ -26,6 +24,10 @@ import org.openhab.binding.signal.internal.protocol.service.UnrecoverableExcepti
  */
 @NonNullByDefault
 public class VersionDownloaderException extends UnrecoverableException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public VersionDownloaderException(String message, Exception cause) {
         super(message, cause);
     }

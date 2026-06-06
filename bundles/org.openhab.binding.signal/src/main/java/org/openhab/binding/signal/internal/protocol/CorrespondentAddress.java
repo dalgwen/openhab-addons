@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * @author Gwendal ROULLEAU - Initial contribution
  */
 @NonNullByDefault
-public class RecipientAddress {
+public class CorrespondentAddress {
     public static final UUID UNKNOWN_UUID = new UUID(0, 0);
 
     private static final Pattern UUID_PATTERN = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", Pattern.CASE_INSENSITIVE);
@@ -36,7 +36,7 @@ public class RecipientAddress {
         return uuid != null && UUID_PATTERN.matcher(uuid).matches();
     }
 
-    public RecipientAddress(@Nullable String number, @Nullable String uuid) {
+    public CorrespondentAddress(@Nullable String number, @Nullable String uuid) {
         this.number = number;
         this.uuid = uuid;
         if (number == null && uuid == null) {

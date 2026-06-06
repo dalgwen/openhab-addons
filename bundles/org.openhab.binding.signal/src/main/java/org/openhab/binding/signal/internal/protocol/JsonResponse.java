@@ -51,6 +51,10 @@ public class JsonResponse<T> {
     private JsonResponse() {
     }
 
+    public static <T> JsonResponse<T> none(Class<T> _clazz) {
+        return new JsonResponse<>();
+    }
+
     public String getJsonrpc() {
         return jsonrpc;
     }

@@ -23,18 +23,24 @@ public class ArchitectureDetector {
     private static final Logger logger = LoggerFactory.getLogger(ArchitectureDetector.class);
 
     public enum Architecture {
-        LINUX_AARCH64("aarch64-unknown-linux-gnu"),
-        LINUX_X86_64("x86_64-unknown-linux-gnu"),
-        LINUX_MUSL_X86_64("x86_64-unknown-linux-musl"),
-        MACOS_AARCH64("aarch64-apple-darwin"),
-        MACOS_X86_64("x86_64-apple-darwin"),
-        WINDOWS_X86_64("x86_64-pc-windows"),
-        UNKNOWN("NONE");
+        LINUX_AARCH64("aarch64-unknown-linux-gnu", true),
+        LINUX_X86_64("x86_64-unknown-linux-gnu", true),
+        LINUX_MUSL_X86_64("x86_64-unknown-linux-musl", false),
+        MACOS_AARCH64("aarch64-apple-darwin", true),
+        MACOS_X86_64("x86_64-apple-darwin", false),
+        WINDOWS_X86_64("x86_64-pc-windows", true),
+        UNKNOWN("NONE", false);
 
         public final String downloadDiscriminant;
+        private final boolean supported;
 
-        Architecture(String downloadDiscriminant) {
+        public boolean isSupported() {
+            return supported;
+        }
+
+        Architecture(String downloadDiscriminant, boolean isSupported) {
             this.downloadDiscriminant = downloadDiscriminant;
+            this.supported = isSupported;
         }
     }
 
@@ -42,8 +48,8 @@ public class ArchitectureDetector {
         return System.getProperty(property, "unknown");
     }
 
-    private static String getEnvironmentVariableSafe(@SuppressWarnings("SameParameterValue") String variable) {
-        String value = System.getenv(variable);
+    private static String getLibc() {
+        String value = System.getenv("org.osgi.framework.os.libc");
         return value != null ? value : "unknown";
     }
 
@@ -71,7 +77,7 @@ public class ArchitectureDetector {
             if (arch.contains("aarch64")) {
                 detected = Architecture.LINUX_AARCH64;
             } else if (arch.contains("amd64") || arch.contains("x86_64")) {
-                String libc = getEnvironmentVariableSafe("org.osgi.framework.os.libc").toLowerCase();
+                String libc = getLibc().toLowerCase();
                 if (libc.contains("musl")) {
                     detected = Architecture.LINUX_MUSL_X86_64;
                 } else {

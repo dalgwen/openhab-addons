@@ -15,7 +15,6 @@ package org.openhab.binding.signal.internal;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
-import org.openhab.binding.signal.internal.downloader.VersionManager;
 import org.openhab.binding.signal.internal.protocol.*;
 import org.openhab.binding.signal.internal.protocol.service.JsonRpcStdioLocalService;
 import org.openhab.binding.signal.internal.protocol.service.JsonRpcStdioManagedService;
@@ -52,8 +51,11 @@ public abstract class SignalService {
     public abstract void start();
     public abstract void stop();
 
-    public abstract DeliveryReport send(String phoneNumber, String address, String message, @Nullable String attachment);
+    public abstract DeliveryReport sendMessage(String account, String recipient, String message, @Nullable String attachment);
 
-    public abstract boolean exists(String phoneNumber) throws JsonResponseException, IOException;
-    public abstract <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType) throws JsonResponseException, IOException;
+    public abstract boolean exists(String account) throws JsonResponseException, IOException;
+    public <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType) throws JsonResponseException, IOException {
+        return sendRequest(account, method, parameters, responseType, 30);
+    }
+    public abstract <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType, int waitTime) throws JsonResponseException, IOException;
 }

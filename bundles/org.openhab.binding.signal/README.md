@@ -1,18 +1,21 @@
 # Signal Binding
 
 This binding connects to the Signal network and allows openHAB to send and receive messages through it.
-It relies on the [signal-cli](https://github.com/AsamK/signal-cli) project. By default, it will manage the download and installation of signal-cli automatically.
-It is also possible to use a pre-installed signal-cli binary.
+It relies on the [signal-cli](https://github.com/AsamK/signal-cli) project.
+By default, it will manage the download and installation of signal-cli automatically (a custom graalVM native build).
+It is also possible to use a pre-installed signal-cli binary (local or remote).
 
-This binding relies on a binary library compiled for specific architecture. These architectures are theoretically supported:
+This binding also relies on a binary library compiled for specific architecture. These architectures are theoretically supported:
 
 * amd64 for Windows
 * amd64 for Linux
-* amd64 for Linux (musl linked lib for distrib like alpine) - use the env variable `org.osgi.framework.os.libc=musl` to select this version
-* arm for Linux
-* aarch64/arm64 for Linux
+* arm64 for Linux
 * aarch64 for OSX
+
+These architectures **WAS** supported, but **NOT ANYMORE** (openHAB support dropped, or I didn't find a way to build them on Github runners):
+* amd64 for Linux (musl linked lib for distrib like alpine) - use the env variable `org.osgi.framework.os.libc=musl` to select this version
 * amd64 for OSX
+* arm for Linux
 
 ## Supported Things
 
@@ -31,34 +34,28 @@ A *signalconversation* thing will be discovered and added to the inbox everytime
 
 Be aware that this Signal binding stores secret keys, id, etc, on your disk (unencrypted). Take appropriate measures protecting the directory <OPENHAB_USER_DIR>/signal.
 
-Also, note that if you use docker with openHAB, you have to lift the cryptography restrictions. See [this link](https://github.com/openhab/openhab-docker#java-cryptographic-strength-policy) for more details.
+Note that if you use docker with openHAB, you may have to lift the cryptography restrictions for signal-cli. See [this link](https://github.com/openhab/openhab-docker#java-cryptographic-strength-policy) for more details.
 
 ## Configuration
 
-The binding has two configuration parameters
+The binding has two configuration parameters.
 
 - The main one is the "kind" of signal-cli integration you want :
-  - LOCAL: the binding will use the signal-cli binary installed on the system. You have to provide the path to the binary in the configuration.
-  - MANAGED: the binding will download and install signal-cli automatically.
-  - NETWORK: the binding will connect to a remote signal-cli instance. You have to provide the URL of the remote signal-cli instance in the configuration.
+  - MANAGED: the binding will download, install, and run signal-cli automatically.
+  - LOCAL: the binding will use the signal-cli binary installed on the system. You have to provide the path to the binary in the configuration. The binding will launch it.
+  - NETWORK: the binding will connect to a remote signal-cli instance. You have to provide the URL of the remote signal-cli instance in the configuration. You have to launch it yourself.
 - The second is an additional configuration string.
-  - for LOCAL, it is the path to the signal-cli binary.
-  - for MANAGED, it is the version of signal-cli you want to install.
+  - for MANAGED, it is the version of signal-cli you want to install. Let it empty to have the default value. Available versions are [here](https://openhab.jfrog.io/ui/repos/tree/General/libs-runtime-deps/AsamK/signal-cli). You may have to update to a more recent value if Signal has changed its protocol.
+  - for LOCAL, it is the path to the signal-cli binary. You can provide at the beginning of the 'configuration' parameter, environment variables to customize the process execution.
   - for NETWORK, it is the ip:port of the remote signal-cli instance.
-
-For LOCAL and MANAGED, you can provide at the beginning of the 'configuration' parameter, environment variables to customize the process execution.
-
-For example, you can add `JAVA_HOME=/path/to/java25_home` as a prefix to the configuration parameter to set up the java version you want to use with signal-cli.
-As time of write, Signal-cli USE java 25+. As openHAB uses java 21, you will need to have both JDK installed and set up the JDK 25 location in the environment variable.   
-
 
 ## Captcha (for signalaccount only)
 
 Unfortunately, registering a custom agent (a non-mobile device) requires an additional step. Signal protects its network with a captcha anti-bot registration system.
 
-So, the Signal network will probably require a captcha to register your number. This is a string, returned by a dedicated web page, proving that you are a human. You have then to provide it to the binding.
+You must provide a string, returned by a dedicated web page, proving that you are a human. You have then to provide it to the binding.
 
-To get one, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and copy/paste the resulting link in the signal account thing configuration.
+To get the captcha, you have to pass a verification check on the URL https://signalcaptchas.org/registration/generate.html and copy/paste the resulting link during the registration process.
 
 
 ## Thing Configuration
@@ -73,8 +70,8 @@ Tip: you can use a landline number. The only requirement is that you can receive
 Because Signal requires several verifications, the signal account thing creation is a several-step process.
 Once you created the Thing, you have to:
 
-* At first, you have to get a valid captcha proving that you are human. You can try without one, but Signal will probably reject your attempt (see above).
-* Use the 'register' action on the Thing (you can use Main UI or anything else). Fill in the captcha as a parameter. You will then receive a verification code (either by voice or SMS)
+* Get a valid captcha proving that you are human. You can try without one, but Signal will probably reject your attempt (see above).
+* Use the 'register' action on the Thing (you can use Main UI or anything else). Fill in the captcha as a parameter. You will then receive a verification code (either by voice or SMS). Note: voice verification can take longer due to signal restriction (+1 minute)
 * Use the 'verify' action on the Thing. Set the verificationCode parameter.
 
 For a *signalaccount*, the following parameters are available:
@@ -92,7 +89,7 @@ This is also a several-step registration process.
 
 * At first, create the thing. It will be in the CONFIGURATION_PENDING state.
 * Use the 'link' action on the Thing.  (you can use Main UI or anything else). 
-* Then, open the thing with the main UI (you may have to refresh the page) and scan the QR code with your Signal application on your phone (linked devices menu). You have 30 seconds to do so. If you pass the delay, try restarting the thing.
+* Then, open the thing with the main UI (you may have to refresh the page) and scan the QR code with your Signal application on your phone (linked devices menu). You have 60 seconds to do so.
 
 | Parameter Name | type | required | description    |
 |----------------|------|----------|----------------|
@@ -102,7 +99,7 @@ This is also a several-step registration process.
 
 ### Conversation
 
-The *signalconversation* thing is just a shortcut to address/receive messages with a specific number, with convenient item. It is not mandatory to use the binding, as you can use action and trigger channel to send/receive a message once the signal bridge is configured.
+The *signalconversation* thing is just an optional shortcut to exchange messages with a specific number, with convenient channels.
 
 | Parameter Name | type | description |
 |-----------|----------|----------|
@@ -114,9 +111,10 @@ The *signalconversation* thing is just a shortcut to address/receive messages wi
 ### Trigger channels
 
 The *signalaccount* and *signallinkedaccount* has the following trigger channel :
+
 | Channel ID          | event                      |  
 |---------------------|----------------------------|
-|receivetrigger| The number and the message received (concatened with the '\|' character as a separator)|
+|receivetrigger| The number and the message received (concatenated with the '\|' character as a separator)|
 
 The *signalconversation* supports the following channels :
 
@@ -151,7 +149,7 @@ Once this action instance is retrieved, you can invoke the 'sendSignal' method o
 signalAction.sendSignal("+33123456789", "Hello world!")
 ```
 
-You can also send image with this action, using file path, web resource, item of type Image, or direct dataUri :
+You can also send images with this action, using file path, web resource, item of type Image, or direct dataUri :
 
 ```
 signalAction.sendSignalImage("+33123456789", "/path/to/image.png", "Look at this !")
@@ -164,8 +162,6 @@ signalAction.sendSignalImage("+33123456789", "data:image/png;base64,iVBORw0KGgoA
 When using the linked bridge thing, you can use the special recipient "self" to send a note to yourself. When sending a note to yourself, there is no notification on your other devices.
 
 If you want notification when sending a message to your own account, use the send action with your full number.
-
-Each "send" action returns a map with one key: "RESULT", which has either "OK" or "KO" as a value.
 
 #### Return value
 
@@ -195,18 +191,4 @@ then
    val signalAction = getActions("signal","signal:signalaccountbridge:mymainsignalaccount")
    signalAction.sendSignal("+33123456789", "Alert !")
 end
-```
-
-### Receive and forward message
-
-`signal.py` with the python helper library :
-
-```python
-@rule("signalcommand.receive", description="Receive SMS and return it")
-@when("Channel signal:signalaccountbridge:mymainsignalaccount:receivetrigger triggered")
-def signalcommand(event):
-    sender_and_message = event.event.split("|")
-    sender = sender_and_message[0]
-    content = sender_and_message[1]
-    actions.get("signal", "signal:signalaccountbridge:mymainsignalaccount").sendSignal("+336123456789", sender + " just send the following message: " + content)
 ```

@@ -17,7 +17,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalConversationConfiguration;
 import org.openhab.binding.signal.internal.protocol.DeliveryReport;
-import org.openhab.binding.signal.internal.protocol.RecipientAddress;
+import org.openhab.binding.signal.internal.protocol.CorrespondentAddress;
 import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
@@ -56,7 +56,7 @@ public class SignalConversationHandler extends BaseThingHandler {
 
     public String getRecipient() {
         String recipient = config.recipient.trim();
-        if (RecipientAddress.isUuid(recipient)) {
+        if (CorrespondentAddress.isUuid(recipient)) {
             return recipient;
         } else {
             if (recipient.startsWith("+")) {
@@ -87,10 +87,10 @@ public class SignalConversationHandler extends BaseThingHandler {
         return this.bridgeHandler;
     }
 
-    protected void checkAndReceive(RecipientAddress address, String message) {
+    protected void checkAndReceive(CorrespondentAddress address, String message) {
         String conversationRecipient = getRecipient();
         // is the recipient the one handled by this conversation ?:
-        String uuid = address.uuid().orElse(RecipientAddress.UNKNOWN_UUID.toString());
+        String uuid = address.uuid().orElse(CorrespondentAddress.UNKNOWN_UUID.toString());
         String number = address.number().orElse("+0123456789");
         if (conversationRecipient.equals(uuid) || conversationRecipient.equals(number)) {
             updateState(SignalBindingConstants.CHANNEL_RECEIVED, new StringType(message));

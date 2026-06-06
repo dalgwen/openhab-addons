@@ -35,7 +35,7 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
 
     private final Logger logger = LoggerFactory.getLogger(JsonRpcStdioAbstractService.class);
 
-    private static final String[] DEFAULT_ARGS = new String[] {"--trust-new-identities", "always", "-o", "json", "jsonRpc", "--send-read-receipts", "--ignore-stories"};
+    private static final String[] DEFAULT_ARGS = new String[] {"--trust-new-identities", "always", "-o", "json", "jsonRpc", "--ignore-stories"};
 
     @Nullable
     private Process process;
