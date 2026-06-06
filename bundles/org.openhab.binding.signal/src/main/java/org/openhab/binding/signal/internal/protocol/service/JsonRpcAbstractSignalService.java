@@ -13,6 +13,7 @@
 package org.openhab.binding.signal.internal.protocol.service;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -81,43 +82,43 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
-    public DeliveryReport send(String phoneNumber, String address, String message, @Nullable String attachment) {
+    public DeliveryReport sendMessage(String account, String recipient, String message, @Nullable String attachment) {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("message", message);
         if (attachment != null) {
             parameters.put("attachment", attachment);
         }
-        if (NOTE_TO_SELF.equalsIgnoreCase(address)) {
-            parameters.put("recipient", phoneNumber);
+        if (NOTE_TO_SELF.equalsIgnoreCase(recipient)) {
+            parameters.put("recipient", account);
             parameters.put("noteToSelf", true);
             parameters.put("notifySelf", false);
-        } else if (phoneNumber.equals(address)) {
-            parameters.put("recipient", phoneNumber);
+        } else if (account.equals(recipient)) {
+            parameters.put("recipient", account);
             parameters.put("noteToSelf", true);
             parameters.put("notifySelf", true);
         } else {
-            parameters.put("recipient", address);
+            parameters.put("recipient", recipient);
         }
         try {
-            JsonResponse<Object> response = sendRequest(phoneNumber, "send", parameters, Object.class);
+            JsonResponse<Object> response = sendRequest(account, "send", parameters, Object.class);
             Object result = response.getResult();
             logger.debug("Response after send: {}", result);
             if (result instanceof Map<?, ?>) {
                 Optional<String> status = getValueAt(String.class, (Map) result, "results", "type");
                 if ("SUCCESS".equalsIgnoreCase(status.orElse("UNKNOWN"))) {
-                    return new DeliveryReport(DeliveryStatus.SENT, address);
+                    return new DeliveryReport(DeliveryStatus.SENT, recipient);
                 } else {
-                    return new DeliveryReport(DeliveryStatus.FAILED, address);
+                    return new DeliveryReport(DeliveryStatus.FAILED, recipient);
                 }
             } else {
-                return new DeliveryReport(DeliveryStatus.FAILED, address);
+                return new DeliveryReport(DeliveryStatus.FAILED, recipient);
             }
         } catch (JsonResponseException jsonResponseException) {
-            logger.warn("Cannot send message to {}, Signal error message is: {}", address, jsonResponseException.getMessage());
-            return new DeliveryReport(DeliveryStatus.FAILED, address);
+            logger.warn("Cannot send message to {}, Signal error message is: {}", recipient, jsonResponseException.getMessage());
+            return new DeliveryReport(DeliveryStatus.FAILED, recipient);
         } catch (IOException e) {
-            logger.warn("Cannot send message to {}", address, e);
-            return new DeliveryReport(DeliveryStatus.FAILED, address);
+            logger.warn("Cannot send message to {}", recipient, e);
+            return new DeliveryReport(DeliveryStatus.FAILED, recipient);
         }
     }
 
@@ -236,6 +237,10 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
                         }
                         throw new IOException("Connection end unexpectedly with null line.");
                     } catch (IOException e) {
+                        if (!shouldRun) {
+                            logger.debug("Connection closed but quitting, ignoring exception :");
+                            return;
+                        }
                         logger.error("Exception when connecting with signal-cli", e);
                         connectionStateEvent(SignalAccountEventListener.ConnectionState.DISCONNECTED, e.toString());
                         final long sleepMilliseconds = 1000 * (long) Math.pow(2, backOffCounter);
@@ -292,7 +297,7 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
             }
             SignalAccount signalAccount = signalAccountManager.getSignalAccount(accountNumber);
             if (signalAccount == null) {
-                logger.warn("Received message for unknown account {}", accountNumber);
+                logger.warn("Received message for unknown or disabled account {}", accountNumber);
                 return false;
             }
 
@@ -301,9 +306,9 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
                 source = getValueAt(String.class, params, ENVELOPE, "sourceNumber").orElse(null);
             }
             String sourceUuid = getValueAt(String.class, params, ENVELOPE, "sourceUuid").orElse(null);
-            RecipientAddress recipientAddress;
+            CorrespondentAddress correspondentAddress;
             try {
-                recipientAddress = new RecipientAddress(source, sourceUuid);
+                correspondentAddress = new CorrespondentAddress(source, sourceUuid);
             } catch (IllegalArgumentException e) {
                 logger.warn("Cannot parse recipient address from source {} and uuid {}", source, sourceUuid);
                 return false;
@@ -311,7 +316,21 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
 
             String message = getValueAt(String.class, params, ENVELOPE, "dataMessage", "message").orElse(null);
             if (message != null && ! message.isBlank()) {
-                signalAccount.messageReceived(recipientAddress, message);
+                boolean shouldReturnReadReceipt = signalAccount.messageReceived(correspondentAddress, message);
+                if (shouldReturnReadReceipt) {
+                    Map<String, Object> receiptParameters = new HashMap<>();
+                    receiptParameters.put("type", "read");
+                    String recipient = correspondentAddress.uuid().orElse("");
+                    receiptParameters.put("recipient", recipient != null ? recipient : ""); // cannot be null but checkstyle complains
+                    Double targetTimestampD = getValueAt(Double.class, params, ENVELOPE, "timestamp").orElse(0D);
+                    long targetTimestamp = targetTimestampD != null ? targetTimestampD.longValue() : 0L; // not null but checkstyle complains
+                    receiptParameters.put("targetTimestamp", targetTimestamp);
+                    try {
+                        sendRequest(accountNumber,"sendReceipt", receiptParameters, Object.class, -1 );
+                    } catch (JsonResponseException | IOException e) {
+                        logger.warn("Cannot send read receipt for account {}", accountNumber, e);
+                    }
+                }
                 return true;
             }
 
@@ -322,7 +341,7 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
                 String emoji = (String) reactionEmoji.get("emoji");
                 if (emoji != null) {
                     Reaction reaction = new Reaction(isRemove, emoji);
-                    signalAccount.reactionReceived(recipientAddress, reaction);
+                    signalAccount.reactionReceived(correspondentAddress, reaction);
                 } else {
                     logger.warn("Cannot parse reaction emoji from {}", params);
                 }
@@ -332,7 +351,7 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
             // message from self :
             Optional<String> messageFromSelf = getValueAt(String.class, params, ENVELOPE, "syncMessage", "sentMessage", "message");
             if (messageFromSelf.isPresent()) {
-                signalAccount.messageReceived(recipientAddress, messageFromSelf.get());
+                signalAccount.messageReceived(correspondentAddress, messageFromSelf.get());
                 return true;
             }
 
@@ -340,13 +359,13 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
             if (receiptOptional.isPresent()) {
                 Map receipt = receiptOptional.get();
                 if ( Boolean.TRUE == receipt.get("isDelivery")) {
-                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.SENT, recipientAddress));
+                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.DELIVERED, correspondentAddress));
                     return true;
                 } else if ( Boolean.TRUE == receipt.get("isRead")) {
-                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.DELIVERED, recipientAddress));
+                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.READ, correspondentAddress));
                     return true;
-                } else if ( Boolean.TRUE == receipt.get("isViewed")) {
-                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.READ, recipientAddress));
+                } else if ( Boolean.TRUE == receipt.get("isViewed")) { // for vocal message and maybe image
+                    signalAccount.deliveryStatusReceived(new DeliveryReport(DeliveryStatus.READ, correspondentAddress));
                     return true;
                 }
             }
@@ -356,32 +375,36 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
     }
 
     private boolean handleResponse(String line) throws JsonSyntaxException {
-        @SuppressWarnings("rawtypes")
-        JsonResponse jsonResponse = gson.fromJson(line, JsonResponse.class);
-        if (jsonResponse == null) { // cannot be null here but checkstyle complains
-            return false;
-        }
-        String responseId = jsonResponse.getId();
-        if (responseId == null) { // not a response
-            return false;
-        }
-        @SuppressWarnings("rawtypes")
-        CompletableFuture<JsonResponse> waitingReceiver = waitingReceivers.remove(responseId);
-        if (waitingReceiver != null) {
-            if (jsonResponse.getError() != null) {
-                String message = jsonResponse.getError().getMessage() + " (" + jsonResponse.getError().getCode() + ")";
-                waitingReceiver.completeExceptionally(
-                        new JsonResponseException(message, jsonResponse.getError()));
-            } else {
-                waitingReceiver.complete(jsonResponse);
+        try {
+            @SuppressWarnings("rawtypes")
+            JsonResponse jsonResponse = gson.fromJson(line, JsonResponse.class);
+            if (jsonResponse == null) { // cannot be null here but checkstyle complains
+                return false;
             }
-        } else {
-            logger.warn("Received message for unknown request ID: {}", responseId);
-            if (jsonResponse.getError() != null) {
-                logger.warn("Unknown response is in error: {}", jsonResponse.getError().getMessage());
-            } else {
-                logger.warn("unknown response full line: {}", line);
+            String responseId = jsonResponse.getId();
+            if (responseId == null) { // not a response
+                return false;
             }
+            @SuppressWarnings("rawtypes")
+            CompletableFuture<JsonResponse> waitingReceiver = waitingReceivers.remove(responseId);
+            if (waitingReceiver != null) {
+                if (jsonResponse.getError() != null) {
+                    String message = jsonResponse.getError().getMessage() + " (" + jsonResponse.getError().getCode() + ")";
+                    waitingReceiver.completeExceptionally(
+                            new JsonResponseException(message, jsonResponse.getError()));
+                } else {
+                    waitingReceiver.complete(jsonResponse);
+                }
+            } else {
+                logger.debug("Received message for unwaited request ID: {}", responseId);
+                if (jsonResponse.getError() != null) {
+                    logger.warn("Unknown response is in error: {}", jsonResponse.getError().getMessage());
+                } else {
+                    logger.debug("unknown response full line: {}", line);
+                }
+            }
+        } catch (JsonIOException e) {
+            logger.warn("Received invalid JSON response : {}", line, e);
         }
         return true;
     }
@@ -398,37 +421,43 @@ public abstract class JsonRpcAbstractSignalService extends SignalService {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType) throws JsonResponseException, IOException {
+    public <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType, int waitTime) throws JsonResponseException, IOException {
         String requestId = null;
         try {
             @SuppressWarnings("rawtypes")
-            CompletableFuture<JsonResponse> jsonResponseCompletableFuture;
+            CompletableFuture<JsonResponse> jsonResponseCompletableFuture = null;
             // this try block writes the request
             lock.lock();
             try {
                 JsonRequest request = new JsonRequest(account, method, parameters);
                 requestId = request.getId();
                 String jsonRequest = gson.toJson(request);
-                jsonResponseCompletableFuture = registerReceiver(requestId);
+                if (waitTime > 0) {
+                    jsonResponseCompletableFuture = registerReceiver(requestId);
+                }
                 logger.debug("Sending request : {}", jsonRequest);
                 writeLine(jsonRequest);
             } finally {
                 lock.unlock();
             }
             // this try block waits for the response
-            try {
-                return (JsonResponse<T>) jsonResponseCompletableFuture.get(30, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                throw new IOException("Interruption while waiting for response");
-            } catch (ExecutionException e) {
-                switch (e.getCause()) {
-                    case JsonResponseException jsonResponseException -> throw jsonResponseException;
-                    case null, default -> throw new IOException(e);
+            if (jsonResponseCompletableFuture != null) {
+                try {
+                    return (JsonResponse<T>) jsonResponseCompletableFuture.get(waitTime, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    throw new IOException("Interruption while waiting for response");
+                } catch (ExecutionException e) {
+                    switch (e.getCause()) {
+                        case JsonResponseException jsonResponseException -> throw jsonResponseException;
+                        case null, default -> throw new IOException(e);
+                    }
+                } catch (TimeoutException e) {
+                    throw new IOException("Timeout while waiting for response");
+                } catch (ClassCastException e) {
+                    throw new IOException("Cannot cast response to expected type " + responseType.getSimpleName());
                 }
-            } catch (TimeoutException e) {
-                throw new IOException("Timeout while waiting for response");
-            } catch (ClassCastException e) {
-                throw new IOException("Cannot cast response to expected type " + responseType.getSimpleName());
+            } else {
+                return JsonResponse.none(responseType);
             }
         } finally {
             if (requestId != null) {

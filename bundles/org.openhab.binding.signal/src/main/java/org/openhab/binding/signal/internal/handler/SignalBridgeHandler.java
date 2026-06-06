@@ -34,6 +34,7 @@ import org.openhab.binding.signal.internal.SignalConversationDiscoveryService;
 import org.openhab.binding.signal.internal.actions.SignalActionsLinked;
 import org.openhab.binding.signal.internal.actions.SignalActionsMain;
 import org.openhab.binding.signal.internal.protocol.*;
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -126,7 +127,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
                 signalAccountLocal.finishLink(deviceLinkUri);
                 updateStatus(ThingStatus.ONLINE);
             } catch (IOException | IncompleteRegistrationException e) {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Not registered. Did you scan the QR code?");
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Not registered. Did you scan the QR code? (" + e.getMessage() + ")" );
+                cleanQRcode();
             }
         });
     }
@@ -188,19 +190,19 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
     }
 
     @Override
-    public void messageReceived(@Nullable RecipientAddress recipientAddress, String messageData) {
+    public boolean messageReceived(@Nullable CorrespondentAddress senderAddress, String messageData) {
         // dispatch to conversation :
-        if (recipientAddress != null) {
+        if (senderAddress != null) {
             for (SignalConversationHandler child : getChildHandlers()) {
-                child.checkAndReceive(recipientAddress, messageData);
+                child.checkAndReceive(senderAddress, messageData);
             }
         }
 
         String sender = null;
-        if (recipientAddress != null) {
-            sender = recipientAddress.number().orElse(null);
+        if (senderAddress != null) {
+            sender = senderAddress.number().orElse(null);
             if (sender == null) {
-                sender = recipientAddress.uuid().orElse(null);
+                sender = senderAddress.uuid().orElse(null);
             }
         }
         logger.debug("Receiving new message from {}", sender != null ? sender : "unknown");
@@ -208,6 +210,10 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
         // channel trigger
         String recipientAndMessage = (sender != null ? sender : "unknown") + "|" + messageData;
         triggerChannel(SignalBindingConstants.CHANNEL_TRIGGER_SIGNAL_RECEIVE, recipientAndMessage);
+
+        // we return a read receipt if the thing is a signal account bridge (dedicated).
+        // or if it is a note to itself
+        boolean returnReadReceipt = shouldReturnReadReceipt(senderAddress);
 
         // prepare discovery service
         if (sender != null) {
@@ -217,10 +223,19 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
                 finalDiscoveryService.buildByAutoDiscovery(sender);
             }
         }
+
+        return returnReadReceipt;
+    }
+
+    private boolean shouldReturnReadReceipt(@Nullable CorrespondentAddress correspondentAddress) {
+        boolean isDedicated = getThing().getThingTypeUID().equals(SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE);
+        boolean isNoteToSelf = correspondentAddress != null && correspondentAddress.number().isPresent()
+                && correspondentAddress.number().map( address -> address.equals(config.phoneNumber)).orElse(false);
+        return isDedicated || isNoteToSelf;
     }
 
     @Override
-    public void reactionReceived(@Nullable RecipientAddress sender, Reaction reaction) {
+    public void reactionReceived(@Nullable CorrespondentAddress sender, Reaction reaction) {
         if (config.enableReaction) {
             String newMessageBody;
             if (!reaction.isRemove()) {
@@ -366,8 +381,16 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
 
     @Override
     public void qrCodeToScan(String qrCode) {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Waiting for QR code scan");
-        getConfig().put(SignalBindingConstants.PROPERTY_QRCODE, qrCode);
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Waiting for QR code scan. You have 60 seconds!");
+        Configuration configuration = getConfig();
+        configuration.put(SignalBindingConstants.PROPERTY_QRCODE, qrCode);
+        updateConfiguration(configuration);
+    }
+
+    public void cleanQRcode() {
+        Configuration configuration = getConfig();
+        configuration.put(SignalBindingConstants.PROPERTY_QRCODE, "");
+        updateConfiguration(configuration);
     }
 
     @Override

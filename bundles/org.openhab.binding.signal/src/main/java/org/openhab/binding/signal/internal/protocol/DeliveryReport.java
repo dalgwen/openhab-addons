@@ -30,17 +30,17 @@ public class DeliveryReport {
     @Nullable
     private final String e164;
 
-    public DeliveryReport(DeliveryStatus deliveryStatus, RecipientAddress recipientAddress) {
+    public DeliveryReport(DeliveryStatus deliveryStatus, CorrespondentAddress correspondentAddress) {
         super();
         this.deliveryStatus = deliveryStatus;
-        this.aci = recipientAddress.uuid().orElse(null);
-        this.e164 = recipientAddress.number().orElse(null);
+        this.aci = correspondentAddress.uuid().orElse(null);
+        this.e164 = correspondentAddress.number().orElse(null);
     }
 
     public DeliveryReport(DeliveryStatus deliveryStatus, String id) {
         super();
         this.deliveryStatus = deliveryStatus;
-        if (RecipientAddress.isUuid(id)) {
+        if (CorrespondentAddress.isUuid(id)) {
             this.aci = id;
             this.e164 = null;
         } else {

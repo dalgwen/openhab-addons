@@ -102,17 +102,35 @@ public class SignalAccount {
 
     public void finishLink(String deviceLinkUri) throws IOException, IncompleteRegistrationException {
         Map<String, Object> config = new HashMap<>();
-        config.put("deviceLinkUri", deviceLinkUri);
         config.put("deviceName", deviceName);
+        config.put("deviceLinkUri", deviceLinkUri);
+        JsonResponseException initialException = null;
         try {
-            JsonResponse<Object> response = signalAccountManager.getSignalService().sendRequest(null, "finishLink", config, Object.class);
-            Map<String,String> result = (Map<String,String>) response.getResult();
-            Optional.ofNullable(result).map(map -> map.get("number"))
-                    .orElseThrow(() -> new IncompleteRegistrationException(RegistrationState.ERROR, "No number returned from the finish link attempt"));
-            logger.debug("finishLink response: {}", response);
-        } catch (JsonResponseException | ClassCastException e) {
-            logger.debug("Error JsonResponseException during linked registration attempt", e);
-            throw new IncompleteRegistrationException(RegistrationState.ERROR, e.getMessage());
+            try {
+                JsonResponse<Object> response = signalAccountManager.getSignalService().sendRequest(null, "finishLink", config, Object.class, 60);
+                @SuppressWarnings("unchecked")
+                Map<String, String> result = (Map<String, String>) response.getResult();
+                Optional.ofNullable(result).map(map -> map.get("number"))
+                        .orElseThrow(() -> new IncompleteRegistrationException(RegistrationState.ERROR, "No number returned from the finish link attempt"));
+                logger.debug("finishLink response: {}", response);
+            } catch (JsonResponseException e) { //workaround for strange signal-cli behavior. It may be OK.
+                initialException = e;
+                String message = e.getMessage();
+                if (message == null || ! message.contains("UnsupportedOperationException")) { // on UnsupportedOperationException, we can try anyway
+                    throw e;
+                }
+                //signal-cli is in an incoherent state. The account may be OK but it doesn't think so. Restarting it
+                signalAccountManager.getSignalService().stop();
+                Thread.sleep(1000);
+                signalAccountManager.getSignalService().start();
+            }
+        } catch (JsonResponseException | ClassCastException | InterruptedException e) {
+            Exception exceptionToThrow = e;
+            if (initialException != null) {
+                exceptionToThrow = initialException;
+            }
+            logger.debug("Error JsonResponseException during linked registration attempt", exceptionToThrow);
+            throw new IncompleteRegistrationException(RegistrationState.ERROR, exceptionToThrow.getMessage());
         }
     }
 
@@ -125,10 +143,11 @@ public class SignalAccount {
             if (verificationCodeMethod == RegistrationType.PhoneCall) {
                 // first ask SMS
                 try {
-                    JsonResponse<Object> response = signalAccountManager.getSignalService().sendRequest(phoneNumber, "register", config, Object.class);
+                    signalAccountManager.getSignalService().sendRequest(phoneNumber, "register", config, Object.class);
                 } catch (JsonResponseException e) {
-                    if (! e.getMessage().contains("InvalidTransportModeException")) {
-                        //ignore InvalidTransportModeException (it may be an old account ans sms is disabled server side) and try directly phone call
+                    String message = e.getMessage();
+                    if (message == null || ! message.contains("InvalidTransportModeException")) {
+                        //ignore InvalidTransportModeException (it may be an old account and sms is disabled server side) and try directly phone call
                         throw e;
                     }
                 }
@@ -140,40 +159,55 @@ public class SignalAccount {
                 signalAccountManager.getSignalService().sendRequest(phoneNumber, "register", config, Object.class);
                 newStateEvent(SignalAccountEventListener.ConnectionState.DISCONNECTED, "Waiting for verification code (sent by voice call)");
             } else {
-                JsonResponse<Object> response = signalAccountManager.getSignalService().sendRequest(phoneNumber, "register", config, Object.class);
+                signalAccountManager.getSignalService().sendRequest(phoneNumber, "register", config, Object.class);
                 newStateEvent(SignalAccountEventListener.ConnectionState.DISCONNECTED, "Waiting for verification code (sent by SMS)");
             }
         } catch (JsonResponseException | InterruptedException e) {
-            newStateEvent(SignalAccountEventListener.ConnectionState.DISCONNECTED, "Cannot register:" + e.getMessage());
-            throw new IOException("Cannot register", e);
+            String message = "Cannot register:" + e.getMessage();
+            newStateEvent(SignalAccountEventListener.ConnectionState.DISCONNECTED, message);
+            throw new IOException(message, e);
         }
     }
 
     public void verify(String verificationCode) throws IncompleteRegistrationException, IOException {
         Map<String, Object> config = new HashMap<>();
         config.put("verificationCode", verificationCode);
+        JsonResponseException initialException = null;
         try {
-            signalAccountManager.getSignalService().sendRequest(phoneNumber, "verify", config, Object.class);
+            try {
+                signalAccountManager.getSignalService().sendRequest(phoneNumber, "verify", config, Object.class);
+            } catch (JsonResponseException e) { //workaround for strange signal-cli behavior. It may be OK.
+                initialException = e;
+                String message = e.getMessage();
+                if (message == null || ! message.contains("UnsupportedOperationException")) { // on UnsupportedOperationException, we can try anyway
+                    throw e;
+                }
+                //signal-cli is in an incoherent state. The account may be OK but it doesn't think so. Restarting it
+                signalAccountManager.getSignalService().stop();
+                Thread.sleep(1000);
+                signalAccountManager.getSignalService().start();
+            }
             check();
             updateProfile();
-        } catch (JsonResponseException e) {
-            logger.debug("Error JsonResponseException during registration/verify attempt", e);
-            throw new IncompleteRegistrationException(RegistrationState.ERROR, e.getMessage());
+            logger.info("Registration successful");
+        } catch (JsonResponseException | InterruptedException | IncompleteRegistrationException e) {
+            Exception exceptionToThrow = e;
+            if (initialException != null) {
+                exceptionToThrow = initialException;
+            }
+            logger.debug("Error JsonResponseException during registration/verify attempt", exceptionToThrow);
+            throw new IncompleteRegistrationException(RegistrationState.ERROR, exceptionToThrow.getMessage(), exceptionToThrow);
         }
     }
 
     public DeliveryReport send(String address, String message, @Nullable String attachment) {
-        return signalAccountManager.getSignalService().send(phoneNumber, address, message, attachment);
+        return signalAccountManager.getSignalService().sendMessage(phoneNumber, address, message, attachment);
     }
 
     public synchronized void deleteAccount() throws IOException {
         try {
-            // is it the right way to unregister? Probably not
-            switch (provisionType) {
-                case MAIN -> signalAccountManager.getSignalService().sendRequest(phoneNumber, "unregister", null, Object.class);
-                case LINKED -> signalAccountManager.getSignalService().sendRequest(phoneNumber, "delete", null, Object.class);
-            }
-
+            signalAccountManager.getSignalService().sendRequest(phoneNumber, "unregister", null, Object.class);
+            signalAccountManager.getSignalService().sendRequest(phoneNumber, "deleteLocalAccountData", null, Object.class);
         } catch (JsonResponseException e) {
             throw new RuntimeException(e);
         }
@@ -183,12 +217,12 @@ public class SignalAccount {
         signalAccountEventListener.newStateEvent(connectionState, detailedMessage);
     }
 
-    public void messageReceived(RecipientAddress recipientAddress, String message) {
-        signalAccountEventListener.messageReceived(recipientAddress, message);
+    public boolean messageReceived(CorrespondentAddress correspondentAddress, String message) {
+        return signalAccountEventListener.messageReceived(correspondentAddress, message);
     }
 
-    public void reactionReceived(RecipientAddress recipientAddress, Reaction reaction) {
-        signalAccountEventListener.reactionReceived(recipientAddress, reaction);
+    public void reactionReceived(CorrespondentAddress correspondentAddress, Reaction reaction) {
+        signalAccountEventListener.reactionReceived(correspondentAddress, reaction);
     }
 
     public void deliveryStatusReceived(DeliveryReport deliveryReport) {

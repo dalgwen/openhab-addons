@@ -1,9 +1,7 @@
 package org.openhab.binding.signal.internal.protocol.service;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.HttpClient;
-import org.openhab.binding.signal.internal.downloader.VersionDownloaderException;
 import org.openhab.binding.signal.internal.downloader.VersionManager;
 import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
 
@@ -16,7 +14,7 @@ import java.util.Optional;
 @NonNullByDefault
 public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
 
-    private static final String DEFAULT_VERSION = "0.14.2";
+    private static final String DEFAULT_VERSION = "0.14.3";
     public static final String SIGNAL_CLI_RELEASE_DIRECTORY = "signal-cli-release";
     private final Path userDataPath;
     private final VersionManager versionManager;
@@ -31,8 +29,7 @@ public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
         String[] binaryPathParts = signalCliConnectionConfiguration.trim().split(" ");
         String lastNonEnvArg = "";
         Map<String, String> envVar = new HashMap<>();
-        for (int i = 0; i < binaryPathParts.length; i++) {
-            String arg = binaryPathParts[i];
+        for (String arg : binaryPathParts) {
             if (arg.contains("=")) {
                 String[] keyValue = arg.split("=", 2);
                 if (keyValue.length > 1) {
@@ -43,7 +40,6 @@ public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
             }
         }
         version = lastNonEnvArg.trim().isEmpty() || lastNonEnvArg.trim().equals("auto") ? DEFAULT_VERSION : lastNonEnvArg.trim();
-        envVar.put("JAVA_OPTS", "-Djava.library.path=" + userDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve("bin").toAbsolutePath());
         this.envVariable = envVar;
     }
 
@@ -60,7 +56,7 @@ public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
 
     @Override
     public Path getBinaryPath() {
-        return userDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY + "/bin/signal-cli");
+        return userDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve(versionManager.getSignalCliBinaryName());
     }
 
 

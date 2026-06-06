@@ -23,9 +23,10 @@ import org.eclipse.jdt.annotation.Nullable;
 @NonNullByDefault
 public interface SignalAccountEventListener {
 
-    public void messageReceived(@Nullable RecipientAddress sender, String messageData);
+    // You must return true if you want to deliver a read receipt
+    public boolean messageReceived(@Nullable CorrespondentAddress sender, String messageData);
 
-    public void reactionReceived(@Nullable RecipientAddress sender, Reaction reaction);
+    public void reactionReceived(@Nullable CorrespondentAddress sender, Reaction reaction);
 
     public void deliveryStatusReceived(DeliveryReport deliveryStatus);
 

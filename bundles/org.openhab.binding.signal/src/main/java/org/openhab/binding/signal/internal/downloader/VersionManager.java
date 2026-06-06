@@ -63,10 +63,10 @@ public class VersionManager {
         this.signalDataPath = signalDataPath;
     }
 
-    private String getSignalCliBinaryName() {
+    public String getSignalCliBinaryName() {
         ArchitectureDetector.Architecture archi = ArchitectureDetector.detect();
         if (archi == ArchitectureDetector.Architecture.WINDOWS_X86_64) {
-            return "signal-cli.bat";
+            return "signal-cli.exe";
         } else {
             return "signal-cli";
         }
@@ -75,7 +75,7 @@ public class VersionManager {
     public boolean isVersionReady(String version) {
         logger.debug("Checking if version {} is ready", version);
         Path versioningFilePath = signalDataPath.resolve(VERSIONING_FILE_NAME);
-        Path signalBinaryPath = signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve("bin").resolve(getSignalCliBinaryName());
+        Path signalBinaryPath = signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve(getSignalCliBinaryName());
         if (versioningFilePath.toFile().exists() && signalBinaryPath.toFile().exists()) {
             String currentVersion = null;
             try {
@@ -166,11 +166,21 @@ public class VersionManager {
         List<ArtifactoryChild> releases = null;
         try {
             releases = getChildren(version);
-            ArtifactoryChild release = releases.stream().filter(ar -> ar.uri().contains("signal-cli")).findFirst().orElseThrow(() -> new VersionDownloaderException("No releases of version " + version + " found"));
             ArchitectureDetector.Architecture archi = ArchitectureDetector.detect();
-            ArtifactoryChild nativeLib = releases.stream().filter(ar -> ar.uri().contains(archi.downloadDiscriminant)).findFirst().orElseThrow(() -> new VersionDownloaderException("No signal lib found for arch " + archi + "/" + archi.downloadDiscriminant));
+            ArtifactoryChild release = releases.stream()
+                    .filter(ar -> ar.uri().contains("signal-cli"))
+                    .filter(ar -> ar.uri().contains(archi.downloadDiscriminant))
+                    .findFirst()
+                    .orElseThrow(() -> new VersionDownloaderException("No releases of version " + version + " found"));
+            if (!archi.isSupported()) {
+                throw new VersionDownloaderException("Architecture " + archi + " is not supported for managed version");
+            }
+            ArtifactoryChild nativeLib = releases.stream()
+                    .filter(ar -> ar.uri().contains(archi.downloadDiscriminant))
+                    .findFirst()
+                    .orElseThrow(() -> new VersionDownloaderException("No signal lib found for arch " + archi + "/" + archi.downloadDiscriminant));
             downloadAndUncompress(release, signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY));
-            downloadAndUncompress(nativeLib, signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve("bin"));
+            downloadAndUncompress(nativeLib, signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY));
         } catch (ExecutionException | InterruptedException | TimeoutException | IOException e) {
             throw new VersionDownloaderException("Cannot download version " + version, e);
         }

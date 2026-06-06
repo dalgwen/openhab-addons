@@ -39,6 +39,12 @@ public class IncompleteRegistrationException extends Exception {
         this.additionalMessage = additionalMessage;
     }
 
+    public IncompleteRegistrationException(RegistrationState registrationState, @Nullable String additionalMessage, Exception source) {
+        super(additionalMessage, source);
+        this.registrationState = registrationState;
+        this.additionalMessage = additionalMessage;
+    }
+
     public RegistrationState getRegistrationState() {
         return registrationState;
     }

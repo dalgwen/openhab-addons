@@ -13,10 +13,6 @@ package org.openhab.binding.signal.internal.protocol.service;
  */
 
 import java.io.Serial;
-import java.util.Optional;
-
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * To notify fatal error
@@ -24,6 +20,10 @@ import org.eclipse.jdt.annotation.Nullable;
  * @author Gwendal ROULLEAU - Initial contribution
  */
 public class UnrecoverableException extends Exception {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     public UnrecoverableException(String message, Exception cause) {
         super(message, cause);
     }
