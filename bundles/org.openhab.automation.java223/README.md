@@ -146,7 +146,7 @@ So, a library is located under the `automation\lib\java` subdirectory, and is ei
   - a third party jar
   - or a custom one containing your own classes. Its name MUST start with `java223` to be recognized as a user library (and benefits from auto-instantiation and auto-injection).
 
-The Java223 bundle will monitor this directory and automatically adds everything inside to the compilation unit of your script (although, it's not applied retrospectively).
+The Java223 bundle will monitor this directory and automatically add everything inside to the compilation unit of your script (although, it's not applied retrospectively).
 There is no change to the fact that the script still has its dedicated ClassLoader, but now inside this ClassLoader, all your library classes are also available.
 
 Be careful: it also means that other scripts have their **own** library classes inside their **own** ClassLoader.
@@ -939,8 +939,8 @@ public class M {
     public Object main() {
         automationManager.addRule(new SimpleRule() {
             {
-                name = "abc"; //If not set, openHAB will assign random name
-                description = "When description is not set, openHAB will assign empty string as description";
+                name = "abc"; //If not set, getName() will return null
+                description = "When description is not set, getDescription() will return null";
                 uid = "1-2-3-uid"; //If not set, openHAB will assign random UID
                 triggers = List.of(TriggerBuilder.create().withId("trig1").withTypeUID("core.ItemStateChangeTrigger").withConfiguration(new Configuration(Map.of("itemName", "r"))).build());
             }
