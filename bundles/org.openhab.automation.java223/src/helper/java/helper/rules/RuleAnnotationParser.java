@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.automation.Condition;
@@ -178,7 +177,7 @@ public class RuleAnnotationParser {
             List<Condition> conditions = CONDITION_FROM_ANNOTATION.entrySet().stream()
                     .map(annotationClazz -> getModuleForAnnotation(member, annotationClazz.getKey(),
                             annotationClazz.getValue(), ModuleBuilder::createCondition, ruleName))
-                    .flatMap(Collection::stream).collect(Collectors.toList());
+                    .flatMap(Collection::stream).toList();
             simpleRule.setConditions(conditions);
 
             // log everything
@@ -227,7 +226,7 @@ public class RuleAnnotationParser {
         return Arrays.stream(annotations)
                 .map(annotation -> builder.get().withId(sanitizeTriggerId(ruleName, annotation.hashCode()))
                         .withTypeUID(typeUid).withConfiguration(getAnnotationConfiguration(annotation)).build())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private static Configuration getAnnotationConfiguration(Annotation annotation) {
