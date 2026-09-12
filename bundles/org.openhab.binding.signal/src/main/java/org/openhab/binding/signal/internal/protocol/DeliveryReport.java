@@ -65,10 +65,7 @@ public class DeliveryReport {
 
     @Override
     public String toString() {
-        return "DeliveryReport{" +
-                "deliveryStatus=" + deliveryStatus +
-                ", aci='" + aci + '\'' +
-                ", e164='" + e164 + '\'' +
-                '}';
+        return "DeliveryReport{" + "deliveryStatus=" + deliveryStatus + ", aci='" + aci + '\'' + ", e164='" + e164
+                + '\'' + '}';
     }
 }

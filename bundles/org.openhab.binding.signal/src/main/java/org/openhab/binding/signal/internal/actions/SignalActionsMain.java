@@ -1,5 +1,9 @@
 package org.openhab.binding.signal.internal.actions;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.handler.SignalBridgeHandler;
@@ -14,10 +18,6 @@ import org.openhab.core.thing.binding.ThingActions;
 import org.openhab.core.thing.binding.ThingActionsScope;
 import org.openhab.core.thing.binding.ThingHandler;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * The {@link SignalActionsMain} exposes some registration action for main account
@@ -45,10 +45,9 @@ public class SignalActionsMain implements ThingActions {
     @RuleAction(label = "Register account", description = "Try to register a new number to the signal service")
     public @ActionOutputs({
             @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: registration request sent. KO: error during registration attempt"),
-            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message")}) Map<String, Object> registerAccount(
-            @ActionInput(name = "captcha", label = "captcha", description = "Captcha") String captcha,
-            @ActionInput(name = "verificationMethod", label = "Verification method (TextMessage or PhoneCall)", description = "verificationMethod", defaultValue = "TextMessage") @Nullable String verificationMethod
-    ) {
+            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message") }) Map<String, Object> registerAccount(
+                    @ActionInput(name = "captcha", label = "captcha", description = "Captcha") String captcha,
+                    @ActionInput(name = "verificationMethod", label = "Verification method (TextMessage or PhoneCall)", description = "verificationMethod", defaultValue = "TextMessage") @Nullable String verificationMethod) {
         Map<String, Object> resultMap = new HashMap<>();
         if (verificationMethod == null || verificationMethod.isEmpty()) {
             verificationMethod = "TextMessage";
@@ -65,8 +64,8 @@ public class SignalActionsMain implements ThingActions {
         return resultMap;
     }
 
-
-    public Map<String, Object> registerAccount(@Nullable ThingActions actions, String captcha, @Nullable String verificationMethod) {
+    public Map<String, Object> registerAccount(@Nullable ThingActions actions, String captcha,
+            @Nullable String verificationMethod) {
         if (actions instanceof SignalActionsMain) {
             return ((SignalActionsMain) actions).registerAccount(captcha, verificationMethod);
         } else {
@@ -77,9 +76,8 @@ public class SignalActionsMain implements ThingActions {
     @RuleAction(label = "Verify account", description = "Verify an account number with the code sent by Signal")
     public @ActionOutputs({
             @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: verify request OK. KO: error during code verification"),
-            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message")}) Map<String, Object> verifyAccount(
-            @ActionInput(name = "verificationCode", label = "Verification Code", description = "Verification Code") String verificationCode
-    ) {
+            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message") }) Map<String, Object> verifyAccount(
+                    @ActionInput(name = "verificationCode", label = "Verification Code", description = "Verification Code") String verificationCode) {
         Map<String, Object> resultMap = new HashMap<>();
         try {
             handler.verify(verificationCode);
@@ -103,11 +101,12 @@ public class SignalActionsMain implements ThingActions {
     @RuleAction(label = "Update Profile", description = "Force profile update to change profile name and avatar (only for main account)")
     public @ActionOutputs({
             @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: update profile OK. KO: error during profile update"),
-            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message")}) Map<String, Object> updateProfile(
-            ) {
+            @ActionOutput(name = "ERROR", label = "Error", type = "java.lang.String", description = "Error message") }) Map<String, Object> updateProfile(
+                    @ActionInput(name = "name", label = "name", description = "Profile name") @Nullable String name,
+                    @ActionInput(name = "profileImage", label = "Profile Image", description = "Profile image") @Nullable String profileImage) {
         Map<String, Object> resultMap = new HashMap<>();
         try {
-            handler.updateProfile();
+            handler.updateProfile(name, profileImage);
             resultMap.put("RESULT", "OK");
         } catch (IOException e) {
             resultMap.put("RESULT", "KO");
@@ -117,9 +116,9 @@ public class SignalActionsMain implements ThingActions {
         return resultMap;
     }
 
-    public Map<String, Object> updateProfile(@Nullable ThingActions actions) {
+    public Map<String, Object> updateProfile(@Nullable ThingActions actions, String name, String profileImage) {
         if (actions instanceof SignalActionsMain) {
-            return ((SignalActionsMain) actions).updateProfile();
+            return ((SignalActionsMain) actions).updateProfile(name, profileImage);
         } else {
             throw new IllegalArgumentException("Instance is not an SignalActionsMain class.");
         }
@@ -127,9 +126,9 @@ public class SignalActionsMain implements ThingActions {
 
     @RuleAction(label = "Send Message With Signal", description = "Send a message with Signal")
     public @ActionOutputs({
-            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending"),}) Map<String, Object> sendSignal(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
+            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending") }) Map<String, Object> sendSignal(
+                    @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
+                    @ActionInput(name = "message", label = "message", description = "Message to send") @Nullable String message) {
         Map<String, Object> resultMap = new HashMap<>();
         if (recipient != null && !recipient.isEmpty() && message != null) {
             DeliveryReport report = handler.send(recipient, message);
@@ -152,7 +151,7 @@ public class SignalActionsMain implements ThingActions {
     }
 
     public static Map<String, Object> sendSignal(@Nullable ThingActions actions, @Nullable String recipient,
-                                                 @Nullable String message) {
+            @Nullable String message) {
         if (actions instanceof SignalActionsMain) {
             return ((SignalActionsMain) actions).sendSignal(recipient, message);
         } else {
@@ -162,10 +161,10 @@ public class SignalActionsMain implements ThingActions {
 
     @RuleAction(label = "Send Image With Signal", description = "Send an Image with Signal")
     public @ActionOutputs({
-            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending")}) Map<String, Object> sendSignalImage(
-            @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
-            @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
-            @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
+            @ActionOutput(name = "RESULT", label = "Result", type = "java.lang.String", description = "OK: message sent. KO: error during sending") }) Map<String, Object> sendSignalImage(
+                    @ActionInput(name = "recipient", label = "recipient", description = "Recipient of the message") @Nullable String recipient,
+                    @ActionInput(name = "image", label = "image", description = "Image to send") @Nullable String image,
+                    @ActionInput(name = "text", label = "text", description = "Text to send") @Nullable String text) {
         Map<String, Object> resultMap = new HashMap<>();
 
         if (recipient != null && !recipient.isEmpty() && image != null) {
@@ -189,7 +188,7 @@ public class SignalActionsMain implements ThingActions {
     }
 
     public static Map<String, Object> sendSignalImage(@Nullable ThingActions actions, @Nullable String recipient,
-                                                      @Nullable String image, @Nullable String text) {
+            @Nullable String image, @Nullable String text) {
         if (actions instanceof SignalActionsMain) {
             return ((SignalActionsMain) actions).sendSignalImage(recipient, image, text);
         } else {

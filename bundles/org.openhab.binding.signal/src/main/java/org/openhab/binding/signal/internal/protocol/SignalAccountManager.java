@@ -12,16 +12,16 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.signal.internal.SignalService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Manage accounts and expose a singleton Signal service implementation instance.
@@ -40,10 +40,12 @@ public class SignalAccountManager {
 
     private final Lock lock = new ReentrantLock();
 
-    public SignalAccountManager() {}
+    public SignalAccountManager() {
+    }
 
     public void setSignalService(SignalService signalService) {
-        @Nullable SignalService signalServiceLocal = this.signalService;
+        @Nullable
+        SignalService signalServiceLocal = this.signalService;
         if (signalServiceLocal != null) {
             signalServiceLocal.stop();
         }
@@ -65,11 +67,14 @@ public class SignalAccountManager {
         return signalAccounts.values();
     }
 
-    public SignalAccount getSignalAccount(SignalAccountEventListener signalAccountEventListener, String phoneNumber, String deviceName, ProvisionType provisionType) {
+    public SignalAccount getSignalAccount(SignalAccountEventListener signalAccountEventListener, String phoneNumber,
+            String deviceName, ProvisionType provisionType) {
         lock.lock();
         try {
             boolean shouldStartBecauseEmpty = signalAccounts.isEmpty();
-            SignalAccount signalAccount = signalAccounts.computeIfAbsent(phoneNumber, (number) -> new SignalAccount(signalAccountEventListener, phoneNumber, deviceName, this, provisionType));
+            SignalAccount signalAccount = signalAccounts.computeIfAbsent(phoneNumber,
+                    (number) -> new SignalAccount(signalAccountEventListener, phoneNumber, deviceName, this,
+                            provisionType));
             if (shouldStartBecauseEmpty) {
                 logger.debug("First SignalAccount start, connecting to signal service...");
                 getSignalService().start();
@@ -77,7 +82,8 @@ public class SignalAccountManager {
             if (signalAccount != null) { // never null, but checkstyle complains
                 return signalAccount;
             }
-            throw new IllegalStateException("Cannot create SignalAccount for phone number " + phoneNumber); // never happen
+            throw new IllegalStateException("Cannot create SignalAccount for phone number " + phoneNumber); // never
+                                                                                                            // happen
         } finally {
             lock.unlock();
         }

@@ -68,10 +68,13 @@ public class SignalHandlerFactory extends BaseThingHandlerFactory {
     @Activate
     public SignalHandlerFactory(@Reference final HttpClientFactory httpClientFactory, Map<String, ?> config) {
         this.httpClient = httpClientFactory.getCommonHttpClient();
-        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND), SignalConfiguration.Kind.class, SignalConfiguration.Kind.MANAGED);
-        String signalCliConnectionConfiguration = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
+        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND),
+                SignalConfiguration.Kind.class, SignalConfiguration.Kind.MANAGED);
+        String signalCliConnectionConfiguration = ConfigParser
+                .valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
         signalAccountManager = new SignalAccountManager();
-        SignalService signalService = SignalService.createSignalService(signalAccountManager, kind, signalCliConnectionConfiguration, httpClient);
+        SignalService signalService = SignalService.createSignalService(signalAccountManager, kind,
+                signalCliConnectionConfiguration, httpClient);
         signalAccountManager.setSignalService(signalService);
     }
 
@@ -119,9 +122,12 @@ public class SignalHandlerFactory extends BaseThingHandlerFactory {
 
     @Modified
     protected void modified(Map<String, ?> config) {
-        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND), SignalConfiguration.Kind.class, SignalConfiguration.Kind.MANAGED);
-        String signalCliConnectionConfiguration = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
-        SignalService newSignalService = SignalService.createSignalService(signalAccountManager, kind, signalCliConnectionConfiguration, httpClient);
+        SignalConfiguration.Kind kind = ConfigParser.valueAsOrElse(config.get(SignalConfiguration.CFG_KIND),
+                SignalConfiguration.Kind.class, SignalConfiguration.Kind.MANAGED);
+        String signalCliConnectionConfiguration = ConfigParser
+                .valueAsOrElse(config.get(SignalConfiguration.CFG_CONFIGURATION), String.class, "");
+        SignalService newSignalService = SignalService.createSignalService(signalAccountManager, kind,
+                signalCliConnectionConfiguration, httpClient);
         signalAccountManager.setSignalService(newSignalService);
         for (SignalAccount account : signalAccountManager.getAllAccounts()) {
             try {

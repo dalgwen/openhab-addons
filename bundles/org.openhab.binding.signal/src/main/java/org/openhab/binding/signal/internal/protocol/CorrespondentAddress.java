@@ -12,12 +12,12 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * Recipient address
@@ -28,7 +28,8 @@ import java.util.regex.Pattern;
 public class CorrespondentAddress {
     public static final UUID UNKNOWN_UUID = new UUID(0, 0);
 
-    private static final Pattern UUID_PATTERN = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern UUID_PATTERN = Pattern
+            .compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", Pattern.CASE_INSENSITIVE);
     private final @Nullable String number;
     private final @Nullable String uuid;
 
@@ -54,8 +55,6 @@ public class CorrespondentAddress {
 
     @Override
     public String toString() {
-        return "{number='" + number + '\'' +
-                ", uuid='" + uuid + '\'' +
-                '}';
+        return "{number='" + number + '\'' + ", uuid='" + uuid + '\'' + '}';
     }
 }

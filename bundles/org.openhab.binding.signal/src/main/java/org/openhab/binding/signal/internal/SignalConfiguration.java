@@ -27,8 +27,8 @@ public class SignalConfiguration {
         this.configuration = configuration;
     }
 
-    static final String CFG_KIND = "kind" ;
-    static final String CFG_CONFIGURATION = "configuration" ;
+    static final String CFG_KIND = "kind";
+    static final String CFG_CONFIGURATION = "configuration";
     /**
      * Embedded or network mode for signal-cli
      */

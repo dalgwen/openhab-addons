@@ -12,10 +12,10 @@
  */
 package org.openhab.binding.signal.internal.downloader;
 
+import java.io.Serial;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.binding.signal.internal.protocol.service.UnrecoverableException;
-
-import java.io.Serial;
 
 /**
  * To notify fatal download error

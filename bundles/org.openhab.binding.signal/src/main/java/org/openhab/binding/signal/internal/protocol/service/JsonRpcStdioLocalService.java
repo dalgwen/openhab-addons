@@ -1,12 +1,12 @@
 package org.openhab.binding.signal.internal.protocol.service;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
-
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
 
 @NonNullByDefault
 public class JsonRpcStdioLocalService extends JsonRpcStdioAbstractService {

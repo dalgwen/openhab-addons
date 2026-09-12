@@ -12,12 +12,12 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  *
@@ -51,12 +51,7 @@ public class JsonRequest {
      */
     private final String id;
 
-
-    public JsonRequest(
-            @Nullable final String account,
-            String method,
-            @Nullable Map<String, Object> params
-    ) {
+    public JsonRequest(@Nullable final String account, String method, @Nullable Map<String, Object> params) {
         this.jsonrpc = "2.0";
         this.method = method;
         this.id = UUID.randomUUID().toString();

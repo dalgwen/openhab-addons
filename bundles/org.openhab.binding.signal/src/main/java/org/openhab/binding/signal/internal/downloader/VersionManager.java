@@ -12,17 +12,7 @@
  */
 package org.openhab.binding.signal.internal.downloader;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.eclipse.jetty.client.api.ContentResponse;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.util.InputStreamResponseListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.openhab.binding.signal.internal.protocol.service.JsonRpcStdioManagedService.SIGNAL_CLI_RELEASE_DIRECTORY;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +32,18 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
-import static org.openhab.binding.signal.internal.protocol.service.JsonRpcStdioManagedService.SIGNAL_CLI_RELEASE_DIRECTORY;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.util.InputStreamResponseListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 /**
  * Utility class for managing version download and use
@@ -94,7 +95,6 @@ public class VersionManager {
         return false;
     }
 
-
     public void manageWantedVersion(String version) throws VersionDownloaderException {
         if (isVersionReady(version)) {
             return;
@@ -115,7 +115,8 @@ public class VersionManager {
             throw e;
         }
         try {
-            Files.writeString(signalDataPath.resolve(VERSIONING_FILE_NAME), version, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+            Files.writeString(signalDataPath.resolve(VERSIONING_FILE_NAME), version, StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
             throw new VersionDownloaderException("Cannot write version file !?", e);
         }
@@ -150,14 +151,13 @@ public class VersionManager {
         Path oldVersionDir = signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY + ".old");
         if (oldVersionDir.toFile().exists()) {
             try (Stream<Path> walk = Files.walk(oldVersionDir)) {
-                walk.sorted(Comparator.reverseOrder())
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                logger.warn("Failed to delete {}", path, e);
-                            }
-                        });
+                walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException e) {
+                        logger.warn("Failed to delete {}", path, e);
+                    }
+                });
             }
         }
     }
@@ -167,32 +167,30 @@ public class VersionManager {
         try {
             releases = getChildren(version);
             ArchitectureDetector.Architecture archi = ArchitectureDetector.detect();
-            ArtifactoryChild release = releases.stream()
-                    .filter(ar -> ar.uri().contains("signal-cli"))
-                    .filter(ar -> ar.uri().contains(archi.downloadDiscriminant))
-                    .findFirst()
+            ArtifactoryChild release = releases.stream().filter(ar -> ar.uri().contains("signal-cli"))
+                    .filter(ar -> ar.uri().contains(archi.downloadDiscriminant)).findFirst()
                     .orElseThrow(() -> new VersionDownloaderException("No releases of version " + version + " found"));
             if (!archi.isSupported()) {
                 throw new VersionDownloaderException("Architecture " + archi + " is not supported for managed version");
             }
-            ArtifactoryChild nativeLib = releases.stream()
-                    .filter(ar -> ar.uri().contains(archi.downloadDiscriminant))
-                    .findFirst()
-                    .orElseThrow(() -> new VersionDownloaderException("No signal lib found for arch " + archi + "/" + archi.downloadDiscriminant));
+            ArtifactoryChild nativeLib = releases.stream().filter(ar -> ar.uri().contains(archi.downloadDiscriminant))
+                    .findFirst().orElseThrow(() -> new VersionDownloaderException(
+                            "No signal lib found for arch " + archi + "/" + archi.downloadDiscriminant));
             downloadAndUncompress(release, signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY));
             downloadAndUncompress(nativeLib, signalDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY));
         } catch (ExecutionException | InterruptedException | TimeoutException | IOException e) {
             throw new VersionDownloaderException("Cannot download version " + version, e);
         }
-
     }
 
-    private List<ArtifactoryChild> getChildren(String version) throws ExecutionException, InterruptedException, TimeoutException, VersionDownloaderException {
+    private List<ArtifactoryChild> getChildren(String version)
+            throws ExecutionException, InterruptedException, TimeoutException, VersionDownloaderException {
         String url = BASE_URL + version;
         ContentResponse response = httpClient.GET(url);
 
         if (response.getStatus() != 200) {
-            throw new VersionDownloaderException("Cannot download version " + version + ". Status code to " + url + " is " + response.getStatus());
+            throw new VersionDownloaderException(
+                    "Cannot download version " + version + ". Status code to " + url + " is " + response.getStatus());
         }
 
         String json = response.getContentAsString();
@@ -209,14 +207,15 @@ public class VersionManager {
         return result;
     }
 
-    private void downloadAndUncompress(ArtifactoryChild child, Path destinationDir) throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    private void downloadAndUncompress(ArtifactoryChild child, Path destinationDir)
+            throws IOException, ExecutionException, InterruptedException, TimeoutException {
         InputStreamResponseListener listener = new InputStreamResponseListener();
         String downloadUri = toDownloadUri(child.fullUri());
         httpClient.newRequest(downloadUri).followRedirects(true).send(listener);
         listener.get(60, TimeUnit.SECONDS);
         try (InputStream downloadStream = listener.getInputStream();
-             GZIPInputStream gzipStream = new GZIPInputStream(downloadStream);
-             TarArchiveInputStream tarStream = new TarArchiveInputStream(gzipStream)) {
+                GZIPInputStream gzipStream = new GZIPInputStream(downloadStream);
+                TarArchiveInputStream tarStream = new TarArchiveInputStream(gzipStream)) {
             TarArchiveEntry entry = tarStream.getNextEntry();
             while (entry != null) {
                 Path targetPath = destinationDir.resolve(entry.getName());
@@ -270,4 +269,3 @@ public class VersionManager {
     public record ArtifactoryChild(String uri, String fullUri) {
     }
 }
-

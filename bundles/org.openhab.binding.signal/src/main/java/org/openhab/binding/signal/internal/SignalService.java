@@ -12,6 +12,10 @@
  */
 package org.openhab.binding.signal.internal;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
@@ -21,10 +25,6 @@ import org.openhab.binding.signal.internal.protocol.service.JsonRpcStdioManagedS
 import org.openhab.binding.signal.internal.protocol.service.JsonRpcTcpService;
 import org.openhab.core.OpenHAB;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Map;
-
 /**
  * Main interface for all signal-related services
  *
@@ -33,29 +33,37 @@ import java.util.Map;
 @NonNullByDefault
 public abstract class SignalService {
 
-    public static SignalService createSignalService(SignalAccountManager accountManager, SignalConfiguration.Kind kind, String signalCliConnectionConfiguration, HttpClient httpClient) {
+    public static SignalService createSignalService(SignalAccountManager accountManager, SignalConfiguration.Kind kind,
+            String signalCliConnectionConfiguration, HttpClient httpClient) {
         return switch (kind) {
             case LOCAL -> {
                 Path signalDataPath = Path.of(OpenHAB.getUserDataFolder(), "signal");
                 yield new JsonRpcStdioLocalService(accountManager, signalDataPath, signalCliConnectionConfiguration);
             }
-            case NETWORK ->
-                    new JsonRpcTcpService(accountManager, signalCliConnectionConfiguration);
+            case NETWORK -> new JsonRpcTcpService(accountManager, signalCliConnectionConfiguration);
             case MANAGED -> {
                 Path signalDataPath = Path.of(OpenHAB.getUserDataFolder(), "signal");
-                yield new JsonRpcStdioManagedService(accountManager, signalDataPath, signalCliConnectionConfiguration, httpClient);
+                yield new JsonRpcStdioManagedService(accountManager, signalDataPath, signalCliConnectionConfiguration,
+                        httpClient);
             }
         };
     }
 
     public abstract void start();
+
     public abstract void stop();
 
-    public abstract DeliveryReport sendMessage(String account, String recipient, String message, @Nullable String attachment);
+    public abstract DeliveryReport sendMessage(String account, String recipient, String message,
+            @Nullable String attachment);
 
     public abstract boolean exists(String account) throws JsonResponseException, IOException;
-    public <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType) throws JsonResponseException, IOException {
+
+    public <T> JsonResponse<T> sendRequest(@Nullable String account, String method,
+            @Nullable Map<String, Object> parameters, Class<T> responseType) throws JsonResponseException, IOException {
         return sendRequest(account, method, parameters, responseType, 30);
     }
-    public abstract <T> JsonResponse<T> sendRequest(@Nullable String account, String method, @Nullable Map<String, Object> parameters, Class<T> responseType, int waitTime) throws JsonResponseException, IOException;
+
+    public abstract <T> JsonResponse<T> sendRequest(@Nullable String account, String method,
+            @Nullable Map<String, Object> parameters, Class<T> responseType, int waitTime)
+            throws JsonResponseException, IOException;
 }

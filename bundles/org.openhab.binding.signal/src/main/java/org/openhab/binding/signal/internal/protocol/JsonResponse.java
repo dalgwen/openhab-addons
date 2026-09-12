@@ -12,8 +12,9 @@
  */
 package org.openhab.binding.signal.internal.protocol;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.eclipse.jdt.annotation.Nullable;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  *
@@ -44,7 +45,8 @@ public class JsonResponse<T> {
     /**
      * This member is REQUIRED.
      * It MUST be the same as the value of the id member in the Request Object.
-     * If there was an error in detecting the id in the Request object (e.g. Parse error/Invalid Request), it MUST be Null.
+     * If there was an error in detecting the id in the Request object (e.g. Parse error/Invalid Request), it MUST be
+     * Null.
      */
     String id;
 

@@ -1,27 +1,28 @@
 package org.openhab.binding.signal.internal.protocol.service;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jetty.client.HttpClient;
-import org.openhab.binding.signal.internal.downloader.VersionManager;
-import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jetty.client.HttpClient;
+import org.openhab.binding.signal.internal.downloader.VersionManager;
+import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
+
 @NonNullByDefault
 public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
 
-    private static final String DEFAULT_VERSION = "0.14.3";
+    private static final String DEFAULT_VERSION = "0.14.8";
     public static final String SIGNAL_CLI_RELEASE_DIRECTORY = "signal-cli-release";
     private final Path userDataPath;
     private final VersionManager versionManager;
     private final String version;
     private final Map<String, String> envVariable;
 
-    public JsonRpcStdioManagedService(SignalAccountManager manager, Path userDataPath, String signalCliConnectionConfiguration, HttpClient httpClient) {
+    public JsonRpcStdioManagedService(SignalAccountManager manager, Path userDataPath,
+            String signalCliConnectionConfiguration, HttpClient httpClient) {
         super(manager);
         this.userDataPath = userDataPath;
         this.versionManager = new VersionManager(userDataPath, httpClient);
@@ -39,7 +40,8 @@ public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
                 lastNonEnvArg = arg;
             }
         }
-        version = lastNonEnvArg.trim().isEmpty() || lastNonEnvArg.trim().equals("auto") ? DEFAULT_VERSION : lastNonEnvArg.trim();
+        version = lastNonEnvArg.trim().isEmpty() || lastNonEnvArg.trim().equals("auto") ? DEFAULT_VERSION
+                : lastNonEnvArg.trim();
         this.envVariable = envVar;
     }
 
@@ -58,7 +60,6 @@ public class JsonRpcStdioManagedService extends JsonRpcStdioAbstractService {
     public Path getBinaryPath() {
         return userDataPath.resolve(SIGNAL_CLI_RELEASE_DIRECTORY).resolve(versionManager.getSignalCliBinaryName());
     }
-
 
     @Override
     public Optional<Path> getUserDataPath() {

@@ -12,18 +12,18 @@
  */
 package org.openhab.binding.signal.internal.protocol.service;
 
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Optional;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -52,7 +52,6 @@ public class JsonRpcTcpService extends JsonRpcAbstractSignalService {
         this.hostname = getNetworkAddress(configuration);
         this.port = getNetworkPort(configuration);
     }
-
 
     /**
      * Extract the network address from the configuration string (e.g., "localhost:5467" returns "localhost")
@@ -84,7 +83,6 @@ public class JsonRpcTcpService extends JsonRpcAbstractSignalService {
         return 0;
     }
 
-
     @Override
     public void internalStart() throws IOException {
         if (bufferedReader != null && printWriter != null) {
@@ -101,11 +99,17 @@ public class JsonRpcTcpService extends JsonRpcAbstractSignalService {
     public void internalStop() {
         BufferedReader bufferedReaderLocal = bufferedReader;
         if (bufferedReaderLocal != null) {
-            try { bufferedReaderLocal.close();} catch (IOException ignored) {}
+            try {
+                bufferedReaderLocal.close();
+            } catch (IOException ignored) {
+            }
         }
         InputStreamReader inLocal = inputStreamReader;
         if (inLocal != null) {
-            try { inLocal.close();} catch (IOException ignored) {}
+            try {
+                inLocal.close();
+            } catch (IOException ignored) {
+            }
         }
         PrintWriter printWriterLocal = printWriter;
         if (printWriterLocal != null) {
@@ -122,7 +126,6 @@ public class JsonRpcTcpService extends JsonRpcAbstractSignalService {
         this.bufferedReader = null;
         this.printWriter = null;
     }
-
 
     @Override
     public @Nullable String readLine() throws IOException {

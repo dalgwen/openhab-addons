@@ -32,8 +32,7 @@ import org.eclipse.jetty.http.HttpMethod;
 public class AttachmentUtils {
 
     private static String createDataUriFromData(byte[] data, String mimeType) {
-        return "data:" + mimeType + ";filename=image;base64," +
-                Base64.getEncoder().encodeToString(data);
+        return "data:" + mimeType + ";filename=image;base64," + Base64.getEncoder().encodeToString(data);
     }
 
     public static String createAttachmentFromHttp(HttpClient httpClient, String httpUrl)

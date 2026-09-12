@@ -1,4 +1,5 @@
 package org.openhab.binding.signal.internal.protocol.service;
+
 /*
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
@@ -11,12 +12,6 @@ package org.openhab.binding.signal.internal.protocol.service;
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -24,6 +19,12 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.signal.internal.protocol.SignalAccountManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -35,7 +36,8 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
 
     private final Logger logger = LoggerFactory.getLogger(JsonRpcStdioAbstractService.class);
 
-    private static final String[] DEFAULT_ARGS = new String[] {"--trust-new-identities", "always", "-o", "json", "jsonRpc", "--ignore-stories"};
+    private static final String[] DEFAULT_ARGS = new String[] { "--trust-new-identities", "always", "-o", "json",
+            "jsonRpc", "--ignore-stories" };
 
     @Nullable
     private Process process;
@@ -51,7 +53,9 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
     }
 
     public abstract Path getBinaryPath();
+
     public abstract Optional<Path> getUserDataPath();
+
     public abstract Map<String, String> getEnvVariable();
 
     @Override
@@ -73,7 +77,7 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
 
         ProcessBuilder pb = new ProcessBuilder(args);
         pb.environment().putAll(getEnvVariable());
-//        pb.redirectErrorStream(true);
+        // pb.redirectErrorStream(true);
         try {
             processLocal = pb.start();
         } catch (IOException e) {
@@ -87,9 +91,11 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
             if (!processLocal.isAlive()) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(processLocal.getErrorStream()))) {
                     String errorOutput = reader.lines().collect(Collectors.joining("\n"));
-                    throw new UnrecoverableException("Process exited unexpectedly with code " + processLocal.exitValue() + ". Error output: " + errorOutput);
+                    throw new UnrecoverableException("Process exited unexpectedly with code " + processLocal.exitValue()
+                            + ". Error output: " + errorOutput);
                 } catch (IOException e) {
-                    throw new UnrecoverableException("Process exited immediately after start with code " + processLocal.exitValue());
+                    throw new UnrecoverableException(
+                            "Process exited immediately after start with code " + processLocal.exitValue());
                 }
             }
         } catch (InterruptedException e) {
@@ -133,7 +139,7 @@ public abstract class JsonRpcStdioAbstractService extends JsonRpcAbstractSignalS
         reader = null;
         writer = null;
     }
-    
+
     @Override
     public Optional<String> readErrorLines() throws IOException {
         BufferedReader readerLocal = errorReader;

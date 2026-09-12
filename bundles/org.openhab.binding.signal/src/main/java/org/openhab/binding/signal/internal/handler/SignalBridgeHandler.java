@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.binding.signal.internal.SignalBindingConstants;
 import org.openhab.binding.signal.internal.SignalBridgeConfiguration;
 import org.openhab.binding.signal.internal.SignalConversationDiscoveryService;
@@ -81,13 +82,13 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
 
     private final AtomicBoolean isStarting = new AtomicBoolean(false);
 
-
     @Override
     public void dispose() {
         scheduler.execute(this::stopAccount);
     }
 
-    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID, HttpClient httpClient, SignalAccountManager signalAccountManager) {
+    public SignalBridgeHandler(Bridge bridge, ThingTypeUID thingTypeUID, HttpClient httpClient,
+            SignalAccountManager signalAccountManager) {
         super(bridge);
         this.thingTypeUID = thingTypeUID;
         this.httpClient = httpClient;
@@ -101,7 +102,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
                 ? ProvisionType.LINKED
                 : ProvisionType.MAIN;
 
-        signalAccount = signalAccountManager.getSignalAccount(this, config.phoneNumber, config.deviceName, provisionType);
+        signalAccount = signalAccountManager.getSignalAccount(this, config.phoneNumber, config.deviceName,
+                provisionType);
 
         scheduler.execute(this::checkAccount);
     }
@@ -113,7 +115,6 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
         }
         signalAccountLocal.register(captcha, registrationType);
     }
-
 
     public void registerLinked() throws IOException, IncompleteRegistrationException {
         SignalAccount signalAccountLocal = signalAccount;
@@ -127,7 +128,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
                 signalAccountLocal.finishLink(deviceLinkUri);
                 updateStatus(ThingStatus.ONLINE);
             } catch (IOException | IncompleteRegistrationException e) {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Not registered. Did you scan the QR code? (" + e.getMessage() + ")" );
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING,
+                        "Not registered. Did you scan the QR code? (" + e.getMessage() + ")");
                 cleanQRcode();
             }
         });
@@ -144,7 +146,7 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
     public void checkAccount() {
         lockStartAndStop.lock();
         try {
-            //TODO simplify ?
+            // TODO simplify ?
             if (!isStarting.getAndSet(true)) {
                 SignalAccount signalAccountFinal = signalAccount;
                 if (signalAccountFinal != null) {
@@ -166,7 +168,6 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
             isStarting.set(false);
             lockStartAndStop.unlock();
         }
-
     }
 
     @SuppressWarnings("null")
@@ -183,7 +184,6 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
             lockStartAndStop.unlock();
         }
     }
-
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
@@ -228,9 +228,10 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
     }
 
     private boolean shouldReturnReadReceipt(@Nullable CorrespondentAddress correspondentAddress) {
-        boolean isDedicated = getThing().getThingTypeUID().equals(SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE);
+        boolean isDedicated = getThing().getThingTypeUID()
+                .equals(SignalBindingConstants.SIGNALACCOUNTBRIDGE_THING_TYPE);
         boolean isNoteToSelf = correspondentAddress != null && correspondentAddress.number().isPresent()
-                && correspondentAddress.number().map( address -> address.equals(config.phoneNumber)).orElse(false);
+                && correspondentAddress.number().map(address -> address.equals(config.phoneNumber)).orElse(false);
         return isDedicated || isNoteToSelf;
     }
 
@@ -289,36 +290,38 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
         if (signalAccountFinal == null) {
             throw new IllegalStateException("Cannot send message if service not ready");
         }
-
-        String lowerCasePhotoUrl = image.toLowerCase();
-
-        String attachment;
-
         try {
-            if (lowerCasePhotoUrl.startsWith("http")) {
-                logger.debug("Http based URL for photo provided.");
-                attachment = AttachmentUtils.createAttachmentFromHttp(httpClient, image);
-            } else if (image.startsWith("data:")) { // direct support of data URI scheme
-                attachment = image;
-            } else if (PHOTO_EXTENSIONS.stream().anyMatch(lowerCasePhotoUrl::endsWith)
-                    || lowerCasePhotoUrl.startsWith("file:")) {
-                String imageSafe = image;
-                if (lowerCasePhotoUrl.startsWith("file:")) {
-                    imageSafe = image.substring(5);
-                }
-                logger.debug("Read file from local file system: {}", imageSafe);
-                attachment = imageSafe;
-            } else {
-                throw new AttachmentCreationException("Scheme not supported for attachment "
-                        + image.substring(0, Math.min(image.length(), 100)));
-            }
+            String attachment = getAttachment(image);
+            return signalAccountFinal.send(recipient, text == null ? "" : text, attachment);
         } catch (AttachmentCreationException e) {
             logger.debug("Cannot attach image: {}", e.getMessage());
             signalAccountFinal.send(recipient, "Cannot attach image: " + e.getMessage(), null);
             return new DeliveryReport(DeliveryStatus.FAILED, recipient);
         }
+    }
 
-        return signalAccountFinal.send(recipient, text == null ? "" : text, attachment);
+    private @NonNull String getAttachment(String image) throws AttachmentCreationException {
+        String lowerCasePhotoUrl = image.toLowerCase();
+
+        String attachment;
+        if (lowerCasePhotoUrl.startsWith("http")) {
+            logger.debug("Http based URL for photo provided.");
+            attachment = AttachmentUtils.createAttachmentFromHttp(httpClient, image);
+        } else if (image.startsWith("data:")) { // direct support of data URI scheme
+            attachment = image;
+        } else if (PHOTO_EXTENSIONS.stream().anyMatch(lowerCasePhotoUrl::endsWith)
+                || lowerCasePhotoUrl.startsWith("file:")) {
+            String imageSafe = image;
+            if (lowerCasePhotoUrl.startsWith("file:")) {
+                imageSafe = image.substring(5);
+            }
+            logger.debug("Read file from local file system: {}", imageSafe);
+            attachment = imageSafe;
+        } else {
+            throw new AttachmentCreationException(
+                    "Scheme not supported for attachment " + image.substring(0, Math.min(image.length(), 100)));
+        }
+        return attachment;
     }
 
     /**
@@ -381,7 +384,8 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
 
     @Override
     public void qrCodeToScan(String qrCode) {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING, "Waiting for QR code scan. You have 60 seconds!");
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_PENDING,
+                "Waiting for QR code scan. You have 60 seconds!");
         Configuration configuration = getConfig();
         configuration.put(SignalBindingConstants.PROPERTY_QRCODE, qrCode);
         updateConfiguration(configuration);
@@ -395,11 +399,12 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
 
     @Override
     public void handleRemoval() {
-        @Nullable SignalAccount signalAccountLocal = signalAccount;
+        @Nullable
+        SignalAccount signalAccountLocal = signalAccount;
         if (signalAccountLocal != null) {
             try {
                 signalAccountLocal.deleteAccount();
-            } catch (Exception e) { //TODO avoir generic exception
+            } catch (Exception e) { // TODO avoir generic exception
                 logger.warn("Error during signal account removal", e);
             }
         }
@@ -409,10 +414,11 @@ public class SignalBridgeHandler extends BaseBridgeHandler implements SignalAcco
         updateStatus(ThingStatus.REMOVED);
     }
 
-    public void updateProfile() throws IOException {
-        @Nullable SignalAccount signalAccountLocal = signalAccount;
+    public void updateProfile(@Nullable String name, @Nullable String profileImage) throws IOException {
+        @Nullable
+        SignalAccount signalAccountLocal = signalAccount;
         if (signalAccountLocal != null) {
-            signalAccountLocal.updateProfile();
+            signalAccountLocal.updateProfile(name, profileImage);
         }
     }
 }
